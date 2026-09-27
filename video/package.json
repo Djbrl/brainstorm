@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "studio": "remotion studio src/index.tsx",
-    "render": "remotion render src/index.tsx Opening out/opening-v1.mp4 --scale=0.6666666667 --concurrency=2"
+    "render": "remotion render src/index.tsx Opening out/opening-v2.mp4 --scale=0.6666666667 --concurrency=2"
   },
   "dependencies": {
     "@remotion/cli": "4.0.529",

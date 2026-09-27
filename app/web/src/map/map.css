@@ -1,5 +1,5 @@
 /* Owner: D. Map view. Light, airy, one clean sheet on the right. */
-.map-wrap { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--bg); }
+.map-wrap { position: relative; width: 100%; height: 100%; overflow: hidden; overflow: clip; background: var(--bg); }
 .map-wrap canvas { display: block; }
 
 .map-empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 10px; color: var(--ink-3); }

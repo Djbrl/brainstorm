@@ -164,6 +164,8 @@ export function MapView() {
   const agentsRef = useRef(drawnAgents); agentsRef.current = drawnAgents;
   const anim = useRef(new Map<string, AgentAnim>());
   const [followId, setFollowId] = useState<string | null>(null);
+  // A thread replay takes over the camera: stop following a live agent when one starts.
+  useEffect(() => { if (replay) setFollowId(null); }, [replay?.sessionId]);
   const followRef = useRef(followId); followRef.current = followId;
   const hoverRef = useRef(hover); hoverRef.current = hover;
   const nodeIndex = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n])), [graph.nodes]);

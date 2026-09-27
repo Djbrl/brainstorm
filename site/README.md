@@ -6,8 +6,8 @@ One static file, `index.html`. No build step. Preview with `python3 -m http.serv
 - `links.video`, `links.demo`, `links.repo`: buttons stay hidden while a link is `null`.
 - `stats`: copy values from `docs/numbers.md` only. A `null` value is hidden, never guessed.
 - `brev`: GPU, $/hour and vLLM version from `docs/brev-setup.md`.
-- `self`: sessions, steps and files from Brainstorm's own db.
-- `team`: names and roles.
+- `team`: list of names, shown as "Made by ..." under the closing CTA.
+- The closing "Try Brainstorm now" button uses `links.demo`, else `links.repo`, and stays greyed out until one is set.
 
 **Screenshots:** drop real PNGs (16:10, taken from the running app) at `img/follow.png`, `img/map.png`, `img/history.png`. Missing files show a placeholder frame.
 

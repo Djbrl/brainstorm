@@ -7,6 +7,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 - 14:00 [site] Landing page live at https://brainstorm-landing.vercel.app
 - 14:11 [site] Landing page redesigned: light, Apple-style scroll scenes, Cabinet Grotesk + Satoshi. Redeployed.
 - 14:50 [site] Hero is now a scroll story: follow Agent 1, then three agents, into the codebase, zoom out to the map. Redeployed.
+- 15:30 [site] Module names on hero map, pinned stats with study titles, 'Where your money goes' section, dark Brev section, 'Try Brainstorm now' CTA. Redeployed.
+- 15:39 [site] Landing page links the hosted app (brainstorm-demo-black.vercel.app) from the header and 'Try Brainstorm now', plus the GitHub repo.
 
 - 13:56 [Video/Codex] Drafted 90-second script (143 words) and rendered a 24-second, 720p motion mockup. Concept UI/data labeled illustrative; no voice/music yet. Outputs: video/script-v1.md and video/out/opening-v1.mp4.
 - 14:18 [human] Brev L40S up (\$1.06/hr), vLLM 0.30 + Nemotron 3 Nano loading, tunnel on localhost:8000. See docs/brev-setup.md.

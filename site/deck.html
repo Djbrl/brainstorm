@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brainstorm Deck</title>
+<style>
+  :root { --bg:#ffffff; --soft:#f5f5f7; --ink:#1d1d1f; --mute:#6e6e73; --g1:#3f8c00; --g2:#76b900; }
+  * { box-sizing:border-box; margin:0; }
+  html { scroll-snap-type:y mandatory; }
+  body { background:var(--bg); color:var(--ink); font:18px/1.5 -apple-system, "SF Pro Text", Helvetica, Arial, sans-serif; }
+  section { min-height:100vh; scroll-snap-align:start; display:flex; flex-direction:column; justify-content:center; padding:8vh max(16px, 9vw); border-bottom:1px solid #e8e8ed; }
+  section:nth-child(even) { background:var(--soft); }
+  .n { color:var(--mute); font-size:14px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:18px; }
+  h1 { font-size:clamp(48px, 9vw, 120px); line-height:1; letter-spacing:-.03em; }
+  h2 { font-size:clamp(32px, 5.5vw, 64px); line-height:1.05; letter-spacing:-.02em; margin-bottom:28px; max-width:18ch; }
+  .g { background:linear-gradient(90deg,var(--g1),var(--g2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  p.lead { font-size:clamp(20px, 2.4vw, 28px); color:var(--mute); max-width:40ch; margin-top:20px; }
+  ul { list-style:none; padding:0; display:grid; gap:14px; max-width:60ch; }
+  li { font-size:clamp(17px, 1.9vw, 22px); }
+  li b { color:var(--ink); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; max-width:1100px; }
+  .card { background:var(--bg); border:1px solid #e8e8ed; border-radius:18px; padding:22px; }
+  section:nth-child(even) .card { background:#fff; }
+  .big { font-size:clamp(34px, 4.5vw, 54px); font-weight:700; letter-spacing:-.02em; }
+  .small { color:var(--mute); font-size:15px; }
+  a { color:var(--g1); }
+  .src { color:var(--mute); font-size:14px; margin-top:26px; }
+</style>
+</head>
+<body>
+
+<section>
+  <div class="n">GOMYCODE × NVIDIA Hackathon · Senegal · 27 Sep 2026</div>
+  <h1>Brain<span class="g">storm</span></h1>
+  <p class="lead">A live map of your code and of the AI agents writing it.</p>
+</section>
+
+<section>
+  <div class="n">01 · Problem</div>
+  <h2>Agents write code faster than we can understand it.</h2>
+  <ul>
+    <li><b>"Done! Updated 47 files."</b> Nobody reads that. We click Accept all.</li>
+    <li><b>19% slower, felt 20% faster:</b> experienced developers using AI tools (METR, 2025).</li>
+    <li><b>50% vs 67% comprehension</b> when learning with AI, except for those who <b>asked questions</b> (Anthropic, 2026).</li>
+  </ul>
+  <p class="src">Sources: <a href="https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/">METR</a> · <a href="https://www.anthropic.com/research/AI-assistance-coding-skills">Anthropic</a> · <a href="https://arxiv.org/abs/2506.08872">MIT Media Lab</a></p>
+</section>
+
+<section>
+  <div class="n">02 · Insight</div>
+  <h2>You don't learn a city by reading street names. <span class="g">You look at a map.</span></h2>
+  <p class="lead">Reading diffs is the wrong way to understand what agents did. Seeing and asking is the right one.</p>
+</section>
+
+<section>
+  <div class="n">03 · Product</div>
+  <h2>Keep working in Claude Code. Brainstorm watches beside it.</h2>
+  <div class="grid">
+    <div class="card"><b>Follow</b><p class="small">Every agent step live, subagents included, each labeled by AI. Click an edit to see its diff.</p></div>
+    <div class="card"><b>Ask</b><p class="small">"Why did you change this?" Answered from the exact step, diff and summaries. Cost shown.</p></div>
+    <div class="card"><b>Map</b><p class="small">Modules and imports, glowing by recency, pulsing where an agent is editing now.</p></div>
+    <div class="card"><b>Failures</b><p class="small">Recurring tool-call errors grouped and ranked, with evidence steps.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="n">04 · AI, the right model for each job</div>
+  <h2>Bulk reading on our GPU. Hard questions to Claude.</h2>
+  <ul>
+    <li><b>NVIDIA Nemotron 3 Nano</b> on an <b>NVIDIA Brev</b> L40S via vLLM: file and module summaries, step labels, risk flags, failure titles, fallback answers. Flat hourly cost.</li>
+    <li><b>Claude</b> answers questions from a small grounded package, with secrets masked.</li>
+    <li>The timeline, map and failures structure need <b>no AI</b>, so they keep working if a model is down.</li>
+  </ul>
+</section>
+
+<section>
+  <div class="n">05 · Tested</div>
+  <h2>Measured, not claimed.</h2>
+  <div class="grid">
+    <div class="card"><div class="big g">73 s</div><p class="small">311 files, 81k lines of Hono summarized, 0 errors</p></div>
+    <div class="card"><div class="big g">$0.02</div><p class="small">GPU cost of that full read</p></div>
+    <div class="card"><div class="big g">0.14 s</div><p class="small">median time to label an agent step</p></div>
+    <div class="card"><div class="big g">$0.03</div><p class="small">per question answered by Claude</p></div>
+    <div class="card"><div class="big g">1,515</div><p class="small">steps of our own 4-session build followed live</p></div>
+    <div class="card"><div class="big g">22 → 13</div><p class="small">failing tool calls grouped into ranked issues</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="n">06 · Responsible AI</div>
+  <h2>Your code stays yours. A human stays in control.</h2>
+  <ul>
+    <li><b>Local-first:</b> logs, maps and answers are stored on your machine.</li>
+    <li><b>Secrets masked</b> before anything is stored or sent; only small context packages leave.</li>
+    <li><b>Every AI label links to its source step</b>, because summaries can be wrong.</li>
+  </ul>
+</section>
+
+<section>
+  <div class="n">07 · Try it</div>
+  <h2>Let the agents type. <span class="g">Keep your brain in the loop.</span></h2>
+  <ul>
+    <li>Live demo: <a href="https://brainstorm-demo-black.vercel.app">brainstorm-demo-black.vercel.app</a></li>
+    <li>Code: <a href="https://github.com/Djbrl/brainstorm">github.com/Djbrl/brainstorm</a></li>
+    <li>Next: Codex support, pause and steer, desktop app, a pilot with GOMYCODE students.</li>
+  </ul>
+</section>
+
+</body>
+</html>

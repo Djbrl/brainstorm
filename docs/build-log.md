@@ -45,6 +45,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 21:40 [lead] POST-DEADLINE: thread replay on the Map + Threads/Files sidebar + show/hide agents deployed to brainstorm-next
 
+- 21:55 [lead] POST-DEADLINE, local first: the looping edit pulse on the Map is replaced by one ripple per agent edit, then a steady outline while the file is being edited. Checked live with real edits.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

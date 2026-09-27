@@ -1,6 +1,8 @@
-// Owner: D. Force graph of files/modules, glow by recency, pulse on activeSessionId, side panel + AskBox.
+// Owner: D. Force graph of files/modules, glow by recency, a ripple per agent edit + outline while active, side panel + AskBox.
 import { clock } from "../lib/live";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+const RIPPLE_MS = 700; // one ripple per edit
 import ForceGraph2D, { type ForceGraphMethods, type LinkObject, type NodeObject } from "react-force-graph-2d";
 import type { AgentPresence, FileNode, ProjectMap, Step } from "@contract";
 import { useLive } from "../lib/live";
@@ -255,6 +257,22 @@ export function MapView() {
 
   const activePaths = useMemo(() => new Set((map?.files ?? []).filter((f) => f.activeSessionId).map((f) => f.path)), [map?.files]);
 
+  // One-shot ripples: start one when a file receives a new agent edit (not on first load).
+  const ripples = useRef(new Map<string, number>());
+  const seenEdits = useRef<Map<string, string> | null>(null);
+  useEffect(() => {
+    const files = map?.files ?? [];
+    const first = seenEdits.current === null;
+    const seen = seenEdits.current ?? new Map<string, string>();
+    for (const f of files) {
+      const sig = `${f.lastChangedAt ?? ""}|${f.activeSessionId ?? ""}`;
+      const prev = seen.get(f.path);
+      if (!first && prev !== undefined && prev !== sig && f.activeSessionId && f.lastChangedAt !== prev.split("|")[0]) ripples.current.set(f.path, performance.now());
+      seen.set(f.path, sig);
+    }
+    seenEdits.current = seen;
+  }, [map?.files]);
+
   const drawNode = useCallback((node: NodeObject, ctx: CanvasRenderingContext2D, scale: number) => {
     const n = node as GNode;
     const x = n.x ?? 0, y = n.y ?? 0, r = n.r;
@@ -265,19 +283,29 @@ export function MapView() {
     ctx.save();
     ctx.globalAlpha = alpha;
 
-    if (active) {
-      const period = 1600;
-      for (const off of [0, period / 2]) {
-        const p = ((now + off) % period) / period;
+    // An edit lands: one ripple, once. While the file stays active: a steady outline, no motion.
+    const rippleStart = ripples.current.get(n.id);
+    if (rippleStart !== undefined) {
+      const t = (performance.now() - rippleStart) / RIPPLE_MS;
+      if (t >= 1) ripples.current.delete(n.id);
+      else {
+        const e = 1 - Math.pow(1 - t, 3); // ease-out
         ctx.beginPath();
-        ctx.arc(x, y, r + (4 + p * 34) / scale, 0, Math.PI * 2); // screen-constant so it reads at any zoom
+        ctx.arc(x, y, r + (3 + e * 26) / scale, 0, Math.PI * 2); // screen-constant size, readable at any zoom
         ctx.strokeStyle = tokens.accent;
-        ctx.globalAlpha = (1 - p) * 0.85 * alpha;
-        ctx.lineWidth = 2.6 / scale;
+        ctx.globalAlpha = (1 - t) * 0.75 * alpha;
+        ctx.lineWidth = 2 / scale;
         ctx.stroke();
+        ctx.globalAlpha = alpha;
       }
-      ctx.globalAlpha = 0.18 * alpha;
-      ctx.beginPath(); ctx.arc(x, y, r + 9 / scale, 0, Math.PI * 2); ctx.fillStyle = tokens.accent; ctx.fill();
+    }
+    if (active) {
+      ctx.beginPath();
+      ctx.arc(x, y, r + 3.5 / scale, 0, Math.PI * 2);
+      ctx.strokeStyle = tokens.accent;
+      ctx.globalAlpha = 0.9 * alpha;
+      ctx.lineWidth = 1.6 / scale;
+      ctx.stroke();
       ctx.globalAlpha = alpha;
     }
 

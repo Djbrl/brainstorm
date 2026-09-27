@@ -54,6 +54,6 @@ Need a change elsewhere (`MapView.tsx`, `lib/*`, `agents.tsx`)? Note it at the e
 - Commit your files only, with the prefix `[sidebar]` or `[replay]`. Don't push.
 
 ## Requests
-- [replay → lead] `MapView.tsx`: clear `followId` when a replay starts (`useEffect(() => { if (replay) setFollowId(null); }, [replay?.sessionId])`). Otherwise the agent-follow camera loop keeps pulling toward a stale marker and fights the replay camera.
-- [replay → lead] `map.css`: `.map-wrap { overflow: clip; }` would stop `scrollIntoView` (focus, automation) from scrolling the map sideways; seen once while testing. Optional.
+- [replay → lead] `MapView.tsx`: clear `followId` when a replay starts (`useEffect(() => { if (replay) setFollowId(null); }, [replay?.sessionId])`). Otherwise the agent-follow camera loop keeps pulling toward a stale marker and fights the replay camera. DONE 2528d56
+- [replay → lead] `map.css`: `.map-wrap { overflow: clip; }` would stop `scrollIntoView` (focus, automation) from scrolling the map sideways; seen once while testing. Optional. DONE 2528d56
 - [replay, FYI] `replay/replay.css` hides `.map-legend` while the ReplayBar is shown (`.map-wrap:has(.rp-bar) .map-legend`), since both sit bottom-left/center and the replay dims most files anyway.

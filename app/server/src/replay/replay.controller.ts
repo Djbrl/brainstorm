@@ -8,6 +8,7 @@ import { WorkspaceService } from "../workspace/workspace.service";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Replay, Step } from "../types";
+import { redactReplayJson } from "./redact";
 
 type Move = NonNullable<Replay["agentMoves"]>[number];
 
@@ -65,8 +66,14 @@ export class ReplayController {
     return moves.sort((a, b) => a.ts.localeCompare(b.ts));
   }
 
+  /** Every export goes through the private redaction list before it can be published. */
   @Get("replay") replay(@Query("sessionId") sessionId?: string, @Query("root") root?: string,
     @Query("movesFrom") movesFrom?: string, @Query("movesTo") movesTo?: string, @Query("preview") preview?: string): Replay {
+    const raw = this.build(sessionId, root, movesFrom, movesTo, preview);
+    return JSON.parse(redactReplayJson(JSON.stringify(raw)).json) as Replay;
+  }
+
+  private build(sessionId?: string, root?: string, movesFrom?: string, movesTo?: string, preview?: string): Replay {
     const all = this.listener.listSessions();
     const wanted = sessionId ? sessionId.split(",") : [];
     const sessions = wanted.length ? all.filter((s) => wanted.includes(s.id)) : all.slice(0, 1);

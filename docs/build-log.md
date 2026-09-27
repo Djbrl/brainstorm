@@ -41,6 +41,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 20:34 [lead] POST-DEADLINE: preview of the setup screen and live agents deployed to https://brainstorm-next.vercel.app (recorded agent moves and a recorded setup run played back; unrelated personal projects redacted). Code on the `post-deadline` branch. The only change on `main` is a README note for the jury. The judged demo is unchanged.
 
+- 20:51 [lead] POST-DEADLINE privacy fix: both public demos redacted (data only). Removed titles of the human's unrelated Claude threads, other project names and folders, a listing of the private Documents folder, a process list, and the Vercel username. Only hackathon threads are in the replays. Replay exports now apply a private, gitignored redaction list (app/server/data/redact.json) automatically.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

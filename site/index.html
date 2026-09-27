@@ -118,14 +118,19 @@ nav .links a:hover { color: var(--text); }
 .done .tick { color: #34c759; }
 .accept { display: inline-block; margin-top: 26px; font: 500 18px var(--body); padding: 10px 26px; border-radius: 999px; background: var(--text); color: #fff; }
 
-/* stats */
-.stats3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 110px; }
+/* stats: pinned, one study at a time */
+#stats { height: 340vh; }
+#stats .stage { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 52px 24px 0; text-align: center; }
+.stats-head { font-size: clamp(36px, 5.4vw, 72px); line-height: 1; }
+.stats3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 9svh; max-width: 1080px; width: 100%; }
+.stat3 { opacity: 0; will-change: opacity, transform; }
 .stat3 .n { font: 800 clamp(56px, 6.4vw, 84px)/1 var(--display); letter-spacing: -0.045em; white-space: nowrap; }
 .stat3 .n.warm { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.stat3 p { color: var(--muted); font-size: 19px; font-weight: 500; margin-top: 14px; max-width: 22ch; }
+.stat3 p { color: var(--muted); font-size: 19px; font-weight: 500; margin: 14px auto 0; max-width: 22ch; }
 .stat3 p b { color: var(--text); font-weight: 500; }
-.src { margin-top: 90px; font-size: 13px; color: var(--faint); }
-.src a { text-decoration: underline; text-underline-offset: 3px; }
+.study { display: block; margin: 22px auto 0; padding-top: 16px; border-top: 1px solid var(--line); max-width: 30ch; font-size: 14px; line-height: 1.4; color: var(--muted); font-weight: 500; }
+.study cite { display: block; font-style: normal; color: var(--text); font-weight: 700; margin-bottom: 4px; }
+.study:hover cite { text-decoration: underline; text-underline-offset: 3px; }
 
 /* product carousel */
 #product { height: 360vh; background: var(--alt); }
@@ -159,25 +164,46 @@ nav .links a:hover { color: var(--text); }
 .caret { display: inline-block; width: 2px; height: 1.1em; background: var(--blue); vertical-align: -0.15em; margin-left: 2px; animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 
-/* how */
-.flow { margin-top: 100px; overflow-x: auto; padding-bottom: 8px; }
-.flow svg { display: block; width: 100%; min-width: 720px; height: auto; }
-.flow text { font: 500 13px var(--body); fill: var(--muted); }
-.flow .t { font: 700 15px var(--display); fill: var(--text); letter-spacing: -0.01em; }
-.flow .draw { stroke-dasharray: 1; stroke-dashoffset: 1; }
-.cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 48px; margin-top: 90px; }
-.col .who { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 9px; }
-.col .who i { width: 10px; height: 10px; border-radius: 50%; }
-.col h3 { font-size: 28px; margin-top: 14px; letter-spacing: -0.03em; }
-.col p { color: var(--muted); margin-top: 10px; font-weight: 500; }
+/* cost: where the money goes */
+.money { display: grid; grid-template-columns: 1fr minmax(240px, 380px); margin-top: 90px; text-align: left; }
+.money canvas { grid-column: 1; grid-row: 1 / 4; width: 100%; height: 100%; min-height: 420px; }
+.lane { grid-column: 2; padding: 30px 0 30px 28px; }
+.lane .who { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 9px; white-space: nowrap; }
+.lane .who i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.lane h3 { font-size: clamp(24px, 2.4vw, 30px); margin-top: 10px; letter-spacing: -0.03em; }
+.lane p { color: var(--muted); margin-top: 8px; font-weight: 500; }
+.swap { display: inline-block; overflow: hidden; height: 1.35em; line-height: 1.35em; vertical-align: top; }
+.swap span { display: inline-block; transition: transform .35s var(--ease), opacity .35s; }
 
-/* brev */
+/* brev: dark, in NVIDIA's colors */
+#brev { background: #000; color: #fff; position: relative; overflow: hidden; }
+#brev::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(rgba(118,185,0,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(118,185,0,.08) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 55% at 50% 45%, #000, transparent); mask-image: radial-gradient(ellipse 70% 55% at 50% 45%, #000, transparent);
+}
+#brev .wrap { position: relative; }
 #brev .h2 .g { color: var(--nvidia); }
+#brev .sub { color: #a1a1a6; }
+.chip { display: block; width: min(560px, 100%); height: auto; margin: 90px auto 0; overflow: visible; }
+.chip .trace { fill: none; stroke: #1d2710; stroke-width: 2; }
+.chip .pulse { fill: none; stroke: var(--nvidia); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: .07 .93; animation: flow 2.6s linear infinite; filter: drop-shadow(0 0 3px #76b900); }
+@keyframes flow { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 1; } }
+.chip .pkg { fill: #080b04; stroke: #2c3a14; stroke-width: 1.5; }
+.chip .die { fill: #0d1307; stroke: rgba(118,185,0,.55); stroke-width: 1.2; }
+.chip .core { fill: #18220d; transition: fill .45s; }
+.chip .core.on { fill: var(--nvidia); }
+.why3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 90px; text-align: left; }
+.why3 > div { border-top: 3px solid var(--nvidia); padding-top: 22px; }
+.why3 h3 { font-size: 26px; letter-spacing: -0.025em; }
+.why3 p { color: #a1a1a6; margin-top: 10px; font-weight: 500; }
 .nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 64px 48px; margin-top: 110px; }
-.num .v { font: 800 clamp(48px, 5.5vw, 76px)/1 var(--display); letter-spacing: -0.045em; }
-.num .k { color: var(--muted); font-weight: 500; margin-top: 12px; }
-.brev-foot { margin-top: 80px; display: flex; justify-content: center; flex-wrap: wrap; gap: 10px 28px; font-size: 14px; color: var(--muted); font-weight: 500; }
-.brev-foot a { color: var(--blue); }
+.nums:empty { display: none; }
+.num .v { font: 800 clamp(48px, 5.5vw, 76px)/1 var(--display); letter-spacing: -0.045em; color: var(--nvidia); }
+.num .k { color: #a1a1a6; font-weight: 500; margin-top: 12px; }
+.brev-foot { margin-top: 80px; display: flex; justify-content: center; flex-wrap: wrap; gap: 10px 28px; font-size: 14px; color: #86868b; font-weight: 500; }
+.brev-foot a { color: var(--nvidia); }
 
 /* privacy */
 .four { display: grid; grid-template-columns: repeat(4, 1fr); gap: 48px; margin-top: 110px; }
@@ -185,23 +211,16 @@ nav .links a:hover { color: var(--text); }
 .four h3 { font-size: 24px; margin-top: 22px; letter-spacing: -0.025em; }
 .four p { color: var(--muted); margin-top: 8px; font-weight: 500; font-size: 16px; }
 
-/* self */
-.counts { display: flex; justify-content: center; gap: 72px; margin-top: 90px; flex-wrap: wrap; }
-.counts div { font: 800 64px/1 var(--display); letter-spacing: -0.04em; }
-.counts span { display: block; font: 500 16px var(--body); color: var(--muted); margin-top: 10px; letter-spacing: 0; }
-.team { display: flex; justify-content: center; gap: 40px; margin-top: 90px; flex-wrap: wrap; }
-.member { text-align: center; }
-.member .av { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 14px; display: grid; place-items: center; font: 800 28px var(--display); color: #fff; background: linear-gradient(135deg, var(--warm), var(--hot)); overflow: hidden; }
-.member .av img { width: 100%; height: 100%; object-fit: cover; }
-.member b { display: block; font-weight: 700; }
-.member small { color: var(--muted); font-size: 14px; }
-.limits { margin-top: 80px; color: var(--faint); font-size: 15px; font-weight: 500; }
-
 /* closing */
 .closing { padding: 220px 0 200px; }
 .closing h2 { font-size: clamp(52px, 9vw, 140px); line-height: .92; letter-spacing: -0.05em; }
 .closing h2 span { display: block; }
 .closing h2 .grad { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.closing .btns { margin-top: 56px; }
+.btn.big { font-size: 20px; padding: 17px 36px; }
+.btn.pending { opacity: .5; pointer-events: none; }
+.team-line { margin-top: 64px; color: var(--muted); font-weight: 500; }
+.team-line:empty { display: none; }
 footer { border-top: 1px solid var(--line); padding: 22px 0 40px; font-size: 12px; color: var(--muted); }
 footer .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 footer a:hover { text-decoration: underline; }
@@ -215,9 +234,13 @@ footer a:hover { text-decoration: underline; }
   .block { padding: 120px 0; }
   nav .links { display: none; }
   nav .btn.small { margin-left: auto; }
-  .stats3, .cols, .nums { grid-template-columns: 1fr; gap: 56px; text-align: center; }
-  .stat3 p { margin-left: auto; margin-right: auto; }
-  .col .who { justify-content: center; }
+  .stats3 { grid-template-columns: 1fr; }
+  .stat3 { grid-area: 1 / 1; }                        /* one at a time on phones */
+  .nums, .why3 { grid-template-columns: 1fr; gap: 48px; }
+  .money { grid-template-columns: 30% 1fr; }
+  .money canvas { min-height: 0; }
+  .lane { padding: 24px 0 24px 14px; }
+  .lane .who { white-space: normal; font-size: 14px; }
   .four { grid-template-columns: 1fr 1fr; gap: 48px 24px; }
   #product .stage { --sw: 84vw; }
   .counts { gap: 40px; }
@@ -229,6 +252,7 @@ footer a:hover { text-decoration: underline; }
 }
 @media (prefers-reduced-motion: reduce) {
   .rv { opacity: 1; transform: none; transition: none; }
+  .chip .pulse { animation: none; opacity: 0; }
   .hero-type h1 .line span, .hero-type p, .cue { animation: none; transform: none; opacity: 1; }
 }
 </style>
@@ -248,7 +272,7 @@ footer a:hover { text-decoration: underline; }
     <div class="links">
       <a href="#problem">Why</a>
       <a href="#product">Product</a>
-      <a href="#how">How it works</a>
+      <a href="#cost">Cost</a>
       <a href="#brev">NVIDIA Brev</a>
       <a href="#privacy">Privacy</a>
     </div>
@@ -296,19 +320,27 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- 3. Research -->
-<section class="block">
-  <div class="wrap center">
-    <h2 class="h2 rv">We lose track.<br>And we don't notice.</h2>
+<!-- 3. Research: pinned, the three findings arrive one by one -->
+<section class="scene" id="stats">
+  <div class="stage">
+    <h2 class="stats-head">We lose track.<br>And we don't notice.</h2>
     <div class="stats3">
-      <div class="stat3 rv"><div class="n" data-count="19" data-suffix="%">19%</div><p>slower with AI. <b>They felt 20% faster.</b></p></div>
-      <div class="stat3 rv d1"><div class="n" data-count="50" data-suffix="%">50%</div><p>comprehension when learning with AI, <b>vs 67% without.</b></p></div>
-      <div class="stat3 rv d2"><div class="n warm">65–86%</div><p>for those who used AI <b>to ask questions.</b></p></div>
+      <div class="stat3">
+        <div class="n" data-count="19" data-suffix="%">19%</div>
+        <p>slower with AI. <b>They felt 20% faster.</b></p>
+        <a class="study" href="https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/" target="_blank" rel="noopener"><cite>Measuring the Impact of Early-2025 AI on Experienced Open-Source Developer Productivity</cite>METR, 2025 · 16 developers</a>
+      </div>
+      <div class="stat3">
+        <div class="n" data-count="50" data-suffix="%">50%</div>
+        <p>comprehension when learning with AI, <b>vs 67% without.</b></p>
+        <a class="study" href="https://www.anthropic.com/research/AI-assistance-coding-skills" target="_blank" rel="noopener"><cite>How AI assistance impacts the formation of coding skills</cite>Anthropic, 2026 · 52 developers</a>
+      </div>
+      <div class="stat3">
+        <div class="n warm">65–86%</div>
+        <p>for those who used AI <b>to ask questions.</b></p>
+        <a class="study" href="https://www.anthropic.com/research/AI-assistance-coding-skills" target="_blank" rel="noopener"><cite>How AI assistance impacts the formation of coding skills</cite>Anthropic, 2026 · same study</a>
+      </div>
     </div>
-    <p class="src rv">
-      <a href="https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/" target="_blank" rel="noopener">METR, 2025</a> (16 developers) ·
-      <a href="https://www.anthropic.com/research/AI-assistance-coding-skills" target="_blank" rel="noopener">Anthropic, 2026</a> (52 developers)
-    </p>
   </div>
 </section>
 
@@ -345,70 +377,50 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- 6. How it works -->
-<section class="block alt" id="how">
+<!-- 6. Cost: where the money goes -->
+<section class="block alt" id="cost">
   <div class="wrap center">
-    <h2 class="h2 rv">The right model<br>for each job.</h2>
-    <div class="flow rv" id="flow">
-      <svg viewBox="0 0 1000 250" role="img" aria-label="Claude Code logs go to the listener and your project to the mapper. Both feed a local SQLite database. Nemotron on Brev labels and summarizes. The app shows Follow, Map and History live, and Ask sends questions to Claude.">
-        <g fill="none" stroke="#c7c7cc" stroke-width="1.5">
-          <path class="draw" pathLength="1" id="f1" d="M180 60H250"/>
-          <path class="draw" pathLength="1" id="f2" d="M180 190H250"/>
-          <path class="draw" pathLength="1" id="f3" d="M390 60H465"/>
-          <path class="draw" pathLength="1" id="f4" d="M390 190H465"/>
-          <path class="draw" pathLength="1" id="f5" d="M560 162V88"/>
-          <path class="draw" pathLength="1" id="f6" d="M655 60H735"/>
-          <path class="draw" pathLength="1" id="f7" d="M860 88V162"/>
-        </g>
-        <g fill="var(--hot)">
-          <circle r="4"><animateMotion dur="2.4s" repeatCount="indefinite"><mpath href="#f1"/></animateMotion></circle>
-          <circle r="4"><animateMotion dur="2.4s" begin=".6s" repeatCount="indefinite"><mpath href="#f3"/></animateMotion></circle>
-          <circle r="4"><animateMotion dur="2.4s" begin="1.2s" repeatCount="indefinite"><mpath href="#f6"/></animateMotion></circle>
-          <circle r="4" fill="var(--nvidia)"><animateMotion dur="2.4s" begin=".3s" repeatCount="indefinite"><mpath href="#f5"/></animateMotion></circle>
-          <circle r="4" fill="var(--claude)"><animateMotion dur="2.4s" begin=".9s" repeatCount="indefinite"><mpath href="#f7"/></animateMotion></circle>
-        </g>
-        <g fill="#fff" stroke="#e3e3e8" stroke-width="1.2">
-          <rect x="20" y="30" width="160" height="60" rx="16"/>
-          <rect x="20" y="160" width="160" height="60" rx="16"/>
-          <rect x="250" y="30" width="140" height="60" rx="16"/>
-          <rect x="250" y="160" width="140" height="60" rx="16"/>
-          <rect x="465" y="30" width="190" height="60" rx="16"/>
-          <rect x="465" y="160" width="190" height="60" rx="16" stroke="var(--nvidia)" stroke-width="1.8"/>
-          <rect x="735" y="30" width="245" height="60" rx="16" stroke="var(--hot)" stroke-width="1.8"/>
-          <rect x="735" y="160" width="245" height="60" rx="16" stroke="var(--claude)" stroke-width="1.8"/>
-        </g>
-        <g text-anchor="middle">
-          <text x="100" y="56" class="t">Claude Code</text><text x="100" y="75">session logs</text>
-          <text x="100" y="186" class="t">Your project</text><text x="100" y="205">files and git</text>
-          <text x="320" y="65" class="t">Listener</text>
-          <text x="320" y="195" class="t">Mapper</text>
-          <text x="560" y="56" class="t">Local SQLite</text><text x="560" y="75">on your machine</text>
-          <text x="560" y="186" class="t">Nemotron on Brev</text><text x="560" y="205">labels and summaries</text>
-          <text x="857" y="56" class="t">Follow · Map · History</text><text x="857" y="75">live</text>
-          <text x="857" y="186" class="t">Ask why → Claude</text><text x="857" y="205">grounded, with cost</text>
-        </g>
-      </svg>
-    </div>
-    <div class="cols">
-      <div class="col rv"><div class="who" style="color:#4a7a00"><i style="background:var(--nvidia)"></i>Nemotron on NVIDIA Brev</div><h3>Reads everything.</h3><p>Summaries, step labels and risk flags, on our own GPU.</p></div>
-      <div class="col rv d1"><div class="who" style="color:#b85a3c"><i style="background:var(--claude)"></i>Claude</div><h3>Answers why.</h3><p>From a small, grounded package. Nemotron takes over if it's down.</p></div>
-      <div class="col rv d2"><div class="who" style="color:var(--muted)"><i style="background:var(--faint)"></i>No AI at all</div><h3>Draws the map.</h3><p>Timeline, imports, heat and history come straight from logs and git.</p></div>
+    <h2 class="h2 rv">Where your<br>money goes.</h2>
+    <p class="sub rv d1">Most of the work is reading, so reading runs on a flat-rate GPU. You only pay per token when you ask.</p>
+    <div class="money rv" id="money">
+      <canvas id="flowCv" aria-hidden="true"></canvas>
+      <div class="lane" data-col="118,185,0" data-rate="1">
+        <div class="who" style="color:#4a7a00"><i style="background:var(--nvidia)"></i>NVIDIA Nemotron on Brev</div>
+        <h3>Reading everything.</h3>
+        <p>Summaries, step labels and risk flags. Thousands of small calls, one GPU billed by the hour.</p>
+      </div>
+      <div class="lane" data-col="217,119,87" data-rate=".1">
+        <div class="who" style="color:#b85a3c"><i style="background:var(--claude)"></i>Your LLM: <span class="swap"><span id="model">Claude</span></span></div>
+        <h3>Answering why.</h3>
+        <p>Only when you ask, with your own key. Claude today, any model you like next.</p>
+      </div>
+      <div class="lane" data-col="161,161,166" data-rate="0">
+        <div class="who" style="color:var(--muted)"><i style="background:var(--faint)"></i>No AI</div>
+        <h3>Drawing the map.</h3>
+        <p>Timeline, imports, heat and history come straight from logs and git. Free.</p>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- 7. Brev -->
+<!-- 7. Brev: dark, in NVIDIA's colors -->
 <section class="block" id="brev">
   <div class="wrap center">
     <h2 class="h2 rv">One open model.<br><span class="g">Our own GPU.</span></h2>
-    <p class="sub rv d1">NVIDIA Nemotron 3 Nano runs on Brev with vLLM. It's also our private mode: your code never has to leave it.</p>
+    <p class="sub rv d1">Reading a codebase is thousands of small calls. On a GPU rented by the hour, the thousandth costs the same as the first.</p>
+    <svg class="chip rv d2" id="chip" viewBox="0 0 520 300" aria-hidden="true"></svg>
+    <div class="why3">
+      <div class="rv"><h3>Flat price.</h3><p>Pay for the hour, not the token. So Brainstorm can read every file and label every step.</p></div>
+      <div class="rv d1"><h3>Open weights.</h3><p>NVIDIA Nemotron 3 Nano, served with vLLM on our own Brev instance.</p></div>
+      <div class="rv d2"><h3>Private by design.</h3><p>Your code goes to a GPU you control, not someone else's API.</p></div>
+    </div>
     <div class="nums" id="nums"></div>
     <div class="brev-foot rv" id="brevFoot"></div>
   </div>
 </section>
 
 <!-- 8. Privacy -->
-<section class="block alt" id="privacy">
+<section class="block" id="privacy">
   <div class="wrap center">
     <h2 class="h2 rv">Your code<br>stays yours.</h2>
     <div class="four">
@@ -420,26 +432,18 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- 9. Built with itself -->
-<section class="block" id="self">
-  <div class="wrap center">
-    <h2 class="h2 rv">Built today.<br>Watched by itself.</h2>
-    <p class="sub rv d1">Parallel Claude Code agents built Brainstorm, and Brainstorm followed every one of them.</p>
-    <div class="counts" id="counts"></div>
-    <div class="team" id="team"></div>
-    <p class="limits rv">Claude Code only for now. Codex is next.</p>
-  </div>
-</section>
-
-<!-- 10. Closing -->
+<!-- 9. Closing -->
 <section class="closing alt">
   <div class="wrap center">
     <h2 class="rv"><span>Let the agents type.</span><span class="grad">Keep your brain in the loop.</span></h2>
     <div class="btns rv d1">
-      <a class="btn" data-link="demo" href="#">Try the live replay</a>
+      <a class="btn big" id="tryNow" href="#">Try Brainstorm now</a>
+    </div>
+    <div class="btns rv d2" style="margin-top:22px">
       <a class="more" data-link="video" href="#">Watch the film</a>
       <a class="more" data-link="repo" href="#">View on GitHub</a>
     </div>
+    <p class="team-line rv d2" id="teamLine"></p>
   </div>
 </section>
 </main>
@@ -478,10 +482,7 @@ const SITE = {
     { label: "from agent step to label", value: null },
     { label: "summary quality vs Claude", value: null },
   ],
-  self: { sessions: null, steps: null, files: null },
-  team: [
-    // { name: "Full Name", role: "What they did", photo: "img/name.jpg" (optional) },
-  ],
+  team: [],   // e.g. ["Full Name", "Full Name"], shown as "Made by ..." under the closing CTA
 };
 
 /* ---------- fill the page from SITE ---------- */
@@ -504,15 +505,12 @@ if (b.vllm) foot.push("vLLM " + esc(b.vllm));
 if (SITE.links.repo) foot.push(`<a href="${esc(SITE.links.repo)}/blob/main/docs/brev-setup.md" target="_blank" rel="noopener">Every Brev command we ran ›</a>`);
 $("#brevFoot").innerHTML = foot.map(f => `<span>${f}</span>`).join("");
 
-const sc = SITE.self;
-$("#counts").innerHTML = [["sessions", sc.sessions], ["agent steps", sc.steps], ["files", sc.files]]
-  .filter(c => c[1] != null).map(([k, v], i) => `<div class="rv d${i}">${esc(v)}<span>${k}</span></div>`).join("");
-
-$("#team").innerHTML = SITE.team.map((m, i) => {
-  const initials = m.name.split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase();
-  const av = m.photo ? `<img src="${esc(m.photo)}" alt="">` : esc(initials);
-  return `<div class="member rv d${i % 4}"><div class="av">${av}</div><b>${esc(m.name)}</b><small>${esc(m.role || "")}</small></div>`;
-}).join("");
+/* closing CTA: the replay demo, else the repo; greyed out until one exists */
+const tryUrl = SITE.links.demo || SITE.links.repo;
+if (tryUrl) { $("#tryNow").href = tryUrl; $("#tryNow").target = "_blank"; $("#tryNow").rel = "noopener"; }
+else $("#tryNow").classList.add("pending");
+const tm = SITE.team.map(esc);
+$("#teamLine").textContent = tm.length ? "Made by " + (tm.length > 1 ? tm.slice(0, -1).join(", ") + " and " + tm.at(-1) : tm[0]) + "." : "";
 
 $("#footLinks").innerHTML = [["repo", "GitHub"], ["video", "Film"], ["demo", "Replay demo"]]
   .filter(([k]) => SITE.links[k]).map(([k, t]) => `<a href="${esc(SITE.links[k])}" target="_blank" rel="noopener">${t}</a>`).join(" · ");
@@ -528,7 +526,7 @@ const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const win = (p, a, b) => clamp((p - a) / (b - a));
 const ease = t => 1 - Math.pow(1 - t, 3);
-const progress = el => { const r = el.getBoundingClientRect(); return clamp(-r.top / (r.height - innerHeight)); };
+const progress = el => window.__P?.[el.id] ?? clamp(-el.getBoundingClientRect().top / (el.offsetHeight - innerHeight));  // __P: preview hook, {sceneId: 0..1}
 
 /* reveal on scroll, plus count-ups and the typed question */
 const io = new IntersectionObserver(es => es.forEach(e => {
@@ -575,7 +573,8 @@ const hero = (() => {
     { name: "Agent 3", col: [48, 176, 199], swoop: [.255, .34], end: .82 },
   ];
   const PS = .34;                                  // the moment all three run side by side
-  let W, H, dpr, S, nodes = [], edges = [], seed;
+  const MODS = ["src/auth", "src/api", "src/billing", "src/ui", "src/db", "workers", "src/lib", "tests", "config", "src/search", "src/hooks", "src/pages"];
+  let W, H, dpr, S, nodes = [], edges = [], clusters = [], seed;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const r = (a, b) => a + rnd() * (b - a);
   const mixN = (a, b, t) => a + (b - a) * t;
@@ -611,6 +610,7 @@ const hero = (() => {
     cv.width = W * dpr; cv.height = H * dpr;
     S = clamp(Math.min(W, H) / 800, .55, 1.2); seed = 11; nodes = []; edges = [];
     const wide = W > H, cols = wide ? 4 : 3, rows = wide ? 3 : 4, rx = W * .42, ry = H * .3;
+    clusters = [];
     const grid = [];
     for (let row = 0; row < rows; row++) for (let c = 0; c < cols; c++) {
       const cx = ((c + .5) / cols - .5) * 2 * rx + r(-30, 30) * S, cy = ((row + .5) / rows - .5) * 2 * ry + r(-24, 24) * S;
@@ -621,6 +621,7 @@ const hero = (() => {
         if (i) edges.push([first + i, first + Math.floor(r(0, i))]);
       }
       grid[row * cols + c] = first;
+      clusters.push({ first, k, name: MODS[row * cols + c] });
     }
     for (let row = 0; row < rows; row++) for (let c = 0; c < cols; c++) {
       const a = grid[row * cols + c];
@@ -718,8 +719,19 @@ const hero = (() => {
       ctx.beginPath(); ctx.arc(n.x, n.y, n.rad * (current ? 1.25 : 1), 0, 7); ctx.fill(); ctx.globalAlpha = 1;
     });
 
-    /* heads and their labels, drawn at screen size */
+    /* module names above each cluster, at screen size */
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.font = "500 12px ui-monospace, 'SF Mono', Menlo, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    clusters.forEach(cl => {
+      let a = 0, top = 1e9, cx = 0;
+      for (let i = cl.first; i < cl.first + cl.k; i++) { a = Math.max(a, nodes[i].a); top = Math.min(top, nodes[i].y - nodes[i].rad); cx += nodes[i].x; }
+      if (a <= 0) return;
+      ctx.fillStyle = `rgba(110,110,115,${.9 * a})`;
+      ctx.fillText(cl.name, ax + (cx / cl.k - camX) * z, ay + (top - camY) * z - 12);
+    });
+    ctx.textAlign = "left";
+
+    /* heads and their labels, drawn at screen size */
     ctx.font = "600 13px Satoshi, system-ui, sans-serif"; ctx.textBaseline = "middle";
     heads.forEach(h => {
       if (h.L <= 0) return;
@@ -745,16 +757,94 @@ const hero = (() => {
   return { set(v) { p = v; } };
 })();
 
+/* ---------- cost: tokens stream from your code into three lanes ---------- */
+(() => {
+  const box = $("#money"), cv = $("#flowCv"), ctx = cv.getContext("2d"), lanes = [...box.querySelectorAll(".lane")];
+  let W, H, dpr, L = [], parts = [], on = false;
+  const bez = (l, t) => { const u = 1 - t; return [0, 1].map(j => u*u*u*l.p[0][j] + 3*u*u*t*l.p[1][j] + 3*u*t*t*l.p[2][j] + t*t*t*l.p[3][j]); };
+  function build() {
+    dpr = Math.min(devicePixelRatio || 1, 2); W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    const br = cv.getBoundingClientRect(), sy = H / 2, sx = 14;
+    L = lanes.map(l => {
+      const r = l.querySelector("h3").getBoundingClientRect(), ty = r.top + r.height / 2 - br.top;
+      const rate = +l.dataset.rate;
+      return { col: l.dataset.col, rate, w: rate >= 1 ? 22 : rate > 0 ? 5 : 1, p: [[sx, sy], [W * .45, sy], [W * .55, ty], [W - 6, ty]] };
+    });
+    parts = [];
+  }
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+    L.forEach(l => {
+      ctx.beginPath(); ctx.moveTo(...l.p[0]); ctx.bezierCurveTo(...l.p[1], ...l.p[2], ...l.p[3]);
+      ctx.lineCap = "round"; ctx.setLineDash(l.rate ? [] : [3, 6]);
+      ctx.strokeStyle = l.rate ? `rgba(${l.col},.16)` : "rgba(161,161,166,.7)"; ctx.lineWidth = l.w; ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = `rgb(${l.col})`; ctx.beginPath(); ctx.arc(l.p[3][0], l.p[3][1], 4, 0, 7); ctx.fill();
+      if (!still && Math.random() < l.rate * .9) parts.push({ l, t: 0, v: .0045 + Math.random() * .0025, o: (Math.random() - .5) * l.w * .8 });
+    });
+    parts = parts.filter(q => (q.t += q.v) < 1);
+    parts.forEach(q => {
+      const [x, y] = bez(q.l, q.t), [x2, y2] = bez(q.l, Math.min(1, q.t + .01)), d = Math.hypot(x2 - x, y2 - y) || 1;
+      ctx.fillStyle = `rgba(${q.l.col},${.9 * Math.min(1, (1 - q.t) * 6)})`;
+      ctx.beginPath(); ctx.arc(x - (y2 - y) / d * q.o, y + (x2 - x) / d * q.o, 2.2, 0, 7); ctx.fill();
+    });
+    ctx.fillStyle = "#1d1d1f"; ctx.beginPath(); ctx.arc(14, H / 2, 8, 0, 7); ctx.fill();
+    ctx.fillStyle = "#6e6e73"; ctx.font = "500 13px Satoshi, system-ui, sans-serif"; ctx.textAlign = "left";
+    ctx.fillText(W < 220 ? "Your code" : "Your code + every agent step", 2, H / 2 + 30);
+  }
+  function loop() { if (on) draw(); requestAnimationFrame(loop); }
+  build(); requestAnimationFrame(loop);
+  addEventListener("resize", build);
+  document.fonts && document.fonts.ready.then(build);
+  new IntersectionObserver(([e]) => { on = e.isIntersecting; if (on) build(); }).observe(box);
+})();
+
+/* the answer model is swappable: cycle names, resting on Claude */
+(() => {
+  const names = ["Claude", "GPT", "Gemini", "Llama", "Mistral"], el = $("#model");
+  if (still) return;
+  let i = 0;
+  (function next() {
+    setTimeout(() => {
+      el.style.transform = "translateY(-100%)"; el.style.opacity = 0;
+      setTimeout(() => {
+        i = (i + 1) % names.length; el.textContent = names[i];
+        el.style.transition = "none"; el.style.transform = "translateY(100%)"; el.offsetHeight;
+        el.style.transition = ""; el.style.transform = ""; el.style.opacity = 1; next();
+      }, 350);
+    }, i === 0 ? 3200 : 1100);
+  })();
+})();
+
+/* brev: a GPU with data running along its traces and cores lighting up */
+(() => {
+  const svg = $("#chip");
+  const T = ["M190 110H120L100 90H0", "M190 140H0", "M190 170H110L90 190H0", "M190 198H130L112 216V300",
+    "M330 110H400L420 90H520", "M330 140H520", "M330 170H410L430 190H520", "M330 198H390L408 216V300",
+    "M230 90V40L210 20V0", "M260 90V0", "M290 90V40L310 20V0", "M232 210V250L214 268V300", "M288 210V250L306 268V300"];
+  let h = T.map(d => `<path class="trace" d="${d}"/>`).join("")
+    + T.map((d, i) => `<path class="pulse" pathLength="1" d="${d}" style="animation-delay:-${(i * .61) % 2.6}s"/>`).join("")
+    + `<rect class="pkg" x="186" y="86" width="148" height="128" rx="8"/><rect class="die" x="194" y="94" width="132" height="112" rx="4"/>`;
+  for (let r = 0; r < 5; r++) for (let c = 0; c < 7; c++) h += `<rect class="core" x="${199 + c * 18}" y="${101 + r * 20}" width="14" height="16" rx="2"/>`;
+  svg.innerHTML = h;
+  const cores = [...svg.querySelectorAll(".core")];
+  let vis = false;
+  new IntersectionObserver(([e]) => vis = e.isIntersecting).observe(svg);
+  cores.forEach(c => c.classList.toggle("on", Math.random() < .3));
+  if (!still) setInterval(() => { if (vis) cores.forEach(c => c.classList.toggle("on", Math.random() < .3)); }, 450);
+})();
+
 /* ---------- scroll-driven scenes ---------- */
 const heroEl = $("#hero"), heroType = $("#heroType"), heroEnd = $("#heroEnd"), cue = $("#cue");
 const hcaps = [...document.querySelectorAll(".hcap")];
 const probEl = $("#problem"), wall = $("#wall"), pDone = $("#pDone"), pNobody = $("#pNobody"), pCity = $("#pCity");
 const prodEl = $("#product"), track = $("#track"), dots = [...document.querySelectorAll("#dots i")];
-const flowPaths = [...document.querySelectorAll("#flow .draw")];
+const statsEl = $("#stats"), statEls = [...document.querySelectorAll(".stat3")];
 
 function onScroll() {
   /* hero: type zooms toward you and dissolves, the map assembles */
-  const hp = window.__heroP ?? progress(heroEl);   // __heroP: preview hook for rendering a frame
+  const hp = progress(heroEl);
   hero.set(hp);
   const tp = ease(win(hp, 0, .09));
   heroType.style.transform = `scale(${1 + tp * .5})`;
@@ -787,10 +877,14 @@ function onScroll() {
   const idx = Math.round(k * (dots.length - 1));
   dots.forEach((dt, i) => dt.classList.toggle("on", i === idx));
 
-  /* how: the flow lines draw as the diagram passes through the viewport */
-  const fr = $("#flow").getBoundingClientRect();
-  const fp = clamp((innerHeight - fr.top) / (innerHeight * .7));
-  flowPaths.forEach((pth, i) => pth.style.strokeDashoffset = 1 - win(fp, i * .08, i * .08 + .4));
+  /* stats: each finding arrives in turn (one at a time on phones) */
+  const sp = progress(statsEl), narrow = innerWidth <= 820;
+  statEls.forEach((el, i) => {
+    const a = .06 + i * .27, k = ease(win(sp, a, a + .1));
+    const out = narrow && i < statEls.length - 1 ? win(sp, a + .22, a + .27) : 0;
+    el.style.opacity = k - out; el.style.transform = `translateY(${(1 - k) * 40 - out * 24}px)`;
+    if (k > .05 && !el.dataset.done) { el.dataset.done = 1; el.querySelectorAll("[data-count]").forEach(countUp); }
+  });
 }
 let ticking = false;
 addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(() => { onScroll(); ticking = false; }); } }, { passive: true });

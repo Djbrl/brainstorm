@@ -7,7 +7,11 @@ import { useLive } from "../lib/live";
 import { useNav } from "../lib/nav";
 import { AskBox } from "../ask/AskBox";
 import { mockAgents, mockMap } from "./mock";
-import { AgentTracker, drawAgents, visibleAgents, type AgentAnim } from "./agents";
+import { drawAgents, visibleAgents, type AgentAnim } from "./agents";
+import { MapSidebar } from "./sidebar/MapSidebar";
+import { ReplayBar } from "./replay/ReplayBar";
+import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
+import { makeFileResolver } from "../lib/paths";
 import "./map.css";
 
 type GNode = NodeObject & { id: string; file: FileNode; r: number; ax: number; ay: number };
@@ -135,7 +139,7 @@ function moduleForce(strength: number) {
 // ---------- view ----------
 export function MapView() {
   const { state } = useLive();
-  const { focusFile, setFocusFile } = useNav();
+  const { focusFile, setFocusFile, hiddenAgents, replay } = useNav();
   const mock = useMemo(() => new URLSearchParams(location.search).has("mockmap"), []);
   const map = useMemo(() => (mock ? mockMap() : state.map), [mock, state.map]);
   const graph = useGraph(map);
@@ -155,7 +159,9 @@ export function MapView() {
     () => visibleAgents(mock && map ? mockAgents(map, mockTick) : Object.values(state.agents ?? {})),
     [mock, map, mockTick, state.agents],
   );
-  const agentsRef = useRef(agents); agentsRef.current = agents;
+  // Hidden agents (sidebar toggles) and all live agents while a thread replay is on are not drawn.
+  const drawnAgents = useMemo(() => (replay ? [] : agents.filter((a) => !hiddenAgents.has(a.id))), [agents, hiddenAgents, replay]);
+  const agentsRef = useRef(drawnAgents); agentsRef.current = drawnAgents;
   const anim = useRef(new Map<string, AgentAnim>());
   const [followId, setFollowId] = useState<string | null>(null);
   const followRef = useRef(followId); followRef.current = followId;
@@ -163,14 +169,21 @@ export function MapView() {
   const nodeIndex = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n])), [graph.nodes]);
   const nodeIndexRef = useRef(nodeIndex); nodeIndexRef.current = nodeIndex;
   /** Map an agent's file (or a searched directory) to a node id on the map. */
+  const fileResolver = useMemo(() => makeFileResolver(map), [map]);
+  const fileResolverRef = useRef(fileResolver); fileResolverRef.current = fileResolver;
   const resolveId = useCallback((file: string): string | undefined => {
     const idx = nodeIndexRef.current;
     if (idx.has(file)) return file;
+    const same = fileResolverRef.current(file); // same file in another worktree of this repo
+    if (same && idx.has(same)) return same;
     const dir = file.replace(/\/+$/, "") + "/";
     for (const id of idx.keys()) if (id.startsWith(dir)) return id;
     return undefined;
   }, []);
+  const replayLayer = useReplayLayer({ fg: fg as never, wrapRef, nodeIndexRef, accent: tokens.accent, font: tokens.body });
+  const replayRef = useRef<ReplayLayerApi>(replayLayer); replayRef.current = replayLayer;
   const drawAgentLayer = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
+    replayRef.current.draw(ctx, scale);
     drawAgents({
       ctx, scale, agents: agentsRef.current, anim: anim.current, accent: tokens.accent, font: tokens.body,
       hoverFile: hoverRef.current, followId: followRef.current, resolveId,
@@ -246,6 +259,9 @@ export function MapView() {
     const now = clock();
     const active = !!n.file.activeSessionId;
     const isSel = n.id === selected, isHover = n.id === hover;
+    const alpha = replayRef.current.nodeAlpha(n.id);
+    ctx.save();
+    ctx.globalAlpha = alpha;
 
     if (active) {
       const period = 1600;
@@ -254,13 +270,13 @@ export function MapView() {
         ctx.beginPath();
         ctx.arc(x, y, r + (4 + p * 34) / scale, 0, Math.PI * 2); // screen-constant so it reads at any zoom
         ctx.strokeStyle = tokens.accent;
-        ctx.globalAlpha = (1 - p) * 0.85;
+        ctx.globalAlpha = (1 - p) * 0.85 * alpha;
         ctx.lineWidth = 2.6 / scale;
         ctx.stroke();
       }
-      ctx.globalAlpha = 0.18;
+      ctx.globalAlpha = 0.18 * alpha;
       ctx.beginPath(); ctx.arc(x, y, r + 9 / scale, 0, Math.PI * 2); ctx.fillStyle = tokens.accent; ctx.fill();
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = alpha;
     }
 
     ctx.beginPath();
@@ -287,6 +303,7 @@ export function MapView() {
       ctx.fillStyle = isSel || active || isHover ? tokens.ink : "rgba(29,29,31,0.62)";
       ctx.fillText(label, x, ty);
     }
+    ctx.restore();
   }, [tokens, selected, hover]);
 
   const drawModules = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
@@ -355,8 +372,9 @@ export function MapView() {
         <p>{graph.nodes.length} files · {graph.anchors.size} modules{activePaths.size ? ` · ${activePaths.size} being edited now` : ""}</p>
       </div>
 
-      <AgentTracker agents={agents} accent={tokens.accent} followId={followId}
-        onFollow={(id) => setFollowId(id)} onFocusFile={focusOnFile} />
+      <MapSidebar agents={agents} accent={tokens.accent} followId={followId}
+        onFollow={(id) => setFollowId(id)} onFocusFile={focusOnFile} map={map} />
+      {replay && <ReplayBar />}
 
       <div className="map-legend" aria-label="Legend">
         <span><i style={{ background: "var(--hot)" }} />Just now</span>

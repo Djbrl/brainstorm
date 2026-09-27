@@ -1,5 +1,17 @@
 # Brainstorm
 
+> **Note for the jury**
+>
+> **The hackathon entry is this `main` branch and the demo at [brainstorm-demo-black.vercel.app](https://brainstorm-demo-black.vercel.app).** The repo exactly as it stood at the 16:30 deadline is tagged [`hackathon-submission`](https://github.com/Djbrl/brainstorm/tree/hackathon-submission). The few commits on `main` after that are cosmetic (a welcome tour on the demo, links, this note) and are labeled `[post-deadline]`.
+>
+> A few hours after the cutoff, we also added a handful of quality-of-life features that didn't make it in time. They are **not part of the entry**. This isn't days of extra development, just an evening of small additions that give a better idea of where Brainstorm is going:
+>
+> - **Setup screen**: pick a workspace from your recent Claude Code projects, then watch Brainstorm read the code, map the imports, connect to Claude Code and check the models.
+> - **Live agents on the map**: each agent is a marker on the file it's working on, gliding from file to file with a fading trail.
+> - **Agent tracker**: every agent's route, file by file; click one to follow it with the camera.
+>
+> Preview: [brainstorm-next.vercel.app](https://brainstorm-next.vercel.app) (played back from a real recording) · Code: the [`post-deadline`](https://github.com/Djbrl/brainstorm/tree/post-deadline) branch.
+
 **A live map of your code and of the AI agents writing it.**
 
 AI coding agents make it easy to stop understanding your own code. Brainstorm runs next to Claude Code and shows what the agents did, where, and why, so a human stays in the loop.

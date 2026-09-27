@@ -20,21 +20,33 @@ Full pitch and features: `../docs/plan.md`. Judges score on working features, pu
 6. **Secrets live in `.env`** (copy `.env.example`). Never commit `.env`.
 7. **Log to `../docs/build-log.md`**: one line per milestone, with the time.
 
-## Stack (decided, don't debate)
+## Stack (decided 14:25, don't debate)
 
 | Piece | Choice |
 | --- | --- |
-| Language | TypeScript, Node 20+ |
-| Server | `server/`: express + ws, run with `tsx watch` |
-| Storage | better-sqlite3, one file: `server/data/brainstorm.db` (gitignored) |
-| File watching | chokidar |
-| Web | `web/`: Vite + React + TypeScript |
+| Language | TypeScript, Node 24 |
+| Server | `server/`: **NestJS 11** (express platform) + `@nestjs/platform-ws` gateway at `/ws`. Built with plain `tsc` (TS 7), run with `node --watch`. No Nest CLI. |
+| Storage | Node's built-in `node:sqlite` (`DatabaseSync`), one file `server/data/brainstorm.db` (gitignored). Each module creates its own tables in `onModuleInit`. |
+| File watching | chokidar 4 |
+| In-process events | `BusService` (core): `step`, `session`, `file-touched` |
+| Web | `web/`: Vite 7 + React 19 + TypeScript. Contract imported as `@contract`. Fonts: Cabinet Grotesk + Satoshi (Fontshare). |
 | Graph | react-force-graph-2d |
 | Diffs | react-diff-viewer-continued |
-| Nemotron | `openai` npm package pointed at `NEMOTRON_URL` (vLLM on Brev) |
+| Nemotron | `openai` npm package pointed at `NEMOTRON_URL` (vLLM on Brev, live at localhost:8000) |
 | Claude | `@anthropic-ai/sdk` |
 
-**Ports:** server `4000` (REST under `/api`, websocket at `/ws`). Web `5173`, whose Vite config proxies `/api` and `/ws` to 4000. Nemotron runs at `http://localhost:8000/v1` through `brev port-forward`.
+**Ports:** server `4000` (REST under `/api`, websocket at `/ws`). Web `5173`, proxying `/api` and `/ws` to 4000.
+
+**Running:** the lead keeps ONE server (`npm run dev` in `server/`, auto-rebuilds on save) and ONE web dev server running. **Do not start your own on 4000/5173.** Logs: `server/data/server.log`, `server/data/web.log`. Don't `npm install` new packages without asking the lead (shared package.json).
+
+**Ownership (from 14:45):**
+| Agent | Files |
+| --- | --- |
+| Lead | `server/src/{main,app.module,types}.ts`, `server/src/core/`, `web/src/{App,main}.tsx`, `web/src/lib/`, `web/src/styles.css` |
+| A: Live | `server/src/listener/` |
+| B: Map + Nemotron | `server/src/mapper/`, `server/src/reader/`, `server/src/llm/nemotron.service.ts` |
+| C: Web Follow + Ask UI | `web/src/follow/`, `web/src/ask/` |
+| D: Web Map + Ask server | `web/src/map/`, `server/src/ask/`, `server/src/llm/claude.service.ts`, `server/src/privacy/` |
 
 ## Architecture
 

@@ -1,0 +1,37 @@
+/* Owned by the lead. Design tokens: light, Apple-like, big type, lots of air.
+   No eyebrow labels, no stacked cards, no all-caps section titles. */
+:root {
+  --bg: #fbfbfd;
+  --surface: #ffffff;
+  --ink: #1d1d1f;
+  --ink-2: #515154;
+  --ink-3: #86868b;
+  --line: #e5e5ea;
+  --accent: #5b5bd6;        /* agent activity */
+  --accent-soft: #ececfb;
+  --hot: #ff6a3d;           /* changed just now */
+  --warm: #ffb547;          /* changed recently */
+  --cool: #c7cbd6;          /* untouched */
+  --ok: #1f9d55;
+  --risk: #d93025;
+  --radius: 14px;
+  --font-display: "Cabinet Grotesk", -apple-system, system-ui, sans-serif;
+  --font-body: "Satoshi", -apple-system, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; cursor: pointer; }
+h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; margin: 0; }
+
+.shell { display: grid; grid-template-rows: 64px 1fr; height: 100%; }
+.topbar { display: flex; align-items: center; gap: 24px; padding: 0 28px; border-bottom: 1px solid var(--line); background: rgba(251,251,253,.85); backdrop-filter: saturate(180%) blur(20px); }
+.wordmark { font-family: var(--font-display); font-weight: 800; font-size: 20px; letter-spacing: -0.03em; }
+.tabs { display: flex; gap: 4px; background: #f0f0f3; border-radius: 999px; padding: 4px; margin: 0 auto; }
+.tabs button { border: 0; background: transparent; padding: 6px 18px; border-radius: 999px; font-weight: 500; color: var(--ink-2); }
+.tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.status { display: flex; align-items: center; gap: 8px; color: var(--ink-3); font-size: 13px; min-width: 120px; justify-content: flex-end; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cool); }
+.dot.live { background: var(--ok); box-shadow: 0 0 0 4px rgba(31,157,85,.15); }
+.view { min-height: 0; overflow: hidden; }

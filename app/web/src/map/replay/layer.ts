@@ -2,7 +2,7 @@
 // camera follow, playback, keyboard and wheel-to-scrub.
 import { useCallback, useEffect, useRef, type RefObject } from "react";
 import type { ForceGraphMethods } from "react-force-graph-2d";
-import { useNav } from "../../lib/nav";
+import { replayCursor, useNav } from "../../lib/nav";
 import { useThread, type Thread } from "../../lib/thread";
 import { replayCamera, USER_CAMERA_MS } from "./store";
 
@@ -22,8 +22,10 @@ const FLASH_MS = 600;       // read flash
 const PULSE_MS = 700;       // edit pulse on the marker
 const DIM = 0.18;           // files the thread never touches
 const BEAT_PX = 60;         // trackpad pixels per beat
-const OTHER_MS = 120;       // playback pace for runs of "other" beats
-const STEP_MS = 700;        // playback pace for edits and reads (at 1×)
+const OTHER_MS = 120;       // playback pace for single "other" steps (every-step detail)
+const SUMMARY_MS = 380;     // playback pace for summary beats (light detail)
+const READ_MS = 520;        // playback pace for reads
+const STEP_MS = 700;        // playback pace for edits and your prompts (at 1×)
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const baseName = (p: string) => p.split("/").pop() || p;
@@ -46,12 +48,20 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
   accent: string;
   font: string;
 }): ReplayLayerApi {
-  const { replay, setReplayIndex, setReplayPlaying, stopReplay } = useNav();
-  const thread = useThread(replay?.sessionId ?? null);
-  const active = !!replay && !!thread && thread.sessionId === replay.sessionId;
+  const { replay, setReplayIndex, setReplayPlaying, stopReplay, landReplay } = useNav();
+  const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
+  const active = !!replay && !!thread && thread.sessionId === replay.sessionId && thread.detail === replay.detail;
   const len = active ? thread!.beats.length : 0;
   const last = Math.max(0, len - 1);
   const index = replay ? Math.min(replay.index, last) : 0;
+  // Publish the step at the cursor so the URL can link to it (read by nav's URL effect in this same commit).
+  replayCursor.stepId = active && !replay?.atStep ? thread!.beats[index]?.step.id ?? null : replayCursor.stepId;
+
+  // Land on a step id (links, Follow, switching detail) once the thread is built.
+  useEffect(() => {
+    if (!active || !replay?.atStep) return;
+    landReplay(thread!.stepBeat.get(replay.atStep) ?? 0);
+  }, [active, replay?.atStep, thread, landReplay]);
 
   replayCamera.fg = fg;
 
@@ -61,8 +71,8 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
 
   // Bounds: clamp the cursor whenever the thread (or its length) changes.
   useEffect(() => {
-    if (active && replay && replay.index > last) setReplayIndex(last);
-  }, [active, last, replay?.index, setReplayIndex]);
+    if (active && replay && !replay.atStep && replay.index > last) setReplayIndex(last); // not while landing on a step
+  }, [active, last, replay?.index, replay?.atStep, setReplayIndex]);
 
   // A new replay: fresh marker and camera.
   useEffect(() => {
@@ -75,7 +85,8 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     if (!active || !replay?.playing) return;
     if (index >= last) { setReplayPlaying(false); return; }
     const cur = thread!.beats[index];
-    const ms = (cur.action === "other" ? OTHER_MS : STEP_MS) / replay.speed;
+    const base = cur.kind === "summary" ? SUMMARY_MS : cur.action === "read" ? READ_MS : cur.kind === "step" && cur.action === "other" ? OTHER_MS : STEP_MS;
+    const ms = base / replay.speed;
     const t = setTimeout(() => setReplayIndex((i) => Math.min(last, i + 1)), ms);
     return () => clearTimeout(t);
   }, [active, replay?.playing, replay?.speed, index, last, thread, setReplayIndex, setReplayPlaying]);
@@ -216,7 +227,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     }
 
     // Camera target: the marker; on a read, between the marker and the file read so both stay in view.
-    const readPos = beat.action === "read" && beat.file ? pos(beat.file) : undefined;
+    const readPos = beat.action === "read" && beat.file ? pos(beat.file) : undefined; // the last file of a read group
     a.cam = target && readPos ? { x: (a.x + readPos.x) / 2, y: (a.y + readPos.y) / 2 } : target ? { x: a.x, y: a.y } : readPos ? { x: readPos.x, y: readPos.y } : null;
 
     // Tracer path through moves[0..mi], newest segments strongest.
@@ -261,9 +272,9 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
       ctx.fillText(label, bx, by + 0.5 / scale);
     }
 
-    // Read flash: a hollow ring on the file that was read; the tracer stays put.
-    if (beat.action === "read" && beat.file) {
-      const n = pos(beat.file);
+    // Read flash: a hollow ring on each file read (a group of reads flashes them all); the tracer stays put.
+    if (beat.action === "read") for (const readFile of beat.files) {
+      const n = pos(readFile);
       if (n) {
         const p = Math.min(1, (t - a.beatAt) / FLASH_MS);
         ctx.lineWidth = 2 / scale;
@@ -276,7 +287,9 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
         ctx.setLineDash([3 / scale, 3 / scale]);
         ctx.beginPath(); ctx.arc(n.x, n.y, n.r + 4 / scale, 0, Math.PI * 2); ctx.stroke();
         ctx.setLineDash([]);
-        const label = `Read ${baseName(beat.file)}`;
+        if (readFile !== beat.file) continue; // one label per group: on the last file read
+        const more = beat.files.length - 1;
+        const label = more > 0 ? `Read ${baseName(readFile)} +${more}` : `Read ${baseName(readFile)}`;
         ctx.font = `600 ${11.5 / scale}px ${font}`;
         ctx.textAlign = "center"; ctx.textBaseline = "bottom";
         const ly = n.y - n.r - 8 / scale;

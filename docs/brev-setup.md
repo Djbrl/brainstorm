@@ -27,6 +27,7 @@ The hackathon voucher was not received (late arrival), so the team used its own 
 | 14:10 | GPU | `docker run -d --name vllm --gpus all --ipc=host --restart unless-stopped -p 127.0.0.1:8000:8000 -v ~/.cache/huggingface:/root/.cache/huggingface vllm/vllm-openai:latest --model nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8 --served-model-name nemotron --max-model-len 32768 --trust-remote-code --gpu-memory-utilization 0.92 --max-num-seqs 16 --api-key $NEMOTRON_KEY` | vLLM 0.30.0 started; downloading model on the GPU machine |
 | 14:16 | Mac | `brev port-forward brainstorm-gpu --port 8000:8000` | localhost:8000 → GPU:8000 |
 | 14:19 | Mac | Test request through the tunnel ("what does `function add(a,b)` do?") | Model ready about 3 min after start. Answer: "Adds the two numbers a and b (JavaScript)." 34 tokens in, 17 out |
+| 14:46 | GPU | `git clone --depth 1 https://github.com/honojs/hono.git` then `python3 bench.py hono/src` (script in `docs/bench/`) | 311 files, 81k lines summarized in 73 s, $0.02. Details in `numbers.md` |
 
 ## How to check it's alive
 

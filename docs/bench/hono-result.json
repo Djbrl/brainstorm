@@ -1,0 +1,78 @@
+{
+  "summary": {
+    "files": 311,
+    "summarized": 311,
+    "errors": 0,
+    "lines": 80983,
+    "prompt_tokens": 646453,
+    "completion_tokens": 20460,
+    "wall_seconds": 73.2,
+    "files_per_minute": 254.9,
+    "tokens_per_second_in": 8830,
+    "gpu_cost_usd": 0.022,
+    "label_latency_p50_s": 0.14,
+    "label_latency_max_s": 0.61
+  },
+  "samples": [
+    [
+      "compose.test.ts",
+      "The file defines a `compose` function that chains middleware functions (including async ones) into a single handler, enabling sequential execution with shared context and proper error/response handling. It's used to build Koa-like request pipelines where middleware can modify the context, call `next()`, and return responses or promises."
+    ],
+    [
+      "http-exception.test.ts",
+      "This file tests an `HTTPException` class that creates HTTP error responses with customizable status codes, messages, and causes. It verifies the exception correctly sets status, message, and propagates error causes for debugging, while ensuring the status code takes priority over any response-level status."
+    ],
+    [
+      "context.test.ts",
+      "The file defines a Hono **Context** class that wraps an incoming request and provides helper methods (`text()`, `json()`, `html()`, `redirect()`, `body()`, `header()`, `set()`, `status()`, etc.) to build and customize HTTP responses. It\u2019s used to generate responses with proper headers, status codes, and body content in Hono route handlers."
+    ],
+    [
+      "types.ts",
+      "This file defines TypeScript type utilities and interfaces for Hono, a web framework. It provides type-safe handlers, middleware, routing, and schema generation for building HTTP APIs with strong typing."
+    ],
+    [
+      "hono-base.ts",
+      "This file defines the base Hono framework class (`HonoBase`) that provides the core structure for building HTTP applications. It sets up routing methods (`get`, `post`, etc.), middleware handling, error handling, and foundational utilities for path management and request dispatching. The class is designed to be extended, serving as the foundation for creating custom Hono applications with features like routing, middleware, and error handling."
+    ],
+    [
+      "hono.ts",
+      "This file defines the main Hono class that extends a base class to set up routing with customizable options. It's used to create HTTP handlers with flexible routing capabilities."
+    ],
+    [
+      "index.ts",
+      "This file defines the main entry point for the Hono web framework, exporting its core classes, types, and utilities to enable developers to build web applications using TypeScript. It serves as the central import for accessing Hono's functionality, including routing, middleware, and type definitions."
+    ],
+    [
+      "hono.test.ts",
+      "**File purpose:**  \n`hono.test.ts` is a Vitest test suite that exercises the Hono framework\u2019s core features\u2014routing, middleware composition, nested routes, error handling, redirects, and built\u2011in utilities\u2014by mounting tiny apps, calling `request()` against them, and asserting status codes, headers, bodies, and thrown errors.\n\n**Typical usage:**  \nThe file is imported by a test runner (e.g., Vitest) and executed automatically; it validates that Hono correctly handles plain routes, middleware chains, base\u2011path composition, strict routing, wildcard paths, and many edge\u2011case scenarios such as encoded URLs, custom error pages, and nested route hierarchies."
+    ],
+    [
+      "context.ts",
+      "The `context.ts` file defines a `Context` class that manages request execution in a web framework (like Hono), providing methods to access environment variables, set headers, status codes, and generate responses (text, JSON, HTML, etc.) while supporting layout rendering and middleware integration. It is used to handle incoming HTTP requests within a worker-based environment, enabling developers to build and customize request flows with structured response handling."
+    ],
+    [
+      "compose.ts",
+      "This file defines a `compose` function that combines multiple middleware functions into a single middleware chain, similar to how Koa's `compose` works. It's used to build modular, reusable middleware pipelines in server-side applications, especially with the Koa framework, where each middleware can handle requests, pass control to the next, and manage errors or missing routes."
+    ],
+    [
+      "types.test.ts",
+      "The file defines type definitions and tests for the Hono framework's typed routing and middleware system. It uses Vitest to validate type safety of route handlers, middleware, and schema inference, ensuring correct typing for path parameters, request validation, response formats, and context variables across various routing patterns. The core purpose is to verify that Hono's type system correctly infers and enforces types for HTTP methods, parameters, request bodies, and responses without runtime errors."
+    ],
+    [
+      "request.test.ts",
+      "The file defines a Hono request wrapper (`HonoRequest`) and provides a suite of unit tests that verify its core functionality \u2014 including query and param parsing, handling of special characters, route matching, data validation, header access, body methods with caching, multipart/form\u2011data parsing, and cloning of raw Request objects. It is used to test how Hono extracts and manipulates URL parameters, query strings, headers, and request bodies, and how it safely clones or re\u2011uses consumed requests in middleware and routing contexts."
+    ],
+    [
+      "http-exception.ts",
+      "This file defines an `HTTPException` class for throwing HTTP errors (like authentication failures) in Hono apps. It lets you create custom error responses with status codes, messages, and optional response objects."
+    ],
+    [
+      "request.ts",
+      "The `request.ts` file defines a `HonoRequest` class that wraps a native `Request` object to provide convenient, typed access to HTTP request data and utilities (like parsing JSON, form data, query parameters, etc.) within the Hono web framework. It is used to handle incoming HTTP requests in Hono route handlers, enabling developers to easily read parameters, headers, body content, and validated data."
+    ],
+    [
+      "router.ts",
+      "This file defines a router system with type-safe route handling, including HTTP method constants, route matching logic, and error handling. It provides the core types and interfaces needed to build and manage route definitions in a server application."
+    ]
+  ]
+}

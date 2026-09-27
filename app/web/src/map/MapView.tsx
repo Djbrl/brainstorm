@@ -191,14 +191,14 @@ export function MapView() {
       for (const off of [0, period / 2]) {
         const p = ((now + off) % period) / period;
         ctx.beginPath();
-        ctx.arc(x, y, r + 2 + p * 16, 0, Math.PI * 2);
+        ctx.arc(x, y, r + (4 + p * 34) / scale, 0, Math.PI * 2); // screen-constant so it reads at any zoom
         ctx.strokeStyle = tokens.accent;
-        ctx.globalAlpha = (1 - p) * 0.7;
-        ctx.lineWidth = 2.2 / Math.sqrt(scale);
+        ctx.globalAlpha = (1 - p) * 0.85;
+        ctx.lineWidth = 2.6 / scale;
         ctx.stroke();
       }
-      ctx.globalAlpha = 0.14;
-      ctx.beginPath(); ctx.arc(x, y, r + 5, 0, Math.PI * 2); ctx.fillStyle = tokens.accent; ctx.fill();
+      ctx.globalAlpha = 0.18;
+      ctx.beginPath(); ctx.arc(x, y, r + 9 / scale, 0, Math.PI * 2); ctx.fillStyle = tokens.accent; ctx.fill();
       ctx.globalAlpha = 1;
     }
 

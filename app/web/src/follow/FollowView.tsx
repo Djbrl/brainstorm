@@ -5,6 +5,7 @@ import { clock, useLive } from "../lib/live";
 import { useNav } from "../lib/nav";
 import { FileIcon, Glyph, RiskIcon } from "./Glyph";
 import { StepDetail } from "./StepDetail";
+import { ReplayOnMapButton } from "../map/replay/ReplayButton";
 import { basename, clockTime, displayLabel, isVisible, pairResults, realLabel, relTime, stepFile } from "./format";
 import "./follow.css";
 
@@ -136,6 +137,7 @@ function Timeline({ session, steps, selectedId, onSelect, reveal }: { session: S
           {session.cwd && <><span className="sep">·</span><span className="tl-cwd" title={session.cwd}>{session.cwd}</span></>}
           {steps && <><span className="sep">·</span><span>{visible.length} steps, {edits} edits</span></>}
         </div>
+        {steps && steps.length > 0 && <ReplayOnMapButton sessionId={session.id} index={selectedId ? steps.findIndex((s) => s.id === selectedId) : 0} />}
       </header>
       <div className="tl-scroll" ref={scrollRef} onScroll={onScroll}>
         {!steps ? (

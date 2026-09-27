@@ -7,7 +7,9 @@ import { ReaderModule } from "./reader/reader.module";
 import { AskModule } from "./ask/ask.module";
 import { ReplayModule } from "./replay/replay.module";
 import { FailuresModule } from "./failures/failures.module";
+import { WorkspaceModule } from "./workspace/workspace.module";
+import { AgentsModule } from "./agents/agents.module";
 
 // Owned by the lead. Agents: don't edit; ask in docs/build-log.md "Requests".
-@Module({ imports: [CoreModule, LlmModule, ListenerModule, MapperModule, ReaderModule, AskModule, ReplayModule, FailuresModule] })
+@Module({ imports: [CoreModule, LlmModule, ListenerModule, MapperModule, ReaderModule, AskModule, ReplayModule, FailuresModule, WorkspaceModule, AgentsModule] })
 export class AppModule {}

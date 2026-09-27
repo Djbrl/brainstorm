@@ -7,6 +7,7 @@ export type BusEvents = {
   "session": [Session];
   "step": [Step];                               // new step stored (listener → reader, mapper)
   "file-touched": [{ path: string; sessionId: string; ts: string }]; // an agent edited a file (listener → mapper)
+  "workspace": [{ root: string }];               // the active workspace changed (workspace → listener, mapper, reader)
 };
 
 @Injectable()

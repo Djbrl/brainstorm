@@ -1,6 +1,6 @@
 // Owned by the lead. One store for the whole app: REST bootstrap + websocket updates, or a static replay file.
 import { createContext, useCallback, useContext, useEffect, useReducer, type ReactNode } from "react";
-import type { AskRequest, AskResponse, FailureGroup, FileNode, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
+import type { AgentPresence, AskRequest, AskResponse, FailureGroup, FileNode, SetupStatus, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
 
 export type LiveState = {
   connected: boolean;
@@ -9,6 +9,8 @@ export type LiveState = {
   steps: Record<string, Step[]>;   // by sessionId, ordered by seq
   map: ProjectMap | null;
   failures: FailureGroup[];
+  agents: Record<string, AgentPresence>; // live agents by id (main session thread or subagent)
+  setup: SetupStatus | null;             // null until loaded (and always null in replay)
 };
 
 type Action =
@@ -17,10 +19,13 @@ type Action =
   | { type: "steps"; sessionId: string; steps: Step[] }
   | { type: "map"; map: ProjectMap }
   | { type: "failures"; failures: FailureGroup[] }
+  | { type: "agents"; agents: AgentPresence[] }
+  | { type: "setup-status"; status: SetupStatus }
+  | { type: "reset" }
   | { type: "replay"; data: Replay }
   | WsMessage;
 
-const initial: LiveState = { connected: false, replay: false, sessions: [], steps: {}, map: null, failures: [] };
+const initial: LiveState = { connected: false, replay: false, sessions: [], steps: {}, map: null, failures: [], agents: {}, setup: null };
 
 function upsertFile(map: ProjectMap | null, file: FileNode): ProjectMap | null {
   if (!map) return map;
@@ -36,6 +41,11 @@ function reducer(s: LiveState, a: Action): LiveState {
     case "steps": return { ...s, steps: { ...s.steps, [a.sessionId]: a.steps } };
     case "map": return { ...s, map: a.map };
     case "failures": return { ...s, failures: a.failures };
+    case "agents": return { ...s, agents: Object.fromEntries(a.agents.map((g) => [g.id, g])) };
+    case "agent": return { ...s, agents: { ...s.agents, [a.agent.id]: a.agent } };
+    case "setup-status": return { ...s, setup: a.status };
+    case "setup": return { ...s, setup: a.status };
+    case "reset": return { ...s, sessions: [], steps: {}, map: null, failures: [], agents: {} };
     case "replay": {
       const steps: Record<string, Step[]> = {};
       for (const st of a.data.steps) (steps[st.sessionId] ??= []).push(st);
@@ -81,7 +91,16 @@ export async function replayAnswer(req: AskRequest): Promise<AskResponse> {
   return { answer: "This is a recorded demo. Run Brainstorm locally to ask new questions.", model: "replay", tokensIn: 0, tokensOut: 0, costUsd: 0, fallback: false };
 }
 
-const Ctx = createContext<{ state: LiveState; loadSteps: (sessionId: string) => void } | null>(null);
+/** Load everything for the active workspace (on start, and again after the setup screen switches workspace). */
+function loadAll(dispatch: (a: Action) => void) {
+  fetch("/api/workspace").then((r) => r.json()).then((status) => dispatch({ type: "setup-status", status })).catch(() => {});
+  fetch("/api/sessions").then((r) => r.json()).then((sessions) => dispatch({ type: "sessions", sessions })).catch(() => {});
+  fetch("/api/map").then((r) => r.json()).then((map) => dispatch({ type: "map", map })).catch(() => {});
+  fetch("/api/failures").then((r) => r.json()).then((failures) => dispatch({ type: "failures", failures })).catch(() => {});
+  fetch("/api/agents").then((r) => r.json()).then((agents) => dispatch({ type: "agents", agents })).catch(() => {});
+}
+
+const Ctx = createContext<{ state: LiveState; loadSteps: (sessionId: string) => void; reload: () => void } | null>(null);
 
 export function LiveProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initial);
@@ -92,10 +111,8 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       fetch(url).then((r) => r.json()).then((data: Replay) => { replayData = data; clockOffset = Math.max(0, Date.now() - Date.parse(data.exportedAt)); dispatch({ type: "replay", data }); });
       return;
     }
-    fetch("/api/sessions").then((r) => r.json()).then((sessions) => dispatch({ type: "sessions", sessions })).catch(() => {});
-    fetch("/api/map").then((r) => r.json()).then((map) => dispatch({ type: "map", map })).catch(() => {});
+    loadAll(dispatch);
     const loadFailures = () => fetch("/api/failures").then((r) => r.json()).then((failures) => dispatch({ type: "failures", failures })).catch(() => {});
-    loadFailures();
     const failTimer = setInterval(loadFailures, 15000);
 
     let ws: WebSocket | null = null;
@@ -116,7 +133,10 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       .then((steps: Step[]) => dispatch({ type: "steps", sessionId, steps })).catch(() => {});
   }, []);
 
-  return <Ctx.Provider value={{ state, loadSteps }}>{children}</Ctx.Provider>;
+  /** Refetch everything for the (new) active workspace. */
+  const reload = useCallback(() => { if (isReplay()) return; dispatch({ type: "reset" }); loadAll(dispatch); }, []);
+
+  return <Ctx.Provider value={{ state, loadSteps, reload }}>{children}</Ctx.Provider>;
 }
 
 export function useLive() {

@@ -257,13 +257,14 @@ export class ListenerService implements OnModuleInit {
         id, sessionId, seq: this.allocSeq(sessionId), ts, kind: "edit",
         tool: name, input: sanitizeDeep(input) as unknown, filePath,
         diff: { before: sanitizeText(before, TEXT_LIMIT), after: sanitizeText(after, TEXT_LIMIT) },
-        isSubagent,
+        isSubagent, ...(isSubagent && (o as { agentId?: string }).agentId ? { agentId: (o as { agentId?: string }).agentId } : {}),
       };
       this.storeStep(step, { cwd: o.cwd });
     } else {
       const step: Step = {
         id, sessionId, seq: this.allocSeq(sessionId), ts, kind: "tool_call",
         tool: name, input: sanitizeDeep(input) as unknown, filePath, isSubagent,
+        ...(isSubagent && (o as { agentId?: string }).agentId ? { agentId: (o as { agentId?: string }).agentId } : {}),
       };
       this.storeStep(step, { cwd: o.cwd });
     }
@@ -275,6 +276,7 @@ export class ListenerService implements OnModuleInit {
       sessionId, seq: this.allocSeq(sessionId), ts, kind,
       text: sanitizeText(text, kind === "tool_result" ? TOOL_RESULT_LIMIT : TEXT_LIMIT),
       isSubagent,
+      ...(isSubagent && (o as { agentId?: string }).agentId ? { agentId: (o as { agentId?: string }).agentId } : {}),
     };
   }
 

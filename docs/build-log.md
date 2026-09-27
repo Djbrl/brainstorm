@@ -8,6 +8,7 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 - 14:11 [site] Landing page redesigned: light, Apple-style scroll scenes, Cabinet Grotesk + Satoshi. Redeployed.
 - 14:50 [site] Hero is now a scroll story: follow Agent 1, then three agents, into the codebase, zoom out to the map. Redeployed.
 - 15:30 [site] Module names on hero map, pinned stats with study titles, 'Where your money goes' section, dark Brev section, 'Try Brainstorm now' CTA. Redeployed.
+- 15:39 [site] Landing page links the hosted app (brainstorm-demo-black.vercel.app) from the header and 'Try Brainstorm now', plus the GitHub repo.
 
 ## Requests
 

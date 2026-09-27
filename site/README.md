@@ -11,4 +11,6 @@ One static file, `index.html`. No build step. Preview with `python3 -m http.serv
 
 **Screenshots:** drop real PNGs (16:10, taken from the running app) at `img/follow.png`, `img/map.png`, `img/history.png`. Missing files show a placeholder frame.
 
-**Deploy:** Vercel, root directory `site/`, framework "Other", no build command.
+**Live:** https://brainstorm-landing.vercel.app (Vercel project `bountbi/brainstorm-landing`).
+
+**Redeploy:** `cd site && vercel deploy --prod --yes`. `site/.vercel/` holds the project link and is gitignored.

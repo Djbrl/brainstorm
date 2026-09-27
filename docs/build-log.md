@@ -4,6 +4,7 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 13:25 [human] Workspace created: app/, docs/, video/ with briefings.
 - 13:57 [site] Landing page draft in `site/` (static index.html, all links and numbers in one `SITE` config, hidden until filled).
+- 14:00 [site] Landing page live at https://brainstorm-landing.vercel.app
 
 ## Requests
 

@@ -12,7 +12,7 @@ type Nav = {
 const Ctx = createContext<Nav | null>(null);
 
 export function NavProvider({ children }: { children: ReactNode }) {
-  const [view, setView] = useState<View>("follow");
+  const [view, setView] = useState<View>(() => (new URLSearchParams(location.search).get("view") === "map" ? "map" : "follow"));
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [focusFile, setFocusFile] = useState<string | null>(null);
   const openFile = (p: string) => { setFocusFile(p); setView("map"); };

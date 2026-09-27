@@ -58,9 +58,9 @@ export class AskService implements OnModuleInit {
     const content = filePath ? this.safe(() => readFileSync(filePath!, "utf8")) : undefined;
     const fileHash = content !== undefined ? createHash("sha1").update(content).digest("hex") : "";
 
-    // Cache: same question + same target + unchanged file.
+    // Cache: same question + same target + unchanged file (only real Claude answers, so a fixed key is picked up).
     const cached = this.dbs.db
-      .prepare(`SELECT response FROM ask_answers WHERE question = ? AND step_id = ? AND file_path = ? AND file_hash = ? ORDER BY id DESC LIMIT 1`)
+      .prepare(`SELECT response FROM ask_answers WHERE question = ? AND step_id = ? AND file_path = ? AND file_hash = ? AND json_extract(response, '$.fallback') = 0 ORDER BY id DESC LIMIT 1`)
       .get(question, req.stepId ?? "", req.filePath ?? "", fileHash) as { response: string } | undefined;
     if (cached) return JSON.parse(cached.response) as AskResponse;
 
@@ -90,7 +90,7 @@ export class AskService implements OnModuleInit {
   }
 
   listAnswers(): { request: AskRequest; response: AskResponse }[] {
-    const rows = this.safe(() => this.dbs.db.prepare(`SELECT request, response FROM ask_answers ORDER BY id`).all() as { request: string; response: string }[]) ?? [];
+    const rows = this.safe(() => this.dbs.db.prepare(`SELECT request, response FROM ask_answers ORDER BY json_extract(response, '$.fallback') ASC, id DESC`).all() as { request: string; response: string }[]) ?? [];
     return rows.map((r) => ({ request: JSON.parse(r.request), response: JSON.parse(r.response) }));
   }
 
@@ -100,7 +100,7 @@ export class AskService implements OnModuleInit {
     const rel = filePath ? relative(base, filePath) : undefined;
 
     if (step) {
-      const before: Step[] = this.safe(() => (this.listener as any).stepsBefore?.(step.id, 3) as Step[] | undefined) ?? [];
+      const before: Step[] = this.safe(() => this.listener.stepsBefore(step.id, 3)) ?? [];
       if (before.length) parts.push("## What the agent did just before\n" + before.map((s) => `- ${this.describe(s)}`).join("\n"));
       parts.push("## The step in question\n" + this.describe(step));
       if (step.diff) parts.push(`## Its diff\n--- before\n${clip(step.diff.before, 3000)}\n+++ after\n${clip(step.diff.after, 3000)}`);

@@ -2,7 +2,8 @@ import { BadRequestException, Injectable, Logger, OnModuleInit } from "@nestjs/c
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { closeSync, existsSync, openSync, readdirSync, readSync, statSync } from "node:fs";
-import { basename, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { homedir } from "node:os";
 import type { SetupStatus, SetupStep, WorkspaceSuggestion } from "../types";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
@@ -13,6 +14,36 @@ import { MapperService } from "../mapper/mapper.service";
 import { ReaderService } from "../reader/reader.service";
 
 const execFileP = promisify(execFile);
+const encodeRoot = (root: string) => root.replace(/[^A-Za-z0-9-]/g, "-");
+
+/** Turn a Claude Code project folder name back into a real path by walking the filesystem ("-Users-me-my-app" → /Users/me/my-app). */
+function decodeProjectDir(name: string): string | null {
+  const walk = (dir: string, rest: string, depth: number): string | null => {
+    if (!rest) return dir;
+    if (depth > 12) return null;
+    let entries: string[];
+    try { entries = readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name); } catch { return null; }
+    for (const e of entries) {
+      const enc = encodeRoot(e);
+      if (rest === enc) return join(dir, e);
+      if (rest.startsWith(enc + "-")) { const hit = walk(join(dir, e), rest.slice(enc.length + 1), depth + 1); if (hit) return hit; }
+    }
+    return null;
+  };
+  return name.startsWith("-") ? walk("/", name.slice(1), 0) : null;
+}
+
+/** `claude` on PATH, else the usual install locations, else the copy bundled with the Claude desktop app. */
+function claudeCandidates(): string[] {
+  const home = homedir();
+  const list = ["claude", join(home, ".local/bin/claude"), join(home, ".claude/local/claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"];
+  const bundled = join(home, "Library/Application Support/Claude/claude-code");
+  try {
+    const versions = readdirSync(bundled).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+    for (const v of versions) list.push(join(bundled, v, "claude.app/Contents/MacOS/claude"));
+  } catch { /* no desktop app */ }
+  return list;
+}
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_SUGGESTIONS = 12;
 const CWD_READ_BYTES = 64 * 1024;
@@ -96,10 +127,18 @@ export class WorkspaceService implements OnModuleInit {
 
       jsonlFiles.sort((a, b) => b.mtimeMs - a.mtimeMs);
       const newest = jsonlFiles[0];
-      const cwd = this.readCwd(newest.path);
-      if (!cwd) continue;
-
-      const root = resolve(cwd);
+      // The folder name is the project root with every non [A-Za-z0-9-] char replaced by "-". A session's cwd can
+      // drift into a subfolder, so try the cwds of the newest few sessions and their ancestors for an exact match.
+      const decoded = decodeProjectDir(d);
+      const cwds = jsonlFiles.slice(0, 5).map((f) => this.readCwd(f.path)).filter((c): c is string => !!c);
+      if (!cwds.length && !decoded) continue;
+      let root = decoded ?? resolve(cwds[0]);
+      if (!decoded) outer: for (const c of cwds) {
+        for (let cand = resolve(c); cand !== dirname(cand); cand = dirname(cand)) {
+          if (encodeRoot(cand) === d) { root = cand; break outer; }
+        }
+      }
+      if (/\/Library\/Application Support\//.test(root)) continue; // Claude Desktop's own scratch folders
       const lastActiveAt = new Date(newest.mtimeMs).toISOString();
       const sessions = jsonlFiles.length;
       const exists = existsSync(root);
@@ -226,11 +265,17 @@ export class WorkspaceService implements OnModuleInit {
 
   private async checkClaude(root: string): Promise<SetupStep> {
     const label = "Connecting to Claude Code";
-    let versionRaw: string;
-    try {
-      const { stdout } = await execFileP("claude", ["--version"], { timeout: 3000 });
-      versionRaw = stdout.trim().split("\n")[0] ?? "";
-    } catch {
+    let versionRaw = "";
+    for (const bin of claudeCandidates()) {
+      try {
+        const { stdout } = await execFileP(bin, ["--version"], { timeout: 3000 });
+        versionRaw = stdout.trim().split("\n")[0] ?? "";
+        if (versionRaw) break;
+      } catch { /* try the next location */ }
+    }
+    if (!versionRaw) {
+      const found = this.countRecentSessions(root);
+      if (found > 0) return { id: "claude", label, state: "done", detail: `Claude Code logs found · ${found} session${found === 1 ? "" : "s"} in the last day` };
       return { id: "claude", label, state: "warn", detail: "Claude Code CLI not found, install it to follow agents live" };
     }
     const version = versionRaw.match(/\d+\.\d+(\.\d+)?/)?.[0] ?? (versionRaw || "?");

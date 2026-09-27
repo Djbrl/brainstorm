@@ -11,4 +11,5 @@ Only real measurements. Leave `TODO` rather than guess.
 | Step label latency | TODO | step arrival → label arrival |
 | Summary quality vs Claude (1–5) | TODO | Claude grades 10 Nemotron summaries |
 | Hallway test | TODO | 3 questions, raw log vs Brainstorm, timed |
+| Failures found in Brainstorm's own build | 22 failing tool calls in 13 groups across 5 sessions; top group (4–8 retried shell failures) named by Nemotron | /api/failures at 15:40 |
 | Brainstorm's own build | TODO sessions, TODO steps, TODO files | from its own db |

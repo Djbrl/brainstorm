@@ -3,12 +3,13 @@ import { ListenerService } from "../listener/listener.service";
 import { MapperService } from "../mapper/mapper.service";
 import { AskService } from "../ask/ask.service";
 import { ConfigService } from "../core/config.service";
+import { FailuresService } from "../failures/failures.service";
 import type { Replay } from "../types";
 
 // Owned by the lead. Static export for the hosted demo: GET /api/replay?sessionId=a,b&root=
 @Controller()
 export class ReplayController {
-  constructor(private listener: ListenerService, private mapper: MapperService, private askService: AskService, private cfg: ConfigService) {}
+  constructor(private listener: ListenerService, private mapper: MapperService, private askService: AskService, private cfg: ConfigService, private failures: FailuresService) {}
 
   @Get("replay") replay(@Query("sessionId") sessionId?: string, @Query("root") root?: string): Replay {
     const all = this.listener.listSessions();
@@ -17,6 +18,7 @@ export class ReplayController {
     const steps = sessions.flatMap((s) => this.listener.listSteps(s.id));
     const map = this.mapper.getMap(root || this.cfg.defaultRoot);
     const answers = this.askService.listAnswers();
-    return { exportedAt: new Date().toISOString(), sessions: sessions.map((s) => ({ ...s, status: "idle" })), steps, map: { ...map, files: map.files.map(({ activeSessionId: _a, ...f }) => f) }, answers };
+    const failures = this.failures.list(sessions.map((s) => s.id).join(","));
+    return { exportedAt: new Date().toISOString(), sessions: sessions.map((s) => ({ ...s, status: "idle" })), steps, map: { ...map, files: map.files.map(({ activeSessionId: _a, ...f }) => f) }, answers, failures };
   }
 }

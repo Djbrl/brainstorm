@@ -36,6 +36,8 @@ Full pitch and features: `../docs/plan.md`. Judges score on working features, pu
 
 **Ports:** server `4000` (REST under `/api`, websocket at `/ws`). Web `5173`, whose Vite config proxies `/api` and `/ws` to 4000. Nemotron runs at `http://localhost:8000/v1` through `brev port-forward`.
 
+**Nemotron is live** (14:20). Read `../docs/nemotron.md` before calling it: connection, rules, code snippet and prompts.
+
 ## Architecture
 
 ```

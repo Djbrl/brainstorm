@@ -1,5 +1,6 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
-import { isAbsolute } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { isAbsolute, join } from "node:path";
 import type { AgentMove, AgentPresence, Step } from "../types";
 import { BusService } from "../core/bus.service";
 import { ConfigService } from "../core/config.service";
@@ -58,20 +59,33 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     return p === root || p.startsWith(root + "/");
   }
 
+  /** Subagent description from Claude Code's agent-<id>.meta.json (cached; cheap: one readdir per new agent). */
+  private metaLabel(sessionId: string, agentId: string): string | undefined {
+    try {
+      for (const proj of readdirSync(this.cfg.claudeProjectsDir)) {
+        const f = join(this.cfg.claudeProjectsDir, proj, sessionId, "subagents", `agent-${agentId}.meta.json`);
+        if (!existsSync(f)) continue;
+        const d = JSON.parse(readFileSync(f, "utf8")) as { description?: string; agentType?: string };
+        return shortLabel(d.description) ?? d.agentType;
+      }
+    } catch { /* ignore */ }
+    return undefined;
+  }
+
   private nameFor(step: Step, id: string): string {
     if (!step.agentId) {
       const title = this.listener.getSession(step.sessionId)?.title;
       return shortLabel(title, 48) ?? `Session ${step.sessionId.slice(0, 6)}`;
     }
-    return `Subagent · ${this.subLabels.get(id) ?? id.slice(0, 7)}`;
+    return `Subagent · ${this.subLabels.get(id) || id.slice(0, 7)}`;
   }
 
   private onStep(step: Step) {
     const id = step.agentId ?? step.sessionId;
     if (!id) return;
-    if (step.agentId && step.kind === "prompt" && !this.subLabels.has(id)) {
-      const l = shortLabel(step.text);
-      if (l) this.subLabels.set(id, l);
+    if (step.agentId && !this.subLabels.has(id)) {
+      const l = this.metaLabel(step.sessionId, step.agentId) ?? (step.kind === "prompt" ? shortLabel(step.text) : undefined);
+      this.subLabels.set(id, l ?? ""); // "" = looked up, nothing found
     }
 
     const now = step.ts || new Date().toISOString();
@@ -91,9 +105,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       next.trail = last && last.file === file && last.action === action ? [...next.trail.slice(0, -1), move] : [...next.trail, move].slice(-TRAIL_MAX);
       next.file = file;
       next.action = action;
-    } else if (action && (step.kind === "tool_call" || step.kind === "edit")) {
-      next.action = action; // e.g. "run": stays on its current file
-    }
+    } // steps without a file (Bash, text, thinking) only refresh ts/active
     this.agents.set(id, next);
     this.gateway.broadcast({ type: "agent", agent: next });
   }

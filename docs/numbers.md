@@ -4,8 +4,8 @@ Only real measurements. Leave `TODO` rather than guess.
 
 | Measure | Value | How measured |
 | --- | --- | --- |
-| Files summarized per minute (Nemotron on Brev) | TODO | reader timing on the demo repo |
-| Time to map the demo repo (lines: TODO) | TODO | first read, start to finish |
+| Files summarized per minute (Nemotron on Brev) | 180–215 files/min (6 requests in flight) | reader timing on the Brainstorm repo itself, 15:00 |
+| Time to map the demo repo (68 files) | 40–72 ms structure; all 66 file summaries in about 20 s | mapper log + reader timing, 15:00 |
 | GPU cost of that read | TODO | minutes × $/hour |
 | Average cost per question (Claude) | TODO | cost meter over TODO questions |
 | Step label latency | TODO | step arrival → label arrival |

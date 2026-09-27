@@ -23,7 +23,7 @@ export const clockTime = (iso: string) => {
 };
 
 const firstLine = (t = "", max = 140) => {
-  const line = t.replace(/\s+/g, " ").trim();
+  const line = t.replace(/```[\s\S]*?```/g, " ").replace(/\*\*|__|`|^#+\s*/gm, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/\s+/g, " ").trim();
   return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line;
 };
 
@@ -62,7 +62,26 @@ export function fallbackLabel(s: Step): string {
   }
 }
 
-export const displayLabel = (s: Step) => s.label?.trim() || fallbackLabel(s);
+/** Mirrors the reader's instant heuristic label, so we can keep our richer fallback until Nemotron's label lands. */
+function readerHeuristic(s: Step): string | undefined {
+  if (s.kind === "edit") return `Edit ${s.filePath ? s.filePath.split("/").pop() : "file"}`;
+  if (s.kind === "tool_call") {
+    if (s.tool === "Bash") { const cmd = str(obj(s.input).command); return cmd ? `Run: ${cmd.slice(0, 40)}` : "Run: shell command"; }
+    if (s.filePath) return `${s.tool ?? "Tool"} ${s.filePath.split("/").pop()}`;
+    return `Run: ${s.tool ?? "tool"}`;
+  }
+  if (s.kind === "prompt") return (s.text ?? "").trim().split(/\s+/).slice(0, 8).join(" ") || "Prompt";
+  return undefined;
+}
+
+/** The model-written label, or undefined while only the heuristic one exists. */
+export function realLabel(s: Step): string | undefined {
+  const l = s.label?.trim();
+  if (!l || l === readerHeuristic(s)) return undefined;
+  return l;
+}
+
+export const displayLabel = (s: Step) => realLabel(s) || fallbackLabel(s);
 
 export function stepFile(s: Step): string | undefined {
   if (s.filePath) return s.filePath;
@@ -90,3 +109,5 @@ export function pairResults(steps: Step[]): Map<string, Step> {
 }
 
 export const isVisible = (s: Step) => s.kind !== "tool_result" && !(s.kind === "thinking" && !s.text?.trim()) && !(s.kind === "text" && !s.text?.trim() && !s.label);
+
+export const toolName = (t?: string) => (t ?? "").replace(/^mcp__.+?__/, "").replace(/_/g, " ");

@@ -6,7 +6,7 @@ import { AskBox } from "../ask/AskBox";
 import { Markdown } from "../ask/Markdown";
 import { useNav } from "../lib/nav";
 import { CloseIcon, FileIcon, Glyph, RiskIcon } from "./Glyph";
-import { basename, clockTime, displayLabel, resultText, stepFile } from "./format";
+import { basename, clockTime, displayLabel, resultText, stepFile, toolName } from "./format";
 
 const BIG_DIFF = 400; // lines; above this the diff starts collapsed
 
@@ -120,7 +120,7 @@ export function StepDetail({ step, result, onClose }: { step: Step; result?: Ste
         <h2 className="sd-title">{step.kind === "prompt" ? "Your prompt" : label}</h2>
         <div className="sd-meta">
           <span>{clockTime(step.ts)}</span>
-          {step.tool && step.kind !== "edit" && <><span className="sep">·</span><span>{step.tool}</span></>}
+          {step.tool && step.kind !== "edit" && <><span className="sep">·</span><span>{toolName(step.tool)}</span></>}
           {step.isSubagent && <><span className="sep">·</span><span>Subagent</span></>}
           {file && (
             <button className="chip" onClick={() => openFile(file)} title={`${file}\nOpen on the map`}>

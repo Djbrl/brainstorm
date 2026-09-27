@@ -5,7 +5,7 @@ import { useLive } from "../lib/live";
 import { useNav } from "../lib/nav";
 import { FileIcon, Glyph, RiskIcon } from "./Glyph";
 import { StepDetail } from "./StepDetail";
-import { basename, clockTime, displayLabel, isVisible, pairResults, relTime, stepFile } from "./format";
+import { basename, clockTime, displayLabel, isVisible, pairResults, realLabel, relTime, stepFile } from "./format";
 import "./follow.css";
 
 const PAGE = 300;
@@ -27,8 +27,7 @@ function SessionList({ sessions, selected, onSelect }: { sessions: Session[]; se
             <div className="fl-session-title">{s.title || "Untitled session"}</div>
             <div className="fl-session-meta">
               {s.status === "running" && <span className="fl-live" />}
-              <span className="fl-session-cwd">{basename(s.cwd) || s.cwd}</span>
-              <span className="sep">·</span>
+              {s.cwd && <><span className="fl-session-cwd">{basename(s.cwd) || s.cwd}</span><span className="sep">·</span></>}
               <span>{s.status === "running" ? "running" : relTime(s.lastEventAt, now)}</span>
             </div>
           </button>
@@ -42,6 +41,7 @@ function StepRow({ step, selected, fresh, onSelect }: { step: Step; selected: bo
   const { openFile } = useNav();
   const file = stepFile(step);
   const label = displayLabel(step);
+  const labeled = !!realLabel(step);
   const cls = ["tl-row", `k-${step.kind}`, step.isSubagent && "sub", selected && "on", fresh && "fresh"].filter(Boolean).join(" ");
 
   if (step.kind === "prompt") {
@@ -60,7 +60,7 @@ function StepRow({ step, selected, fresh, onSelect }: { step: Step; selected: bo
     <div className={cls} onClick={() => onSelect(step)}>
       <div className="tl-glyph"><Glyph kind={step.kind} tool={step.tool} /></div>
       <div className="tl-body">
-        <div className={`tl-label ${step.label ? "has" : "pending"}`} key={step.label ? "l" : "f"}>{label}</div>
+        <div className={`tl-label ${labeled ? "has" : "pending"}`} key={labeled ? "l" : "f"}>{label}</div>
         <div className="tl-meta">
           <span>{clockTime(step.ts)}</span>
           {step.isSubagent && <><span className="sep">·</span><span>subagent</span></>}
@@ -113,8 +113,7 @@ function Timeline({ session, steps, selectedId, onSelect }: { session: Session; 
         <h1 className="tl-title">{session.title || "Untitled session"}</h1>
         <div className="tl-sub">
           {session.status === "running" ? <span className="tl-running"><span className="fl-live" />Live</span> : <span>Last active {relTime(session.lastEventAt, now)}</span>}
-          <span className="sep">·</span>
-          <span title={session.cwd}>{session.cwd}</span>
+          {session.cwd && <><span className="sep">·</span><span className="tl-cwd" title={session.cwd}>{session.cwd}</span></>}
           {steps && <><span className="sep">·</span><span>{visible.length} steps, {edits} edits</span></>}
         </div>
       </header>

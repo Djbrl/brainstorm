@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import chokidar, { type FSWatcher } from "chokidar";
-import { closeSync, openSync, readSync, statSync } from "node:fs";
-import { relative, sep } from "node:path";
+import { closeSync, openSync, readdirSync, readSync, statSync } from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
 import type { Session, Step, StepKind } from "../types";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
@@ -48,7 +48,11 @@ type SessionRow = { id: string; cwd: string; title: string; started_at: string; 
 @Injectable()
 export class ListenerService implements OnModuleInit {
   private log = new Logger("Listener");
-  private readonly sessionFilter = process.env.SESSION_FILTER ?? "brainstorm";
+  // SESSION_FILTER env is a permanent override (substring match, old behavior). Otherwise the
+  // active workspace's Claude Code project folder prefix is used (set on "workspace", owner: S).
+  private readonly sessionFilterOverride = process.env.SESSION_FILTER || undefined;
+  private projectFilterPrefix: string | null = null;
+  private activeRoot: string | null = null;
   private offsets = new Map<string, number>();
   private nextSeq = new Map<string, number>();
   private ready = false;
@@ -84,6 +88,12 @@ export class ListenerService implements OnModuleInit {
       this.nextSeq.set(row.session_id, row.m + 1);
     }
 
+    // Start out scoped to the configured default root (repo root, or MAP_ROOT) until a workspace
+    // is explicitly chosen (WorkspaceService then emits "workspace" and we re-scope, see below).
+    this.activeRoot = resolve(this.cfg.defaultRoot);
+    this.projectFilterPrefix = this.sessionFilterOverride ? null : this.encodeRoot(this.activeRoot);
+    this.bus.on("workspace", ({ root }) => this.onWorkspaceChanged(root));
+
     this.watcher = chokidar.watch(this.cfg.claudeProjectsDir, {
       ignoreInitial: false,
       depth: 4,
@@ -94,8 +104,62 @@ export class ListenerService implements OnModuleInit {
     this.watcher.on("error", (e) => this.log.warn(`watcher error: ${(e as Error).message}`));
     this.watcher.on("ready", () => {
       this.ready = true;
-      this.log.log(`backfill complete, watching ${this.cfg.claudeProjectsDir} live (filter="${this.sessionFilter}")`);
+      this.log.log(`backfill complete, watching ${this.cfg.claudeProjectsDir} live (filter="${this.sessionFilterOverride ?? this.projectFilterPrefix}")`);
     });
+  }
+
+  // ---- workspace switching (owner: S) ----
+
+  /** `root.replace(/[^A-Za-z0-9-]/g, "-")` — matches Claude Code's own project-folder naming. */
+  private encodeRoot(root: string): string {
+    return resolve(root).replace(/[^A-Za-z0-9-]/g, "-");
+  }
+
+  /** True if `projectDir` (a top-level folder name under claudeProjectsDir) belongs to the active workspace. */
+  private matchesFilter(projectDir: string): boolean {
+    if (this.sessionFilterOverride) return projectDir.includes(this.sessionFilterOverride);
+    return this.projectFilterPrefix ? projectDir.startsWith(this.projectFilterPrefix) : false;
+  }
+
+  private onWorkspaceChanged(root: string) {
+    this.activeRoot = resolve(root);
+    if (this.sessionFilterOverride) return; // permanent override, ignore workspace changes
+    this.projectFilterPrefix = this.encodeRoot(this.activeRoot);
+    this.log.log(`workspace changed: now filtering Claude Code projects by prefix "${this.projectFilterPrefix}"`);
+    this.backfillForNewFilter();
+  }
+
+  /** Scan (not watch) every project folder now matching the filter for jsonl files from the last
+   * 24h that we haven't tailed yet. Reuses handleFile's offset bookkeeping, so nothing duplicates. */
+  private backfillForNewFilter() {
+    let dirs: string[];
+    try { dirs = readdirSync(this.cfg.claudeProjectsDir); } catch (e) {
+      this.log.warn(`backfill: cannot read ${this.cfg.claudeProjectsDir}: ${(e as Error).message}`);
+      return;
+    }
+    let scanned = 0;
+    for (const d of dirs) {
+      if (!this.matchesFilter(d)) continue;
+      scanned += this.scanDirForJsonl(join(this.cfg.claudeProjectsDir, d));
+    }
+    this.log.log(`backfill: scanned ${scanned} jsonl file(s) for the new workspace`);
+  }
+
+  private scanDirForJsonl(dir: string): number {
+    let entries: string[];
+    try { entries = readdirSync(dir); } catch { return 0; }
+    let count = 0;
+    for (const name of entries) {
+      const p = join(dir, name);
+      let st;
+      try { st = statSync(p); } catch { continue; }
+      if (st.isDirectory()) { count += this.scanDirForJsonl(p); continue; } // e.g. <session>/subagents/
+      if (!name.endsWith(".jsonl")) continue;
+      if (Date.now() - st.mtimeMs > ONE_DAY_MS) continue;
+      this.handleFile(p);
+      count++;
+    }
+    return count;
   }
 
   // ---- file tailing ----
@@ -107,7 +171,7 @@ export class ListenerService implements OnModuleInit {
       // Filter on the top-level project folder name either way.
       const rel = relative(this.cfg.claudeProjectsDir, file);
       const projectDir = rel.split(sep)[0] ?? "";
-      if (!projectDir.includes(this.sessionFilter)) return;
+      if (!this.matchesFilter(projectDir)) return;
       const stat = statSync(file);
       if (Date.now() - stat.mtimeMs > ONE_DAY_MS) return;
 
@@ -379,9 +443,19 @@ export class ListenerService implements OnModuleInit {
     return row ? this.rowToSession(row) : undefined;
   }
 
+  /** Only sessions whose cwd is the active workspace root or inside it (owner: S). */
   listSessions(): Session[] {
     const rows = this.dbs.db.prepare(`SELECT * FROM sessions ORDER BY last_event_at DESC`).all() as SessionRow[];
-    return rows.map((r) => this.rowToSession(r));
+    const sessions = rows.map((r) => this.rowToSession(r));
+    if (!this.activeRoot) return sessions;
+    return sessions.filter((s) => this.isWithinRoot(s.cwd));
+  }
+
+  private isWithinRoot(cwd: string): boolean {
+    if (!cwd || !this.activeRoot) return false;
+    let abs: string;
+    try { abs = resolve(cwd); } catch { return false; }
+    return abs === this.activeRoot || abs.startsWith(this.activeRoot + sep);
   }
 
   private rowToStep(row: any): Step {

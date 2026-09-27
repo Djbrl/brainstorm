@@ -1,10 +1,356 @@
-import { Injectable } from "@nestjs/common";
-import type { SetupStatus, WorkspaceSuggestion } from "../types";
+import { BadRequestException, Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { closeSync, existsSync, openSync, readdirSync, readSync, statSync } from "node:fs";
+import { basename, isAbsolute, join, resolve } from "node:path";
+import type { SetupStatus, SetupStep, WorkspaceSuggestion } from "../types";
+import { DbService } from "../core/db.service";
+import { BusService } from "../core/bus.service";
+import { EventsGateway } from "../core/events.gateway";
+import { ConfigService } from "../core/config.service";
+import { ListenerService } from "../listener/listener.service";
+import { MapperService } from "../mapper/mapper.service";
+import { ReaderService } from "../reader/reader.service";
 
-// Owner: S (workspace setup). Stub from the lead.
+const execFileP = promisify(execFile);
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const MAX_SUGGESTIONS = 12;
+const CWD_READ_BYTES = 64 * 1024;
+const POLL_MS = 300;
+const POLL_TIMEOUT_MS = 5 * 60_000;
+
+// Owner: S (workspace setup, server).
 @Injectable()
-export class WorkspaceService {
-  status(): SetupStatus { return { root: null, name: null, ready: false, steps: [] }; }
-  suggestions(): WorkspaceSuggestion[] { return []; }
-  async select(_root: string): Promise<SetupStatus> { return this.status(); }
+export class WorkspaceService implements OnModuleInit {
+  private log = new Logger("Workspace");
+  private root: string | null = null;
+  private claudeStep: SetupStep = { id: "claude", label: "Connecting to Claude Code", state: "pending" };
+  private nemotronStep: SetupStep = { id: "nemotron", label: "Nemotron on NVIDIA Brev", state: "pending" };
+  private anthropicStep: SetupStep = { id: "anthropic", label: "Claude for questions", state: "pending" };
+  private lastBroadcast = "";
+  private pollTimer?: NodeJS.Timeout;
+  private gen = 0;
+
+  constructor(
+    private dbs: DbService,
+    private bus: BusService,
+    private gateway: EventsGateway,
+    private cfg: ConfigService,
+    private listener: ListenerService,
+    private mapper: MapperService,
+    private reader: ReaderService,
+  ) {}
+
+  onModuleInit() {
+    this.dbs.db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
+    const saved = this.getSetting("workspace");
+    if (saved && this.isValidDir(saved)) {
+      this.log.log(`boot: applying saved workspace ${saved}`);
+      this.activate(saved); // fire and forget: don't block startup
+    } else {
+      this.log.log(`boot: no saved workspace, the web will show the setup screen`);
+    }
+  }
+
+  // ---- reads ----
+
+  status(): SetupStatus {
+    if (!this.root) return { root: null, name: null, ready: false, steps: [] };
+    const scan = this.scanStep(this.root);
+    const imports = this.importsStep(this.root);
+    const summaries = this.summariesStep();
+    const steps: SetupStep[] = [scan, imports, this.claudeStep, this.nemotronStep, this.anthropicStep, summaries];
+    const ready = scan.state === "done" && imports.state === "done" && this.claudeStep.state !== "error";
+    return { root: this.root, name: basename(this.root), ready, steps };
+  }
+
+  /** Recent Claude Code projects, most recently active first (owner: S). Must stay fast (<300ms). */
+  suggestions(): WorkspaceSuggestion[] {
+    let dirs: string[];
+    try {
+      dirs = readdirSync(this.cfg.claudeProjectsDir);
+    } catch (e) {
+      this.log.warn(`suggestions: cannot read ${this.cfg.claudeProjectsDir}: ${(e as Error).message}`);
+      return [];
+    }
+
+    const byRoot = new Map<string, WorkspaceSuggestion>();
+    const worktrees: { root: string; parentRoot: string; sessions: number; lastActiveAt: string }[] = [];
+
+    for (const d of dirs) {
+      const dirPath = join(this.cfg.claudeProjectsDir, d);
+      let dirStat;
+      try { dirStat = statSync(dirPath); } catch { continue; }
+      if (!dirStat.isDirectory()) continue;
+
+      let jsonlFiles: { path: string; mtimeMs: number }[];
+      try {
+        jsonlFiles = readdirSync(dirPath)
+          .filter((f) => f.endsWith(".jsonl"))
+          .map((f) => {
+            const p = join(dirPath, f);
+            return { path: p, mtimeMs: statSync(p).mtimeMs };
+          });
+      } catch { continue; }
+      if (!jsonlFiles.length) continue;
+
+      jsonlFiles.sort((a, b) => b.mtimeMs - a.mtimeMs);
+      const newest = jsonlFiles[0];
+      const cwd = this.readCwd(newest.path);
+      if (!cwd) continue;
+
+      const root = resolve(cwd);
+      const lastActiveAt = new Date(newest.mtimeMs).toISOString();
+      const sessions = jsonlFiles.length;
+      const exists = existsSync(root);
+
+      // Git worktrees belong to their parent repo, not to their own suggestion.
+      const wtMatch = root.match(/^(.*)[/\\]\.claude[/\\]worktrees[/\\][^/\\]+$/);
+      if (wtMatch) {
+        worktrees.push({ root, parentRoot: resolve(wtMatch[1]), sessions, lastActiveAt });
+        continue;
+      }
+
+      const existing = byRoot.get(root);
+      if (existing) {
+        existing.sessions += sessions;
+        if (lastActiveAt > (existing.lastActiveAt ?? "")) existing.lastActiveAt = lastActiveAt;
+        existing.exists = existing.exists || exists;
+      } else {
+        byRoot.set(root, { root, name: basename(root), lastActiveAt, sessions, exists });
+      }
+    }
+
+    for (const wt of worktrees) {
+      const parent = byRoot.get(wt.parentRoot);
+      if (!parent) continue; // no listed parent: skip per spec, worktrees aren't their own suggestion
+      parent.sessions += wt.sessions;
+      if (wt.lastActiveAt > (parent.lastActiveAt ?? "")) parent.lastActiveAt = wt.lastActiveAt;
+    }
+
+    return [...byRoot.values()]
+      .sort((a, b) => (b.lastActiveAt ?? "").localeCompare(a.lastActiveAt ?? ""))
+      .slice(0, MAX_SUGGESTIONS);
+  }
+
+  // ---- writes ----
+
+  async select(root: string): Promise<SetupStatus> {
+    const abs = this.validateRoot(root);
+    this.setSetting("workspace", abs);
+    this.activate(abs);
+    return this.status();
+  }
+
+  // ---- validation ----
+
+  private validateRoot(root: string): string {
+    if (!root || typeof root !== "string") throw new BadRequestException("root is required");
+    if (!isAbsolute(root)) throw new BadRequestException(`"${root}" must be an absolute path`);
+    if (!existsSync(root)) throw new BadRequestException(`"${root}" does not exist`);
+    if (!statSync(root).isDirectory()) throw new BadRequestException(`"${root}" is not a directory`);
+    return resolve(root);
+  }
+
+  private isValidDir(p: string): boolean {
+    try { return isAbsolute(p) && existsSync(p) && statSync(p).isDirectory(); } catch { return false; }
+  }
+
+  // ---- settings persistence ----
+
+  private getSetting(key: string): string | null {
+    const row = this.dbs.db.prepare(`SELECT value FROM settings WHERE key = ?`).get(key) as { value: string } | undefined;
+    return row?.value ?? null;
+  }
+
+  private setSetting(key: string, value: string) {
+    this.dbs.db
+      .prepare(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
+      .run(key, value);
+  }
+
+  // ---- activation pipeline ----
+
+  /** Set the active workspace, notify listener/mapper/reader, and start the checklist checks
+   * (Claude CLI, Nemotron, Anthropic) in the background. Synchronous parts (map build) happen
+   * inline since they're fast local fs work; the network/subprocess checks are not awaited. */
+  private activate(abs: string) {
+    this.root = abs;
+    this.cfg.defaultRoot = abs;
+    this.claudeStep = { id: "claude", label: "Connecting to Claude Code", state: "running" };
+    this.nemotronStep = { id: "nemotron", label: "Nemotron on NVIDIA Brev", state: "running" };
+    this.anthropicStep = { id: "anthropic", label: "Claude for questions", state: "running" };
+
+    this.bus.emit("workspace", { root: abs }); // listener re-scopes, mapper rebuilds+watches, reader re-summarizes
+
+    this.startPolling();
+    this.broadcastIfChanged();
+
+    const gen = ++this.gen;
+    this.runChecks(abs, gen).catch((e) => this.log.warn(`runChecks failed: ${(e as Error).message}`));
+  }
+
+  private async runChecks(root: string, gen: number) {
+    const [claude, nemotron] = await Promise.all([this.checkClaude(root), this.checkNemotron()]);
+    if (gen !== this.gen) return; // superseded by a newer select()
+    this.claudeStep = claude;
+    this.nemotronStep = nemotron;
+    this.anthropicStep = this.checkAnthropic();
+    this.broadcastIfChanged();
+  }
+
+  // ---- step: scan / imports (derived live from the mapper) ----
+
+  private scanStep(root: string): SetupStep {
+    const label = "Reading your code";
+    const cached = this.mapper.getCached(root);
+    if (cached) return { id: "scan", label, state: "done", detail: `${cached.map.files.length} files` };
+    if (this.mapper.isBuilding(root)) return { id: "scan", label, state: "running" };
+    return { id: "scan", label, state: this.root === root ? "running" : "pending" };
+  }
+
+  private importsStep(root: string): SetupStep {
+    const label = "Mapping imports";
+    const cached = this.mapper.getCached(root);
+    if (cached) {
+      return {
+        id: "imports", label, state: "done",
+        detail: `${cached.map.edges.length} imports across ${cached.map.modules.length} modules`,
+      };
+    }
+    if (this.mapper.isBuilding(root)) return { id: "imports", label, state: "running" };
+    return { id: "imports", label, state: this.root === root ? "running" : "pending" };
+  }
+
+  // ---- step: claude ----
+
+  private async checkClaude(root: string): Promise<SetupStep> {
+    const label = "Connecting to Claude Code";
+    let versionRaw: string;
+    try {
+      const { stdout } = await execFileP("claude", ["--version"], { timeout: 3000 });
+      versionRaw = stdout.trim().split("\n")[0] ?? "";
+    } catch {
+      return { id: "claude", label, state: "warn", detail: "Claude Code CLI not found, install it to follow agents live" };
+    }
+    const version = versionRaw.match(/\d+\.\d+(\.\d+)?/)?.[0] ?? (versionRaw || "?");
+    const sessions = this.countRecentSessions(root);
+    if (sessions === 0) {
+      return { id: "claude", label, state: "warn", detail: "No sessions yet. Start `claude` in this folder and they will appear live" };
+    }
+    return { id: "claude", label, state: "done", detail: `Claude Code ${version} · ${sessions} session${sessions === 1 ? "" : "s"} in the last day` };
+  }
+
+  /** Count *.jsonl files modified in the last 24h across every Claude Code project folder for `root`. */
+  private countRecentSessions(root: string): number {
+    const encoded = resolve(root).replace(/[^A-Za-z0-9-]/g, "-");
+    let dirs: string[];
+    try { dirs = readdirSync(this.cfg.claudeProjectsDir); } catch { return 0; }
+    let count = 0;
+    const now = Date.now();
+    for (const d of dirs) {
+      if (!d.startsWith(encoded)) continue;
+      const dirPath = join(this.cfg.claudeProjectsDir, d);
+      let entries: string[];
+      try { entries = readdirSync(dirPath); } catch { continue; }
+      for (const name of entries) {
+        if (!name.endsWith(".jsonl")) continue;
+        try {
+          const st = statSync(join(dirPath, name));
+          if (now - st.mtimeMs <= ONE_DAY_MS) count++;
+        } catch { /* ignore */ }
+      }
+    }
+    return count;
+  }
+
+  // ---- step: nemotron ----
+
+  private async checkNemotron(): Promise<SetupStep> {
+    const label = "Nemotron on NVIDIA Brev";
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 3000);
+      try {
+        const res = await fetch(`${this.cfg.nemotron.url}/models`, {
+          headers: this.cfg.nemotron.key ? { Authorization: `Bearer ${this.cfg.nemotron.key}` } : undefined,
+          signal: ctrl.signal,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } finally {
+        clearTimeout(timer);
+      }
+      return { id: "nemotron", label, state: "done", detail: "online" };
+    } catch {
+      return { id: "nemotron", label, state: "warn", detail: "offline: plain labels, no summaries" };
+    }
+  }
+
+  // ---- step: anthropic ----
+
+  private checkAnthropic(): SetupStep {
+    const label = "Claude for questions";
+    if (this.cfg.claude.key) return { id: "anthropic", label, state: "done", detail: "configured" };
+    return { id: "anthropic", label, state: "warn", detail: "no API key: Ask is disabled" };
+  }
+
+  // ---- step: summaries (derived live from the reader) ----
+
+  private summariesStep(): SetupStep {
+    const label = "Summarizing files with Nemotron";
+    if (this.nemotronStep.state === "warn") return { id: "summaries", label, state: "warn", detail: "skipped: Nemotron offline" };
+    if (this.nemotronStep.state !== "done") return { id: "summaries", label, state: "pending" };
+    const { done, total } = this.reader.summaryProgress();
+    if (total === 0) return { id: "summaries", label, state: "pending", done: 0, total: 0 };
+    return { id: "summaries", label, state: done >= total ? "done" : "running", done, total };
+  }
+
+  // ---- ws broadcast (throttled ~300ms) ----
+
+  private startPolling() {
+    if (this.pollTimer) clearInterval(this.pollTimer);
+    const startedAt = Date.now();
+    this.pollTimer = setInterval(() => {
+      const s = this.status();
+      this.broadcastIfChanged(s);
+      const settled = s.ready && s.steps.every((st) => st.state !== "running");
+      if (settled || Date.now() - startedAt > POLL_TIMEOUT_MS) {
+        if (this.pollTimer) clearInterval(this.pollTimer);
+        this.pollTimer = undefined;
+      }
+    }, POLL_MS);
+  }
+
+  private broadcastIfChanged(s?: SetupStatus) {
+    const status = s ?? this.status();
+    const serialized = JSON.stringify(status);
+    if (serialized === this.lastBroadcast) return;
+    this.lastBroadcast = serialized;
+    this.gateway.broadcast({ type: "setup", status });
+  }
+
+  // ---- helpers ----
+
+  /** Read the `cwd` field from the first ~64KB of a jsonl file, line by line. */
+  private readCwd(file: string): string | null {
+    let fd: number;
+    try { fd = openSync(file, "r"); } catch { return null; }
+    try {
+      const buf = Buffer.alloc(CWD_READ_BYTES);
+      const bytesRead = readSync(fd, buf, 0, CWD_READ_BYTES, 0);
+      const text = buf.toString("utf8", 0, bytesRead);
+      for (const line of text.split("\n")) {
+        if (!line.trim()) continue;
+        try {
+          const obj = JSON.parse(line) as { cwd?: unknown };
+          if (typeof obj.cwd === "string" && obj.cwd) return obj.cwd;
+        } catch { /* partial/invalid line (e.g. cut off at the 64KB boundary), skip */ }
+      }
+      return null;
+    } catch {
+      return null;
+    } finally {
+      closeSync(fd);
+    }
+  }
 }

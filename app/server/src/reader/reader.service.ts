@@ -66,6 +66,7 @@ export class ReaderService implements OnModuleInit {
   // measurement
   private labelLatenciesMs: number[] = [];
   private summariesDone = 0;
+  private summaryTotal = 0;
   private summaryPhaseStart = 0;
 
   constructor(
@@ -112,6 +113,18 @@ export class ReaderService implements OnModuleInit {
 
     // Nemotron (Brev tunnel) can be flaky; periodically retry any file that never got a summary.
     setInterval(() => this.retryMissingSummaries(), 45_000);
+
+    // Owner: S. When the workspace changes, re-summarize the new root's files from scratch.
+    this.bus.on("workspace", () => {
+      this.summariesDone = 0;
+      this.summaryTotal = 0;
+      this.summarizeAll().catch((e) => this.log.warn(`summarizeAll after workspace change failed: ${(e as Error).message}`));
+    });
+  }
+
+  /** {done, total} file summaries for the current root (owner: S, for the setup checklist). */
+  summaryProgress(): { done: number; total: number } {
+    return { done: this.summariesDone, total: this.summaryTotal };
   }
 
   /** Scan already-labeled steps for ones that look like an echoed prompt and re-label them. */
@@ -257,6 +270,7 @@ export class ReaderService implements OnModuleInit {
   private async summarizeAll() {
     const map = this.mapper.getMap(this.cfg.defaultRoot);
     const files = [...map.files].sort((a, b) => (b.lastChangedAt ?? "").localeCompare(a.lastChangedAt ?? ""));
+    this.summaryTotal = files.length;
     this.summaryPhaseStart = Date.now();
     this.log.log(`summarizing ${files.length} files (most recently changed first)`);
 

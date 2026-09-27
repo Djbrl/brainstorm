@@ -25,33 +25,61 @@ export class MapperService implements OnModuleInit {
   private cache = new Map<string, Cached>();
   private watchers = new Map<string, FSWatcher>();
   private activeClearTimers = new Map<string, NodeJS.Timeout>();
+  private building = new Set<string>();
+  /** The workspace's active root: the one we keep a live chokidar watch on (owner: S). */
+  private activeRoot?: string;
   buildMs = 0;
 
   constructor(private bus: BusService, private gateway: EventsGateway, private cfg: ConfigService) {}
 
   onModuleInit() {
     // Build + watch the default root eagerly so live updates and the reader have something to work with.
-    this.getMap(this.cfg.defaultRoot);
-    this.watch(this.cfg.defaultRoot);
+    this.activeRoot = resolve(this.cfg.defaultRoot);
+    this.getMap(this.activeRoot);
+    this.watch(this.activeRoot);
     this.bus.on("file-touched", ({ path, sessionId, ts }) => this.onFileTouched(this.cfg.defaultRoot, path, sessionId, ts));
+    this.bus.on("workspace", ({ root }) => this.switchRoot(root));
   }
 
   getMap(root: string): ProjectMap {
     const abs = resolve(root);
     const existing = this.cache.get(abs);
     if (existing) return existing.map;
-    const t0 = Date.now();
-    const built = this.buildMap(abs);
-    this.buildMs = Date.now() - t0;
-    this.cache.set(abs, built);
-    this.log.log(`built map for ${abs}: ${built.map.files.length} files, ${built.map.edges.length} edges, ${built.map.modules.length} modules in ${this.buildMs}ms`);
-    return built.map;
+    this.building.add(abs);
+    try {
+      const t0 = Date.now();
+      const built = this.buildMap(abs);
+      this.buildMs = Date.now() - t0;
+      this.cache.set(abs, built);
+      this.log.log(`built map for ${abs}: ${built.map.files.length} files, ${built.map.edges.length} edges, ${built.map.modules.length} modules in ${this.buildMs}ms`);
+      return built.map;
+    } finally {
+      this.building.delete(abs);
+    }
   }
 
   getHistory(_root: string): Snapshot[] { return []; } // history/snapshots cut for the demo
 
   /** Internal: cached ProjectMap for a root, if it has been built. Used by the reader to attach summaries. */
   getCached(root: string): Cached | undefined { return this.cache.get(resolve(root)); }
+
+  /** True while `getMap(root)` is walking the tree for the first time (used by the setup checklist). */
+  isBuilding(root: string): boolean { return this.building.has(resolve(root)); }
+
+  /** React to the active workspace changing: watch the new root, build its map, broadcast it. */
+  switchRoot(root: string): ProjectMap {
+    const abs = resolve(root);
+    if (this.activeRoot && this.activeRoot !== abs) {
+      const oldWatcher = this.watchers.get(this.activeRoot);
+      if (oldWatcher) { oldWatcher.close(); this.watchers.delete(this.activeRoot); }
+    }
+    const map = this.getMap(abs); // cache hit if something already built it (e.g. the reader)
+    this.activeRoot = abs;
+    this.watch(abs);
+    this.gateway.broadcast({ type: "map", map });
+    this.log.log(`switched active map root to ${abs}: ${map.files.length} files, ${map.edges.length} edges, ${map.modules.length} modules`);
+    return map;
+  }
 
   // ---- build ----
 

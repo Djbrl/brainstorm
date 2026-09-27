@@ -27,6 +27,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 15:45 [lead] Failures panel (SupplyzPro "Find the Hidden Failures"): GET /api/failures finds failing tool calls (is_error, <tool_use_error>, non-zero exit, blocked permissions), pairs each with its call, groups by tool + normalized error, ranks by count x recency with boosts for retries and edits, and Nemotron names each group with a one-line fix. Failures tab with evidence that jumps to the step in Follow (C). In the replay demo. Brev tunnel dropped again at 15:38; reopened.
 
+- 16:50 [lead] POST-DEADLINE cosmetic update: replay welcome tour (no feature or data changes)
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

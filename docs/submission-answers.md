@@ -25,10 +25,10 @@ Developers increasingly let AI agents write most of their code, often several ag
 - Live Follow timeline of every Claude Code session on the machine, including subagents; each step gets a short Nemotron label within about 0.2 s; click an edit to see its diff.
 - Ask: question any step or file; Claude answers from a small grounded package (the step, its diff, the steps before it, file and module summaries). Secrets are masked first. Cached, with cost shown (about $0.03 per question); falls back to Nemotron.
 - Map: modules and import links of the project; nodes colored by edit recency and pulsing where an agent is working; click a file for its Nemotron summary and recent steps.
-- Failures: recurring tool-call errors grouped and ranked with evidence steps [verify it shipped].
+- Failures: recurring tool-call errors grouped and ranked with evidence steps; on our own build it found 22 failing tool calls in 13 groups across 5 sessions (hosted demo: ?view=failures).
 - Replay export: a recorded session with its map and answers, viewable in a static build.
 
-(2) Not built or simulated: pause and steer, Codex sessions, keyboard shortcut and Markdown export are not built. [If the video still shows illustrative UI, say so here.]
+(2) Not built or simulated: pause and steer, Codex sessions, keyboard shortcut and Markdown export are not built.
 
 (3) Built today: all product code (NestJS server, React web, listener, mapper, reader, Ask, replay), the landing page and the video, written by parallel Claude Code agents directed by the team. Reused: open-source libraries only (NestJS, React, Vite, react-force-graph, Remotion) and the open Nemotron model. See `docs/build-log.md` for the timeline.
 
@@ -36,7 +36,7 @@ Developers increasingly let AI agents write most of their code, often several ag
 
 TypeScript; NestJS 11 server (node:sqlite, chokidar, WebSocket); React 19 + Vite web; react-force-graph; NVIDIA Nemotron 3 Nano 30B-A3B (FP8) served by vLLM 0.30 on an NVIDIA Brev L40S GPU; Claude API (claude-opus-5) through the Anthropic SDK; Claude Code (multi-agent build); Remotion (video); Vercel (landing page and hosted replay).
 
-**Source code URL:** [FILL: public GitHub repo]
+**Source code URL:** https://github.com/Djbrl/brainstorm
 **Presentation URL:** https://brainstorm-landing.vercel.app
 **90-second demo video URL:** [FILL: unlisted YouTube / Drive / Loom]
 
@@ -56,7 +56,7 @@ Thunders, Guepard, SupplyzPro, EY Studio+, CompTIA, Brightest, Artefact.
 
 **Guepard (AI Automation):** Brainstorm automates the review work that follows every agent run: labeling each step, summarizing every file, flagging risky edits and grouping failures. The productivity gain is understanding what several agents did in minutes instead of reading dozens of diffs. See the Follow and Map views in the video and `app/server/src/reader/`. Open to all countries.
 
-**SupplyzPro (Find the Hidden Failures):** Brainstorm reads every AI-agent conversation and tool call as it happens. Its Failures view detects failed tool calls, groups them by tool and normalized error, and ranks the groups by frequency, recency and retries, each with its evidence steps and a Nemotron one-line title. Demonstrated on Brainstorm's own multi-agent build logs (`app/server/src/failures/`, video). [Verify it shipped.] Senegal; no country restriction stated.
+**SupplyzPro (Find the Hidden Failures):** Brainstorm reads every AI-agent conversation and tool call as it happens. Its Failures view detects failed tool calls, groups them by tool and normalized error, and ranks the groups by frequency, recency and retries, each with its evidence steps and a Nemotron one-line title. Demonstrated on Brainstorm's own multi-agent build logs: 22 failing tool calls in 13 groups across 5 sessions, top group "Environment access failures retried" (live at https://brainstorm-demo-black.vercel.app/?view=failures; code in `app/server/src/failures/`). Senegal; no country restriction stated.
 
 **EY Studio+ (Human-Centred Innovation):** A clear problem backed by research (comprehension debt), a user who feels it daily (anyone coding with AI agents), and an experience built around seeing rather than reading. Route to adoption: it sits beside the tools developers already use, needs no workflow change, and is local-first. See `docs/plan.md` and the video. Open to all countries.
 
@@ -85,7 +85,7 @@ Thunders, Guepard, SupplyzPro, EY Studio+, CompTIA, Brightest, Artefact.
 
 ## Live demo URL (optional)
 
-[FILL: hosted replay URL]
+https://brainstorm-demo-black.vercel.app
 
 ## Testing, results and known limitations (optional)
 

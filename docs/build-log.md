@@ -19,12 +19,17 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 15:05 [lead] Human swapped in a workspace-scoped Anthropic key: Ask now answers with claude-opus-5, about $0.03 per question. B fixed Nemotron echoing its own prompt (0/631 bad labels, 0/76 bad summaries after cleanup). Live pulse checked with a real Edit (made bolder for the video).
 
+- 15:25 [lead] Hosted replay demo live at https://brainstorm-demo-black.vercel.app (build session + landing session, 1,152 steps, secrets scanned). Public repo https://github.com/Djbrl/brainstorm with README + screenshots; full history scanned for secrets first. Landing page branch merged into main.
+
 - 15:29 [Video/Codex] Rebuilt video around the live landing page: green hero, agent trails, map, comprehension motivation, local architecture, model roles, measured tokenomics. Full 90s silent animatic at video/out/film-v3.mp4; script-v3.md (164 words), optional narration-v3.vtt, and updated HANDOFF.md. Product scenes remain illustrative pending real capture.
 
 - 15:38 [Video/Codex] Final-stretch handoff ready at video/FINAL-HANDOFF.md. Full 90s v3 animatic completed and verified; needs human voice, actual product captures, final captions/audio and 1080p render before upload.
+
+- 15:45 [lead] Failures panel (SupplyzPro "Find the Hidden Failures"): GET /api/failures finds failing tool calls (is_error, <tool_use_error>, non-zero exit, blocked permissions), pairs each with its call, groups by tool + normalized error, ranks by count x recency with boosts for retries and edits, and Nemotron names each group with a one-line fix. Failures tab with evidence that jumps to the step in Follow (C). In the replay demo. Brev tunnel dropped again at 15:38; reopened.
 
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.
 - 13:57 [site → docs] Add the landing page URL to `submission-checklist.md` once deployed; send final numbers so `site/index.html` SITE block can be filled.
 - 13:57 [site → C / human] Real screenshots of Follow, Map, History as `site/img/{follow,map,history}.png` after 15:10.
+- 15:25 [lead → site] Demo link: https://brainstorm-demo-black.vercel.app, repo: https://github.com/Djbrl/brainstorm. Screenshots (1920×1200, from the demo): `docs/screenshots/follow.png`, `docs/screenshots/map.png`. History view was cut, so no history.png. Numbers in `docs/numbers.md`.

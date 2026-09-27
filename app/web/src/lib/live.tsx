@@ -1,6 +1,6 @@
 // Owned by the lead. One store for the whole app: REST bootstrap + websocket updates, or a static replay file.
 import { createContext, useCallback, useContext, useEffect, useReducer, type ReactNode } from "react";
-import type { AskRequest, AskResponse, FileNode, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
+import type { AskRequest, AskResponse, FailureGroup, FileNode, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
 
 export type LiveState = {
   connected: boolean;
@@ -8,6 +8,7 @@ export type LiveState = {
   sessions: Session[];
   steps: Record<string, Step[]>;   // by sessionId, ordered by seq
   map: ProjectMap | null;
+  failures: FailureGroup[];
 };
 
 type Action =
@@ -15,10 +16,11 @@ type Action =
   | { type: "sessions"; sessions: Session[] }
   | { type: "steps"; sessionId: string; steps: Step[] }
   | { type: "map"; map: ProjectMap }
+  | { type: "failures"; failures: FailureGroup[] }
   | { type: "replay"; data: Replay }
   | WsMessage;
 
-const initial: LiveState = { connected: false, replay: false, sessions: [], steps: {}, map: null };
+const initial: LiveState = { connected: false, replay: false, sessions: [], steps: {}, map: null, failures: [] };
 
 function upsertFile(map: ProjectMap | null, file: FileNode): ProjectMap | null {
   if (!map) return map;
@@ -33,11 +35,12 @@ function reducer(s: LiveState, a: Action): LiveState {
     case "sessions": return { ...s, sessions: sortSessions(a.sessions) };
     case "steps": return { ...s, steps: { ...s.steps, [a.sessionId]: a.steps } };
     case "map": return { ...s, map: a.map };
+    case "failures": return { ...s, failures: a.failures };
     case "replay": {
       const steps: Record<string, Step[]> = {};
       for (const st of a.data.steps) (steps[st.sessionId] ??= []).push(st);
       Object.values(steps).forEach((l) => l.sort((x, y) => x.seq - y.seq));
-      return { ...s, replay: true, connected: true, sessions: sortSessions(a.data.sessions), steps, map: a.data.map };
+      return { ...s, replay: true, connected: true, sessions: sortSessions(a.data.sessions), steps, map: a.data.map, failures: a.data.failures ?? [] };
     }
     case "session": {
       const others = s.sessions.filter((x) => x.id !== a.session.id);
@@ -91,6 +94,9 @@ export function LiveProvider({ children }: { children: ReactNode }) {
     }
     fetch("/api/sessions").then((r) => r.json()).then((sessions) => dispatch({ type: "sessions", sessions })).catch(() => {});
     fetch("/api/map").then((r) => r.json()).then((map) => dispatch({ type: "map", map })).catch(() => {});
+    const loadFailures = () => fetch("/api/failures").then((r) => r.json()).then((failures) => dispatch({ type: "failures", failures })).catch(() => {});
+    loadFailures();
+    const failTimer = setInterval(loadFailures, 15000);
 
     let ws: WebSocket | null = null;
     let stop = false;
@@ -101,7 +107,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       ws.onmessage = (e) => { try { dispatch(JSON.parse(e.data) as WsMessage); } catch {} };
     };
     connect();
-    return () => { stop = true; ws?.close(); };
+    return () => { stop = true; ws?.close(); clearInterval(failTimer); };
   }, []);
 
   const loadSteps = useCallback((sessionId: string) => {

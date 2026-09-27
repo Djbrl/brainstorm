@@ -7,7 +7,7 @@ import { isReplay, useLive } from "../../lib/live";
 import { useNav } from "../../lib/nav";
 import { useThread, type Beat } from "../../lib/thread";
 import { Glyph } from "../../follow/Glyph";
-import { basename, clockTime, displayLabel, resultText, stepFile } from "../../follow/format";
+import { basename, clockTime, displayLabel, resultText, stepFile, stripInjected } from "../../follow/format";
 import "./replay.css";
 
 const ROW_H = 52;          // collapsed row height, keep in sync with replay.css
@@ -45,7 +45,7 @@ function editPair(s: Step): { before: string; after: string } | null {
 
 function preview(s: Step): string {
   const i = s.input && typeof s.input === "object" ? (s.input as Record<string, unknown>) : {};
-  const t = typeof i.command === "string" ? `$ ${i.command}` : s.kind === "tool_result" ? resultText(s) : s.text ?? "";
+  const t = typeof i.command === "string" ? `$ ${i.command}` : s.kind === "tool_result" ? resultText(s) : stripInjected(s.text ?? "");
   const clean = t.trim();
   return clean.length > 600 ? `${clean.slice(0, 599)}…` : clean;
 }

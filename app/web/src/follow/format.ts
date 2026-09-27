@@ -23,8 +23,12 @@ export const clockTime = (iso: string) => {
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 };
 
+/** Drop blocks Claude Code injects into the log (e.g. `<system-reminder>…</system-reminder>`); they aren't what the person or agent wrote. */
+export const stripInjected = (t = "") =>
+  t.replace(/<(system-reminder|command-[a-z-]+|local-command-[a-z-]+)>[\s\S]*?(<\/\1>|$)/g, " ").trim();
+
 const firstLine = (t = "", max = 140) => {
-  const line = t.replace(/```[\s\S]*?```/g, " ").replace(/\*\*|__|`|^#+\s*/gm, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/\s+/g, " ").trim();
+  const line = stripInjected(t).replace(/```[\s\S]*?```/g, " ").replace(/\*\*|__|`|^#+\s*/gm, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/\s+/g, " ").trim();
   return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line;
 };
 

@@ -31,6 +31,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 16:50 [lead] POST-DEADLINE cosmetic update: replay welcome tour (no feature or data changes)
 
+- 16:55 [human] POST-DEADLINE cosmetic update: landing page screenshots (Follow, Map, Failures), Failures card replaces the unbuilt History card, deck.html. No product changes.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

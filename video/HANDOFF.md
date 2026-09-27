@@ -1,6 +1,24 @@
 # Brainstorm video — handoff for Claude or the next Codex context
 
-Last updated: 27 September 2026, 14:20 Dakar. Submission 16:30; code freeze 15:40; aim to finish video by 16:10–16:15.
+**For the final stretch, start with `FINAL-HANDOFF.md`.**
+
+Last updated: 27 September 2026, 15:29 Dakar. Submission 16:30; code freeze 15:40; aim to finish video by 16:10–16:15.
+
+## Latest user direction and deliverable (v3, 15:22)
+
+The user now wants the film to mirror their landing page, https://brainstorm-landing.vercel.app/, with more time for motivation, technical workings, and tokenomics. This supersedes v2's violet-led visual direction. We inspected the live site and read its source in `.claude/worktrees/hackathon-landing-page-7cd864/site/index.html` without modifying it.
+
+- New entry: `src/film-v3.tsx`, composition `Film`, 2700 frames, 30fps, 1920×1080. Full 90-second silent animatic.
+- Latest narration and shot plan: `script-v3.md`, 164 spoken words. User has NOT recorded or approved it yet. Optional timed draft text is in `narration-v3.vtt`, linked as captions in `review.html`. Retiming must follow actual voice.
+- New render: `npm run render:film -- --browser-executable='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'` from `video/`. Output `out/film-v3.mp4`, 720p review. Preserve v1/v2 for comparison.
+- Visuals now match site: pure white / #f5f5f7, Cabinet Grotesk 800, Satoshi; green gradient #3f8c00 → #76b900 → #9ccc1c; blue/violet/cyan agent trails; orange/red map heat.
+- Story: hero 0–6s; one/three-agent trails 6–14; scrolling edits 14–20; comprehension 20–31; product carousel 31–45; local technical flow 45–54; model responsibilities 54–65; benchmark 65–77; incremental rereads/token-free map 77–83; closing 83–90.
+- **Still illustrative product UI** in the 31–45s segment. The live landing page also has placeholder product panels. Replace these with real app footage before calling the film a prototype demonstration. Ask answer is explicitly marked illustrative in the preview. No music or narration yet.
+- Research restored at user's request for more motivation: Anthropic January 2026, 52 developers learning Trio, quiz 50% with AI / 67% without. Explanation-seeking correlates with stronger comprehension; no claim Brainstorm itself has a measured learning benefit. Verified official source in `script-v3.md`.
+- Real benchmark now exists: `docs/bench/hono-result.json`, `docs/bench/bench.py`. 311/311 successful responses; 73.2s; 646,453 input tokens and 20,460 output tokens. Price in docs is $1.06/hr; allocated warm-run GPU cost = $0.02155, displayed 2.2¢. Excludes startup/download/idle time.
+- Important: benchmark slices each file to 60,000 CHARACTERS despite variable named MAX_BYTES. Do not claim all 80,983 corpus lines were read. Video discloses cap and 16 concurrent requests. Do not use estimated 35× comparison or invent Ask costs.
+- Confirmed in the coding worktree source: reader uses content-hash summary caching; Ask context caps file excerpt to 150 lines. Integrated runtime still needs verification.
+- Next priority: review full animatic, record human narration, replace product scenes with actual capture at 15:40, then sound/captions/final ≤90-second 1080p export.
 
 ## Mission and ownership
 
@@ -41,7 +59,7 @@ The user liked the initial mockup, then specifically requested:
 - `package.json`, `package-lock.json`: local Remotion/React dependencies installed in `video/node_modules`.
 - Initial commit: `65edd20` (`[Video] add opening motion mockup and 90-second script`).
 
-`out/` is intentionally gitignored. Local rendered files exist but are not in Git. Source and script are committed. No product footage, human voice, music, captions, or finished 90-second film exists yet.
+`out/` is intentionally gitignored. Local rendered files exist but are not in Git. Source and script are committed. No product footage, human voice, music, captions, or finished submission film exists yet. A full 90-second animatic is now available in v3.
 
 ## How it is made
 
@@ -88,3 +106,7 @@ Keep this handoff updated as decisions change. Commit only this work; other agen
 ## Verification and current output
 
 Version 2 export: `out/opening-v2.mp4`; six-scene visual check: `out/contact-sheet-v2.jpg`; poster: `out/poster-v2.jpg`. Font loading completed without errors. Source is still 1080p, preview is 720p. Product frame intentionally enters from below and extends beyond the bottom of the shot. No sound yet.
+
+## Version 3 validation
+
+The full animatic exported at exactly 90.000 seconds, 1280×720, 30fps, H.264. Ten representative scenes were visually inspected. A carousel caption mismatch was corrected in source (`page = Math.round(shift)`). The 31–45s segment was re-rendered with `--frames=930-1349` and spliced into the full export with FFmpeg to avoid rerendering unchanged scenes. A normal `render:film` run produces the corrected composition directly. Outputs remain gitignored. Final submission still needs actual product footage, human voice, sound, final captions, and a 1080p export.

@@ -209,6 +209,7 @@ export class ListenerService implements OnModuleInit {
       else if (Array.isArray(b.content)) text = b.content.filter((c: any) => c?.type === "text").map((c: any) => c.text).join("\n\n");
       else text = JSON.stringify(b.content ?? "");
       const step = this.makeStep(o, sessionId, i, ts, "tool_result", sanitizeText(text, TOOL_RESULT_LIMIT), isSubagent);
+      if (b.is_error) step.input = { isError: true, toolUseId: b.tool_use_id }; // read by the failures module
       this.storeStep(step, { cwd: o.cwd });
     });
   }

@@ -20,6 +20,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 16:58 [lead] POST-DEADLINE cosmetic update: header wordmark links to landing page
 
+- 18:56 [lead] POST-DEADLINE, local app only: started a workspace Setup screen (pick a folder, live checklist while Brainstorm reads the code and connects to Claude Code) and live agents on the Map (markers that move file to file, trails, tracker panel). Agents S (server setup), C (setup screen), D (agents server + map). The hosted demo is unchanged.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

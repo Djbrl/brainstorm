@@ -53,8 +53,10 @@ export function relTime(iso: string | undefined, now = Date.now()): string {
   return `changed ${Math.round(s / 86400)} days ago`;
 }
 const relPath = (p: string, root: string) => (p.startsWith(root) ? p.slice(root.length).replace(/^\/+/, "") : p);
+const modName = (m: string) => (!m || m === "." ? "root" : m);
+const projectName = (root: string) => (root ? baseName(root.replace(/\/\.claude\/worktrees\/.*$/, "").replace(/\/+$/, "")) : "Map");
 const baseName = (p: string) => p.split("/").pop() || p;
-const radius = (lines: number) => Math.min(16, 2.5 + Math.sqrt(Math.max(0, lines)) * 0.38);
+const radius = (lines: number) => Math.min(22, 3.5 + Math.sqrt(Math.max(0, lines)) * 0.55);
 
 function useSize<T extends HTMLElement>() {
   const ref = useRef<T>(null);
@@ -78,8 +80,15 @@ function useNow(ms = 20000) {
 // ---------- graph data (node objects are reused so positions survive live updates) ----------
 function useGraph(map: ProjectMap | null) {
   const nodesRef = useRef(new Map<string, GNode>());
+  const lastRef = useRef<{ key: string; graph: { nodes: GNode[]; links: GLink[]; anchors: Map<string, { x: number; y: number }> } } | null>(null);
   return useMemo(() => {
     if (!map) return { nodes: [] as GNode[], links: [] as GLink[], anchors: new Map<string, { x: number; y: number }>() };
+    // Same files, modules and edges: update node data in place so the simulation is not disturbed.
+    const key = map.files.map((f) => f.path + "|" + f.module).join(",") + "#" + map.edges.length;
+    if (lastRef.current && lastRef.current.key === key) {
+      for (const f of map.files) { const n = nodesRef.current.get(f.path); if (n) { n.file = f; n.r = radius(f.lines); } }
+      return lastRef.current.graph;
+    }
     // Module anchors on a sunflower spiral, biggest modules in the middle.
     const counts = new Map<string, number>();
     for (const f of map.files) counts.set(f.module, (counts.get(f.module) ?? 0) + 1);
@@ -102,7 +111,9 @@ function useGraph(map: ProjectMap | null) {
     });
     nodesRef.current = next;
     const links: GLink[] = map.edges.filter((e) => next.has(e.from) && next.has(e.to) && e.from !== e.to).map((e) => ({ source: e.from, target: e.to }));
-    return { nodes, links, anchors };
+    const graph = { nodes, links, anchors };
+    lastRef.current = { key, graph };
+    return graph;
   }, [map?.files, map?.edges]);
 }
 
@@ -132,13 +143,14 @@ export function MapView() {
   const [selected, setSelected] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const fitted = useRef(false);
+  const settledFit = useRef(false);
   const root = map?.root ?? "";
 
   // Forces
   useEffect(() => {
     const g = fg.current;
     if (!g) return;
-    g.d3Force("module", moduleForce(0.06) as never);
+    g.d3Force("module", moduleForce(0.1) as never);
     (g.d3Force("charge") as any)?.strength?.((n: GNode) => -30 - n.r * 6);
     (g.d3Force("link") as any)?.distance?.((l: GLink) => {
       const s = l.source as GNode, t = l.target as GNode;
@@ -151,7 +163,7 @@ export function MapView() {
   // Zoom to fit once, after the first layout settles a bit.
   useEffect(() => {
     if (fitted.current || graph.nodes.length === 0) return;
-    const t = setTimeout(() => { fg.current?.zoomToFit(900, 90); fitted.current = true; }, 1600);
+    const t = setTimeout(() => { fg.current?.zoomToFit(900, 130); fitted.current = true; }, 1600);
     return () => clearTimeout(t);
   }, [graph.nodes.length]);
 
@@ -165,7 +177,7 @@ export function MapView() {
     if (n.x === undefined) setTimeout(go, 800); else go();
   }, [focusFile, graph.nodes, setFocusFile]);
 
-  const activePaths = useMemo(() => new Set(graph.nodes.filter((n) => n.file.activeSessionId).map((n) => n.id)), [graph.nodes]);
+  const activePaths = useMemo(() => new Set((map?.files ?? []).filter((f) => f.activeSessionId).map((f) => f.path)), [map?.files]);
 
   const drawNode = useCallback((node: NodeObject, ctx: CanvasRenderingContext2D, scale: number) => {
     const n = node as GNode;
@@ -231,7 +243,7 @@ export function MapView() {
       ctx.font = `700 ${px / scale}px ${tokens.display}`;
       ctx.fillStyle = "rgba(29,29,31,0.2)";
       ctx.textBaseline = "bottom";
-      ctx.fillText(m || "(root)", a.x / a.n, a.minY - 10 / scale);
+      ctx.fillText(modName(m), a.x / a.n, a.minY - 10 / scale);
     }
   }, [graph.nodes, tokens]);
 
@@ -267,6 +279,7 @@ export function MapView() {
           autoPauseRedraw={false}
           cooldownTicks={400}
           d3VelocityDecay={0.35}
+          onEngineStop={() => { if (!settledFit.current && !selected) { settledFit.current = true; fg.current?.zoomToFit(900, 130); } }}
           onNodeHover={(n) => setHover(n ? (n as GNode).id : null)}
           onNodeClick={(n) => setSelected((n as GNode).id)}
           onBackgroundClick={() => setSelected(null)}
@@ -274,7 +287,7 @@ export function MapView() {
       )}
 
       <div className="map-head">
-        <h1>{root ? baseName(root.replace(/\/+$/, "")) : "Map"}</h1>
+        <h1>{projectName(root)}</h1>
         <p>{graph.nodes.length} files · {graph.anchors.size} modules{activePaths.size ? ` · ${activePaths.size} being edited now` : ""}</p>
       </div>
 
@@ -307,7 +320,7 @@ function FilePanel({ file, root, steps, onClose }: { file?: FileNode; root: stri
           <h2>{baseName(file.path)}</h2>
           <p className="map-path">{relPath(file.path, root)}</p>
           <p className="map-meta">
-            {file.module || "(root)"} · {file.lines.toLocaleString()} lines · {relTime(file.lastChangedAt, now)}
+            {modName(file.module)} · {file.lines.toLocaleString()} lines · {relTime(file.lastChangedAt, now)}
           </p>
           {file.activeSessionId && <p className="map-live"><i />An agent is editing this file right now</p>}
 

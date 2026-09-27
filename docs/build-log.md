@@ -39,6 +39,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 19:05 [lead] POST-DEADLINE, local app only: Setup and live agents work end to end. Setup lists recent Claude Code projects (decoded from ~/.claude/projects), reads the code, maps imports, finds the Claude Code CLI (including the copy bundled with the desktop app), checks Nemotron and the Claude key, and shows summary progress. On the Map, each agent's marker moves file to file with a fading trail, and a tracker lists each agent's route. Checked with this session's own reads and edits.
 
+- 20:34 [lead] POST-DEADLINE: preview of the setup screen and live agents deployed to https://brainstorm-next.vercel.app (recorded agent moves and a recorded setup run played back; unrelated personal projects redacted). Code on the `post-deadline` branch. The only change on `main` is a README note for the jury. The judged demo is unchanged.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

@@ -1,7 +1,7 @@
 # Submission checklist (deadline 16:30, aim for 16:15)
 
-- [ ] GitHub repo, public, README with a screenshot: TODO link
-- [ ] Hosted replay demo (Vercel): TODO link
+- [x] GitHub repo, public, README with a screenshot: https://github.com/Djbrl/brainstorm
+- [x] Hosted replay demo (Vercel): https://brainstorm-demo-black.vercel.app
 - [ ] 90-second video, unlisted: TODO link
 - [ ] Project card (project-card.md)
 - [ ] Disclosures (disclosures.md)

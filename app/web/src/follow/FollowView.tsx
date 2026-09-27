@@ -44,7 +44,8 @@ function StepRow({ step, selected, fresh, onSelect }: { step: Step; selected: bo
   const labeled = !!realLabel(step);
   const cls = ["tl-row", `k-${step.kind}`, step.isSubagent && "sub", selected && "on", fresh && "fresh"].filter(Boolean).join(" ");
 
-  if (step.kind === "prompt") {
+  // A subagent's "prompt" is the lead agent's brief, not the human: render it as a normal step.
+  if (step.kind === "prompt" && !step.isSubagent) {
     return (
       <div className={cls} onClick={() => onSelect(step)}>
         <div className="tl-glyph"><Glyph kind="prompt" size={17} /></div>

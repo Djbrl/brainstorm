@@ -1,4 +1,5 @@
 // Owner: C. Sessions list + live timeline of steps. Click a step → diff + AskBox.
+import { clock } from "../lib/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Session, Step } from "@contract";
 import { useLive } from "../lib/live";
@@ -11,8 +12,8 @@ import "./follow.css";
 const PAGE = 300;
 
 function useNow(ms = 15000) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), ms); return () => clearInterval(t); }, [ms]);
+  const [now, setNow] = useState(clock());
+  useEffect(() => { const t = setInterval(() => setNow(clock()), ms); return () => clearInterval(t); }, [ms]);
   return now;
 }
 

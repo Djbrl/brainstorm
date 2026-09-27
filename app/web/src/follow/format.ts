@@ -1,9 +1,10 @@
 // Owner: C. Display helpers for steps and sessions.
+import { clock } from "../lib/live";
 import type { Step } from "@contract";
 
 export const basename = (p?: string) => (p ? p.split(/[\\/]/).filter(Boolean).pop() ?? p : "");
 
-export function relTime(iso: string, now = Date.now()): string {
+export function relTime(iso: string, now = clock()): string {
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return "";
   const s = Math.max(0, Math.round((now - t) / 1000));

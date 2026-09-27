@@ -1,4 +1,5 @@
 // Owner: D. Force graph of files/modules, glow by recency, pulse on activeSessionId, side panel + AskBox.
+import { clock } from "../lib/live";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods, type LinkObject, type NodeObject } from "react-force-graph-2d";
 import type { FileNode, ProjectMap, Step } from "@contract";
@@ -44,7 +45,7 @@ function recencyColor(t: Tokens, iso: string | undefined, now: number): string {
   return mix(t.cool, t.cool, 0);
 }
 
-export function relTime(iso: string | undefined, now = Date.now()): string {
+export function relTime(iso: string | undefined, now = clock()): string {
   if (!iso) return "not changed recently";
   const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
   if (s < 45) return "changed just now";
@@ -72,8 +73,8 @@ function useSize<T extends HTMLElement>() {
 }
 
 function useNow(ms = 20000) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), ms); return () => clearInterval(t); }, [ms]);
+  const [now, setNow] = useState(clock());
+  useEffect(() => { const t = setInterval(() => setNow(clock()), ms); return () => clearInterval(t); }, [ms]);
   return now;
 }
 
@@ -182,7 +183,7 @@ export function MapView() {
   const drawNode = useCallback((node: NodeObject, ctx: CanvasRenderingContext2D, scale: number) => {
     const n = node as GNode;
     const x = n.x ?? 0, y = n.y ?? 0, r = n.r;
-    const now = Date.now();
+    const now = clock();
     const active = !!n.file.activeSessionId;
     const isSel = n.id === selected, isHover = n.id === hover;
 

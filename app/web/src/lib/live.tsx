@@ -67,6 +67,10 @@ const replayUrl = () => new URLSearchParams(location.search).get("replay") ?? (i
 export const isReplay = () => !!replayUrl();
 
 let replayData: Replay | null = null;
+
+/** App clock. In replay mode it runs from the export time, so "just now" and recency colors look as they did when recorded. */
+let clockOffset = 0;
+export const clock = () => Date.now() - clockOffset;
 export async function replayAnswer(req: AskRequest): Promise<AskResponse> {
   const hit = replayData?.answers.find((a) => a.request.question === req.question && a.request.stepId === req.stepId && a.request.filePath === req.filePath)
     ?? replayData?.answers.find((a) => (req.stepId && a.request.stepId === req.stepId) || (req.filePath && a.request.filePath === req.filePath));
@@ -82,7 +86,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const url = replayUrl();
     if (url) {
-      fetch(url).then((r) => r.json()).then((data: Replay) => { replayData = data; dispatch({ type: "replay", data }); });
+      fetch(url).then((r) => r.json()).then((data: Replay) => { replayData = data; clockOffset = Math.max(0, Date.now() - Date.parse(data.exportedAt)); dispatch({ type: "replay", data }); });
       return;
     }
     fetch("/api/sessions").then((r) => r.json()).then((sessions) => dispatch({ type: "sessions", sessions })).catch(() => {});

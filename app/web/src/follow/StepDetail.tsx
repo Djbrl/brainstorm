@@ -66,7 +66,7 @@ function EditBody({ step }: { step: Step }) {
     <div className="sd-diff">
       <div className="sd-diffstat"><span className="add">+{added}</span><span className="del">−{removed}</span></div>
       {open ? (
-        <DiffViewer oldValue={pair.before} newValue={pair.after} splitView={false} showDiffOnly extraLinesSurroundingDiff={2} hideSummary styles={diffStyles} />
+        <div className="sd-diff-scroll"><DiffViewer oldValue={pair.before} newValue={pair.after} splitView={false} showDiffOnly extraLinesSurroundingDiff={2} hideSummary styles={diffStyles} /></div>
       ) : (
         <button className="sd-expand" onClick={() => setOpen(true)}>Large change, {lines} lines. Show the diff</button>
       )}

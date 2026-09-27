@@ -56,7 +56,7 @@ export function fallbackLabel(s: Step): string {
         case "WebSearch": return `Search the web for “${firstLine(str(input.query), 60)}”`;
         case "TodoWrite": return "Update the plan";
         case "ToolSearch": return "Look up tools";
-        default: return file ? `${t} ${file}` : t.replace(/^mcp__[^_]+__/, "").replace(/_/g, " ");
+        default: return file ? `${t} ${file}` : t.replace(/^mcp__.+?__/, "").replace(/_/g, " ");
       }
     }
   }

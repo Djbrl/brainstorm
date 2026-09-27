@@ -1,7 +1,192 @@
 // Owner: C. Sessions list + live timeline of steps. Click a step → diff + AskBox.
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { Session, Step } from "@contract";
 import { useLive } from "../lib/live";
+import { useNav } from "../lib/nav";
+import { FileIcon, Glyph, RiskIcon } from "./Glyph";
+import { StepDetail } from "./StepDetail";
+import { basename, clockTime, displayLabel, isVisible, pairResults, relTime, stepFile } from "./format";
+import "./follow.css";
+
+const PAGE = 300;
+
+function useNow(ms = 15000) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), ms); return () => clearInterval(t); }, [ms]);
+  return now;
+}
+
+function SessionList({ sessions, selected, onSelect }: { sessions: Session[]; selected: string | null; onSelect: (id: string) => void }) {
+  const now = useNow();
+  return (
+    <nav className="fl-sessions">
+      <h2 className="fl-sessions-title">Sessions</h2>
+      <div className="fl-sessions-list">
+        {sessions.map((s) => (
+          <button key={s.id} className={`fl-session ${s.id === selected ? "on" : ""}`} onClick={() => onSelect(s.id)}>
+            <div className="fl-session-title">{s.title || "Untitled session"}</div>
+            <div className="fl-session-meta">
+              {s.status === "running" && <span className="fl-live" />}
+              <span className="fl-session-cwd">{basename(s.cwd) || s.cwd}</span>
+              <span className="sep">·</span>
+              <span>{s.status === "running" ? "running" : relTime(s.lastEventAt, now)}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+function StepRow({ step, selected, fresh, onSelect }: { step: Step; selected: boolean; fresh: boolean; onSelect: (s: Step) => void }) {
+  const { openFile } = useNav();
+  const file = stepFile(step);
+  const label = displayLabel(step);
+  const cls = ["tl-row", `k-${step.kind}`, step.isSubagent && "sub", selected && "on", fresh && "fresh"].filter(Boolean).join(" ");
+
+  if (step.kind === "prompt") {
+    return (
+      <div className={cls} onClick={() => onSelect(step)}>
+        <div className="tl-glyph"><Glyph kind="prompt" size={17} /></div>
+        <div className="tl-body">
+          <div className="tl-prompt">{step.text?.trim() || label}</div>
+          <div className="tl-meta"><span>You</span><span className="sep">·</span><span>{clockTime(step.ts)}</span></div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cls} onClick={() => onSelect(step)}>
+      <div className="tl-glyph"><Glyph kind={step.kind} tool={step.tool} /></div>
+      <div className="tl-body">
+        <div className={`tl-label ${step.label ? "has" : "pending"}`} key={step.label ? "l" : "f"}>{label}</div>
+        <div className="tl-meta">
+          <span>{clockTime(step.ts)}</span>
+          {step.isSubagent && <><span className="sep">·</span><span>subagent</span></>}
+          {file && (
+            <button className="chip" onClick={(e) => { e.stopPropagation(); openFile(file); }} title={`${file}\nOpen on the map`}>
+              <FileIcon />{basename(file)}
+            </button>
+          )}
+          {step.risk?.map((r) => <span key={r} className="risk"><RiskIcon />{r}</span>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Timeline({ session, steps, selectedId, onSelect }: { session: Session; steps: Step[] | undefined; selectedId: string | null; onSelect: (s: Step) => void }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const atBottom = useRef(true);
+  const initialIds = useRef<Set<string> | null>(null);
+  const [limit, setLimit] = useState(PAGE);
+  const visible = useMemo(() => (steps ?? []).filter(isVisible), [steps]);
+  const shown = visible.length > limit ? visible.slice(visible.length - limit) : visible;
+  const edits = useMemo(() => visible.filter((s) => s.kind === "edit").length, [visible]);
+  const now = useNow();
+
+  // Reset per session.
+  useEffect(() => { initialIds.current = null; atBottom.current = true; setLimit(PAGE); }, [session.id]);
+  if (steps && !initialIds.current) initialIds.current = new Set(steps.map((s) => s.id));
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (el && atBottom.current) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [visible.length]);
+
+  // First paint of a session: jump, don't glide.
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (el && steps) el.scrollTop = el.scrollHeight;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.id, !!steps]);
+
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (el) atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  };
+
+  return (
+    <section className="fl-timeline">
+      <header className="tl-head">
+        <h1 className="tl-title">{session.title || "Untitled session"}</h1>
+        <div className="tl-sub">
+          {session.status === "running" ? <span className="tl-running"><span className="fl-live" />Live</span> : <span>Last active {relTime(session.lastEventAt, now)}</span>}
+          <span className="sep">·</span>
+          <span title={session.cwd}>{session.cwd}</span>
+          {steps && <><span className="sep">·</span><span>{visible.length} steps, {edits} edits</span></>}
+        </div>
+      </header>
+      <div className="tl-scroll" ref={scrollRef} onScroll={onScroll}>
+        {!steps ? (
+          <div className="tl-list">
+            {Array.from({ length: 7 }, (_, i) => (
+              <div key={i} className="tl-skel" style={{ animationDelay: `${i * 80}ms` }}><span className="dotph" /><span className="bar" style={{ width: `${40 + ((i * 37) % 45)}%` }} /></div>
+            ))}
+          </div>
+        ) : visible.length === 0 ? (
+          <div className="fl-empty small"><p className="fl-empty-title">Nothing yet</p><p>Steps appear here the moment the agent acts.</p></div>
+        ) : (
+          <div className="tl-list">
+            {visible.length > shown.length && (
+              <button className="tl-more" onClick={() => setLimit((l) => l + PAGE)}>Show {Math.min(PAGE, visible.length - shown.length)} earlier steps</button>
+            )}
+            {shown.map((s) => (
+              <StepRow key={s.id} step={s} selected={s.id === selectedId} fresh={!initialIds.current?.has(s.id)} onSelect={onSelect} />
+            ))}
+            {session.status === "running" && <div className="tl-tail"><span className="tl-pulse" />Working</div>}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
 
 export function FollowView() {
-  const { state } = useLive();
-  return <div style={{ padding: 40 }}><h1>Follow</h1><p>{state.sessions.length} sessions</p></div>;
+  const { state, loadSteps } = useLive();
+  const { sessionId, setSessionId } = useNav();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Auto-select the most recent running session (sessions are sorted newest first).
+  useEffect(() => {
+    if (sessionId && state.sessions.some((s) => s.id === sessionId)) return;
+    const pick = state.sessions.find((s) => s.status === "running") ?? state.sessions[0];
+    if (pick) setSessionId(pick.id);
+  }, [state.sessions, sessionId, setSessionId]);
+
+  useEffect(() => {
+    if (sessionId && !state.steps[sessionId]) loadSteps(sessionId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, loadSteps]);
+
+  const session = state.sessions.find((s) => s.id === sessionId) ?? null;
+  const steps = sessionId ? state.steps[sessionId] : undefined;
+  const results = useMemo(() => pairResults(steps ?? []), [steps]);
+  const selected = steps?.find((s) => s.id === selectedId) ?? null;
+
+  const select = useCallback((id: string) => { setSessionId(id); setSelectedId(null); loadSteps(id); }, [setSessionId, loadSteps]);
+  const onClose = useCallback(() => setSelectedId(null), []);
+
+  if (state.sessions.length === 0) {
+    return (
+      <div className="fl-root empty">
+        <div className="fl-empty">
+          <span className="fl-empty-pulse" />
+          <p className="fl-empty-title">{state.connected ? "Waiting for an agent" : "Connecting…"}</p>
+          <p>Start a Claude Code session in any project. It shows up here, live, step by step.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`fl-root ${selected ? "with-detail" : ""}`}>
+      <SessionList sessions={state.sessions} selected={sessionId} onSelect={select} />
+      {session ? (
+        <Timeline session={session} steps={steps} selectedId={selectedId} onSelect={(s) => setSelectedId((cur) => (cur === s.id ? null : s.id))} />
+      ) : <section className="fl-timeline" />}
+      {selected && <StepDetail step={selected} result={results.get(selected.id)} onClose={onClose} />}
+    </div>
+  );
 }

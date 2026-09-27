@@ -70,6 +70,17 @@ export class ReaderService implements OnModuleInit {
 
     // Kick off file + module summarization once the map exists.
     setTimeout(() => this.summarizeAll(), 500);
+
+    // Nemotron (Brev tunnel) can be flaky; periodically retry any file that never got a summary.
+    setInterval(() => this.retryMissingSummaries(), 45_000);
+  }
+
+  private async retryMissingSummaries() {
+    const map = this.mapper.getMap(this.cfg.defaultRoot);
+    const missing = map.files.filter((f) => !f.summary);
+    if (!missing.length) return;
+    this.log.log(`retrying ${missing.length} files with no summary yet`);
+    await Promise.all(missing.map((f) => this.summarizeFile(f.path).catch((e) => this.log.warn(`retry summary failed for ${f.path}: ${(e as Error).message}`))));
   }
 
   getFileSummary(path: string): string | undefined { return this.fileSummaryCache.get(path); }

@@ -2,6 +2,9 @@
 
 Newest first.
 
+- 14:58 Coding agents are now committing on branch `claude/other-agents-progress-b2e6fe` (B: mapper, Nemotron client, reader labels, summaries and risk flags; D: Ask with Claude). A test merge of that branch and the landing page branch into main shows **no conflicts**. Plan: merge both into main at 15:40.
+- 14:58 Waiting on the Anthropic API key. When it's in, run the summary quality check (Claude grades 10 Nemotron summaries).
+
 - 14:50 Nemotron stress test done: 81k lines of Hono in 73 s for $0.02, labels in 0.14 s. See `numbers.md`.
 
 - 14:45 Measuring Nemotron on the GPU: summarizing every file of a real open-source TypeScript project. Results go in `numbers.md`.

@@ -22,3 +22,6 @@
   /* Phones: the step card becomes a bottom sheet. */
   .tour-tip:not(.tour-center) { top: auto !important; bottom: 12px !important; left: 12px !important; right: 12px; width: auto; }
 }
+/* Inside the tour layer the scrim must sit under the step card (it has z-index 1000 on its own for the welcome card). */
+.tour-layer .tour-scrim { z-index: 0; }
+.tour-layer .tour-tip { z-index: 1; }

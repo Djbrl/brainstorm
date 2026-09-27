@@ -33,6 +33,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 16:55 [human] POST-DEADLINE cosmetic update: landing page screenshots (Follow, Map, Failures), Failures card replaces the unbuilt History card, deck.html. No product changes.
 
+- 16:58 [lead] POST-DEADLINE cosmetic update: header wordmark links to landing page
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

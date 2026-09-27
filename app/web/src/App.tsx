@@ -1,5 +1,5 @@
 // Owned by the lead.
-import { useLive } from "./lib/live";
+import { isReplay, useLive } from "./lib/live";
 import { NavProvider, useNav, type View } from "./lib/nav";
 import { FollowView } from "./follow/FollowView";
 import { MapView } from "./map/MapView";
@@ -15,7 +15,9 @@ function Shell() {
   return (
     <div className="shell">
       <header className="topbar">
-        <div className="wordmark">Brainstorm</div>
+        {isReplay()
+          ? <a className="wordmark" href="https://brainstorm-landing.vercel.app" aria-label="Brainstorm home">Brainstorm</a>
+          : <div className="wordmark">Brainstorm</div>}
         <nav className="tabs" role="tablist">
           {tabs.map((t) => (
             <button key={t.id} role="tab" data-tour={`tab-${t.id}`} aria-selected={view === t.id} onClick={() => setView(t.id)}>{t.label}</button>

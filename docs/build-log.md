@@ -18,6 +18,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 16:50 [lead] POST-DEADLINE cosmetic update: replay welcome tour (no feature or data changes)
 
+- 16:58 [lead] POST-DEADLINE cosmetic update: header wordmark links to landing page
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

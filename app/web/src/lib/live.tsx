@@ -62,7 +62,8 @@ function reducer(s: LiveState, a: Action): LiveState {
 
 const sortSessions = (l: Session[]) => [...l].sort((a, b) => b.lastEventAt.localeCompare(a.lastEventAt));
 
-const replayUrl = () => new URLSearchParams(location.search).get("replay");
+// Hosted demo: built with VITE_REPLAY_URL=/replay.json so it opens straight into the recording.
+const replayUrl = () => new URLSearchParams(location.search).get("replay") ?? (import.meta.env.VITE_REPLAY_URL as string | undefined) ?? null;
 export const isReplay = () => !!replayUrl();
 
 let replayData: Replay | null = null;

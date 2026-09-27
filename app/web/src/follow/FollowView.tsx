@@ -42,7 +42,8 @@ function StepRow({ step, selected, fresh, onSelect }: { step: Step; selected: bo
   const file = stepFile(step);
   const label = displayLabel(step);
   const labeled = !!realLabel(step);
-  const cls = ["tl-row", `k-${step.kind}`, step.isSubagent && "sub", selected && "on", fresh && "fresh"].filter(Boolean).join(" ");
+  const brief = step.kind === "prompt" && step.isSubagent; // lead agent's brief to a subagent
+  const cls = ["tl-row", brief ? "k-brief" : `k-${step.kind}`, step.isSubagent && "sub", selected && "on", fresh && "fresh"].filter(Boolean).join(" ");
 
   // A subagent's "prompt" is the lead agent's brief, not the human: render it as a normal step.
   if (step.kind === "prompt" && !step.isSubagent) {
@@ -59,7 +60,7 @@ function StepRow({ step, selected, fresh, onSelect }: { step: Step; selected: bo
 
   return (
     <div className={cls} onClick={() => onSelect(step)}>
-      <div className="tl-glyph"><Glyph kind={step.kind} tool={step.tool} /></div>
+      <div className="tl-glyph">{brief ? <Glyph kind="tool_call" tool="Agent" /> : <Glyph kind={step.kind} tool={step.tool} />}</div>
       <div className="tl-body">
         <div className={`tl-label ${labeled ? "has" : "pending"}`} key={labeled ? "l" : "f"}>{label}</div>
         <div className="tl-meta">

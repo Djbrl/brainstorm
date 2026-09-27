@@ -5,7 +5,8 @@ import { ListenerModule } from "./listener/listener.module";
 import { MapperModule } from "./mapper/mapper.module";
 import { ReaderModule } from "./reader/reader.module";
 import { AskModule } from "./ask/ask.module";
+import { ReplayModule } from "./replay/replay.module";
 
 // Owned by the lead. Agents: don't edit; ask in docs/build-log.md "Requests".
-@Module({ imports: [CoreModule, LlmModule, ListenerModule, MapperModule, ReaderModule, AskModule] })
+@Module({ imports: [CoreModule, LlmModule, ListenerModule, MapperModule, ReaderModule, AskModule, ReplayModule] })
 export class AppModule {}

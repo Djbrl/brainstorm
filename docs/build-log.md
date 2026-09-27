@@ -6,6 +6,7 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 - 13:57 [site] Landing page draft in `site/` (static index.html, all links and numbers in one `SITE` config, hidden until filled).
 - 14:00 [site] Landing page live at https://brainstorm-landing.vercel.app
 - 14:11 [site] Landing page redesigned: light, Apple-style scroll scenes, Cabinet Grotesk + Satoshi. Redeployed.
+- 14:50 [site] Hero is now a scroll story: follow Agent 1, then three agents, into the codebase, zoom out to the map. Redeployed.
 
 ## Requests
 

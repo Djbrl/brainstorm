@@ -75,7 +75,7 @@ nav .links a:hover { color: var(--text); }
 .stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; }
 
 /* hero */
-#hero { height: 280vh; }
+#hero { height: 560vh; }
 #hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero-type {
   position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -97,6 +97,11 @@ nav .links a:hover { color: var(--text); }
   background: linear-gradient(to top, #fff 45%, rgba(255,255,255,0));
 }
 .hero-end h2 { font-size: clamp(34px, 5vw, 64px); line-height: 1; }
+.hcap {
+  position: absolute; left: 0; right: 0; bottom: 13vh; padding: 0 24px; text-align: center; pointer-events: none; opacity: 0;
+  font: 800 clamp(30px, 4.6vw, 60px)/1.05 var(--display); letter-spacing: -0.035em; text-wrap: balance;
+  text-shadow: 0 0 18px #fff, 0 0 36px #fff, 0 0 8px #fff; will-change: opacity, transform;
+}
 .legend { display: flex; justify-content: center; gap: 22px; margin-top: 22px; font-size: 14px; color: var(--muted); font-weight: 500; flex-wrap: wrap; }
 .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; vertical-align: 0; }
 
@@ -252,7 +257,7 @@ footer a:hover { text-decoration: underline; }
 </nav>
 
 <main>
-<!-- 1. Hero: big type zooms away, the code map assembles behind it -->
+<!-- 1. Hero: big type dissolves, we follow one agent, then three, into the codebase, then zoom out -->
 <section class="scene" id="hero">
   <div class="stage">
     <canvas id="map" aria-hidden="true"></canvas>
@@ -261,8 +266,11 @@ footer a:hover { text-decoration: underline; }
       <p>And of the AI agents writing it.</p>
     </div>
     <div class="cue" id="cue" aria-hidden="true"></div>
+    <p class="hcap" data-in=".1" data-out=".25">One agent, you can follow.</p>
+    <p class="hcap" data-in=".29" data-out=".47">Three, you can't.</p>
+    <p class="hcap" data-in=".5" data-out=".64">Each one is somewhere in your code.</p>
     <div class="hero-end" id="heroEnd">
-      <h2>Watch your agents work.</h2>
+      <h2>Brainstorm shows you where.</h2>
       <div class="legend">
         <span><i style="background:var(--cool)"></i>unchanged</span>
         <span><i style="background:var(--warm)"></i>changed recently</span>
@@ -554,90 +562,210 @@ function typeQuestion() {
   $("#wall").innerHTML = html;
 })();
 
-/* ---------- hero map (a decorative drawing, not product data) ---------- */
+/* ---------- hero story (an illustration, not product data) ----------
+   One agent's line draws on white while the camera follows it. Two more agents
+   join in parallel lanes, all three enter a codebase graph and touch files,
+   then the camera zooms out to show the whole map. Everything is driven by p (0..1). */
 const hero = (() => {
   const cv = $("#map"), ctx = cv.getContext("2d");
   const COOL = [180, 194, 212], WARM = [255, 159, 10], HOT = [255, 55, 95];
-  let W, H, dpr, nodes = [], edges = [], seed = 7;
+  const AG = [
+    { name: "Agent 1", col: [10, 132, 255], swoop: [.06, .34], end: .78 },
+    { name: "Agent 2", col: [191, 90, 242], swoop: [.24, .34], end: .8 },
+    { name: "Agent 3", col: [48, 176, 199], swoop: [.255, .34], end: .82 },
+  ];
+  const PS = .34;                                  // the moment all three run side by side
+  let W, H, dpr, S, nodes = [], edges = [], seed;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const r = (a, b) => a + rnd() * (b - a);
+  const mixN = (a, b, t) => a + (b - a) * t;
+  const mixC = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+
+  /* Catmull-Rom through waypoints -> dense polyline with cumulative length */
+  function spline(pts, n = 28) {
+    const out = [], P = [pts[0], ...pts, pts[pts.length - 1]];
+    for (let i = 1; i < P.length - 2; i++) for (let k = 0; k < n; k++) {
+      const t = k / n, [p0, p1, p2, p3] = [P[i - 1], P[i], P[i + 1], P[i + 2]], t2 = t * t, t3 = t2 * t;
+      out.push([0, 1].map(j => .5 * (2 * p1[j] + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3)));
+    }
+    out.push(pts[pts.length - 1]);
+    const cum = [0];
+    for (let i = 1; i < out.length; i++) cum.push(cum[i - 1] + Math.hypot(out[i][0] - out[i - 1][0], out[i][1] - out[i - 1][1]));
+    return { pts: out, cum, L: cum[cum.length - 1], n };
+  }
+  function at(path, len) {
+    const { pts, cum } = path; let i = 1;
+    while (i < cum.length - 1 && cum[i] < len) i++;
+    const k = clamp((len - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1));
+    return { x: mixN(pts[i - 1][0], pts[i][0], k), y: mixN(pts[i - 1][1], pts[i][1], k), i };
+  }
+  /* how far along its path each agent is at scroll progress p */
+  function lenAt(a, p) {
+    const sy = a.sync;
+    if (p < PS) return sy * (a === AG[0] ? win(p, a.swoop[0], a.swoop[1]) : ease(win(p, a.swoop[0], a.swoop[1])));
+    return sy + (a.path.L - sy) * win(p, PS, a.end);
+  }
 
   function build() {
     dpr = Math.min(devicePixelRatio || 1, 2); W = cv.clientWidth; H = cv.clientHeight;
-    cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    seed = 7; nodes = []; edges = [];
-    const n = W < 700 ? 6 : 9, R = Math.min(W, H) * .36;
-    for (let c = 0; c < n; c++) {
-      const a = c / n * Math.PI * 2 + r(-.3, .3), d = c === 0 ? 0 : R * r(.55, 1.05);
-      const cx = W / 2 + Math.cos(a) * d * (W / H > 1 ? 1.5 : 1), cy = H * .44 + Math.sin(a) * d * .8;
-      const k = Math.round(r(6, 11)), first = nodes.length;
+    cv.width = W * dpr; cv.height = H * dpr;
+    S = clamp(Math.min(W, H) / 800, .55, 1.2); seed = 11; nodes = []; edges = [];
+    const wide = W > H, cols = wide ? 4 : 3, rows = wide ? 3 : 4, rx = W * .42, ry = H * .3;
+    const grid = [];
+    for (let row = 0; row < rows; row++) for (let c = 0; c < cols; c++) {
+      const cx = ((c + .5) / cols - .5) * 2 * rx + r(-30, 30) * S, cy = ((row + .5) / rows - .5) * 2 * ry + r(-24, 24) * S;
+      const k = Math.round(r(5, 10)), first = nodes.length;
       for (let i = 0; i < k; i++) {
-        const ang = r(0, 6.28), dist = r(8, 78);
-        nodes.push({ ox: cx + Math.cos(ang) * dist, oy: cy + Math.sin(ang) * dist, x: 0, y: 0, rad: r(3.5, 8), t: r(0, .5) + c * .02, heat: rnd() < .28 ? r(.5, 1) : 0, ph: r(0, 6.28) });
+        const ang = r(0, 6.28), d = r(6, 62) * S;
+        nodes.push({ x: cx + Math.cos(ang) * d, y: cy + Math.sin(ang) * d, rad: r(3, 7) * S, ph: r(0, 6.28), base: rnd() < .12 ? 1 : 0, rp: 1, touch: [] });
         if (i) edges.push([first + i, first + Math.floor(r(0, i))]);
       }
-      if (c) edges.push([first, Math.floor(r(0, first))]);
+      grid[row * cols + c] = first;
     }
+    for (let row = 0; row < rows; row++) for (let c = 0; c < cols; c++) {
+      const a = grid[row * cols + c];
+      if (c < cols - 1 && rnd() < .75) edges.push([a, grid[row * cols + c + 1] + 1]);
+      if (row < rows - 1 && rnd() < .6) edges.push([a + 2, grid[(row + 1) * cols + c]]);
+    }
+    const near = (fx, fy, used) => {
+      let best = -1, bd = 1e9;
+      nodes.forEach((n, i) => { if (used.has(i)) return; const d = Math.hypot(n.x - fx * 2 * rx, n.y - fy * 2 * ry); if (d < bd) { bd = d; best = i; } });
+      used.add(best); return best;
+    };
+    const used = new Set(), lane = 46 * S;
+    const plans = [
+      // start: [entry, approach, lane point (sync), end of the parallel run]
+      { start: [[-W * .8, 0], [-W * .6, 0], [-W * .5, 0], [-W * .38, 0]], stops: [[-.3, .02], [-.02, -.06], [.3, -.28]] },
+      { start: [[-W * .76, -H * .34], [-W * .6, -lane * 1.1], [-W * .5, -lane], [-W * .38, -lane]], stops: [[-.28, -.26], [.04, -.34], [.36, .02]] },
+      { start: [[-W * .76, H * .34], [-W * .6, lane * 1.1], [-W * .5, lane], [-W * .38, lane]], stops: [[-.26, .28], [.06, .3], [.32, .3]] },
+    ];
+    AG.forEach((a, k) => {
+      const pl = plans[k];
+      a.stops = pl.stops.map(([fx, fy]) => near(fx, fy, used));
+      const pts = [...pl.start, ...a.stops.map(i => [nodes[i].x, nodes[i].y])];
+      a.path = spline(pts);
+      a.sync = a.path.cum[2 * a.path.n];                               // arclength at the lane point
+      a.stopLen = a.stops.map((_, j) => a.path.cum[(j + pl.start.length) * a.path.n] ?? a.path.L);
+    });
+    /* precompute when each node is revealed (an agent passes nearby) and when stops are touched */
+    const R = 150 * S;
+    for (let p = 0; p <= .9; p += .004) AG.forEach(a => {
+      const L = lenAt(a, p), h = at(a.path, L);
+      nodes.forEach(n => { if (n.rp === 1 && Math.hypot(n.x - h.x, n.y - h.y) < R) n.rp = p; });
+      a.stops.forEach((ni, j) => { if (L >= a.stopLen[j] - 1 && !nodes[ni].touch.some(t => t.a === a)) nodes[ni].touch.push({ a, p }); });
+    });
+    nodes.forEach(n => { n.rp = Math.min(n.rp, .64 + r(0, .16)); });
   }
-  let p = 0, active = -1, nextSwitch = 0, visible = true;
-  const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 
+  let p = 0, visible = true;
   function draw(t) {
-    ctx.clearRect(0, 0, W, H);
-    const z = .55 + .45 * ease(win(p, 0, .75)), cx = W / 2, cy = H * .44;
-    const heatOn = win(p, .45, .7);
-    if (t > nextSwitch && p > .55) { active = Math.floor(rnd() * nodes.length); nextSwitch = t + 1800; if (nodes[active]) nodes[active].heat = 1; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+    const heads = AG.map(a => { const L = lenAt(a, p); return { a, L, ...at(a.path, L) }; });
+    const live = heads.filter(h => h.L > 0);
+
+    /* camera: follow agent 1, widen to fit all three, then pull back to the whole map */
+    const zo = ease(win(p, .64, .88));
+    const cen = { x: live.reduce((s, h) => s + h.x, 0) / (live.length || 1), y: live.reduce((s, h) => s + h.y, 0) / (live.length || 1) };
+    const fk = ease(win(p, .23, .36));
+    const fx = mixN(heads[0].x, cen.x, fk), fy = mixN(heads[0].y, cen.y, fk);
+    const zf = mixN(3, 2.1, fk) * (W < 700 ? .8 : 1);
+    const z = mixN(zf, 1, zo), camX = mixN(fx, 0, zo), camY = mixN(fy, H * .06, zo);
+    const ax = W / 2 + W * .06 * (1 - zo), ay = H * .46 + H * .04 * zo;
+    ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * (ax - camX * z), dpr * (ay - camY * z));
+    const px = 1 / z;                                                    // one screen pixel in world units
+
+    nodes.forEach(n => { n.a = ease(win(p, n.rp, n.rp + .05)); });
+    ctx.lineWidth = 1.2 * px;
+    edges.forEach(([i, j]) => {
+      const A = nodes[i], B = nodes[j]; if (!A || !B) return;
+      const al = Math.min(A.a, B.a); if (al <= 0) return;
+      ctx.strokeStyle = `rgba(160,170,190,${.4 * al})`;
+      ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(mixN(A.x, B.x, al), mixN(A.y, B.y, al)); ctx.stroke();
+    });
+
+    /* agent trails */
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    heads.forEach(h => {
+      if (h.L <= 0) return;
+      const pts = h.a.path.pts;
+      ctx.strokeStyle = `rgba(${h.a.col},.9)`; ctx.lineWidth = 2.6 * px;
+      ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < h.i; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.lineTo(h.x, h.y); ctx.stroke();
+    });
+
+    /* files */
     nodes.forEach(n => {
-      const dx = still ? 0 : Math.sin(t / 2600 + n.ph) * 5, dy = still ? 0 : Math.cos(t / 3100 + n.ph) * 5;
-      n.x = cx + (n.ox + dx - cx) * z; n.y = cy + (n.oy + dy - cy) * z;
-      n.a = ease(win(p, n.t * .9 + .02, n.t * .9 + .14));
-    });
-    ctx.lineWidth = 1.2;
-    edges.forEach(([a, b]) => {
-      const A = nodes[a], B = nodes[b], al = Math.min(A.a, B.a);
-      if (al <= 0) return;
-      const hot = (a === active || b === active) && p > .55;
-      ctx.strokeStyle = hot ? `rgba(255,55,95,${.6 * al})` : `rgba(160,170,190,${.35 * al})`;
-      ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(A.x + (B.x - A.x) * al, A.y + (B.y - A.y) * al); ctx.stroke();
-    });
-    nodes.forEach((n, i) => {
-      if (n.a <= 0) return;
-      const isA = i === active && p > .55;
-      const col = isA ? HOT : mix(COOL, WARM, n.heat * heatOn);
-      const rad = n.rad * z * (0.4 + 0.6 * n.a);
-      if (isA) {
-        const pulse = 18 + Math.sin(t / 160) * 8;
-        const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, rad + pulse);
-        g.addColorStop(0, "rgba(255,55,95,.45)"); g.addColorStop(1, "rgba(255,55,95,0)");
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(n.x, n.y, rad + pulse, 0, 7); ctx.fill();
+      if (n.a <= 0 && !n.touch.length) return;
+      const tk = n.touch.filter(tc => p >= tc.p);
+      const touched = tk.length ? win(p, tk[0].p, tk[0].p + .03) : 0;
+      const current = tk.some(tc => heads.find(h => h.a === tc.a && Math.hypot(h.x - n.x, h.y - n.y) < 2));
+      const heat = Math.max(touched, n.base * win(p, .7, .85));
+      const col = current ? HOT : mixC(COOL, WARM, heat);
+      const a = Math.max(n.a, touched);
+      if (current) {
+        const pulse = (still ? 24 : 24 + Math.sin(t / 170 + n.ph) * 8) * px;
+        const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.rad + pulse);
+        g.addColorStop(0, "rgba(255,55,95,.55)"); g.addColorStop(.5, "rgba(255,55,95,.22)"); g.addColorStop(1, "rgba(255,55,95,0)");
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(n.x, n.y, n.rad + pulse, 0, 7); ctx.fill();
       }
-      ctx.globalAlpha = n.a; ctx.fillStyle = `rgb(${col})`;
-      ctx.beginPath(); ctx.arc(n.x, n.y, isA ? rad + 2 : rad, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+      tk.forEach(tc => {                                                 // ripple when an agent edits the file
+        const k = win(p, tc.p, tc.p + .05); if (k <= 0 || k >= 1) return;
+        ctx.strokeStyle = `rgba(${tc.a.col},${1 - k})`; ctx.lineWidth = 2 * px;
+        ctx.beginPath(); ctx.arc(n.x, n.y, n.rad + 36 * k * px + 4 * px, 0, 7); ctx.stroke();
+      });
+      ctx.globalAlpha = a; ctx.fillStyle = `rgb(${col})`;
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.rad * (current ? 1.25 : 1), 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+    });
+
+    /* heads and their labels, drawn at screen size */
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.font = "600 13px Satoshi, system-ui, sans-serif"; ctx.textBaseline = "middle";
+    heads.forEach(h => {
+      if (h.L <= 0) return;
+      const sx = ax + (h.x - camX) * z, sy = ay + (h.y - camY) * z;
+      const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, 16);
+      g.addColorStop(0, `rgba(${h.a.col},.35)`); g.addColorStop(1, `rgba(${h.a.col},0)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, 16, 0, 7); ctx.fill();
+      ctx.fillStyle = `rgb(${h.a.col})`; ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 7); ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(sx, sy, 2, 0, 7); ctx.fill();
+      const tw = ctx.measureText(h.a.name).width, bw = tw + 30, bh = 26, by = sy - 30;
+      const bx = sx + 12 + bw > W - 8 ? sx - 12 - bw : sx + 12;          // flip left near the right edge
+      ctx.save(); ctx.shadowColor = "rgba(0,0,0,.12)"; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3;
+      ctx.fillStyle = "rgba(255,255,255,.96)"; ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 13); ctx.fill(); ctx.restore();
+      ctx.fillStyle = `rgb(${h.a.col})`; ctx.beginPath(); ctx.arc(bx + 13, by + bh / 2, 4, 0, 7); ctx.fill();
+      ctx.fillStyle = "#1d1d1f"; ctx.fillText(h.a.name, bx + 22, by + bh / 2 + .5);
     });
   }
   function loop(t) { if (visible) draw(t); requestAnimationFrame(loop); }
   build(); requestAnimationFrame(loop);
   addEventListener("resize", build);
+  document.fonts && document.fonts.ready.then(() => draw(performance.now()));
   new IntersectionObserver(([e]) => visible = e.isIntersecting).observe(cv);
   return { set(v) { p = v; } };
 })();
 
 /* ---------- scroll-driven scenes ---------- */
 const heroEl = $("#hero"), heroType = $("#heroType"), heroEnd = $("#heroEnd"), cue = $("#cue");
+const hcaps = [...document.querySelectorAll(".hcap")];
 const probEl = $("#problem"), wall = $("#wall"), pDone = $("#pDone"), pNobody = $("#pNobody"), pCity = $("#pCity");
 const prodEl = $("#product"), track = $("#track"), dots = [...document.querySelectorAll("#dots i")];
 const flowPaths = [...document.querySelectorAll("#flow .draw")];
 
 function onScroll() {
   /* hero: type zooms toward you and dissolves, the map assembles */
-  const hp = progress(heroEl);
+  const hp = window.__heroP ?? progress(heroEl);   // __heroP: preview hook for rendering a frame
   hero.set(hp);
-  const tp = ease(win(hp, 0, .4));
+  const tp = ease(win(hp, 0, .09));
   heroType.style.transform = `scale(${1 + tp * .5})`;
   heroType.style.opacity = 1 - tp;
   heroType.style.filter = `blur(${tp * 12}px)`;
   cue.style.visibility = hp > .02 ? "hidden" : "";
-  const ep = ease(win(hp, .72, .92));
+  hcaps.forEach(c => {
+    const k = win(hp, +c.dataset.in, +c.dataset.in + .03) - win(hp, +c.dataset.out - .03, +c.dataset.out);
+    c.style.opacity = k; c.style.transform = `translateY(${(1 - k) * 16}px)`;
+  });
+  const ep = ease(win(hp, .87, .95));
   heroEnd.style.opacity = ep; heroEnd.style.transform = `translateY(${(1 - ep) * 40}px)`;
 
   /* problem: files pour past, "Updated 47 files", then the punchline */

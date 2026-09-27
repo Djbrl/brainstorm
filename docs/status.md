@@ -2,6 +2,8 @@
 
 Newest first.
 
+- 15:40 Submission form partly filled in the app's browser pane (not submitted). Backup of every answer: `submission-answers.md`. Lead agent building the Failures panel for SupplyzPro (ETA 16:10). Judging audit: `judging-audit.md`.
+
 - 14:58 Coding agents are now committing on branch `claude/other-agents-progress-b2e6fe` (B: mapper, Nemotron client, reader labels, summaries and risk flags; D: Ask with Claude). A test merge of that branch and the landing page branch into main shows **no conflicts**. Plan: merge both into main at 15:40.
 - 14:58 Waiting on the Anthropic API key. When it's in, run the summary quality check (Claude grades 10 Nemotron summaries).
 

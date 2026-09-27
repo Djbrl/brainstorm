@@ -87,4 +87,8 @@ export type Replay = {
   map: ProjectMap | null;
   answers: { request: AskRequest; response: AskResponse }[];
   failures?: FailureGroup[];
+  /** Post-deadline preview: recorded agent moves (chronological), played back on the Map. */
+  agentMoves?: { id: string; name: string; isSubagent: boolean; sessionId: string; file: string; action: string; ts: string }[];
+  /** Post-deadline preview: a recorded setup run, played back by the setup screen. */
+  setupPreview?: { status: SetupStatus; suggestions: WorkspaceSuggestion[] };
 };

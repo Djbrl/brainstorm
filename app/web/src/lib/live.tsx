@@ -1,4 +1,5 @@
 // Owned by the lead. One store for the whole app: REST bootstrap + websocket updates, or a static replay file.
+import { installSetupShim, startAgentPlayback } from "./preview";
 import { createContext, useCallback, useContext, useEffect, useReducer, type ReactNode } from "react";
 import type { AgentPresence, AskRequest, AskResponse, FailureGroup, FileNode, SetupStatus, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
 
@@ -11,6 +12,7 @@ export type LiveState = {
   failures: FailureGroup[];
   agents: Record<string, AgentPresence>; // live agents by id (main session thread or subagent)
   setup: SetupStatus | null;             // null until loaded (and always null in replay)
+  preview: boolean;                      // replay built for the post-deadline preview (agent + setup playback)
 };
 
 type Action =
@@ -25,7 +27,7 @@ type Action =
   | { type: "replay"; data: Replay }
   | WsMessage;
 
-const initial: LiveState = { connected: false, replay: false, sessions: [], steps: {}, map: null, failures: [], agents: {}, setup: null };
+const initial: LiveState = { connected: false, replay: false, sessions: [], steps: {}, map: null, failures: [], agents: {}, setup: null, preview: false };
 
 function upsertFile(map: ProjectMap | null, file: FileNode): ProjectMap | null {
   if (!map) return map;
@@ -50,7 +52,7 @@ function reducer(s: LiveState, a: Action): LiveState {
       const steps: Record<string, Step[]> = {};
       for (const st of a.data.steps) (steps[st.sessionId] ??= []).push(st);
       Object.values(steps).forEach((l) => l.sort((x, y) => x.seq - y.seq));
-      return { ...s, replay: true, connected: true, sessions: sortSessions(a.data.sessions), steps, map: a.data.map, failures: a.data.failures ?? [] };
+      return { ...s, replay: true, connected: true, sessions: sortSessions(a.data.sessions), steps, map: a.data.map, failures: a.data.failures ?? [], preview: !!(a.data.agentMoves?.length || a.data.setupPreview) };
     }
     case "session": {
       const others = s.sessions.filter((x) => x.id !== a.session.id);
@@ -108,8 +110,14 @@ export function LiveProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const url = replayUrl();
     if (url) {
-      fetch(url).then((r) => r.json()).then((data: Replay) => { replayData = data; clockOffset = Math.max(0, Date.now() - Date.parse(data.exportedAt)); dispatch({ type: "replay", data }); });
-      return;
+      let stopPlayback = () => {};
+      fetch(url).then((r) => r.json()).then((data: Replay) => {
+        replayData = data; clockOffset = Math.max(0, Date.now() - Date.parse(data.exportedAt));
+        dispatch({ type: "replay", data });
+        installSetupShim(data);
+        stopPlayback = startAgentPlayback(data, dispatch);
+      });
+      return () => stopPlayback();
     }
     loadAll(dispatch);
     const loadFailures = () => fetch("/api/failures").then((r) => r.json()).then((failures) => dispatch({ type: "failures", failures })).catch(() => {});

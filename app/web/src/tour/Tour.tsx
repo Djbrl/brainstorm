@@ -4,9 +4,16 @@ import { useNav, type View } from "../lib/nav";
 import "./tour.css";
 
 const SEEN_KEY = "brainstorm-tour-seen";
+// (The preview lives on its own domain, so its "seen" flag is separate.)
 const REPO = "https://github.com/Djbrl/brainstorm";
 
 type Step = { target?: string; view?: View; title: string; body: string };
+const PREVIEW_STEPS: Step[] = [
+  { target: ".ws-chip", title: "Setup", body: "Pick a workspace, then watch Brainstorm read the code, map imports, find Claude Code and check the models. Click it to play back a recorded run." },
+  { target: '[data-tour="tab-map"]', view: "map", title: "Live agents", body: "Each agent is a marker on the file it is working on. It glides to the next file and leaves a trail. These are the real moves recorded while the agents built Brainstorm." },
+  { target: ".map-agents", view: "map", title: "Agent tracker", body: "Every agent's route, file by file. Click an agent to follow it with the camera, or a step to jump to that file." },
+];
+
 const STEPS: Step[] = [
   { target: ".fl-sessions", view: "follow", title: "Sessions", body: "Every Claude Code session and subagent on the machine, live." },
   { target: ".fl-timeline", view: "follow", title: "Follow", body: "Each agent step with a short AI label (NVIDIA Nemotron on Brev). Click an edit to see its diff, or ask why it happened." },
@@ -24,7 +31,8 @@ function markSeen() {
 
 type Rect = { top: number; left: number; width: number; height: number };
 
-export function Tour({ openSignal }: { openSignal: number }) {
+export function Tour({ openSignal, preview = false }: { openSignal: number; preview?: boolean }) {
+  const steps = preview ? [...PREVIEW_STEPS, STEPS[STEPS.length - 1]] : STEPS;
   const { setView } = useNav();
   const [mode, setMode] = useState<"welcome" | "tour" | null>(() => (seen() ? null : "welcome"));
   const [i, setI] = useState(0);
@@ -35,7 +43,7 @@ export function Tour({ openSignal }: { openSignal: number }) {
   useEffect(() => { if (openSignal > 0) { setI(0); setMode("welcome"); } }, [openSignal]);
 
   const close = useCallback(() => { markSeen(); setMode(null); }, []);
-  const step = STEPS[i];
+  const step = steps[i];
 
   // Switch to the view the step needs, then measure its target.
   useEffect(() => { if (mode === "tour" && step.view) setView(step.view); }, [mode, i, step.view, setView]);
@@ -61,7 +69,7 @@ export function Tour({ openSignal }: { openSignal: number }) {
     if (!mode) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
-      else if (mode === "tour" && e.key === "ArrowRight" && i < STEPS.length - 1) setI(i + 1);
+      else if (mode === "tour" && e.key === "ArrowRight" && i < steps.length - 1) setI(i + 1);
       else if (mode === "tour" && e.key === "ArrowLeft" && i > 0) setI(i - 1);
     };
     window.addEventListener("keydown", onKey);
@@ -75,7 +83,9 @@ export function Tour({ openSignal }: { openSignal: number }) {
       <div className="tour-scrim" onClick={close}>
         <div className="tour-card tour-welcome" role="dialog" aria-modal="true" aria-labelledby="tour-title" onClick={(e) => e.stopPropagation()}>
           <h2 id="tour-title">Welcome to Brainstorm</h2>
-          <p>A live map of your code and of the AI agents writing it. You're watching a recording of Brainstorm following its own build, live during the GOMYCODE × NVIDIA hackathon on 27 Sep 2026.</p>
+          {preview
+            ? <p>This is the post-deadline preview: a few features we added a few hours after the GOMYCODE × NVIDIA hackathon cutoff, to show where Brainstorm is going. The judged version is at brainstorm-demo-black.vercel.app.</p>
+            : <p>A live map of your code and of the AI agents writing it. You're watching a recording of Brainstorm following its own build, live during the GOMYCODE × NVIDIA hackathon on 27 Sep 2026.</p>}
           <div className="tour-actions">
             <button className="tour-ghost" onClick={close}>Skip</button>
             <button ref={primary} className="tour-primary" onClick={() => { setI(0); setMode("tour"); }}>Take the tour</button>
@@ -85,7 +95,7 @@ export function Tour({ openSignal }: { openSignal: number }) {
     );
   }
 
-  const last = i === STEPS.length - 1;
+  const last = i === steps.length - 1;
   // Tooltip placement: below, else above, else beside, else inside the target. Always kept on screen.
   let tipStyle: React.CSSProperties = {};
   if (rect) {
@@ -105,7 +115,7 @@ export function Tour({ openSignal }: { openSignal: number }) {
         ? <div className="tour-spot" style={{ top: rect.top, left: rect.left, width: rect.width, height: rect.height }} />
         : <div className="tour-scrim" />}
       <div className={`tour-card tour-tip ${rect ? "" : "tour-center"}`} style={tipStyle} role="dialog" aria-modal="true" aria-labelledby="tour-step-title">
-        <div className="tour-count">{i + 1} of {STEPS.length}</div>
+        <div className="tour-count">{i + 1} of {steps.length}</div>
         <h2 id="tour-step-title">{step.title}</h2>
         <p>{step.body}</p>
         {last && <a className="tour-repo" href={REPO} target="_blank" rel="noreferrer">Open the repo on GitHub</a>}

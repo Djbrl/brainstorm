@@ -29,3 +29,22 @@ export function mockMap(): ProjectMap {
     edges.push({ from: p("app/web", a), to: p("app/web", b) });
   return { root, files, edges, modules: Object.keys(mods).map((id) => ({ id })) };
 }
+
+/** Dev-only: a few agents hopping between files of the mock map (tick advances every few seconds). */
+export function mockAgents(map: ProjectMap, tick: number): import("@contract").AgentPresence[] {
+  const files = map.files.map((f) => f.path);
+  const acts = ["read", "search", "read", "edit", "run", "edit"];
+  const mk = (id: string, name: string, isSubagent: boolean, seed: number, stride: number) => {
+    const trail = Array.from({ length: Math.min(tick + 1, 8) }, (_, k) => {
+      const step = tick - Math.min(tick, 7) + k;
+      return { file: files[(seed + step * stride) % files.length], action: acts[(seed + step) % acts.length], ts: new Date(Date.now() - (7 - k) * 4000).toISOString() };
+    });
+    const last = trail[trail.length - 1];
+    return { id, sessionId: "s1", name, isSubagent, file: last.file, action: last.action, ts: new Date().toISOString(), active: true, trail };
+  };
+  return [
+    mk("s1", "Build the live agents layer", false, 3, 5),
+    mk("a1b2c3d", "Subagent · Explore the mapper", true, 11, 7),
+    mk("f9e8d7c", "Subagent · Fix reader labels", true, 20, 3),
+  ];
+}

@@ -2,11 +2,12 @@
 import { clock } from "../lib/live";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods, type LinkObject, type NodeObject } from "react-force-graph-2d";
-import type { FileNode, ProjectMap, Step } from "@contract";
+import type { AgentPresence, FileNode, ProjectMap, Step } from "@contract";
 import { useLive } from "../lib/live";
 import { useNav } from "../lib/nav";
 import { AskBox } from "../ask/AskBox";
-import { mockMap } from "./mock";
+import { mockAgents, mockMap } from "./mock";
+import { AgentTracker, drawAgents, visibleAgents, type AgentAnim } from "./agents";
 import "./map.css";
 
 type GNode = NodeObject & { id: string; file: FileNode; r: number; ax: number; ay: number };
@@ -147,6 +148,65 @@ export function MapView() {
   const settledFit = useRef(false);
   const root = map?.root ?? "";
 
+  // ---- live agents ----
+  const [mockTick, setMockTick] = useState(0);
+  useEffect(() => { if (!mock) return; const t = setInterval(() => setMockTick((x) => x + 1), 2600); return () => clearInterval(t); }, [mock]);
+  const agents: AgentPresence[] = useMemo(
+    () => visibleAgents(mock && map ? mockAgents(map, mockTick) : Object.values(state.agents ?? {})),
+    [mock, map, mockTick, state.agents],
+  );
+  const agentsRef = useRef(agents); agentsRef.current = agents;
+  const anim = useRef(new Map<string, AgentAnim>());
+  const [followId, setFollowId] = useState<string | null>(null);
+  const followRef = useRef(followId); followRef.current = followId;
+  const hoverRef = useRef(hover); hoverRef.current = hover;
+  const nodeIndex = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n])), [graph.nodes]);
+  const nodeIndexRef = useRef(nodeIndex); nodeIndexRef.current = nodeIndex;
+  /** Map an agent's file (or a searched directory) to a node id on the map. */
+  const resolveId = useCallback((file: string): string | undefined => {
+    const idx = nodeIndexRef.current;
+    if (idx.has(file)) return file;
+    const dir = file.replace(/\/+$/, "") + "/";
+    for (const id of idx.keys()) if (id.startsWith(dir)) return id;
+    return undefined;
+  }, []);
+  const drawAgentLayer = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
+    drawAgents({
+      ctx, scale, agents: agentsRef.current, anim: anim.current, accent: tokens.accent, font: tokens.body,
+      hoverFile: hoverRef.current, followId: followRef.current, resolveId,
+      resolve: (id) => { const n = nodeIndexRef.current.get(id); return n && n.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y, r: n.r } : undefined; },
+    });
+  }, [tokens, resolveId]);
+
+  // Follow an agent: keep the camera on its marker until the user drags, zooms or clicks the map.
+  useEffect(() => {
+    if (!followId) return;
+    fg.current?.zoom(Math.max(2.2, fg.current?.zoom() ?? 0), 700);
+    // Ease the camera toward the marker every frame (no stacked tweens).
+    let raf = 0;
+    const tick = () => {
+      const st = anim.current.get(followId);
+      const g = fg.current;
+      if (st && g) {
+        const c = g.centerAt() as unknown as { x: number; y: number };
+        const dx = st.x - c.x, dy = st.y - c.y;
+        if (Math.hypot(dx, dy) * g.zoom() > 1.5) g.centerAt(c.x + dx * 0.09, c.y + dy * 0.09);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [followId]);
+  const focusOnFile = useCallback((file: string) => {
+    setFollowId(null);
+    const id = resolveId(file);
+    const n = id ? nodeIndexRef.current.get(id) : undefined;
+    if (!n) return;
+    setSelected(n.id);
+    fg.current?.centerAt((n.x ?? 0) + 220 / 3, n.y ?? 0, 800);
+    fg.current?.zoom(3, 800);
+  }, [resolveId]);
+
   // Forces
   useEffect(() => {
     const g = fg.current;
@@ -251,7 +311,9 @@ export function MapView() {
   const sel = selected ? graph.nodes.find((n) => n.id === selected)?.file : undefined;
 
   return (
-    <div className="map-wrap" ref={wrapRef}>
+    <div className="map-wrap" ref={wrapRef}
+      onPointerDown={(e) => { if ((e.target as HTMLElement).tagName === "CANVAS") setFollowId(null); }}
+      onWheel={(e) => { if ((e.target as HTMLElement).tagName === "CANVAS") setFollowId(null); }}>
       {graph.nodes.length === 0 ? (
         <div className="map-empty">
           <h2>Mapping the codebase…</h2>
@@ -271,6 +333,7 @@ export function MapView() {
           nodeCanvasObject={drawNode}
           nodePointerAreaPaint={(n, color, ctx) => { const g = n as GNode; ctx.fillStyle = color; ctx.beginPath(); ctx.arc(g.x ?? 0, g.y ?? 0, g.r + 3, 0, Math.PI * 2); ctx.fill(); }}
           onRenderFramePre={drawModules}
+          onRenderFramePost={drawAgentLayer}
           linkColor={(l) => (activePaths.has(((l as GLink).source as GNode).id) || activePaths.has(((l as GLink).target as GNode).id) ? "rgba(91,91,214,0.35)" : "rgba(29,29,31,0.08)")}
           linkWidth={0.6}
           linkDirectionalParticles={(l) => (activePaths.has(((l as GLink).source as GNode).id) || activePaths.has(((l as GLink).target as GNode).id) ? 2 : 0)}
@@ -291,6 +354,9 @@ export function MapView() {
         <h1>{projectName(root)}</h1>
         <p>{graph.nodes.length} files · {graph.anchors.size} modules{activePaths.size ? ` · ${activePaths.size} being edited now` : ""}</p>
       </div>
+
+      <AgentTracker agents={agents} accent={tokens.accent} followId={followId}
+        onFollow={(id) => setFollowId(id)} onFocusFile={focusOnFile} />
 
       <div className="map-legend" aria-label="Legend">
         <span><i style={{ background: "var(--hot)" }} />Just now</span>

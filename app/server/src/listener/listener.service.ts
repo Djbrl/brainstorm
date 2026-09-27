@@ -198,6 +198,7 @@ export class ListenerService implements OnModuleInit {
     });
     if (textBlocks.length) {
       const joined = textBlocks.map((b) => b.text).join("\n\n");
+      if (/^\s*\[Request interrupted by user/.test(joined)) return; // harness notice, not a human prompt
       const step = this.makeStep(o, sessionId, textBlocks[0].i, ts, "prompt", joined, isSubagent);
       this.storeStep(step, { cwd: o.cwd, promptTitle: joined });
     }

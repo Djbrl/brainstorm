@@ -7,7 +7,7 @@ Only real measurements. Leave `TODO` rather than guess.
 | Files summarized per minute (Nemotron on Brev) | 180–215 files/min (6 requests in flight) | reader timing on the Brainstorm repo itself, 15:00 |
 | Time to map the demo repo (68 files) | 40–72 ms structure; all 66 file summaries in about 20 s | mapper log + reader timing, 15:00 |
 | GPU cost of that read | TODO | minutes × $/hour |
-| Average cost per question (Claude) | TODO | cost meter over TODO questions |
+| Average cost per question (Claude) | $0.030 (file question $0.035, 3,622 in / 675 out; step question $0.025, 2,905 in / 418 out) | cost meter, claude-opus-5 at $5/$25 per M tokens, 2 questions at 15:04 |
 | Step label latency | TODO | step arrival → label arrival |
 | Summary quality vs Claude (1–5) | TODO | Claude grades 10 Nemotron summaries |
 | Hallway test | TODO | 3 questions, raw log vs Brainstorm, timed |

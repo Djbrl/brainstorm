@@ -1,5 +1,5 @@
 // Owned by the lead. Cross-view navigation: which view, which session, which file is focused.
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
 export type View = "follow" | "map" | "failures";
 type Nav = {
@@ -20,6 +20,13 @@ export function NavProvider({ children }: { children: ReactNode }) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [focusFile, setFocusFile] = useState<string | null>(null);
   const [focusStep, setFocusStep] = useState<string | null>(null);
+  // Keep the view in the URL so a reload (e.g. the dev server reacting to agents editing this very repo) stays put.
+  useEffect(() => {
+    const u = new URL(location.href);
+    if (u.searchParams.get("view") === view) return;
+    u.searchParams.set("view", view);
+    history.replaceState(null, "", u);
+  }, [view]);
   const openFile = (p: string) => { setFocusFile(p); setView("map"); };
   const openStep = (sid: string, stepId: string) => { setSessionId(sid); setFocusStep(stepId); setView("follow"); };
   return <Ctx.Provider value={{ view, setView, sessionId, setSessionId, focusFile, setFocusFile, openFile, focusStep, setFocusStep, openStep }}>{children}</Ctx.Provider>;

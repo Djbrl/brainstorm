@@ -22,6 +22,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 18:56 [lead] POST-DEADLINE, local app only: started a workspace Setup screen (pick a folder, live checklist while Brainstorm reads the code and connects to Claude Code) and live agents on the Map (markers that move file to file, trails, tracker panel). Agents S (server setup), C (setup screen), D (agents server + map). The hosted demo is unchanged.
 
+- 19:05 [lead] POST-DEADLINE, local app only: Setup and live agents work end to end. Setup lists recent Claude Code projects (decoded from ~/.claude/projects), reads the code, maps imports, finds the Claude Code CLI (including the copy bundled with the desktop app), checks Nemotron and the Claude key, and shows summary progress. On the Map, each agent's marker moves file to file with a fading trail, and a tracker lists each agent's route. Checked with this session's own reads and edits.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

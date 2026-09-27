@@ -5,7 +5,7 @@ import DiffViewer from "react-diff-viewer-continued";
 import type { Step } from "@contract";
 import { isReplay, useLive } from "../../lib/live";
 import { useNav } from "../../lib/nav";
-import { useThread, type Beat } from "../../lib/thread";
+import { beatLabel, countParts, isFailedResult, useThread, type Beat } from "../../lib/thread";
 import { Glyph } from "../../follow/Glyph";
 import { basename, clockTime, displayLabel, resultText, stepFile, stripInjected } from "../../follow/format";
 import "./replay.css";
@@ -50,9 +50,43 @@ function preview(s: Step): string {
   return clean.length > 600 ? `${clean.slice(0, 599)}…` : clean;
 }
 
+const SUMMARY_ROWS = 8;
+
+/** A summary or read group, expanded: its notable steps, each opening Follow at that step. */
+function GroupDetail({ beat, sessionId }: { beat: Beat; sessionId: string }) {
+  const { openStep } = useNav();
+  const failedCalls = useMemo(() => {
+    const ids = new Set<string>();
+    beat.steps.forEach((st, i) => { if (isFailedResult(st)) for (let j = i - 1; j >= 0; j--) if (beat.steps[j].kind === "tool_call") { ids.add(beat.steps[j].id); break; } });
+    return ids;
+  }, [beat]);
+  const notable = useMemo(() => beat.steps.filter((st) => st.kind !== "tool_result" && !(st.kind === "thinking" && !st.text?.trim()) && !(st.kind === "text" && !st.text?.trim() && !st.label)), [beat]);
+  const shown = notable.slice(0, SUMMARY_ROWS);
+  const more = notable.length - shown.length;
+  return (
+    <div className="rp-detail">
+      <ul className="rp-sub">
+        {shown.map((st) => (
+          <li key={st.id}>
+            <button className={failedCalls.has(st.id) ? "fail" : ""} onClick={() => openStep(sessionId, st.id)} title="Open in Follow">
+              <span className="rp-glyph sm" aria-hidden="true"><Glyph kind={st.kind} tool={st.tool} size={12} /></span>
+              <span className="rp-sub-label">{displayLabel(st)}</span>
+              {failedCalls.has(st.id) && <span className="rp-fail-dot" aria-label="failed" />}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button className="rp-link" onClick={() => openStep(sessionId, beat.step.id)}>
+        {more > 0 ? `${more} more ${more === 1 ? "step" : "steps"}: open in Follow` : "Open in Follow"}
+      </button>
+    </div>
+  );
+}
+
 function BeatDetail({ beat, sessionId }: { beat: Beat; sessionId: string }) {
   const { openStep } = useNav();
   const s = beat.step;
+  if (beat.kind === "summary" || (beat.kind === "reads" && beat.steps.filter((x) => x.kind === "tool_call").length > 1)) return <GroupDetail beat={beat} sessionId={sessionId} />;
   const pair = useMemo(() => (s.kind === "edit" ? editPair(s) : null), [s]);
   const lines = pair ? pair.before.split("\n").length + pair.after.split("\n").length : 0;
   const text = s.kind === "edit" ? "" : preview(s);
@@ -76,18 +110,28 @@ const Row = memo(function Row({ beat, state, expanded, sessionId, onPick }: {
   beat: Beat; state: RowState; expanded: boolean; sessionId: string; onPick: (i: number) => void;
 }) {
   const s = beat.step;
-  const file = stepFile(s);
-  const label = s.kind === "prompt" && !s.isSubagent ? `You: ${displayLabel(s)}` : displayLabel(s);
+  const file = beat.kind === "summary" ? undefined : stepFile(s);
+  const label = s.kind === "prompt" && !s.isSubagent ? `You: ${beatLabel(beat)}` : beatLabel(beat);
+  const parts = beat.counts ? countParts(beat.counts) : [];
+  const readFiles = beat.kind === "reads" ? beat.files.map(basename) : [];
   return (
-    <div className={`rp-row ${state} a-${beat.action}${expanded ? " open" : ""}`} data-beat={beat.index}>
+    <div className={`rp-row ${state} a-${beat.action} k-${beat.kind}${expanded ? " open" : ""}`} data-beat={beat.index}>
       <button className="rp-row-main" onClick={() => onPick(beat.index)} aria-current={state === "current" ? "step" : undefined}>
-        <span className="rp-glyph" aria-hidden="true">{s.kind === "prompt" && s.isSubagent ? <Glyph kind="tool_call" tool="Agent" size={14} /> : <Glyph kind={s.kind} tool={s.tool} size={14} />}</span>
+        <span className="rp-glyph" aria-hidden="true">{
+          beat.kind === "summary" ? <SummaryGlyph />
+            : s.kind === "prompt" && s.isSubagent ? <Glyph kind="tool_call" tool="Agent" size={14} />
+            : <Glyph kind={s.kind} tool={s.tool} size={14} />}</span>
         <span className="rp-row-text">
           <span className="rp-row-label">{label}</span>
           <span className="rp-row-meta">
             <time>{clockTime(s.ts)}</time>
-            {file && <span className="rp-file" title={file}>{basename(file)}</span>}
+            {beat.failed > 0 && <span className="rp-chip fail">{beat.failed} failed</span>}
+            {parts.length > 0 && <span className="rp-counts" title={parts.join(" · ")}>{parts.join(" · ")}</span>}
+            {readFiles.length > 1
+              ? <span className="rp-file" title={readFiles.join(", ")}>{readFiles.slice(0, 2).join(", ")}{readFiles.length > 2 ? ` +${readFiles.length - 2}` : ""}</span>
+              : file && <span className="rp-file" title={file}>{basename(file)}</span>}
             {beat.outside && <span className="rp-chip">outside project</span>}
+            {beat.why && <span className="rp-why" title={beat.why}>{beat.why}</span>}
           </span>
         </span>
       </button>
@@ -96,10 +140,14 @@ const Row = memo(function Row({ beat, state, expanded, sessionId, onPick }: {
   );
 });
 
+function SummaryGlyph() {
+  return <svg width="14" height="14" viewBox="0 0 16 16"><path d="M3 4.5h10M3 8h10M3 11.5h6" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" /></svg>;
+}
+
 export function ReplaySteps() {
   const { replay, setReplayIndex, setReplayPlaying } = useNav();
   const { state } = useLive();
-  const thread = useThread(replay?.sessionId ?? null);
+  const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
   const listRef = useRef<HTMLDivElement>(null);
   const userAt = useRef(0);
   const dragging = useRef(false);
@@ -172,7 +220,6 @@ export function ReplaySteps() {
   }, [index, len, expandedIndex]);
   useEffect(() => { first.current = true; }, [replay?.sessionId]);
 
-  const edits = useMemo(() => thread?.beats.filter((b) => b.action === "edit").length ?? 0, [thread]);
 
   if (!replay) return null;
   if (!thread) {
@@ -183,7 +230,11 @@ export function ReplaySteps() {
 
   return (
     <div className="rp-steps">
-      <p className="rp-steps-sum">{len} steps · {edits} edits · {thread.files.length} files</p>
+      <p className="rp-steps-sum">
+        {thread.detail === "light"
+          ? <>{len.toLocaleString()} moments from {thread.stepCount.toLocaleString()} steps · {thread.editCount} edits · {thread.files.length} files</>
+          : <>{thread.stepCount.toLocaleString()} steps · {thread.editCount} edits · {thread.files.length} files</>}
+      </p>
       <div className="rp-list" ref={listRef} onScroll={onScroll} onWheel={markUser} onTouchMove={markUser}
         onKeyDown={(e) => { if (["PageUp", "PageDown", "ArrowUp", "ArrowDown"].includes(e.key)) markUser(); }}
         onPointerDown={(e) => { if (e.target === e.currentTarget) { dragging.current = true; markUser(); } }}>

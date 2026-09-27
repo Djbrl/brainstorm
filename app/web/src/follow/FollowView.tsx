@@ -137,7 +137,7 @@ function Timeline({ session, steps, selectedId, onSelect, reveal }: { session: S
           {session.cwd && <><span className="sep">·</span><span className="tl-cwd" title={session.cwd}>{session.cwd}</span></>}
           {steps && <><span className="sep">·</span><span>{visible.length} steps, {edits} edits</span></>}
         </div>
-        {steps && steps.length > 0 && <ReplayOnMapButton sessionId={session.id} index={selectedId ? steps.findIndex((s) => s.id === selectedId) : 0} />}
+        {steps && steps.length > 0 && <ReplayOnMapButton sessionId={session.id} stepId={selectedId} />}
       </header>
       <div className="tl-scroll" ref={scrollRef} onScroll={onScroll}>
         {!steps ? (

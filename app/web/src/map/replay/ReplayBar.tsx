@@ -2,8 +2,7 @@
 import { memo, useMemo } from "react";
 import { isReplay, useLive } from "../../lib/live";
 import { useNav, type ReplaySpeed } from "../../lib/nav";
-import { useThread, type Thread } from "../../lib/thread";
-import { displayLabel } from "../../follow/format";
+import { beatLabel, useThread, type Thread } from "../../lib/thread";
 import { togglePlay } from "./layer";
 import { replayCamera } from "./store";
 import "./replay.css";
@@ -36,9 +35,9 @@ const EditTicks = memo(function EditTicks({ thread }: { thread: Thread }) {
 });
 
 export function ReplayBar() {
-  const { replay, setReplayIndex, setReplayPlaying, setReplaySpeed, stopReplay } = useNav();
+  const { replay, setReplayIndex, setReplayPlaying, setReplaySpeed, setReplayDetail, stopReplay } = useNav();
   const { state } = useLive();
-  const thread = useThread(replay?.sessionId ?? null);
+  const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
   if (!replay) return null;
 
   const stop = <button className="rp-icon" onClick={stopReplay} aria-label="Stop replay" title="Stop replay (Esc)">{Icon.close}</button>;
@@ -58,14 +57,22 @@ export function ReplayBar() {
   const len = thread.beats.length;
   const index = Math.min(replay.index, len - 1);
   const beat = thread.beats[index];
+  const label = beatLabel(beat);
+  const full = replay.detail === "full";
   const set = (i: number) => { setReplayPlaying(false); setReplayIndex(Math.max(0, Math.min(len - 1, i))); };
   const pct = len > 1 ? (index / (len - 1)) * 100 : 100;
 
   return (
     <div className="rp-bar" role="region" aria-label="Thread replay">
       <div className="rp-top">
-        <span className="rp-count">Beat {index + 1} / {len}</span>
-        <span className="rp-label" title={`${title}\n${displayLabel(beat.step)}`}>{displayLabel(beat.step)}</span>
+        <span className="rp-count">{index + 1} / {len}</span>
+        <span className="rp-label" title={`${title}\n${label}`}>{label}</span>
+        {beat.failed > 0 && <span className="rp-chip fail">{beat.failed} failed</span>}
+        <button className={`rp-text rp-detail-toggle${full ? " on" : ""}`} aria-pressed={full}
+          onClick={() => setReplayDetail(full ? "light" : "full", beat.step.id)}
+          title={full ? "Back to the light replay: edits, reads and summaries" : "Show every step, including commands, messages and results"}>
+          All steps
+        </button>
         <button className="rp-text" onClick={() => replayCamera.recenter()} title="Follow the tracer again">{Icon.target}<span>Recenter</span></button>
         {stop}
       </div>
@@ -85,7 +92,7 @@ export function ReplayBar() {
         <div className="rp-slider" style={{ ["--rp-pct" as string]: `${pct}%` }}>
           <EditTicks thread={thread} />
           <input type="range" min={0} max={len - 1} step={1} value={index} aria-label="Replay position"
-            aria-valuetext={`Beat ${index + 1} of ${len}: ${displayLabel(beat.step)}`}
+            aria-valuetext={`${index + 1} of ${len}: ${label}`}
             onChange={(e) => set(Number(e.target.value))} />
         </div>
         <div className="rp-speed" role="group" aria-label="Speed">

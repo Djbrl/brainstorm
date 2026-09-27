@@ -101,3 +101,22 @@
   color: var(--ink); border-radius: 999px; padding: 5px 14px 5px 11px; font-size: 13.5px; font-weight: 600; transition: color .15s, border-color .15s; }
 .rp-follow-btn svg { color: var(--accent); }
 .rp-follow-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Light replay: summaries, read groups, failures */
+.rp-row.k-summary .rp-glyph { background: transparent; color: var(--ink-3); box-shadow: inset 0 0 0 1px var(--line); }
+.rp-row.k-summary .rp-row-label { color: var(--ink-2); }
+.rp-row.k-prompt .rp-row-label { font-weight: 600; }
+.rp-counts { overflow: hidden; text-overflow: ellipsis; }
+.rp-chip.fail { color: #c62828; border-color: rgba(198,40,40,.35); background: #fff5f5; font-weight: 600; }
+.rp-sub { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 2px; }
+.rp-sub button { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 0; background: transparent; padding: 5px 6px; border-radius: 8px; font: inherit; font-size: 12.5px; color: var(--ink-2); cursor: pointer; }
+.rp-sub button:hover { background: rgba(0,0,0,.04); color: var(--ink); }
+.rp-sub button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.rp-sub button.fail .rp-sub-label { color: #c62828; }
+.rp-sub-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-glyph.sm { width: 18px; height: 18px; flex: none; }
+.rp-fail-dot { width: 7px; height: 7px; border-radius: 50%; background: #d93025; flex: none; }
+.rp-detail-toggle { font-size: 12px; }
+.rp-detail-toggle.on { color: var(--accent); background: var(--accent-soft); }
+.rp-top .rp-chip.fail { margin-left: -4px; }
+.rp-why { overflow: hidden; text-overflow: ellipsis; color: var(--ink-3); font-style: italic; }

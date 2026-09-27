@@ -29,6 +29,7 @@
 .tl-row { position: relative; display: grid; grid-template-columns: 32px 1fr; gap: 16px; padding: 12px 16px 12px 0; border-radius: 14px; cursor: pointer; transition: background .15s; }
 .tl-row:hover { background: rgba(0,0,0,.025); }
 .tl-row.on { background: var(--accent-soft); }
+.tl-row.flash { animation: tl-flash 2s ease; }
 .tl-row.fresh { animation: tl-in .5s cubic-bezier(.2,.7,.2,1); }
 .tl-row.sub { margin-left: 32px; }
 .tl-row.sub .tl-label { font-size: 17px; }
@@ -116,3 +117,4 @@
 @keyframes sd-in { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
 @keyframes fl-pulse { 0% { box-shadow: 0 0 0 0 rgba(91,91,214,.35); } 100% { box-shadow: 0 0 0 14px rgba(91,91,214,0); } }
 @keyframes fl-breathe { 0%, 100% { box-shadow: 0 0 0 3px rgba(31,157,85,.15); } 50% { box-shadow: 0 0 0 5px rgba(31,157,85,.08); } }
+@keyframes tl-flash { 0%, 30% { background: #fff1d6; box-shadow: 0 0 0 2px var(--warm); } 100% { background: var(--accent-soft); box-shadow: 0 0 0 0 transparent; } }

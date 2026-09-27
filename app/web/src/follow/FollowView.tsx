@@ -1,8 +1,7 @@
 // Owner: C. Sessions list + live timeline of steps. Click a step → diff + AskBox.
-import { clock } from "../lib/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Session, Step } from "@contract";
-import { useLive } from "../lib/live";
+import { clock, useLive } from "../lib/live";
 import { useNav } from "../lib/nav";
 import { FileIcon, Glyph, RiskIcon } from "./Glyph";
 import { StepDetail } from "./StepDetail";
@@ -38,18 +37,18 @@ function SessionList({ sessions, selected, onSelect }: { sessions: Session[]; se
   );
 }
 
-function StepRow({ step, selected, fresh, onSelect }: { step: Step; selected: boolean; fresh: boolean; onSelect: (s: Step) => void }) {
+function StepRow({ step, selected, fresh, flash, onSelect }: { step: Step; selected: boolean; fresh: boolean; flash?: boolean; onSelect: (s: Step) => void }) {
   const { openFile } = useNav();
   const file = stepFile(step);
   const label = displayLabel(step);
   const labeled = !!realLabel(step);
   const brief = step.kind === "prompt" && step.isSubagent; // lead agent's brief to a subagent
-  const cls = ["tl-row", brief ? "k-brief" : `k-${step.kind}`, step.isSubagent && "sub", selected && "on", fresh && "fresh"].filter(Boolean).join(" ");
+  const cls = ["tl-row", brief ? "k-brief" : `k-${step.kind}`, step.isSubagent && "sub", selected && "on", fresh && "fresh", flash && "flash"].filter(Boolean).join(" ");
 
   // A subagent's "prompt" is the lead agent's brief, not the human: render it as a normal step.
   if (step.kind === "prompt" && !step.isSubagent) {
     return (
-      <div className={cls} onClick={() => onSelect(step)}>
+      <div className={cls} data-step-id={step.id} onClick={() => onSelect(step)}>
         <div className="tl-glyph"><Glyph kind="prompt" size={17} /></div>
         <div className="tl-body">
           <div className="tl-prompt">{step.text?.trim() || label}</div>
@@ -60,7 +59,7 @@ function StepRow({ step, selected, fresh, onSelect }: { step: Step; selected: bo
   }
 
   return (
-    <div className={cls} onClick={() => onSelect(step)}>
+    <div className={cls} data-step-id={step.id} onClick={() => onSelect(step)}>
       <div className="tl-glyph">{brief ? <Glyph kind="tool_call" tool="Agent" /> : <Glyph kind={step.kind} tool={step.tool} />}</div>
       <div className="tl-body">
         <div className={`tl-label ${labeled ? "has" : "pending"}`} key={labeled ? "l" : "f"}>{label}</div>
@@ -79,7 +78,7 @@ function StepRow({ step, selected, fresh, onSelect }: { step: Step; selected: bo
   );
 }
 
-function Timeline({ session, steps, selectedId, onSelect }: { session: Session; steps: Step[] | undefined; selectedId: string | null; onSelect: (s: Step) => void }) {
+function Timeline({ session, steps, selectedId, onSelect, reveal }: { session: Session; steps: Step[] | undefined; selectedId: string | null; onSelect: (s: Step) => void; reveal?: { id: string; n: number } | null }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
   const initialIds = useRef<Set<string> | null>(null);
@@ -104,6 +103,24 @@ function Timeline({ session, steps, selectedId, onSelect }: { session: Session; 
     if (el && steps) el.scrollTop = el.scrollHeight;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.id, !!steps]);
+
+  // Reveal a focused step (from Failures): page it in, scroll to it, flash it.
+  const [flashId, setFlashId] = useState<string | null>(null);
+  const handled = useRef(0);
+  useEffect(() => { if (!flashId) return; const t = setTimeout(() => setFlashId(null), 2000); return () => clearTimeout(t); }, [flashId]);
+  useEffect(() => {
+    if (!reveal || reveal.n === handled.current) return;
+    const idx = visible.findIndex((s) => s.id === reveal.id);
+    if (idx === -1) return;
+    if (idx < visible.length - limit) { setLimit(visible.length - idx + 20); return; }
+    atBottom.current = false;
+    const raf = requestAnimationFrame(() => {
+      scrollRef.current?.querySelector(`[data-step-id="${CSS.escape(reveal.id)}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+      handled.current = reveal.n;
+      setFlashId(reveal.id);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [reveal, visible, limit]);
 
   const onScroll = () => {
     const el = scrollRef.current;
@@ -135,7 +152,7 @@ function Timeline({ session, steps, selectedId, onSelect }: { session: Session; 
               <button className="tl-more" onClick={() => setLimit((l) => l + PAGE)}>Show {Math.min(PAGE, visible.length - shown.length)} earlier steps</button>
             )}
             {shown.map((s) => (
-              <StepRow key={s.id} step={s} selected={s.id === selectedId} fresh={!initialIds.current?.has(s.id)} onSelect={onSelect} />
+              <StepRow key={s.id} step={s} selected={s.id === selectedId} fresh={!initialIds.current?.has(s.id)} flash={s.id === flashId} onSelect={onSelect} />
             ))}
             {session.status === "running" && <div className="tl-tail"><span className="tl-pulse" />Working</div>}
           </div>
@@ -147,8 +164,10 @@ function Timeline({ session, steps, selectedId, onSelect }: { session: Session; 
 
 export function FollowView() {
   const { state, loadSteps } = useLive();
-  const { sessionId, setSessionId } = useNav();
+  const { sessionId, setSessionId, focusStep, setFocusStep } = useNav();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [reveal, setReveal] = useState<{ id: string; n: number } | null>(null);
+  const retried = useRef<string | null>(null);
 
   // Auto-select the most recent running session (sessions are sorted newest first).
   useEffect(() => {
@@ -166,6 +185,26 @@ export function FollowView() {
   const steps = sessionId ? state.steps[sessionId] : undefined;
   const results = useMemo(() => pairResults(steps ?? []), [steps]);
   const selected = steps?.find((s) => s.id === selectedId) ?? null;
+
+  // Focus a step requested by another view (openStep). tool_result rows are hidden, so land on their call.
+  useEffect(() => {
+    if (!focusStep || !sessionId) return;
+    if (!steps) { loadSteps(sessionId); return; }
+    const idx = steps.findIndex((s) => s.id === focusStep);
+    if (idx === -1) {
+      if (retried.current !== focusStep) { retried.current = focusStep; loadSteps(sessionId); return; } // maybe newer than our copy
+      setFocusStep(null);
+      return;
+    }
+    let target = steps[idx];
+    if (!isVisible(target)) {
+      const callId = [...results.entries()].find(([, r]) => r.id === target.id)?.[0];
+      target = (callId && steps.find((s) => s.id === callId)) || [...steps.slice(0, idx)].reverse().find(isVisible) || target;
+    }
+    setSelectedId(target.id);
+    setReveal((r) => ({ id: target.id, n: (r?.n ?? 0) + 1 }));
+    setFocusStep(null);
+  }, [focusStep, sessionId, steps, results, loadSteps, setFocusStep]);
 
   const select = useCallback((id: string) => { setSessionId(id); setSelectedId(null); loadSteps(id); }, [setSessionId, loadSteps]);
   const onClose = useCallback(() => setSelectedId(null), []);
@@ -186,7 +225,7 @@ export function FollowView() {
     <div className={`fl-root ${selected ? "with-detail" : ""}`}>
       <SessionList sessions={state.sessions} selected={sessionId} onSelect={select} />
       {session ? (
-        <Timeline session={session} steps={steps} selectedId={selectedId} onSelect={(s) => setSelectedId((cur) => (cur === s.id ? null : s.id))} />
+        <Timeline session={session} steps={steps} selectedId={selectedId} reveal={reveal} onSelect={(s) => setSelectedId((cur) => (cur === s.id ? null : s.id))} />
       ) : <section className="fl-timeline" />}
       {selected && <StepDetail step={selected} result={results.get(selected.id)} onClose={onClose} />}
     </div>

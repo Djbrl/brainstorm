@@ -43,6 +43,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 20:51 [lead] POST-DEADLINE privacy fix: both public demos redacted (data only). Removed titles of the human's unrelated Claude threads, other project names and folders, a listing of the private Documents folder, a process list, and the Vercel username. Only hackathon threads are in the replays. Replay exports now apply a private, gitignored redaction list (app/server/data/redact.json) automatically.
 
+- 21:40 [lead] POST-DEADLINE: thread replay on the Map + Threads/Files sidebar + show/hide agents deployed to brainstorm-next
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

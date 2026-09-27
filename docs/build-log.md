@@ -3,8 +3,17 @@
 One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 13:25 [human] Workspace created: app/, docs/, video/ with briefings.
+- 13:57 [site] Landing page draft in `site/` (static index.html, all links and numbers in one `SITE` config, hidden until filled).
+- 14:00 [site] Landing page live at https://brainstorm-landing.vercel.app
+- 14:11 [site] Landing page redesigned: light, Apple-style scroll scenes, Cabinet Grotesk + Satoshi. Redeployed.
+- 14:50 [site] Hero is now a scroll story: follow Agent 1, then three agents, into the codebase, zoom out to the map. Redeployed.
+- 15:30 [site] Module names on hero map, pinned stats with study titles, 'Where your money goes' section, dark Brev section, 'Try Brainstorm now' CTA. Redeployed.
+- 15:39 [site] Landing page links the hosted app (brainstorm-demo-black.vercel.app) from the header and 'Try Brainstorm now', plus the GitHub repo.
 
 - 13:56 [Video/Codex] Drafted 90-second script (143 words) and rendered a 24-second, 720p motion mockup. Concept UI/data labeled illustrative; no voice/music yet. Outputs: video/script-v1.md and video/out/opening-v1.mp4.
+- 14:18 [human] Brev L40S up (\$1.06/hr), vLLM 0.30 + Nemotron 3 Nano loading, tunnel on localhost:8000. See docs/brev-setup.md.
+
+- 14:20 [Video/Codex] Added video/HANDOFF.md for Claude/context recovery. Revised 24-second mockup to light theme, no eyebrow headings or card stacks; Cabinet Grotesk + Satoshi from Fontshare. Rendered/visually checked video/out/opening-v2.mp4; latest script is video/script-v2.md.
 
 - 14:43 [lead] App foundation committed: NestJS 11 server (node:sqlite, chokidar, ws gateway) + Vite/React 19 web, contract in `app/server/src/types.ts` (+ `Replay` type). Stack changed from express to NestJS at the human's request. 4 agents launched in parallel: A listener, B map + Nemotron reader, C web Follow + Ask UI, D web Map + Ask server. Target end-to-end 15:10.
 
@@ -14,9 +23,15 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 15:25 [lead] Hosted replay demo live at https://brainstorm-demo-black.vercel.app (build session + landing session, 1,152 steps, secrets scanned). Public repo https://github.com/Djbrl/brainstorm with README + screenshots; full history scanned for secrets first. Landing page branch merged into main.
 
+- 15:29 [Video/Codex] Rebuilt video around the live landing page: green hero, agent trails, map, comprehension motivation, local architecture, model roles, measured tokenomics. Full 90s silent animatic at video/out/film-v3.mp4; script-v3.md (164 words), optional narration-v3.vtt, and updated HANDOFF.md. Product scenes remain illustrative pending real capture.
+
+- 15:38 [Video/Codex] Final-stretch handoff ready at video/FINAL-HANDOFF.md. Full 90s v3 animatic completed and verified; needs human voice, actual product captures, final captions/audio and 1080p render before upload.
+
 - 15:45 [lead] Failures panel (SupplyzPro "Find the Hidden Failures"): GET /api/failures finds failing tool calls (is_error, <tool_use_error>, non-zero exit, blocked permissions), pairs each with its call, groups by tool + normalized error, ranks by count x recency with boosts for retries and edits, and Nemotron names each group with a one-line fix. Failures tab with evidence that jumps to the step in Follow (C). In the replay demo. Brev tunnel dropped again at 15:38; reopened.
 
 - 16:50 [lead] POST-DEADLINE cosmetic update: replay welcome tour (no feature or data changes)
+
+- 16:55 [human] POST-DEADLINE cosmetic update: landing page screenshots (Follow, Map, Failures), Failures card replaces the unbuilt History card, deck.html. No product changes.
 
 - 16:58 [lead] POST-DEADLINE cosmetic update: header wordmark links to landing page
 
@@ -27,4 +42,6 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.
+- 13:57 [site → docs] Add the landing page URL to `submission-checklist.md` once deployed; send final numbers so `site/index.html` SITE block can be filled.
+- 13:57 [site → C / human] Real screenshots of Follow, Map, History as `site/img/{follow,map,history}.png` after 15:10.
 - 15:25 [lead → site] Demo link: https://brainstorm-demo-black.vercel.app, repo: https://github.com/Djbrl/brainstorm. Screenshots (1920×1200, from the demo): `docs/screenshots/follow.png`, `docs/screenshots/map.png`. History view was cut, so no history.png. Numbers in `docs/numbers.md`.

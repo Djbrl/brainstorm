@@ -1,0 +1,58 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:06.000
+Brainstorm. A live map of your code,
+and the agents writing it.
+
+00:00:06.000 --> 00:00:14.000
+One agent, you can follow. Three, and the changes
+scatter across your project.
+
+00:00:14.000 --> 00:00:20.000
+A wall of edits tells you what changed.
+Understanding why takes more.
+
+00:00:20.000 --> 00:00:26.000
+In one coding study, AI users
+scored lower on comprehension.
+
+00:00:26.000 --> 00:00:31.000
+Those who sought explanations understood more.
+That's the habit we're designing for.
+
+00:00:31.000 --> 00:00:38.000
+Follow a session. Open an edit. Ask why.
+
+00:00:38.000 --> 00:00:45.000
+Then zoom out to see where agents are working
+and how your files connect.
+
+00:00:45.000 --> 00:00:50.000
+Underneath, local listeners read session logs.
+
+00:00:50.000 --> 00:00:54.000
+A mapper follows files and imports.
+SQLite keeps the record.
+
+00:00:54.000 --> 00:01:00.000
+Nemotron on our Brev GPU
+summarizes code and labels steps.
+
+00:01:00.000 --> 00:01:05.000
+Claude answers questions from a small package
+of relevant context.
+
+00:01:05.000 --> 00:01:12.000
+On our Hono benchmark: three hundred eleven files,
+seventy-three seconds, about two cents of GPU time.
+
+00:01:12.000 --> 00:01:17.000
+Startup and idle time are extra.
+
+00:01:17.000 --> 00:01:23.000
+Re-read only changed files. Keep each question focused.
+The map itself uses no model tokens.
+
+00:01:23.000 --> 00:01:30.000
+Let the agents type.
+Keep your brain in the loop.

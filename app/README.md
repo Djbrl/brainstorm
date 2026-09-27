@@ -48,6 +48,8 @@ Full pitch and features: `../docs/plan.md`. Judges score on working features, pu
 | C: Web Follow + Ask UI | `web/src/follow/`, `web/src/ask/` |
 | D: Web Map + Ask server | `web/src/map/`, `server/src/ask/`, `server/src/llm/claude.service.ts`, `server/src/privacy/` |
 
+**Nemotron is live** (14:20). Read `../docs/nemotron.md` before calling it: connection, rules, code snippet and prompts.
+
 ## Architecture
 
 ```

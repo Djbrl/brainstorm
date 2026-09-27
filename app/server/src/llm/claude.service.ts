@@ -10,7 +10,8 @@ export class ClaudeService {
 
   private get api(): Anthropic {
     if (!this.cfg.claude.key) throw new Error("ANTHROPIC_API_KEY not set");
-    this.client ??= new Anthropic({ apiKey: this.cfg.claude.key, timeout: 30_000, maxRetries: 1 });
+    const ws = process.env.ANTHROPIC_WORKSPACE_ID;
+    this.client ??= new Anthropic({ apiKey: this.cfg.claude.key, timeout: 30_000, maxRetries: 1, ...(ws && { defaultHeaders: { "anthropic-workspace-id": ws } }) });
     return this.client;
   }
 

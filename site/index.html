@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brainstorm</title>
+<meta name="description" content="A live map of your code and of the AI agents writing it. Follow every agent step, ask why, and see your codebase glow where agents are working.">
+<meta property="og:title" content="Brainstorm: a live map of your code and of the AI agents writing it">
+<meta property="og:description" content="Let the agents type. Keep your brain in the loop.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0c11;
+  --surface: #11141b;
+  --surface-2: #161a23;
+  --border: #232836;
+  --text: #e7e9ef;
+  --muted: #8b92a5;
+  --faint: #5b6275;
+  --cool: #6fb6ff;      /* old / cold nodes */
+  --warm: #ffb45e;      /* recently changed */
+  --hot: #ff6b5e;       /* agent editing now */
+  --nvidia: #76b900;
+  --claude: #d97757;
+  --radius: 14px;
+  --max: 1120px;
+  --display: "Space Grotesk", system-ui, sans-serif;
+  --body: "Inter", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.6 var(--body); -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+a { color: inherit; }
+.wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+section { padding: 104px 0; border-top: 1px solid var(--border); }
+h1, h2, h3 { font-family: var(--display); letter-spacing: -0.02em; margin: 0; }
+h2 { font-size: clamp(30px, 4vw, 44px); line-height: 1.1; max-width: 18ch; }
+h3 { font-size: 20px; }
+p { margin: 0; }
+.eyebrow {
+  font: 500 12px/1 var(--mono); text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--warm); margin-bottom: 18px; display: block;
+}
+.lede { color: var(--muted); font-size: 18px; max-width: 60ch; margin-top: 18px; }
+.mono { font-family: var(--mono); }
+
+/* nav */
+nav {
+  position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+nav .wrap { display: flex; align-items: center; gap: 28px; height: 60px; }
+.logo { display: flex; align-items: center; gap: 10px; font: 700 18px var(--display); text-decoration: none; }
+.logo svg { width: 22px; height: 22px; }
+nav .links { display: flex; gap: 22px; margin-left: auto; font-size: 14px; color: var(--muted); }
+nav .links a { text-decoration: none; }
+nav .links a:hover { color: var(--text); }
+
+/* buttons */
+.btns { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 36px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px;
+  border-radius: 999px; border: 1px solid var(--border); background: var(--surface);
+  font: 500 15px var(--body); text-decoration: none; transition: border-color .2s, transform .2s;
+}
+.btn:hover { border-color: var(--muted); transform: translateY(-1px); }
+.btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+.btn.primary:hover { background: #fff; }
+.btn[hidden] { display: none; }
+
+/* hero */
+.hero { position: relative; padding: 120px 0 112px; border-top: 0; overflow: hidden; }
+.hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .9; }
+.hero::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 70% 80% at 22% 50%, var(--bg) 25%, transparent 75%);
+}
+.hero .wrap { position: relative; z-index: 1; }
+.hero h1 { font-size: clamp(40px, 6.4vw, 76px); line-height: 1.02; max-width: 13ch; }
+.hero h1 em { font-style: normal; background: linear-gradient(90deg, var(--warm), var(--hot)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hero .lede { font-size: 19px; max-width: 50ch; }
+.legend { display: flex; gap: 18px; margin-top: 44px; font: 12px var(--mono); color: var(--faint); flex-wrap: wrap; }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+/* problem */
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+.term {
+  background: #07080c; border: 1px solid var(--border); border-radius: var(--radius);
+  font: 13px/1.7 var(--mono); overflow: hidden;
+}
+.term .bar { display: flex; gap: 6px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.term .bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--border); }
+.term pre { margin: 0; padding: 18px 20px; color: var(--muted); white-space: pre-wrap; }
+.term .ok { color: #7ee2a8; }
+.term .del { color: #ff8f86; }
+.term .add { color: #7ee2a8; }
+.term .accept { display: inline-block; margin-top: 8px; padding: 2px 10px; border-radius: 6px; background: var(--text); color: var(--bg); }
+.studies { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 64px; }
+.study {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 26px; display: flex; flex-direction: column; gap: 12px;
+}
+.study .big { font: 600 40px/1 var(--display); letter-spacing: -0.03em; }
+.study .big small { font-size: 18px; color: var(--muted); font-weight: 500; }
+.study p { color: var(--muted); font-size: 15px; }
+.study .src { margin-top: auto; padding-top: 10px; font: 12px var(--mono); color: var(--faint); }
+.study .src a { color: var(--muted); }
+
+/* views */
+.views { display: grid; gap: 20px; margin-top: 56px; }
+.view {
+  display: grid; grid-template-columns: 5fr 7fr; gap: 40px; align-items: center;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 36px;
+}
+.view:nth-child(even) { grid-template-columns: 7fr 5fr; }
+.view:nth-child(even) .shot { order: -1; }
+.view .tag { font: 500 12px var(--mono); color: var(--warm); letter-spacing: .1em; text-transform: uppercase; }
+.view h3 { font-size: 28px; margin: 10px 0 12px; }
+.view p { color: var(--muted); }
+.view ul { margin: 18px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; font-size: 15px; }
+.view li::before { content: "→"; color: var(--faint); margin-right: 10px; }
+.shot {
+  aspect-ratio: 16 / 10; border-radius: 12px; border: 1px solid var(--border);
+  background: #07080c; overflow: hidden; position: relative;
+}
+.shot img { width: 100%; height: 100%; object-fit: cover; object-position: top left; display: block; }
+.shot .ph {
+  position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+  font: 13px var(--mono); color: var(--faint);
+  background: repeating-linear-gradient(45deg, transparent 0 12px, #0e1016 12px 24px);
+}
+
+/* how it works */
+.models { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 56px; }
+.model { border: 1px solid var(--border); border-radius: var(--radius); padding: 26px; background: var(--surface); }
+.model .who { font: 500 13px var(--mono); display: flex; align-items: center; gap: 8px; }
+.model .who i { width: 8px; height: 8px; border-radius: 2px; }
+.model h3 { margin: 14px 0 10px; }
+.model p { color: var(--muted); font-size: 15px; }
+.flow {
+  margin-top: 16px; border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 28px; background: #07080c; overflow-x: auto;
+}
+.flow svg { display: block; width: 100%; min-width: 760px; height: auto; }
+.flow text { font-family: var(--mono); font-size: 12px; fill: var(--muted); }
+.flow .t { fill: var(--text); font-size: 13px; }
+
+/* brev */
+#brev { background: radial-gradient(ellipse 60% 60% at 80% 0%, rgba(118,185,0,.10), transparent 70%); }
+#brev .eyebrow { color: var(--nvidia); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 56px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.stat { background: var(--bg); padding: 28px; }
+.stat .v { font: 600 38px/1.1 var(--display); letter-spacing: -0.03em; color: var(--text); }
+.stat .k { color: var(--muted); font-size: 14px; margin-top: 8px; }
+.stat .how { font: 11px var(--mono); color: var(--faint); margin-top: 6px; }
+.brev-foot { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 12px 28px; font: 13px var(--mono); color: var(--muted); }
+.brev-foot a { color: var(--nvidia); }
+
+/* privacy */
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 56px; }
+.card { border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; background: var(--surface); }
+.card h3 { font-size: 17px; margin-bottom: 8px; }
+.card p { color: var(--muted); font-size: 14.5px; }
+
+/* built with itself */
+.self { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: start; }
+.self .counts { display: flex; gap: 36px; margin-top: 32px; flex-wrap: wrap; }
+.self .counts div { font: 600 34px var(--display); }
+.self .counts span { display: block; font: 13px var(--body); color: var(--muted); }
+.team { display: grid; gap: 12px; }
+.member { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.member .av { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font: 600 15px var(--display); background: var(--surface-2); border: 1px solid var(--border); }
+.member b { display: block; font-weight: 600; }
+.member small { color: var(--muted); }
+.limits { margin-top: 28px; color: var(--muted); font-size: 15px; }
+.limits b { color: var(--text); font-weight: 500; }
+
+/* closing */
+.closing { text-align: center; padding: 140px 0; }
+.closing h2 { margin: 0 auto; max-width: 20ch; font-size: clamp(34px, 5vw, 60px); }
+.closing .btns { justify-content: center; }
+footer { border-top: 1px solid var(--border); padding: 28px 0 40px; color: var(--faint); font-size: 13px; }
+footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+
+.reveal { opacity: 0; transform: translateY(16px); transition: opacity .7s ease, transform .7s ease; }
+.reveal.in { opacity: 1; transform: none; }
+
+@media (max-width: 900px) {
+  section { padding: 80px 0; }
+  .split, .self, .view, .view:nth-child(even) { grid-template-columns: 1fr; gap: 32px; }
+  .view:nth-child(even) .shot { order: 0; }
+  .view { padding: 24px; }
+  .studies, .models { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: 1fr 1fr; }
+  .grid4 { grid-template-columns: 1fr 1fr; }
+  nav .links { display: none; }
+  nav .btn { margin-left: auto; }
+}
+@media (max-width: 560px) {
+  .wrap { padding: 0 16px; }
+  .stats, .grid4 { grid-template-columns: 1fr; }
+  .hero { padding: 80px 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="logo" href="#top">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <line x1="5" y1="7" x2="12" y2="4" stroke="#5b6275" stroke-width="1.5"/>
+        <line x1="12" y1="4" x2="19" y2="9" stroke="#5b6275" stroke-width="1.5"/>
+        <line x1="5" y1="7" x2="9" y2="18" stroke="#5b6275" stroke-width="1.5"/>
+        <line x1="19" y1="9" x2="16" y2="19" stroke="#5b6275" stroke-width="1.5"/>
+        <line x1="9" y1="18" x2="16" y2="19" stroke="#5b6275" stroke-width="1.5"/>
+        <line x1="12" y1="4" x2="12.5" y2="12" stroke="#5b6275" stroke-width="1.5"/>
+        <circle cx="5" cy="7" r="2.2" fill="#6fb6ff"/><circle cx="12" cy="4" r="2.2" fill="#6fb6ff"/>
+        <circle cx="19" cy="9" r="2.2" fill="#ffb45e"/><circle cx="9" cy="18" r="2.2" fill="#6fb6ff"/>
+        <circle cx="16" cy="19" r="2.2" fill="#ffb45e"/><circle cx="12.5" cy="12" r="3" fill="#ff6b5e"/>
+      </svg>
+      Brainstorm
+    </a>
+    <div class="links">
+      <a href="#problem">Problem</a>
+      <a href="#views">Product</a>
+      <a href="#how">How it works</a>
+      <a href="#brev">NVIDIA Brev</a>
+      <a href="#privacy">Privacy</a>
+    </div>
+    <a class="btn" data-link="video" href="#" style="padding:8px 16px;font-size:14px">Watch demo</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <canvas id="graph" aria-hidden="true"></canvas>
+  <div class="wrap">
+    <span class="eyebrow">For anyone building with AI coding agents</span>
+    <h1>A live map of your code and of the <em>AI agents writing it.</em></h1>
+    <p class="lede">Keep working in Claude Code as usual. Brainstorm follows every agent step, labels it, lets you ask <i>why</i>, and shows your whole codebase glowing where agents are working right now.</p>
+    <div class="btns">
+      <a class="btn primary" data-link="video" href="#">▶ Watch the 90-second demo</a>
+      <a class="btn" data-link="demo" href="#">Try the live replay</a>
+      <a class="btn" data-link="repo" href="#">GitHub</a>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--cool)"></i>unchanged</span>
+      <span><i style="background:var(--warm)"></i>changed recently</span>
+      <span><i style="background:var(--hot);box-shadow:0 0 10px var(--hot)"></i>agent editing now</span>
+    </div>
+  </div>
+</header>
+
+<main>
+<section id="problem">
+  <div class="wrap">
+    <div class="split">
+      <div class="reveal">
+        <span class="eyebrow">The problem</span>
+        <h2>Agents write code faster than we can understand it.</h2>
+        <p class="lede">A 47-file change lands in a chat scroll, and the button everyone ends up clicking is <b>Accept all</b>. Reading diffs line by line is the wrong way to understand a system. You don't learn a city from a list of streets. You look at a map.</p>
+      </div>
+      <div class="term reveal" aria-hidden="true">
+        <div class="bar"><i></i><i></i><i></i></div>
+<pre><span class="ok">●</span> Update(src/auth/session.ts)
+  <span class="del">- if (!token) return null;</span>
+  <span class="add">+ if (!token) return guest();</span>
+<span class="ok">●</span> Update(src/api/billing.ts)
+<span class="ok">●</span> Write(src/lib/cache.ts)
+<span class="ok">●</span> Update(tests/auth.test.ts)
+  … 43 more files
+
+<span class="ok">✓</span> Done! Updated 47 files.
+<span class="accept">Accept all</span></pre>
+      </div>
+    </div>
+
+    <div class="studies">
+      <div class="study reveal">
+        <div class="big">19% <small>slower</small></div>
+        <p>Experienced open-source developers were slower with AI tools, but <b>felt 20% faster</b>. We lose track without noticing.</p>
+        <div class="src"><a href="https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/" target="_blank" rel="noopener">METR, 2025</a> · 16 developers</div>
+      </div>
+      <div class="study reveal">
+        <div class="big">50% <small>vs 67%</small></div>
+        <p>Comprehension when learning with AI versus without. People who used AI to <b>ask questions</b> scored 65–86%.</p>
+        <div class="src"><a href="https://www.anthropic.com/research/AI-assistance-coding-skills" target="_blank" rel="noopener">Anthropic, 2026</a> · 52 developers</div>
+      </div>
+      <div class="study reveal">
+        <div class="big">83%</div>
+        <p>of LLM users couldn't quote the essay they had just written. They showed the weakest brain engagement of all groups.</p>
+        <div class="src"><a href="https://arxiv.org/abs/2506.08872" target="_blank" rel="noopener">MIT Media Lab, 2025</a> · preprint, 54 people</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="views">
+  <div class="wrap">
+    <div class="reveal">
+      <span class="eyebrow">The product</span>
+      <h2>Follow. Ask. Zoom out.</h2>
+      <p class="lede">Three views that sit next to your agent. Claude Code runs the agents; Brainstorm shows you what they did, where, and lets you question it.</p>
+    </div>
+    <div class="views">
+      <article class="view reveal">
+        <div>
+          <span class="tag">01 · Follow</span>
+          <h3>Every agent step, labeled.</h3>
+          <p>A live timeline of a Claude Code session: prompts, actions and code edits, each with a short plain-English label.</p>
+          <ul>
+            <li>Click any edit to see its diff</li>
+            <li>Ask “why did you change this?” and get a grounded answer, with its cost shown</li>
+            <li>Risky edits are flagged: deleted tests, auth or env files, large deletions</li>
+          </ul>
+        </div>
+        <div class="shot"><img src="img/follow.png" alt="Brainstorm Follow view: a labeled timeline of a Claude Code session" data-ph="Follow view screenshot"></div>
+      </article>
+      <article class="view reveal">
+        <div>
+          <span class="tag">02 · Map</span>
+          <h3>Your codebase, glowing where agents work.</h3>
+          <p>Modules and files as a graph, with imports as lines. Nodes glow by how recently they changed and pulse where an agent is editing right now.</p>
+          <ul>
+            <li>Click a node for its summary and recent steps</li>
+            <li>Point it at any existing repo, not only agent-written code</li>
+          </ul>
+        </div>
+        <div class="shot"><img src="img/map.png" alt="Brainstorm Map view: files as a graph, glowing by recency" data-ph="Map view screenshot"></div>
+      </article>
+      <article class="view reveal">
+        <div>
+          <span class="tag">03 · History</span>
+          <h3>Watch your project grow.</h3>
+          <p>Every map is saved as a snapshot. Drag the slider to see how the codebase took shape, turn by turn.</p>
+        </div>
+        <div class="shot"><img src="img/history.png" alt="Brainstorm History view: a slider over map snapshots" data-ph="History view screenshot"></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="reveal">
+      <span class="eyebrow">How it works</span>
+      <h2>The right model for each job.</h2>
+      <p class="lede">Most of Brainstorm needs no AI at all. Where it does, each model does what it's best at.</p>
+    </div>
+    <div class="models">
+      <div class="model reveal">
+        <div class="who" style="color:var(--nvidia)"><i style="background:var(--nvidia)"></i>Nemotron 3 Nano · NVIDIA Brev</div>
+        <h3>Reads everything</h3>
+        <p>The bulk work: a summary for every file and module, a label for every agent step, risk flags on edits. Runs on our own GPU with vLLM, at a flat hourly cost.</p>
+      </div>
+      <div class="model reveal">
+        <div class="who" style="color:var(--claude)"><i style="background:var(--claude)"></i>Claude</div>
+        <h3>Answers “why?”</h3>
+        <p>Gets a small, grounded package: your question, the step and its diff, the steps before it, the file and module summaries. Falls back to Nemotron if it's down.</p>
+      </div>
+      <div class="model reveal">
+        <div class="who" style="color:var(--muted)"><i style="background:var(--muted)"></i>No AI</div>
+        <h3>The map itself</h3>
+        <p>The timeline, the import graph, recency heat and history come straight from the agent's logs, the file system and git. Fast, exact, free.</p>
+      </div>
+    </div>
+    <div class="flow reveal">
+      <svg viewBox="0 0 960 200" role="img" aria-label="Architecture: Claude Code logs and your project flow through the listener and mapper into a local database; Nemotron on Brev labels and summarizes; Claude answers questions; the web app shows Follow, Map and History.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5b6275"/></marker>
+        </defs>
+        <g fill="none" stroke="#5b6275" stroke-width="1.2" marker-end="url(#ar)">
+          <path d="M170 48H232"/><path d="M170 150H232"/>
+          <path d="M372 48H448"/><path d="M372 150H448"/>
+          <path d="M540 72V96"/>
+          <path d="M630 48H708"/>
+          <path d="M630 150H708"/>
+          <path d="M800 126V72"/>
+        </g>
+        <g stroke="#232836" fill="#11141b">
+          <rect x="10" y="22" width="160" height="52" rx="10"/>
+          <rect x="10" y="124" width="160" height="52" rx="10"/>
+          <rect x="232" y="22" width="140" height="52" rx="10"/>
+          <rect x="232" y="124" width="140" height="52" rx="10"/>
+          <rect x="450" y="22" width="180" height="52" rx="10"/>
+          <rect x="450" y="124" width="180" height="52" rx="10" stroke="#76b900"/>
+          <rect x="710" y="22" width="240" height="52" rx="10" stroke="#ffb45e"/>
+          <rect x="710" y="124" width="240" height="52" rx="10" stroke="#d97757"/>
+        </g>
+        <text x="90" y="45" text-anchor="middle" class="t">Claude Code logs</text>
+        <text x="90" y="62" text-anchor="middle">~/.claude/**/*.jsonl</text>
+        <text x="90" y="147" text-anchor="middle" class="t">Your project</text>
+        <text x="90" y="164" text-anchor="middle">files + git</text>
+        <text x="302" y="53" text-anchor="middle" class="t">Listener</text>
+        <text x="302" y="155" text-anchor="middle" class="t">Mapper</text>
+        <text x="540" y="45" text-anchor="middle" class="t">Local SQLite</text>
+        <text x="540" y="62" text-anchor="middle">on your machine</text>
+        <text x="540" y="147" text-anchor="middle" class="t">Nemotron on Brev</text>
+        <text x="540" y="164" text-anchor="middle">labels · summaries · risk</text>
+        <text x="830" y="45" text-anchor="middle" class="t">Follow · Map · History</text>
+        <text x="830" y="62" text-anchor="middle">live over websocket</text>
+        <text x="830" y="147" text-anchor="middle" class="t">Ask “why?” → Claude</text>
+        <text x="830" y="164" text-anchor="middle">grounded, with cost shown</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section id="brev">
+  <div class="wrap">
+    <div class="reveal">
+      <span class="eyebrow">Built on NVIDIA Brev</span>
+      <h2>One open model, our own GPU, several jobs.</h2>
+      <p class="lede" id="brev-lede">NVIDIA Nemotron 3 Nano runs on a Brev GPU through vLLM. It reads the whole codebase, labels every agent step and flags risky edits. Because it's our own GPU, it's also Brainstorm's private mode: your code never has to leave it.</p>
+    </div>
+    <div class="stats reveal" id="stats"></div>
+    <div class="brev-foot reveal" id="brev-foot"></div>
+  </div>
+</section>
+
+<section id="privacy">
+  <div class="wrap">
+    <div class="reveal">
+      <span class="eyebrow">Privacy &amp; control</span>
+      <h2>Your code stays yours.</h2>
+    </div>
+    <div class="grid4">
+      <div class="card reveal"><h3>Local-first</h3><p>Sessions, maps, summaries and answers are stored in one SQLite file on your machine.</p></div>
+      <div class="card reveal"><h3>Secrets masked</h3><p>API keys, tokens and passwords are redacted before anything is stored or sent.</p></div>
+      <div class="card reveal"><h3>Small packages</h3><p>Questions send only the step, its diff and short summaries, to the provider you already use, with your own key.</p></div>
+      <div class="card reveal"><h3>Private mode</h3><p>Run all the reading on your own GPU. A human stays in control: follow, ask, pause.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="self">
+  <div class="wrap self">
+    <div class="reveal">
+      <span class="eyebrow">Built with itself</span>
+      <h2>Brainstorm watched its own build.</h2>
+      <p class="lede">We built Brainstorm today with several Claude Code agents working in parallel, and Brainstorm followed every one of them. The map in our demo is our own codebase, growing.</p>
+      <div class="counts" id="self-counts"></div>
+      <p class="limits"><b>Known limits:</b> Claude Code only today. Large repos show modules first.<br><b>Next:</b> Codex support, a desktop app with a global shortcut, a pilot with GOMYCODE students.</p>
+    </div>
+    <div class="reveal">
+      <span class="eyebrow" style="color:var(--muted)">Team</span>
+      <div class="team" id="team"></div>
+    </div>
+  </div>
+</section>
+
+<section class="closing">
+  <div class="wrap reveal">
+    <h2>Let the agents type. Keep your brain in the loop.</h2>
+    <div class="btns">
+      <a class="btn primary" data-link="video" href="#">▶ Watch the demo</a>
+      <a class="btn" data-link="demo" href="#">Try the live replay</a>
+      <a class="btn" data-link="repo" href="#">GitHub</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Brainstorm · built in one day with Claude Code, Claude and NVIDIA Nemotron on Brev</span>
+    <span id="foot-links"></span>
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   EDIT HERE. Everything the jury sees that changes on the day.
+   null = hidden on the page. Never put a guessed number here;
+   copy only from docs/numbers.md and docs/brev-setup.md.
+   ============================================================ */
+const SITE = {
+  links: {
+    video: null,   // unlisted YouTube / Drive link
+    demo: null,    // Vercel replay demo
+    repo: null,    // public GitHub repo
+  },
+  brev: {
+    gpu: null,          // e.g. "L40S"
+    pricePerHour: null, // e.g. "$1.20/h"
+    model: "Nemotron 3 Nano 30B-A3B FP8",
+    vllm: null,         // e.g. "0.11.0"
+  },
+  // from docs/numbers.md; value: string shown big, note: how measured
+  stats: [
+    { label: "files summarized per minute", value: null, note: "reader timing on the demo repo" },
+    { label: "to map the demo repo", value: null, note: "first read, start to finish" },
+    { label: "GPU cost of that read", value: null, note: "minutes × $/hour" },
+    { label: "average cost per question (Claude)", value: null, note: "cost meter" },
+    { label: "step label latency", value: null, note: "step arrival → label arrival" },
+    { label: "summary quality vs Claude", value: null, note: "Claude grades 10 Nemotron summaries" },
+  ],
+  self: { sessions: null, steps: null, files: null },
+  team: [
+    // { name: "Full Name", role: "What they did" },
+  ],
+};
+
+/* ---------- fill the page from SITE ---------- */
+document.querySelectorAll("[data-link]").forEach(a => {
+  const url = SITE.links[a.dataset.link];
+  if (url) { a.href = url; a.target = "_blank"; a.rel = "noopener"; }
+  else a.hidden = true;
+});
+
+const stats = SITE.stats.filter(s => s.value);
+const statsEl = document.getElementById("stats");
+if (stats.length) {
+  statsEl.innerHTML = stats.map(s =>
+    `<div class="stat"><div class="v">${s.value}</div><div class="k">${s.label}</div><div class="how">${s.note}</div></div>`).join("");
+  if (stats.length % 3) statsEl.style.gridTemplateColumns = `repeat(${Math.min(stats.length, 3)}, 1fr)`;
+} else statsEl.remove();
+
+const b = SITE.brev, foot = [];
+if (b.model) foot.push(`model: ${b.model}`);
+if (b.gpu) foot.push(`GPU: ${b.gpu}${b.pricePerHour ? " · " + b.pricePerHour : ""}`);
+if (b.vllm) foot.push(`vLLM ${b.vllm}`);
+if (SITE.links.repo) foot.push(`<a href="${SITE.links.repo}/blob/main/docs/brev-setup.md" target="_blank" rel="noopener">every Brev command we ran →</a>`);
+document.getElementById("brev-foot").innerHTML = foot.map(f => `<span>${f}</span>`).join("");
+
+const sc = SITE.self, counts = [["sessions", sc.sessions], ["agent steps", sc.steps], ["files", sc.files]].filter(c => c[1] != null);
+document.getElementById("self-counts").innerHTML = counts.map(([k, v]) => `<div>${v}<span>${k}</span></div>`).join("");
+
+const teamEl = document.getElementById("team");
+if (SITE.team.length) {
+  teamEl.innerHTML = SITE.team.map(m => {
+    const initials = m.name.split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase();
+    return `<div class="member"><div class="av">${initials}</div><div><b>${m.name}</b><small>${m.role || ""}</small></div></div>`;
+  }).join("");
+} else teamEl.parentElement.remove();
+
+document.getElementById("foot-links").innerHTML = [["repo", "GitHub"], ["video", "Video"], ["demo", "Replay demo"]]
+  .filter(([k]) => SITE.links[k]).map(([k, t]) => `<a href="${SITE.links[k]}" target="_blank" rel="noopener">${t}</a>`).join(" · ");
+
+/* screenshots: show a placeholder frame until the real PNG exists */
+document.querySelectorAll(".shot img").forEach(img => {
+  const ph = () => { const d = document.createElement("div"); d.className = "ph"; d.textContent = img.dataset.ph; img.replaceWith(d); };
+  if (img.complete && !img.naturalWidth) ph(); else img.addEventListener("error", ph);
+});
+
+/* reveal on scroll */
+const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: 0.12 });
+document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+
+/* ---------- hero: decorative code-map animation (illustration, not product data) ---------- */
+(() => {
+  const cv = document.getElementById("graph"), ctx = cv.getContext("2d");
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let W, H, nodes = [], edges = [], dpr;
+  const COOL = [111, 182, 255], WARM = [255, 180, 94], HOT = [255, 107, 94];
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  function build() {
+    dpr = Math.min(devicePixelRatio || 1, 2);
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    nodes = []; edges = [];
+    const narrow = W < 700, clusters = narrow ? 4 : 6;
+    for (let c = 0; c < clusters; c++) {
+      const cx = narrow ? rand(W * .1, W * .9) : rand(W * .5, W * .95), cy = rand(H * .15, H * .85);
+      const n = Math.round(rand(6, 11)), first = nodes.length;
+      for (let i = 0; i < n; i++) {
+        nodes.push({ x: cx + rand(-90, 90), y: cy + rand(-70, 70), ox: 0, oy: 0, r: rand(2, 5.5), heat: Math.random() < .25 ? rand(.4, 1) : 0, ph: rand(0, 6.28), c });
+        if (i) edges.push([first + i, first + Math.floor(rand(0, i))]);
+      }
+    }
+    for (let i = 0; i < clusters + 3; i++) edges.push([Math.floor(rand(0, nodes.length)), Math.floor(rand(0, nodes.length))]);
+    nodes.forEach(n => { n.ox = n.x; n.oy = n.y; });
+  }
+  let active = -1, activeUntil = 0;
+  const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+
+  function frame(t) {
+    ctx.clearRect(0, 0, W, H);
+    if (t > activeUntil) {
+      if (active >= 0) nodes[active].heat = 1;
+      active = Math.floor(Math.random() * nodes.length); activeUntil = t + rand(1800, 3200);
+    }
+    nodes.forEach(n => {
+      n.x = n.ox + Math.sin(t / 2400 + n.ph) * 6; n.y = n.oy + Math.cos(t / 2900 + n.ph) * 6;
+      n.heat = Math.max(0, n.heat - 0.0006);
+    });
+    ctx.lineWidth = 1;
+    edges.forEach(([a, b]) => {
+      const A = nodes[a], B = nodes[b], hot = a === active || b === active;
+      ctx.strokeStyle = hot ? "rgba(255,107,94,.45)" : "rgba(139,146,165,.16)";
+      ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+    });
+    nodes.forEach((n, i) => {
+      const isActive = i === active;
+      const col = isActive ? HOT : mix(COOL, WARM, n.heat);
+      if (isActive || n.heat > .3) {
+        const pulse = isActive ? 14 + Math.sin(t / 180) * 6 : 10 * n.heat;
+        const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r + pulse);
+        g.addColorStop(0, `rgba(${col},.55)`); g.addColorStop(1, `rgba(${col},0)`);
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(n.x, n.y, n.r + pulse, 0, 7); ctx.fill();
+      }
+      ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(n.x, n.y, isActive ? n.r + 1.5 : n.r, 0, 7); ctx.fill();
+    });
+    if (!still) requestAnimationFrame(frame);
+  }
+  build(); requestAnimationFrame(frame);
+  let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { build(); if (still) requestAnimationFrame(frame); }, 150); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+.tour-scrim { position: fixed; inset: 0; background: rgba(29, 29, 31, 0.32); z-index: 1000; display: grid; place-items: center; padding: 16px; }
+.tour-layer { position: fixed; inset: 0; z-index: 1000; }
+.tour-spot { position: fixed; border-radius: var(--radius); box-shadow: 0 0 0 9999px rgba(29, 29, 31, 0.32); outline: 2px solid var(--accent); transition: all 0.25s ease; pointer-events: none; }
+.tour-card { background: var(--surface); color: var(--ink); border-radius: 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18); padding: 24px 24px 18px; width: min(360px, calc(100vw - 24px)); }
+.tour-welcome { width: min(460px, calc(100vw - 32px)); padding: 32px 30px 22px; }
+.tour-card h2 { font-size: 26px; font-weight: 800; margin-bottom: 8px; }
+.tour-welcome h2 { font-size: 32px; }
+.tour-card p { margin: 0 0 18px; color: var(--ink-2); font-size: 16px; line-height: 1.55; }
+.tour-tip { position: fixed; }
+.tour-center { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.tour-count { font-size: 13px; color: var(--ink-3); margin-bottom: 6px; }
+.tour-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+.tour-actions .tour-ghost:first-child { margin-right: auto; }
+.tour-primary { border: 0; background: var(--ink); color: #fff; border-radius: 999px; padding: 9px 20px; font-weight: 600; }
+.tour-ghost { border: 0; background: transparent; color: var(--ink-2); border-radius: 999px; padding: 9px 12px; font-weight: 500; }
+.tour-ghost:hover { background: #f0f0f3; }
+.tour-primary:focus-visible, .tour-ghost:focus-visible, .tour-repo:focus-visible, .tour-help:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tour-repo { display: inline-block; margin: -6px 0 18px; color: var(--accent); font-weight: 600; text-decoration: none; }
+.tour-repo:hover { text-decoration: underline; }
+.tour-help { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font-weight: 700; font-size: 14px; line-height: 1; margin-left: 10px; }
+@media (max-width: 600px) {
+  /* Phones: the step card becomes a bottom sheet. */
+  .tour-tip:not(.tour-center) { top: auto !important; bottom: 12px !important; left: 12px !important; right: 12px; width: auto; }
+}

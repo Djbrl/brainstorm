@@ -117,6 +117,39 @@ The Map, Follow, Ask and Failures are ways of reading a replay. Local use is fre
 4. **Day 3:** real-time hooks, `/brainstorm:share` (redacted replay file), clean-machine test.
 5. **Later:** hosted encrypted share links, pull request replays, pause and steer, the official marketplace.
 
+## Tasks: following agents beyond code (28 Sep 2026)
+
+Agents don't only write code. They edit videos with FFmpeg, write documents, research the web for a paper or a reference board, and automate things on the computer. Tasks lets anyone follow and replay that work, and learn how it was done. It starts from the prototype on `feature/cowork` (see `docs/cowork.md`), which sorts every non-code tool call into a place (site, page, service, app) and separates reads from changes. "Cowork" is Anthropic's product name, so the feature is called **Tasks**.
+
+**A task replay has four parts:**
+
+1. **The goal:** what the user asked for.
+2. **How it did it:** the steps in plain language, grouped under the agent's own explanations. Commands are explained (for example, what each FFmpeg option does), so the replay doubles as a recipe you can learn from and ask about.
+3. **What it made:** the files and outputs, with previews (images, video frames, documents).
+4. **Where it got things:** the sites, pages, files and images it used.
+
+**Picture-in-picture, in three levels:**
+
+1. **The agent's own screenshots.** Browser and computer-use tools take a screenshot at almost every step, and Claude Code stores them in its logs (JPEG, about 30 KB each). Kept and shown in order, they make a filmstrip replay and a picture-in-picture that updates at each step. No permissions, no extra cost.
+2. **Live previews of the files being worked on.** Brainstorm watches the output files and refreshes a thumbnail when one changes: images, video frames (extracted locally with FFmpeg), rendered documents.
+3. **Live video of an app window** (Photoshop, a video editor), with the system's window capture. It needs a native helper and screen-recording permission, so it's for the future desktop app, opt-in only.
+
+**Layout:** a task is a sequence, not a network, so Tasks uses a storyboard (filmstrip, steps, outputs, sources) rather than a graph. The code map stays a map, possibly with a treemap view for large repos.
+
+**Open questions:**
+
+- **Reaching non-coders' tools.** Cowork keeps no local transcripts, and neither do ChatGPT's agent or most browser agents. We need a way in (a Cowork plugin, if hooks load there, or an import format) before Tasks can serve people who don't use Claude Code or Codex.
+- **Privacy.** Screenshots and browsing show far more than code: emails, messages, typed text. Tasks needs a private mode and redaction for screenshots before anything is shared.
+- **Audience.** We launch with developers ("see everything your agents do, not just the code"; about a quarter of their agents' tool calls are already outside the code), then expand once we can reach non-coders' tools.
+
+**Order:**
+
+1. Task view (goal, how, made, sources) and the filmstrip replay, on `feature/tasks`.
+2. Live file previews.
+3. The places map merged into the main map.
+4. Research access to Cowork and other agents.
+5. Window capture in the desktop app.
+
 ## Open product questions
 
 To settle before building. Record each decision here with the date.
@@ -135,3 +168,4 @@ To settle before building. Record each decision here with the date.
 | 28 Sep 2026 | AI: bring your own, detected automatically; default is the user's Claude Code. We provide AI only in the paid, hosted parts, paid per token rather than on our own GPUs. |
 | 28 Sep 2026 | License: FSL-1.1-ALv2 (Functional Source License). Free to use, change and self-host; no competing product or service; each release becomes Apache 2.0 after two years. The future cloud service stays in a separate, closed repo. |
 | 28 Sep 2026 | Results out: 3rd place, Senegal. `post-deadline` merged into `main`, which is the development branch again. The judged state stays tagged `hackathon-submission`, and the judged demo stays online unchanged. |
+| 28 Sep 2026 | Tasks (formerly the Cowork prototype): follow and replay agents' non-code work as a storyboard (goal, how, made, sources) with a filmstrip of the agent's screenshots. Developers first, non-coders once we can reach their tools. |

@@ -53,6 +53,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 00:53 (28 Sep) [lead] POST-DEADLINE, judged demo header only: a "Try Brainstorm Next" button linking to the preview, at the human's request. Built from main + that button (tag `judged-demo-live`); data unchanged; no other feature added to the judged demo.
 
+- 01:43 (28 Sep) [lead] POST-DEADLINE: brainstorm-next redeployed with a fresh recording (1,904 steps and 124 agent moves, up to 01:42) and every post-deadline feature. The setup playback keeps the run recorded while Nemotron was online; the newest 15 files have no summary because the Brev instance is gone. Redaction fixed: it now works on text values, not escaped JSON, and blanks any value mentioning a private item. Re-checked the judged demo data with the fix: nothing left to remove.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

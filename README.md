@@ -2,7 +2,7 @@
 
 **A live map and replay of your code and of the AI agents writing it.**
 
-🥉 **3rd place at [GOMYCODE × NVIDIA "Come Build with AI" 2026](https://hackathon.gomycode.com/onboarding/winners) (listed as "Brainstorm.ap").
+🥉 **3rd place** at [GOMYCODE × NVIDIA "Come Build with AI" 2026](https://hackathon.gomycode.com/onboarding/winners) (listed as "Brainstorm.ap").
 
 AI coding agents make it easy to stop understanding your own code. Brainstorm runs next to Claude Code and shows what the agents did, where, and why, so a human stays in the loop. Every agent session becomes a replay you can watch live or catch up on later.
 

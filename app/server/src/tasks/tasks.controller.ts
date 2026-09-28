@@ -38,7 +38,7 @@ export class TasksController {
     if (frame && kind === "video") {
       const still = await videoStill(path);
       if (!still) throw new NotFoundException();
-      return res.sendFile(still);
+      return res.sendFile(still, { dotfiles: "allow" }); // the data folder can sit under ~/.claude
     }
     res.sendFile(path, { dotfiles: "allow" });
   }

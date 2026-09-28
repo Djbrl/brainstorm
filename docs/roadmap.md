@@ -144,7 +144,7 @@ Agents don't only write code. They edit videos with FFmpeg, write documents, res
 
 **Order:**
 
-1. Task view (goal, how, made, sources) and the filmstrip replay, on `feature/tasks`.
+1. Task view (goal, how, made, sources) and the filmstrip replay, on `feature/tasks`. **v0 built (28 Sep), see [tasks.md](tasks.md).**
 2. Live file previews.
 3. The places map merged into the main map.
 4. Research access to Cowork and other agents.

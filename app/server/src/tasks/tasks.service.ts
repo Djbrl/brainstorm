@@ -112,8 +112,11 @@ export class TasksService {
         else if (typeof input.url === "string") detail = input.url;
         else if (typeof input.query === "string") detail = input.query;
         else if (typeof input.pattern === "string") detail = input.pattern;
-        else if (typeof input.description === "string") detail = input.description;
-        const ts: TaskStep = { id: st.id, ts: st.ts, tool: toolName(tool), label: st.label || (typeof input.description === "string" ? input.description : toolName(tool)), ...(detail ? { detail } : {}), ...(explain ? { explain } : {}), ...(st.isSubagent ? { subagent: true } : {}) };
+        // The agent's own one-line description of a command reads best; generic "Run: <command>" labels repeat the detail.
+        const own = typeof input.description === "string" && input.description.trim() ? input.description.trim() : undefined;
+        const generic = !st.label || /^Run: /.test(st.label);
+        const label = own ?? (generic ? (tool.startsWith("mcp__") ? toolName(tool).replace(/^./, (c) => c.toUpperCase()) : tool === "Bash" ? "Ran a command" : toolName(tool)) : st.label!);
+        const ts: TaskStep = { id: st.id, ts: st.ts, tool: toolName(tool), label, ...(detail ? { detail } : {}), ...(explain ? { explain } : {}), ...(st.isSubagent ? { subagent: true } : {}) };
         taskSteps.set(st.id, ts);
         beat().steps.push(ts);
         if (st.kind === "edit" && st.filePath) addMade(st.filePath, st.ts, tool, st.id);

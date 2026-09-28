@@ -73,6 +73,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 18:40 (28 Sep) [lead] Plugin 0.1.2, easier install: the session-start hook now tells the user where Brainstorm runs (first time), that it was updated, that a newer version is on GitHub (checked at most once a day), or that Node is missing or too old (at most once a day). The server releases the start lock once it listens, which fixes a 20 s gap after an update restart. Docs: one-command install (`/plugin install brainstorm --marketplace Djbrl/brainstorm`) and update steps.
 
+- 18:45 (28 Sep) [lead] Tasks v0 on `feature/tasks` (local only): every session as a task with a filmstrip replay of the screenshots its tools took (kept in the local db), how it did it (the agent's own words, then the calls; FFmpeg options explained), what it made (edits and command outputs, with image, video, PDF and text previews), what it did outside this computer, and where it got things (sites, searches, input files). Checked on real sessions (91 frames on the landing page session) and a real FFmpeg edit. Screenshots and previews are never in replay exports. Notes in docs/tasks.md.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { join, resolve } from "node:path";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, rmSync, writeFileSync } from "node:fs";
 import { NestFactory } from "@nestjs/core";
 import { WsAdapter } from "@nestjs/platform-ws";
 import type { NestExpressApplication } from "@nestjs/platform-express";
@@ -33,6 +33,7 @@ async function bootstrap() {
   await app.listen(port, "127.0.0.1");
   if (process.env.BRAINSTORM_DATA_DIR) {
     writeFileSync(join(dataDir(), "server.json"), JSON.stringify({ pid: process.pid, port, version, startedAt: new Date().toISOString() }));
+    rmSync(join(dataDir(), "launch.lock"), { force: true }); // up: the launcher that started us is done
   }
   console.log(`Brainstorm ${version} on http://localhost:${port}  (api /api, ws /ws)`);
 }

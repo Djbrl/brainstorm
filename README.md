@@ -15,6 +15,8 @@ In Claude Code:
 /plugin install brainstorm@brainstorm
 ```
 
+Or in one command (Claude Code 2.1.275 or later): `/plugin install brainstorm --marketplace Djbrl/brainstorm`.
+
 Then start a new session in your project and run `/brainstorm:open`: the map opens in your browser. You need Node.js 22.13 or later. Everything runs on your machine. Details, settings and uninstall: [plugin/README.md](plugin/README.md).
 
 ## Demos

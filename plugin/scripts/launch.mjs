@@ -2,7 +2,8 @@
 // Brainstorm launcher: starts the server (or reuses the running one) and opens it. No dependencies.
 // Used by the SessionStart hook (--background) and the /brainstorm:open and /brainstorm:stop skills.
 //
-//   --background   start if needed and return at once, print nothing (the hook's stdout would go into Claude's context)
+//   --background   for the SessionStart hook: start if needed and return at once. Prints nothing, or one JSON line with a
+//                  `systemMessage` for the user (welcome, updated, update available); plain stdout would go into Claude's context
 //   --open         open the map in the browser
 //   --switch       make the project the active workspace
 //   --project DIR  the project (default: CLAUDE_PROJECT_DIR, then the current folder)
@@ -10,7 +11,7 @@
 // It always exits 0 and prints any problem on stdout, so a skill can run it as one plain command.
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { createServer } from "node:net";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -33,7 +34,10 @@ const WEB = join(PLUGIN, "build", "web");
 const STATE = join(DATA, "server.json");
 const LOG = join(DATA, "server.log");
 const LOCK = join(DATA, "launch.lock");
+const NOTICES = join(DATA, "notices.json");
 const FIRST_PORT = 4747;
+const LATEST_URL = "https://raw.githubusercontent.com/Djbrl/brainstorm/main/plugin/.claude-plugin/plugin.json";
+const DAY = 24 * 60 * 60 * 1000;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const keyHash = (k) => (k ? createHash("sha256").update(k).digest("hex").slice(0, 12) : null);
@@ -66,6 +70,7 @@ async function stop(run) {
   try { process.kill(run.health.pid, "SIGTERM"); } catch { /* already gone */ }
   for (let i = 0; i < 30 && (await health(run.port)); i++) await sleep(100);
   rmSync(STATE, { force: true });
+  rmSync(LOCK, { force: true }); // whatever start it guarded is over
 }
 
 function portFree(port) {
@@ -109,17 +114,59 @@ async function waitUp(port, ms) {
   return null;
 }
 
+// ---- what the hook tells the user ----
+
+function readNotices() { try { return JSON.parse(readFileSync(NOTICES, "utf8")); } catch { return {}; } }
+function writeNotices(n) { try { writeFileSync(NOTICES, JSON.stringify(n)); } catch { /* next time */ } }
+
+const newer = (a, b) => { // a > b, for x.y.z versions
+  const pa = String(a).split(/[.-]/).map(Number), pb = String(b).split(/[.-]/).map(Number);
+  for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+  return false;
+};
+
+/** Messages for the user at session start: first run, just updated, a newer version on GitHub (checked at most once a day). */
+async function notices(port) {
+  const n = readNotices();
+  const out = [];
+  if (!n.welcomed) {
+    out.push(port ? `Brainstorm is running for this project at http://localhost:${port}. Run /brainstorm:open to see the map.` : "Brainstorm is starting. Run /brainstorm:open to see the map.");
+    n.welcomed = true;
+  } else if (n.lastVersion && n.lastVersion !== VERSION) {
+    out.push(`Brainstorm was updated to ${VERSION}.`);
+  }
+  n.lastVersion = VERSION;
+  if (!n.checkedAt || Date.now() - n.checkedAt > DAY) {
+    n.checkedAt = Date.now();
+    try {
+      const latest = (await (await fetch(LATEST_URL, { signal: AbortSignal.timeout(1500) })).json()).version;
+      if (latest && newer(latest, VERSION)) {
+        out.push(`Brainstorm ${latest} is available (you have ${VERSION}). To update, run \`claude plugin update brainstorm@brainstorm\` in a terminal, or choose Update now in /plugin → Installed.`);
+      }
+    } catch { /* offline: try again tomorrow */ }
+  }
+  writeNotices(n);
+  return out;
+}
+
+function tellUser(lines) {
+  if (lines.length) console.log(JSON.stringify({ systemMessage: lines.join("\n") }));
+}
+
 function openBrowser(url) {
   const [cmd, args] = process.platform === "darwin" ? ["open", [url]] : process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : ["xdg-open", [url]];
   try { spawn(cmd, args, { detached: true, stdio: "ignore" }).unref(); } catch { /* the URL is printed anyway */ }
 }
 
 async function main() {
-  if (!nodeOk()) {
-    say(`Brainstorm needs Node.js 22.13 or later (found ${process.versions.node}).`);
-    process.exit(0);
-  }
   mkdirSync(DATA, { recursive: true });
+  if (!nodeOk()) {
+    const msg = `Brainstorm needs Node.js 22.13 or later (you have ${process.versions.node}). Update Node, then start a new session.`;
+    if (!BACKGROUND) return say(msg);
+    const n = readNotices(); // once a day, not every session
+    if (!n.nodeWarnedAt || Date.now() - n.nodeWarnedAt > DAY) { n.nodeWarnedAt = Date.now(); writeNotices(n); tellUser([msg]); }
+    return;
+  }
 
   let run = await running();
 
@@ -141,18 +188,21 @@ async function main() {
     if (takeLock()) {
       port = await start();
       // The hook doesn't make the session wait: it leaves the lock, which goes stale after 20 s, by when the server is up.
-      if (BACKGROUND) return;
+      if (BACKGROUND) return tellUser(await notices(port));
       const up = await waitUp(port, 20_000);
       rmSync(LOCK, { force: true });
       if (!up) { console.log(`Brainstorm didn't start. Last lines of ${LOG}:`); console.log(tail(LOG)); return; }
     } else {
-      if (BACKGROUND) return; // another session is starting it
+      if (BACKGROUND) return tellUser(await notices()); // another session is starting it
       for (let t = 0; t < 20_000 && !(run = await running()); t += 250) await sleep(250);
       if (!run) { console.log(`Brainstorm didn't start. See ${LOG}`); return; }
       port = run.port;
     }
   }
-  if (BACKGROUND) return;
+  if (BACKGROUND) return tellUser(await notices(port));
+  // Someone who opens Brainstorm themselves doesn't need the welcome.
+  const n = readNotices();
+  if (!n.welcomed || n.lastVersion !== VERSION) writeNotices({ ...n, welcomed: true, lastVersion: VERSION });
 
   if (flag("--switch")) {
     const ws = await fetch(`http://127.0.0.1:${port}/api/workspace`).then((r) => r.json()).catch(() => null);

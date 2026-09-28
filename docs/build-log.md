@@ -65,6 +65,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 16:45 (28 Sep) [lead] POST-DEADLINE: repo licensed under FSL-1.1-ALv2 (LICENSE.md), at the human's request; set in the plugin manifest and README.
 
+- 17:05 (28 Sep) [lead] POST-DEADLINE: plugin pushed to post-deadline and installed from GitHub in a throwaway Claude Code config (`/plugin marketplace add Djbrl/brainstorm@post-deadline`): the hook started the installed copy and it mapped the session's project. 0.1.1: key instructions point to `/plugin configure brainstorm@brainstorm`, uninstall steps in the plugin README.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

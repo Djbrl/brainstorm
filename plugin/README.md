@@ -13,7 +13,7 @@ In Claude Code:
 /plugin install brainstorm@brainstorm
 ```
 
-Then start a new session (or run `/reload-plugins`). You need Node.js 22.13 or later.
+Then start a new session. You need Node.js 22.13 or later (`node -v`).
 
 To get updates automatically, turn on auto-update for the `brainstorm` marketplace in `/plugin` → Marketplaces. Otherwise, run `/plugin marketplace update brainstorm`, then `/plugin update brainstorm@brainstorm`.
 
@@ -26,7 +26,7 @@ Brainstorm starts in the background when a Claude Code session starts, and reads
 
 ## Settings
 
-- **Anthropic API key (optional):** lets you ask Claude questions about your code. Claude Code asks for it when you enable the plugin and keeps it in your system's secure credential store. Leave it empty and everything else still works.
+- **Anthropic API key (optional):** lets you ask Claude questions about your code. Set it with `/plugin configure brainstorm@brainstorm`, then start a new session. Claude Code keeps it in your system's secure credential store. Leave it empty and everything else still works.
 
 Summaries of files and labels written by a model are off in this release. They'll use the Claude Code you already have in a later version.
 
@@ -45,3 +45,12 @@ Summaries of files and labels written by a model are off in this release. They'l
 ## License
 
 [FSL-1.1-ALv2](../LICENSE.md): use, change and self-host it freely; no competing product or service. Each release also becomes Apache 2.0 two years later.
+
+## Uninstall
+
+```
+/plugin uninstall brainstorm@brainstorm
+/plugin marketplace remove brainstorm
+```
+
+Run `/brainstorm:stop` first to stop the server. Uninstalling deletes Brainstorm's data folder.

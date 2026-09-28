@@ -1,6 +1,6 @@
 {
   "name": "brainstorm",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A live map and replay of what your coding agents do: every session, every file they touch, what broke.",
   "author": {
     "name": "Djbrl",

@@ -28,6 +28,8 @@ The hackathon voucher was not received (late arrival), so the team used its own 
 | 14:16 | Mac | `brev port-forward brainstorm-gpu --port 8000:8000` | localhost:8000 → GPU:8000 |
 | 14:19 | Mac | Test request through the tunnel ("what does `function add(a,b)` do?") | Model ready about 3 min after start. Answer: "Adds the two numbers a and b (JavaScript)." 34 tokens in, 17 out |
 | 14:46 | GPU | `git clone --depth 1 https://github.com/honojs/hono.git` then `python3 bench.py hono/src` (script in `docs/bench/`) | 311 files, 81k lines summarized in 73 s, $0.02. Details in `numbers.md` |
+| 14:55–21:00 | Mac | `brev port-forward brainstorm-gpu --port 8000:8000` (re-run 4 times) | The tunnel dropped at about 14:55, 15:38, 19:00 and 20:20; the app fell back to plain labels each time |
+| 00:03 (28 Sep) | Mac | `brev delete brainstorm-gpu` | Instance deleted, billing stopped. It ran for about 10 hours, roughly $11 at $1.06/hour |
 
 ## How to check it's alive
 
@@ -44,4 +46,4 @@ Send `"chat_template_kwargs": {"enable_thinking": false}` with every request, to
 
 ## After submission
 
-Delete the instance in the Brev console (stops billing).
+Done: the instance was deleted on 28 Sep at 00:03 with `brev delete brainstorm-gpu`. Nemotron is offline from then on, so the local app falls back to plain labels and no summaries until a new instance is started.

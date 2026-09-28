@@ -47,6 +47,10 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 21:55 [lead] POST-DEADLINE, local first: the looping edit pulse on the Map is replaced by one ripple per agent edit, then a steady outline while the file is being edited. Checked live with real edits.
 
+- 00:02 (28 Sep) [lead] POST-DEADLINE: one-ripple edit animation + light replay (180 moments from 1,583 steps) deployed to brainstorm-next.
+
+- 00:03 (28 Sep) [lead] Brev instance brainstorm-gpu deleted at the human's request; billing stopped. Nemotron is offline from here on.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

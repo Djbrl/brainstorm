@@ -22,8 +22,9 @@ function cleanPrompt(text: string): string {
   const args = /<command-args>([^<]*)/.exec(text)?.[1]?.trim();
   if (command) return `${command}${args ? " " + args : ""}`;
   return text
-    .replace(/<(local-command-caveat|local-command-stdout|local-command-stderr|system-reminder|command-message)>[\s\S]*?(<\/\1>|$)/g, "")
+    .replace(/<(local-command-caveat|local-command-stdout|local-command-stderr|system-reminder|command-message|task-notification|bash-notification|user-prompt-submit-hook)>[\s\S]*?(<\/\1>|$)/g, "")
     .replace(/<\/?[a-z-]+>/g, "")
+    .replace(/^\[Image[:#][^\]]*\]\s*$/gm, "") // Claude Code's note on an image a tool returned, not a request
     .trim();
 }
 
@@ -83,7 +84,7 @@ export class TasksService {
       if (/[$*?`]/.test(path)) return; // a shell variable or glob, not a file name
       const a = made.get(path);
       if (a) { a.edits++; a.lastTs = ts; a.stepId = stepId; a.via = via; return; }
-      made.set(path, { path, name: basename(path), kind: fileKind(path), exists: false, lastTs: ts, edits: 1, via, stepId });
+      made.set(path, { path, name: basename(path), kind: fileKind(path), exists: false, firstTs: ts, firstStepId: stepId, lastTs: ts, edits: 1, via, stepId });
     };
 
     for (const st of steps) {

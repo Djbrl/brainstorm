@@ -143,7 +143,7 @@ export type TaskBeat = { id: string; ts: string; prompt?: string; text?: string;
 export type TaskFrame = { stepId: string; callId?: string; idx: number; ts: string; caption: string; page?: string; beat: number; src: string };
 export type TaskFileKind = "image" | "video" | "audio" | "pdf" | "doc" | "data" | "code" | "other";
 /** A file the task wrote or produced (edits, or an output of a command like ffmpeg). `src` serves a preview when there is one. */
-export type TaskArtifact = { path: string; name: string; kind: TaskFileKind; exists: boolean; bytes?: number; lastTs: string; edits: number; via: string; stepId: string; src?: string };
+export type TaskArtifact = { path: string; name: string; kind: TaskFileKind; exists: boolean; bytes?: number; firstTs: string; firstStepId: string; lastTs: string; edits: number; via: string; stepId: string; src?: string };
 /** Something the task did outside this computer (sent, published, deployed...), from the places classifier. */
 export type TaskOutside = { verb: CoworkVerb; what: string; site: string; title?: string; ts: string; stepId: string; confidence: CoworkConfidence };
 export type TaskSourceSite = { site: string; visits: number; pages: { page: string; title?: string; url?: string; visits: number }[]; searches: string[] };

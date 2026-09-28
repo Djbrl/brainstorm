@@ -5,6 +5,7 @@ import type { TaskArtifact, TaskBeat, TaskDetail, TaskFileKind, TaskFrame, TaskL
 import { useNav } from "../lib/nav";
 import { clockTime, relTime, stripInjected } from "../follow/format";
 import "./tasks.css";
+import { TaskJourney } from "./TaskJourney";
 
 const KIND_NAME: Record<TaskListItem["kind"], string> = { code: "Code", web: "Web", media: "Media", docs: "Writing", mixed: "Other" };
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
@@ -339,6 +340,9 @@ export function TasksView() {
   const [selected, setSelected] = useState<string | null>(() => new URLSearchParams(location.search).get("task"));
   const current = list?.find((t) => t.sessionId === selected) ?? null;
   const task = useTask(selected, !!current?.live);
+  const mainRef = useRef<HTMLElement>(null);
+  const [mode, setMode] = useState<"journey" | "details">("journey");
+  useEffect(() => { mainRef.current?.scrollTo({ top: 0 }); }, [selected, mode]);
 
   useEffect(() => { if (!selected && list?.length) setSelected(list[0].sessionId); }, [list, selected]);
   useEffect(() => {
@@ -365,8 +369,14 @@ export function TasksView() {
           ))}
         </ul>
       </nav>
-      <main className="tk-main">
-        {task ? <TaskStory task={task} /> : selected ? <p className="tk-empty pad">Loading the task…</p> : null}
+      <main className="tk-main" ref={mainRef} style={{ position: "relative" }}>
+        {task && (
+          <div className="tk-mode" role="tablist" aria-label="Layout">
+            <button className={mode === "journey" ? "on" : ""} onClick={() => setMode("journey")}>Journey</button>
+            <button className={mode === "details" ? "on" : ""} onClick={() => setMode("details")}>Details</button>
+          </div>
+        )}
+        {task ? (mode === "journey" ? <TaskJourney key={task.sessionId} task={task} scroller={mainRef} /> : <TaskStory task={task} />) : selected ? <p className="tk-empty pad">Loading the task…</p> : null}
       </main>
     </div>
   );

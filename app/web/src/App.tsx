@@ -38,6 +38,9 @@ function Shell() {
           {!state.replay && state.setup?.root && (
             <button className="ws-chip" title={state.setup.root} onClick={() => setSetupOpen(true)}>{state.setup.name} <span>Change</span></button>
           )}
+          {state.replay && !state.preview && (
+            <a className="next-cta" href="https://brainstorm-next.vercel.app" title="Post-deadline preview: setup, live agents on the map, thread replay">Try Brainstorm Next</a>
+          )}
           <span className={`dot ${state.connected ? "live" : ""}`} />
           {state.replay ? "Recorded demo" : state.connected ? "Live" : "Connecting…"}
           {state.replay && <button className="tour-help" aria-label="Show the tour" title="Show the tour" onClick={() => setTourSignal((n) => n + 1)}>?</button>}

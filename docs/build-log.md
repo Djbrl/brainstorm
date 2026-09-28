@@ -51,6 +51,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 00:03 (28 Sep) [lead] Brev instance brainstorm-gpu deleted at the human's request; billing stopped. Nemotron is offline from here on.
 
+- 00:53 (28 Sep) [lead] POST-DEADLINE, judged demo header only: a "Try Brainstorm Next" button linking to the preview, at the human's request. Built from main + that button (tag `judged-demo-live`); data unchanged; no other feature added to the judged demo.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

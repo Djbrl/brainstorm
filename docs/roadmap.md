@@ -101,7 +101,7 @@ The Map, Follow, Ask and Failures are ways of reading a replay. Local use is fre
 ## Packaging: the Claude Code plugin
 
 - **One bundle, two ways in.** The plugin contains the local app (server and web in one process). `npx brainstorm` ships the same bundle later, for Codex and Cursor users.
-- **Install:** `/plugin marketplace add Djbrl/brainstorm@post-deadline`, then `/plugin install brainstorm@brainstorm`. The marketplace lives on `post-deadline` so `main` stays the judged entry.
+- **Install:** `/plugin marketplace add Djbrl/brainstorm`, then `/plugin install brainstorm@brainstorm`.
 - **Start:** a `SessionStart` hook starts Brainstorm in the background (or reuses the running one). Claude Code's logs stay on disk, so it catches up on anything it missed.
 - **Viewing:** `/brainstorm:open` opens the map in a browser tab on `localhost`, focused on the current project. To try: Claude's desktop browser pane. Later: a desktop app with a shortcut.
 - **Node:** the plugin needs Node 22 or later. If it's missing, the open command asks Claude to install it (the "agent installer" idea).
@@ -134,3 +134,4 @@ To settle before building. Record each decision here with the date.
 | 28 Sep 2026 | First package: a Claude Code plugin (replay + map), built on the same bundle a later `npx brainstorm` will use. |
 | 28 Sep 2026 | AI: bring your own, detected automatically; default is the user's Claude Code. We provide AI only in the paid, hosted parts, paid per token rather than on our own GPUs. |
 | 28 Sep 2026 | License: FSL-1.1-ALv2 (Functional Source License). Free to use, change and self-host; no competing product or service; each release becomes Apache 2.0 after two years. The future cloud service stays in a separate, closed repo. |
+| 28 Sep 2026 | Results out: 3rd place, Senegal. `post-deadline` merged into `main`, which is the development branch again. The judged state stays tagged `hackathon-submission`, and the judged demo stays online unchanged. |

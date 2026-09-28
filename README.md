@@ -1,31 +1,34 @@
 # Brainstorm
 
-> **Note for the jury**
->
-> **The hackathon entry is this `main` branch and the demo at [brainstorm-demo-black.vercel.app](https://brainstorm-demo-black.vercel.app).** The repo exactly as it stood at the 16:30 deadline is tagged [`hackathon-submission`](https://github.com/Djbrl/brainstorm/tree/hackathon-submission). The few commits on `main` after that are cosmetic (a welcome tour on the demo, links, this note) and are labeled `[post-deadline]`.
->
-> A few hours after the cutoff, we also added a handful of quality-of-life features that didn't make it in time. They are **not part of the entry**. This isn't days of extra development, just an evening of small additions that give a better idea of where Brainstorm is going:
->
-> - **Setup screen**: pick a workspace from your recent Claude Code projects, then watch Brainstorm read the code, map the imports, connect to Claude Code and check the models.
-> - **Live agents on the map**: each agent is a marker on the file it's working on, gliding from file to file with a fading trail.
-> - **Agent tracker**: every agent's route, file by file; click one to follow it with the camera.
->
-> Preview: [brainstorm-next.vercel.app](https://brainstorm-next.vercel.app) (played back from a real recording) · Code: the [`post-deadline`](https://github.com/Djbrl/brainstorm/tree/post-deadline) branch.
+**A live map and replay of your code and of the AI agents writing it.**
 
-**A live map of your code and of the AI agents writing it.**
+🥉 **3rd place, Senegal**, at [GOMYCODE × NVIDIA "Come Build with AI" 2026](https://hackathon.gomycode.com/onboarding/winners) (listed as "Brainstorm.ap").
 
-AI coding agents make it easy to stop understanding your own code. Brainstorm runs next to Claude Code and shows what the agents did, where, and why, so a human stays in the loop.
+AI coding agents make it easy to stop understanding your own code. Brainstorm runs next to Claude Code and shows what the agents did, where, and why, so a human stays in the loop. Every agent session becomes a replay you can watch live or catch up on later.
 
-**Try the recorded demo:** https://brainstorm-demo-black.vercel.app (Brainstorm following its own build: one lead agent and four subagents, plus the landing page session) · **Landing page:** https://brainstorm-landing.vercel.app
+## Install (Claude Code plugin, preview)
 
-**New, post-deadline: install it as a Claude Code plugin (preview).** In Claude Code, run `/plugin marketplace add Djbrl/brainstorm@post-deadline`, then `/plugin install brainstorm@brainstorm`, then `/brainstorm:open`. Details: [plugin/README.md](plugin/README.md).
+In Claude Code:
+
+```
+/plugin marketplace add Djbrl/brainstorm
+/plugin install brainstorm@brainstorm
+```
+
+Then start a new session in your project and run `/brainstorm:open`: the map opens in your browser. You need Node.js 22.13 or later. Everything runs on your machine. Details, settings and uninstall: [plugin/README.md](plugin/README.md).
+
+## Demos
+
+- **[brainstorm-demo-black.vercel.app](https://brainstorm-demo-black.vercel.app)**: the hackathon entry as judged, following its own build (one lead agent and four subagents, plus the landing page session).
+- **[brainstorm-next.vercel.app](https://brainstorm-next.vercel.app)**: the same recording with what we added after the deadline: setup screen, live agents moving on the map, thread replay.
+- **[Landing page](https://brainstorm-landing.vercel.app)**
 
 ![Map: the repo's modules and files, glowing by how recently they changed](docs/screenshots/map.png)
 
 ## What it does
 
 - **Follow**: a live timeline of a Claude Code session: prompts, messages, tool calls and edits, each with a short label. Click a step to see its diff and ask "why?".
-- **Map**: the project's modules and files as a graph, with imports as lines. Files glow by how recently they changed and pulse where an agent is editing right now. Click a file for its summary, the steps that touched it, and a question box.
+- **Map**: the project's modules and files as a graph. Files glow by how recently they changed. Each agent is a marker that moves to the file it writes, with a trail, and reads show as short lines of sight. Replay any thread on the map, step by step. Hover or select a file to see what it imports and what uses it; click it for its summary, the steps that touched it, and a question box.
 - **Failures**: failing tool calls across agent sessions, grouped by cause and ranked by how often and how recently they happen, with the evidence one click away. Nemotron names each group and suggests a fix.
 - **Ask**: questions go to Claude with a small, grounded context (the step, its diff, the steps before it, the file and module summaries, at most 150 lines of the file). Every answer shows its model, tokens and cost.
 
@@ -39,13 +42,15 @@ AI coding agents make it easy to stop understanding your own code. Brainstorm ru
 
 Measured numbers: [docs/numbers.md](docs/numbers.md). Nemotron stress test: 81k lines of Hono summarized in 73 seconds for $0.02 of GPU time.
 
+That was the hackathon setup. The Brev instance is shut down now, so the plugin ships with summaries off; they'll move to the Claude Code you already have (see the [roadmap](docs/roadmap.md)).
+
 ## Privacy
 
 Local-first. Session logs are read from `~/.claude/projects` on your machine and stored in a local SQLite file. API keys, tokens and passwords are masked before anything is stored or sent. Only small, masked context packages go to a model.
 
-## Run it
+## Run it from source
 
-Needs Node 24, Claude Code and git. Nemotron and a Claude key are optional (without them: plain labels, no summaries, no Ask).
+For development. Needs Node 24, Claude Code and git. Nemotron and a Claude key are optional (without them: plain labels, no summaries, no Ask).
 
 ```bash
 git clone https://github.com/Djbrl/brainstorm.git && cd brainstorm
@@ -64,12 +69,17 @@ Full guide, Brev setup and troubleshooting: [docs/run-locally.md](docs/run-local
 | [Technical documentation](docs/technical.md) | Architecture, modules, contract, API, storage, how each model is used, Failures algorithm, privacy |
 | [Run it on your machine](docs/run-locally.md) | The demo, installing, configuring, Nemotron on Brev, troubleshooting |
 | [How we built it](docs/how-we-built-it.md) | One human and several AI agents in parallel: who did what, timeline, problems and fixes |
-| [What's next](docs/next-steps.md) | What we cut and how we'd build it, with size estimates |
+| [Roadmap](docs/roadmap.md) | Product vision, packaging as a plugin, pricing ideas, decisions |
+| [What's next](docs/next-steps.md) | What we cut at the hackathon and how we'd build it, with size estimates |
 | [Measured numbers](docs/numbers.md) · [Brev setup log](docs/brev-setup.md) · [Build log](docs/build-log.md) | The raw record |
+
+## The hackathon
+
+Brainstorm was built in about three hours on 27 September 2026 at GOMYCODE × NVIDIA "Come Build with AI", by one human and several AI agents working in parallel ([how we built it](docs/how-we-built-it.md)). The repo exactly as it stood at the 16:30 deadline is tagged [`hackathon-submission`](https://github.com/Djbrl/brainstorm/tree/hackathon-submission); everything after it is labeled `[post-deadline]` in the history.
 
 ## Known limits
 
-Claude Code only today (Codex is next). The history slider, pause/steer and Markdown export are not built yet; see [What's next](docs/next-steps.md).
+Claude Code only today (Codex is next). No file summaries or model-written step labels in the plugin yet. The history slider, pause/steer and sharing are not built yet; see the [roadmap](docs/roadmap.md).
 
 ## License
 

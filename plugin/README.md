@@ -2,14 +2,14 @@
 
 A live map and replay of what your coding agents do: every session, every file they touch, what broke. Everything runs on your machine.
 
-Preview release (0.1). It lives on the `post-deadline` branch.
+Preview release (0.1).
 
 ## Install
 
 In Claude Code:
 
 ```
-/plugin marketplace add Djbrl/brainstorm@post-deadline
+/plugin marketplace add Djbrl/brainstorm
 /plugin install brainstorm@brainstorm
 ```
 

@@ -55,6 +55,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 01:43 (28 Sep) [lead] POST-DEADLINE: brainstorm-next redeployed with a fresh recording (1,904 steps and 124 agent moves, up to 01:42) and every post-deadline feature. The setup playback keeps the run recorded while Nemotron was online; the newest 15 files have no summary because the Brev instance is gone. Redaction fixed: it now works on text values, not escaped JSON, and blanks any value mentioning a private item. Re-checked the judged demo data with the fix: nothing left to remove.
 
+- 01:55 (28 Sep) [lead] POST-DEADLINE: at the human's request, the brainstorm-next recording now stops at the 16:30 deadline (1,066 steps, 77 agent moves, 9 failure groups; the map is the hackathon-time snapshot plus the 4 docs written before 16:30). All post-deadline features and the redaction stay. Replay export gained `until=<ISO time>`.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

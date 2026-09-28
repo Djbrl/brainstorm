@@ -68,24 +68,26 @@ export class ReplayController {
 
   /** Every export goes through the private redaction list before it can be published. */
   @Get("replay") replay(@Query("sessionId") sessionId?: string, @Query("root") root?: string,
-    @Query("movesFrom") movesFrom?: string, @Query("movesTo") movesTo?: string, @Query("preview") preview?: string): Replay {
-    const raw = this.build(sessionId, root, movesFrom, movesTo, preview);
+    @Query("movesFrom") movesFrom?: string, @Query("movesTo") movesTo?: string, @Query("preview") preview?: string,
+    @Query("until") until?: string): Replay {
+    const raw = this.build(sessionId, root, movesFrom, movesTo, preview, until);
     return JSON.parse(redactReplayJson(JSON.stringify(raw)).json) as Replay;
   }
 
-  private build(sessionId?: string, root?: string, movesFrom?: string, movesTo?: string, preview?: string): Replay {
+  /** `until` (ISO time): the recording stops there (steps, agent moves, failures, answers). */
+  private build(sessionId?: string, root?: string, movesFrom?: string, movesTo?: string, preview?: string, until?: string): Replay {
     const all = this.listener.listSessions();
     const wanted = sessionId ? sessionId.split(",") : [];
     const sessions = wanted.length ? all.filter((s) => wanted.includes(s.id)) : all.slice(0, 1);
-    const steps = sessions.flatMap((s) => this.listener.listSteps(s.id));
+    const steps = sessions.flatMap((s) => this.listener.listSteps(s.id)).filter((st) => !until || st.ts <= until);
     const map = this.mapper.getMap(root || this.cfg.defaultRoot);
     const answers = this.askService.listAnswers();
-    const failures = this.failures.list(sessions.map((s) => s.id).join(","));
-    const base: Replay = { exportedAt: new Date().toISOString(), sessions: sessions.map((s) => ({ ...s, status: "idle" })), steps, map: { ...map, files: map.files.map(({ activeSessionId: _a, ...f }) => f) }, answers, failures };
+    const failures = this.failures.list(sessions.map((s) => s.id).join(","), until);
+    const base: Replay = { exportedAt: until ?? new Date().toISOString(), sessions: sessions.map((s) => ({ ...s, status: "idle" })), steps, map: { ...map, files: map.files.map(({ activeSessionId: _a, ...f }) => f) }, answers, failures };
     if (!preview) return base;
     // Post-deadline preview extras: recorded agent moves and a recorded setup run (only this workspace, no other projects).
     const status = this.workspace.status();
     const suggestions = this.workspace.suggestions().filter((w) => w.root === status.root || (status.root ?? "").startsWith(w.root + "/"));
-    return { ...base, agentMoves: this.agentMoves(sessions, steps, new Set(map.files.map((f) => f.path)), movesFrom, movesTo), setupPreview: { status, suggestions } };
+    return { ...base, agentMoves: this.agentMoves(sessions, steps, new Set(map.files.map((f) => f.path)), movesFrom, movesTo ?? until), setupPreview: { status, suggestions } };
   }
 }

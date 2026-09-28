@@ -66,20 +66,23 @@ export class FailuresService implements OnModuleInit {
     this.dbs.db.exec(`CREATE TABLE IF NOT EXISTS failure_names (key TEXT PRIMARY KEY, title TEXT NOT NULL, advice TEXT NOT NULL)`);
   }
 
-  list(sessionId?: string): FailureGroup[] {
+  /** `until` (ISO time) ignores everything after it, e.g. to replay a recording that stops at a deadline. */
+  list(sessionId?: string, until?: string): FailureGroup[] {
+    if (until) return this.compute(sessionId, until);
     if (this.cache && this.cache.sessionId === sessionId && Date.now() - this.cache.at < 10_000) return this.cache.groups;
     const groups = this.compute(sessionId);
     this.cache = { at: Date.now(), sessionId, groups };
     return groups;
   }
 
-  private compute(sessionId?: string): FailureGroup[] {
+  private compute(sessionId?: string, until?: string): FailureGroup[] {
     const sessions = sessionId ? sessionId.split(",") : this.listener.listSessions().map((s) => s.id);
     const rows: Row[] = [];
     for (const sid of sessions) {
       // Results come back in call order (also for parallel calls), so pair them first-in-first-out per thread.
       const pending = new Map<boolean, Step[]>();
       for (const st of this.listener.listSteps(sid)) {
+        if (until && st.ts > until) continue;
         const q = pending.get(!!st.isSubagent) ?? pending.set(!!st.isSubagent, []).get(!!st.isSubagent)!;
         if (st.kind === "tool_call" || st.kind === "edit") { q.push(st); continue; }
         if (st.kind !== "tool_result") continue;
@@ -103,7 +106,7 @@ export class FailuresService implements OnModuleInit {
       (byKey.get(key) ?? byKey.set(key, []).get(key)!).push(r);
     }
 
-    const now = Date.now();
+    const now = until ? Date.parse(until) : Date.now();
     const names = new Map<string, { title: string; advice: string }>();
     for (const r of this.dbs.db.prepare(`SELECT key, title, advice FROM failure_names`).all() as { key: string; title: string; advice: string }[]) names.set(r.key, r);
 

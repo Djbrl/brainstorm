@@ -92,3 +92,35 @@ export type Replay = {
   /** Post-deadline preview: a recorded setup run, played back by the setup screen. */
   setupPreview?: { status: SetupStatus; suggestions: WorkspaceSuggestion[] };
 };
+
+/**
+ * Cowork prototype (GET /api/cowork). Agent work outside the code: websites, apps running locally,
+ * connected services and command-line tools that reach the outside world. Sorted into places
+ * (area → site → page) and actions (reads vs changes). See docs/cowork.md.
+ */
+export type CoworkArea = "web" | "local" | "services" | "apps";
+export type CoworkAction = "visit" | "read" | "search" | "input" | "click" | "write";
+export type CoworkVerb = "sent" | "submitted" | "published" | "deployed" | "pushed" | "created" | "updated" | "deleted" | "typed" | "clicked";
+/** How sure we are that a change happened: sure = the tool itself changes something (API call, deploy); likely = a click on "Send" and similar; maybe = a click or typing we can't read. */
+export type CoworkConfidence = "sure" | "likely" | "maybe";
+export type CoworkEvent = {
+  id: string;              // step id, or "<step id>#<n>" for one action inside a browser batch
+  stepId: string; sessionId: string; ts: string;
+  area: CoworkArea;
+  site: string;            // host ("docs.google.com"), app ("iOS Simulator") or service ("GitHub")
+  page: string;            // page id inside the site: host + path without query, or a service item
+  title?: string;          // page title when the browser reported one
+  tool: string;            // short tool name, e.g. "navigate", "WebFetch", "git push"
+  action: CoworkAction;
+  what: string;            // one short line: 'Clicked "Envoyer"', "Read the page"
+  change?: { verb: CoworkVerb; confidence: CoworkConfidence };
+  failed?: boolean;
+};
+export type CoworkPage = { id: string; site: string; area: CoworkArea; url?: string; title?: string; events: number; reads: number; changes: number; failed: number; lastTs: string; sessions: string[] };
+export type CoworkSite = { id: string; area: CoworkArea; name: string; pages: number; events: number; changes: number; failed: number; lastTs: string };
+export type CoworkSummary = {
+  areas: Record<CoworkArea, number>;  // events per area
+  codeSteps: number;                   // tool calls that stay in the code (for scale)
+  sites: CoworkSite[]; pages: CoworkPage[];
+  events: CoworkEvent[];               // chronological
+};

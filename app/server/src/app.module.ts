@@ -10,7 +10,8 @@ import { FailuresModule } from "./failures/failures.module";
 import { WorkspaceModule } from "./workspace/workspace.module";
 import { AgentsModule } from "./agents/agents.module";
 import { HealthController } from "./core/health.controller";
+import { CoworkModule } from "./cowork/cowork.module";
 
 // Owned by the lead. Agents: don't edit; ask in docs/build-log.md "Requests".
-@Module({ imports: [CoreModule, LlmModule, ListenerModule, MapperModule, ReaderModule, AskModule, ReplayModule, FailuresModule, WorkspaceModule, AgentsModule], controllers: [HealthController] })
+@Module({ imports: [CoreModule, LlmModule, ListenerModule, MapperModule, ReaderModule, AskModule, ReplayModule, FailuresModule, WorkspaceModule, AgentsModule, CoworkModule], controllers: [HealthController] })
 export class AppModule {}

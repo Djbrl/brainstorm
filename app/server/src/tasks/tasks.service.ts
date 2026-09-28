@@ -130,7 +130,7 @@ export class TasksService {
       if (!call) continue;
       const failed = !!(st.input as { isError?: boolean } | undefined)?.isError || FAILED.test((st.text ?? "").slice(0, 300));
       const ts = taskSteps.get(call.id);
-      if (ts && failed) ts.failed = true;
+      if (ts && failed) { ts.failed = true; ts.error = short((st.text ?? "").replace(/<\/?tool_use_error>/g, ""), 500); }
       const events = tracker.handle(call, st);
       if (events.length) {
         eventsByCall.set(call.id, events);

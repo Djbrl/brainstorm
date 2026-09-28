@@ -105,12 +105,16 @@ export type AgentAnim = {
   seen: Set<string>; seeded: boolean;           // trail entries already accounted for (no flash on first sight)
   flashes: { file: string; t0: number }[];      // recent reads to draw as lines of sight
   lastTs: string; pulseT0: number;              // activity without a new file → pulse
+  lastErr?: string; errT0: number;              // a failed tool call → the marker flashes red
 };
 type Pt = { x: number; y: number; r: number };
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const GLIDE_MS = 650;
 const READ_MS = 1500;
 const PULSE_MS = 700;
+export const ERROR_RED = "#d93025";
+const ERR_MS = 2600;        // how long the marker stays red
+const ERR_PULSE_MS = 1100;  // one red ring
 export const isWrite = (action?: string) => action === "edit" || action === "write";
 
 /** Where the marker stands: the last file written, or before any write, the first file touched. */
@@ -148,7 +152,7 @@ export function drawAgents(opts: {
 
       let st = anim.get(a.id);
       if (!st) {
-        st = { x: tx, y: ty, fromX: tx, fromY: ty, t0: -1e9, file: key, alpha: 0, seen: new Set(), seeded: false, flashes: [], lastTs: a.ts, pulseT0: -1e9 };
+        st = { x: tx, y: ty, fromX: tx, fromY: ty, t0: -1e9, file: key, alpha: 0, seen: new Set(), seeded: false, flashes: [], lastTs: a.ts, pulseT0: -1e9, errT0: -1e9, lastErr: a.errorAt };
         anim.set(a.id, st);
       }
       if (st.file !== key) { st.fromX = st.x; st.fromY = st.y; st.t0 = t; st.file = key; }
@@ -169,11 +173,13 @@ export function drawAgents(opts: {
         if (st.seeded && !isWrite(m.action)) st.flashes.push({ file: m.file, t0: t });
       }
       if (st.seeded && a.ts !== st.lastTs && !fresh) st.pulseT0 = t;
+      if (a.errorAt && a.errorAt !== st.lastErr) { st.lastErr = a.errorAt; if (Date.now() - Date.parse(a.errorAt) < 10_000) st.errT0 = t; }
       st.lastTs = a.ts; st.seeded = true;
       if (st.seen.size > 200) st.seen = new Set([...st.seen].slice(-60));
       if (st.alpha < 0.01) return;
 
-      const color = agentColor(a, accent);
+      const erring = t - st.errT0 < ERR_MS;
+      const color = erring ? ERROR_RED : agentColor(a, accent);
 
       // Trail through the last distinct files it wrote, newest strongest.
       const files: string[] = [];
@@ -228,6 +234,14 @@ export function drawAgents(opts: {
         ctx.strokeStyle = color; ctx.lineWidth = 1.6 / scale; ctx.stroke();
       }
 
+      // A failed tool call: one red ring, wider than the activity pulse.
+      const ep = (t - st.errT0) / ERR_PULSE_MS;
+      if (ep >= 0 && ep < 1) {
+        ctx.globalAlpha = st.alpha * (1 - ep) * 0.8;
+        ctx.beginPath(); ctx.arc(st.x, st.y, (10 + ep * 26) / scale, 0, Math.PI * 2);
+        ctx.strokeStyle = ERROR_RED; ctx.lineWidth = 2.4 / scale; ctx.stroke();
+      }
+
       // Marker
       ctx.globalAlpha = st.alpha;
       ctx.shadowColor = "rgba(0,0,0,0.18)"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 1;
@@ -240,8 +254,8 @@ export function drawAgents(opts: {
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText(initial(a), st.x, st.y + 0.5 / scale);
 
-      if (scale > 1.6 || hoverFile === key || followId === a.id) {
-        const label = `${shortName(a, 28)} · ${verbIng(a.action)}`;
+      if (scale > 1.6 || hoverFile === key || followId === a.id || erring) {
+        const label = erring && a.error ? `${shortName(a, 20)} · ${a.error.slice(0, 48)}` : `${shortName(a, 28)} · ${verbIng(a.action)}`;
         ctx.font = `600 ${12 / scale}px ${font}`;
         ctx.textAlign = "left";
         const lx = st.x + 13 / scale, ly = st.y;

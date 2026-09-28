@@ -20,6 +20,8 @@ export type ReplayLayerApi = {
 const GLIDE_MS = 650;       // same glide as the live agent markers (map/agents.tsx)
 const FLASH_MS = 600;       // read flash
 const PULSE_MS = 700;       // edit pulse on the marker
+const RED = "#d93025";      // a beat with a failed tool call
+const ERR_PULSE_MS = 1100;
 const DIM = 0.18;           // files the thread never touches
 const BEAT_PX = 60;         // trackpad pixels per beat
 const OTHER_MS = 120;       // playback pace for single "other" steps (every-step detail)
@@ -299,16 +301,25 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
       }
     }
 
-    // Current marker with a soft halo.
+    // Current marker with a soft halo. Red, with one red ring, when this beat has a failed tool call.
+    const failed = beat.failed > 0;
+    const mark = failed ? RED : accent;
     if (target && curFile) {
       const halo = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, 26 / scale);
-      halo.addColorStop(0, hexA(accent, 0.28));
-      halo.addColorStop(1, hexA(accent, 0));
+      halo.addColorStop(0, hexA(mark, 0.28));
+      halo.addColorStop(1, hexA(mark, 0));
       ctx.globalAlpha = 1;
       ctx.fillStyle = halo;
       ctx.beginPath(); ctx.arc(a.x, a.y, 26 / scale, 0, Math.PI * 2); ctx.fill();
 
-      if (beat.action === "edit") { // pulse on every edit, even when the tracer stays on the same file
+      if (failed) {
+        const p = (t - a.beatAt) / ERR_PULSE_MS;
+        if (p < 1) {
+          ctx.globalAlpha = 0.8 * (1 - p);
+          ctx.beginPath(); ctx.arc(a.x, a.y, (10 + p * 28) / scale, 0, Math.PI * 2);
+          ctx.strokeStyle = RED; ctx.lineWidth = 2.4 / scale; ctx.stroke();
+        }
+      } else if (beat.action === "edit") { // pulse on every edit, even when the tracer stays on the same file
         const p = (t - a.beatAt) / PULSE_MS;
         if (p < 1) {
           ctx.globalAlpha = 0.6 * (1 - p);
@@ -320,7 +331,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
       ctx.globalAlpha = 1;
       ctx.shadowColor = "rgba(0,0,0,0.18)"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 1;
       ctx.beginPath(); ctx.arc(a.x, a.y, 10 / scale, 0, Math.PI * 2);
-      ctx.fillStyle = accent; ctx.fill();
+      ctx.fillStyle = mark; ctx.fill();
       ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
       ctx.lineWidth = 2 / scale; ctx.strokeStyle = "#fff"; ctx.stroke();
       const num = String(mi + 1);
@@ -334,7 +345,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
       ctx.font = `600 ${12 / scale}px ${font}`;
       ctx.lineWidth = 3.5 / scale; ctx.strokeStyle = HALO;
       const name = baseName(curFile);
-      ctx.strokeText(name, lx, a.y); ctx.fillStyle = accent; ctx.fillText(name, lx, a.y);
+      ctx.strokeText(name, lx, a.y); ctx.fillStyle = mark; ctx.fillText(name, lx, a.y);
       if (beat.outside) {
         const note = "outside project";
         ctx.font = `500 ${11 / scale}px ${font}`;

@@ -7,6 +7,7 @@ import { FileIcon, Glyph, RiskIcon } from "./Glyph";
 import { StepDetail } from "./StepDetail";
 import { ReplayOnMapButton } from "../map/replay/ReplayButton";
 import { basename, clockTime, displayLabel, isVisible, pairResults, realLabel, relTime, stepFile } from "./format";
+import { isFailedResult } from "../lib/thread";
 import "./follow.css";
 
 const PAGE = 300;
@@ -38,13 +39,16 @@ function SessionList({ sessions, selected, onSelect }: { sessions: Session[]; se
   );
 }
 
-function StepRow({ step, selected, fresh, flash, onSelect }: { step: Step; selected: boolean; fresh: boolean; flash?: boolean; onSelect: (s: Step) => void }) {
+/** The first line of a failed result, without the harness wrapper. */
+const errorLine = (r: Step) => (r.text ?? "").replace(/<\/?tool_use_error>/g, "").trim().split("\n")[0].slice(0, 220);
+
+function StepRow({ step, selected, fresh, flash, onSelect, error }: { step: Step; selected: boolean; fresh: boolean; flash?: boolean; onSelect: (s: Step) => void; error?: string }) {
   const { openFile } = useNav();
   const file = stepFile(step);
   const label = displayLabel(step);
   const labeled = !!realLabel(step);
   const brief = step.kind === "prompt" && step.isSubagent; // lead agent's brief to a subagent
-  const cls = ["tl-row", brief ? "k-brief" : `k-${step.kind}`, step.isSubagent && "sub", selected && "on", fresh && "fresh", flash && "flash"].filter(Boolean).join(" ");
+  const cls = ["tl-row", brief ? "k-brief" : `k-${step.kind}`, step.isSubagent && "sub", selected && "on", fresh && "fresh", flash && "flash", error !== undefined && "failed"].filter(Boolean).join(" ");
 
   // A subagent's "prompt" is the lead agent's brief, not the human: render it as a normal step.
   if (step.kind === "prompt" && !step.isSubagent) {
@@ -73,7 +77,9 @@ function StepRow({ step, selected, fresh, flash, onSelect }: { step: Step; selec
             </button>
           )}
           {step.risk?.map((r) => <span key={r} className="risk"><RiskIcon />{r}</span>)}
+          {error !== undefined && <span className="tl-failed">failed</span>}
         </div>
+        {error && <div className="tl-error">{error}</div>}
       </div>
     </div>
   );
@@ -87,6 +93,12 @@ function Timeline({ session, steps, selectedId, onSelect, reveal }: { session: S
   const visible = useMemo(() => (steps ?? []).filter(isVisible), [steps]);
   const shown = visible.length > limit ? visible.slice(visible.length - limit) : visible;
   const edits = useMemo(() => visible.filter((s) => s.kind === "edit").length, [visible]);
+  // Failed calls show in red with the first line of the error: the quickest way to see where the agent got stuck.
+  const errors = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const [callId, r] of pairResults(steps ?? [])) if (isFailedResult(r)) m.set(callId, errorLine(r));
+    return m;
+  }, [steps]);
   const now = useNow();
 
   // Reset per session.
@@ -154,7 +166,7 @@ function Timeline({ session, steps, selectedId, onSelect, reveal }: { session: S
               <button className="tl-more" onClick={() => setLimit((l) => l + PAGE)}>Show {Math.min(PAGE, visible.length - shown.length)} earlier steps</button>
             )}
             {shown.map((s) => (
-              <StepRow key={s.id} step={s} selected={s.id === selectedId} fresh={!initialIds.current?.has(s.id)} flash={s.id === flashId} onSelect={onSelect} />
+              <StepRow key={s.id} step={s} selected={s.id === selectedId} fresh={!initialIds.current?.has(s.id)} flash={s.id === flashId} onSelect={onSelect} error={errors.get(s.id)} />
             ))}
             {session.status === "running" && <div className="tl-tail"><span className="tl-pulse" />Working</div>}
           </div>

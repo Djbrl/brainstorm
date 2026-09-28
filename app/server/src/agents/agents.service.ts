@@ -12,6 +12,12 @@ const INACTIVE_MS = 2 * 60_000;
 const DROP_MS = 30 * 60_000;
 const TRAIL_MAX = 12;
 
+const FAILED = /^\s*(<tool_use_error>|error\b|exit code [1-9])|file has not been read yet|string to replace not found|permission (denied|to use)|was blocked|denied by|not allowed/i;
+/** Same rule as Follow and the Failures view: a result flagged as an error, or one that reads like one. */
+function isFailed(step: Step): boolean {
+  return !!(step.input as { isError?: boolean } | undefined)?.isError || FAILED.test((step.text ?? "").slice(0, 300));
+}
+
 function actionOf(step: Step): string | undefined {
   const t = step.tool ?? "";
   if (step.kind === "edit") return t === "Write" ? "write" : "edit";
@@ -99,6 +105,10 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       this.agents.set(id, a);
     }
     const next: AgentPresence = { ...a, name: this.nameFor(step, id), ts: now, active: true };
+    if (step.kind === "tool_result" && isFailed(step)) {
+      next.errorAt = now;
+      next.error = (step.text ?? "").replace(/<\/?tool_use_error>/g, "").trim().split("\n")[0].slice(0, 160);
+    }
     if (file && action) {
       const last = next.trail[next.trail.length - 1];
       const move: AgentMove = { file, action, ts: now };

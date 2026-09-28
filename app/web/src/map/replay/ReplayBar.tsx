@@ -34,6 +34,19 @@ const EditTicks = memo(function EditTicks({ thread }: { thread: Thread }) {
   );
 });
 
+/** Red ticks where a step failed: where to look first when something went wrong. */
+const FailTicks = memo(function FailTicks({ thread }: { thread: Thread }) {
+  const d = useMemo(() => {
+    const n = Math.max(1, thread.beats.length - 1);
+    return thread.beats.filter((b) => b.failed > 0).map((b) => `M${((b.index / n) * 1000).toFixed(1)} 0v10`).join("");
+  }, [thread]);
+  return (
+    <svg className="rp-ticks rp-fail-ticks" viewBox="0 0 1000 10" preserveAspectRatio="none" aria-hidden="true">
+      <path d={d} stroke="#d93025" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+});
+
 export function ReplayBar() {
   const { replay, setReplayIndex, setReplayPlaying, setReplaySpeed, setReplayDetail, stopReplay } = useNav();
   const { state } = useLive();
@@ -67,6 +80,7 @@ export function ReplayBar() {
       <div className="rp-top">
         <span className="rp-count">{index + 1} / {len}</span>
         <span className="rp-label" title={`${title}\n${label}`}>{label}</span>
+        {replay.live && <span className="rp-chip live"><i />Live</span>}
         {beat.failed > 0 && <span className="rp-chip fail">{beat.failed} failed</span>}
         <button className={`rp-text rp-detail-toggle${full ? " on" : ""}`} aria-pressed={full}
           onClick={() => setReplayDetail(full ? "light" : "full", beat.step.id)}
@@ -91,6 +105,7 @@ export function ReplayBar() {
         </div>
         <div className="rp-slider" style={{ ["--rp-pct" as string]: `${pct}%` }}>
           <EditTicks thread={thread} />
+          <FailTicks thread={thread} />
           <input type="range" min={0} max={len - 1} step={1} value={index} aria-label="Replay position"
             aria-valuetext={`${index + 1} of ${len}: ${label}`}
             onChange={(e) => set(Number(e.target.value))} />

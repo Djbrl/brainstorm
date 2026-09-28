@@ -25,7 +25,9 @@ export const clockTime = (iso: string) => {
 
 /** Drop blocks Claude Code injects into the log (e.g. `<system-reminder>…</system-reminder>`); they aren't what the person or agent wrote. */
 export const stripInjected = (t = "") =>
-  t.replace(/<(system-reminder|command-[a-z-]+|local-command-[a-z-]+)>[\s\S]*?(<\/\1>|$)/g, " ").trim();
+  t.replace(/<(system-reminder|command-[a-z-]+|local-command-[a-z-]+|task-notification)>[\s\S]*?(<\/\1>|$)/g, " ")
+    .replace(/^\[Image[:#][^\]]*\]\s*$/gm, "") // Claude Code's note on an image a tool returned
+    .trim();
 
 const firstLine = (t = "", max = 140) => {
   const line = stripInjected(t).replace(/```[\s\S]*?```/g, " ").replace(/\*\*|__|`|^#+\s*/gm, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/\s+/g, " ").trim();

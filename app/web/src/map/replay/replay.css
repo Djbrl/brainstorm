@@ -120,3 +120,6 @@
 .rp-detail-toggle.on { color: var(--accent); background: var(--accent-soft); }
 .rp-top .rp-chip.fail { margin-left: -4px; }
 .rp-why { overflow: hidden; text-overflow: ellipsis; color: var(--ink-3); font-style: italic; }
+.rp-chip.live { display: inline-flex; align-items: center; gap: 6px; background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.rp-chip.live i { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: sidebar-pulse 1.6s infinite; }
+.rp-fail-ticks { color: #d93025; }

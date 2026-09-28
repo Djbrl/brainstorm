@@ -98,3 +98,14 @@
 /* Keep the map title and legend clear of the sidebar. */
 .map-wrap:has(.map-sidebar) .map-legend { left: 388px; }
 .map-wrap:has(.sidebar-collapsed) .map-legend { left: 86px; }
+
+/* Threads: click to play. The selected thread expands with its actions and step list; a running one pulses blue. */
+button.sidebar-thread-head { width: 100%; border: 0; background: transparent; padding: 6px 8px; margin: -6px -8px; border-radius: 10px; text-align: left; color: var(--ink); cursor: pointer; box-sizing: content-box; }
+button.sidebar-thread-head:hover { background: #f4f4f7; }
+.sidebar-thread.selected button.sidebar-thread-head { background: var(--accent-soft); cursor: default; }
+.sidebar-thread-status.running { background: var(--accent); box-shadow: 0 0 0 0 rgba(91,91,214,.55); animation: sidebar-pulse 1.6s infinite; }
+.sidebar-thread-head time { font-variant-numeric: tabular-nums; }
+.sidebar-thread-actions button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.sidebar-live-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: 1px; }
+.sidebar-thread-actions button:not(.on) .sidebar-live-dot { background: var(--accent); }
+.sidebar-thread-steps { height: min(52vh, 520px); margin: 10px -2px 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); }

@@ -3,13 +3,15 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import type { ReplayDetail } from "./thread";
 
-export type View = "follow" | "map" | "tasks" | "failures" | "cowork";
+export type View = "follow" | "map" | "failures" | "cowork";
+/** How the Map tab shows the selected thread: where it happened in the code, or the story as a vertical track. */
+export type Lens = "map" | "track";
 export type ReplaySpeed = 1 | 2 | 4;
 /**
  * A thread being replayed on the map. `index` is the current beat (see lib/thread.ts) in `detail` mode.
  * `atStep` is a step id to land on once the thread is built (links, Follow, switching detail); the replay layer resolves and clears it.
  */
-export type ThreadReplay = { sessionId: string; index: number; playing: boolean; speed: ReplaySpeed; detail: ReplayDetail; atStep?: string };
+export type ThreadReplay = { sessionId: string; index: number; playing: boolean; speed: ReplaySpeed; detail: ReplayDetail; atStep?: string; live?: boolean };
 
 /**
  * Map display prefs read by the canvas layers (live agents, thread replay) on every frame.
@@ -33,8 +35,13 @@ type Nav = {
 
   /** Thread replay on the map, or null. */
   replay: ThreadReplay | null;
-  /** Open the map and replay a thread, paused: from a beat index, or from the beat holding a step id. */
-  startReplay: (sessionId: string, at?: number | string) => void;
+  /** Open the map and replay a thread, paused: from a beat index, or from the beat holding a step id. `live` follows its newest step. */
+  startReplay: (sessionId: string, at?: number | string, opts?: { live?: boolean }) => void;
+  /** Keep a live replay on the newest beat (called as the thread grows). */
+  followLive: (index: number) => void;
+  /** Go back to following a running thread live, or stop following. */
+  setReplayLive: (live: boolean) => void;
+  lens: Lens; setLens: (l: Lens) => void;
   /** Move the replay cursor. The caller clamps to the thread length. */
   setReplayIndex: (i: number | ((prev: number) => number)) => void;
   setReplayPlaying: (playing: boolean) => void;
@@ -79,6 +86,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
     return { sessionId: t, index: Math.max(0, Number(params.get("beat")) || 0), playing: false, speed: 1, detail, atStep: params.get("step") ?? undefined };
   });
   const [hiddenAgents, setHidden] = useState<Set<string>>(loadHidden);
+  const [lens, setLens] = useState<Lens>(() => (params.get("lens") === "track" ? "track" : "map"));
   const [showReads, setShowReadsState] = useState<boolean>(() => (mapPrefs.showReads = loadShowReads()));
   const setShowReads = useCallback((v: boolean) => {
     mapPrefs.showReads = v;
@@ -90,6 +98,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const u = new URL(location.href);
     u.searchParams.set("view", view);
+    if (lens === "track") u.searchParams.set("lens", "track"); else u.searchParams.delete("lens");
     u.searchParams.delete("beat");
     if (replay) {
       u.searchParams.set("thread", replay.sessionId);
@@ -98,7 +107,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
       if (replay.detail === "full") u.searchParams.set("detail", "full"); else u.searchParams.delete("detail");
     } else { u.searchParams.delete("thread"); u.searchParams.delete("step"); u.searchParams.delete("detail"); }
     if (u.href !== location.href) history.replaceState(null, "", u);
-  }, [view, replay?.sessionId, replay?.index, replay?.detail, replay?.atStep]);
+  }, [view, lens, replay?.sessionId, replay?.index, replay?.detail, replay?.atStep]);
 
   useEffect(() => {
     try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hiddenAgents])); } catch { /* storage blocked: hidden agents reset on reload */ }
@@ -107,16 +116,19 @@ export function NavProvider({ children }: { children: ReactNode }) {
   const openFile = (p: string) => { setFocusFile(p); setView("map"); };
   const openStep = (sid: string, stepId: string) => { setSessionId(sid); setFocusStep(stepId); setView("follow"); };
 
-  const startReplay = useCallback((sid: string, at: number | string = 0) => {
+  const startReplay = useCallback((sid: string, at: number | string = 0, opts?: { live?: boolean }) => {
     setReplay((r) => ({
       sessionId: sid, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light",
-      index: typeof at === "number" ? Math.max(0, at) : 0, atStep: typeof at === "string" ? at : undefined,
+      index: typeof at === "number" ? Math.max(0, at) : 0, atStep: typeof at === "string" ? at : undefined, live: !!opts?.live,
     }));
     setView("map");
   }, []);
+  // Moving the cursor by hand stops following live; followLive is the only setter that keeps it.
   const setReplayIndex = useCallback((i: number | ((prev: number) => number)) =>
-    setReplay((r) => (r ? { ...r, index: Math.max(0, typeof i === "function" ? i(r.index) : i) } : r)), []);
-  const setReplayPlaying = useCallback((playing: boolean) => setReplay((r) => (r ? { ...r, playing } : r)), []);
+    setReplay((r) => (r ? { ...r, live: false, index: Math.max(0, typeof i === "function" ? i(r.index) : i) } : r)), []);
+  const followLive = useCallback((i: number) => setReplay((r) => (r && r.live && r.index !== i ? { ...r, index: Math.max(0, i), atStep: undefined } : r)), []);
+  const setReplayLive = useCallback((live: boolean) => setReplay((r) => (r ? { ...r, live, playing: false } : r)), []);
+  const setReplayPlaying = useCallback((playing: boolean) => setReplay((r) => (r ? { ...r, playing, live: playing ? false : r.live } : r)), []);
   const setReplaySpeed = useCallback((speed: ReplaySpeed) => setReplay((r) => (r ? { ...r, speed } : r)), []);
   const setReplayDetail = useCallback((detail: ReplayDetail, atStep?: string) =>
     setReplay((r) => (r ? { ...r, detail, playing: false, atStep: atStep ?? replayCursor.stepId ?? undefined } : r)), []);
@@ -129,7 +141,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{
       view, setView, sessionId, setSessionId, focusFile, setFocusFile, openFile, focusStep, setFocusStep, openStep,
-      replay, startReplay, setReplayIndex, setReplayPlaying, setReplaySpeed, setReplayDetail, landReplay, stopReplay,
+      replay, startReplay, setReplayIndex, setReplayPlaying, setReplaySpeed, setReplayDetail, landReplay, stopReplay, followLive, setReplayLive, lens, setLens,
       hiddenAgents, toggleAgent, setHiddenAgents, showReads, setShowReads,
     }}>{children}</Ctx.Provider>
   );

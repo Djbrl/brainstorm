@@ -1,4 +1,6 @@
 // Owner: D. Force graph of files/modules, glow by recency, a ripple per agent edit + outline while active, side panel + AskBox.
+import { LensSwitch } from "./LensSwitch";
+import "../tasks/track.css";
 import { clock } from "../lib/live";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -416,6 +418,7 @@ export function MapView() {
       <MapSidebar agents={agents} accent={tokens.accent} followId={followId}
         onFollow={(id) => setFollowId(id)} onFocusFile={focusOnFile} map={map} />
       {replay && <ReplayBar />}
+      <LensSwitch />
 
       <div className="map-legend" aria-label="Legend">
         <span><i style={{ background: "var(--hot)" }} />Just now</span>

@@ -61,6 +61,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 02:58 (28 Sep) [lead] POST-DEADLINE: Map clarity (writes move agents, reads as lines of sight, Writes / Reads + writes switch, import links on hover or selection with Imports / Used by lists) pushed to post-deadline and deployed to brainstorm-next, same 16:30 recording.
 
+- 17:50 [cowork][post-deadline] Cowork prototype on `feature/cowork` (local only): browser, web, connector and outward shell steps sorted into places (web, your apps, services, apps) with reads vs changes (sure / likely / maybe), a list of changes and a places map in a new Cowork tab. Hard parts logged in docs/cowork.md.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

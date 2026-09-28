@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import type { ReplayDetail } from "./thread";
 
-export type View = "follow" | "map" | "failures";
+export type View = "follow" | "map" | "failures" | "cowork";
 export type ReplaySpeed = 1 | 2 | 4;
 /**
  * A thread being replayed on the map. `index` is the current beat (see lib/thread.ts) in `detail` mode.

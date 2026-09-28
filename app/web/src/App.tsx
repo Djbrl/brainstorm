@@ -4,6 +4,7 @@ import { NavProvider, useNav, type View } from "./lib/nav";
 import { FollowView } from "./follow/FollowView";
 import { MapView } from "./map/MapView";
 import { FailuresView } from "./failures/FailuresView";
+import { CoworkView } from "./cowork/CoworkView";
 import { Tour } from "./tour/Tour";
 import { SetupView } from "./setup/SetupView";
 import { useState } from "react";
@@ -14,6 +15,8 @@ function Shell() {
   const { view, setView } = useNav();
   const [tourSignal, setTourSignal] = useState(0);
   const tabs: { id: View; label: string }[] = [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }, { id: "failures", label: `Failures${state.failures.length ? ` ${state.failures.length}` : ""}` }];
+  // Cowork prototype: local only (the hosted replays carry no cowork data yet).
+  if (!state.replay) tabs.push({ id: "cowork", label: "Cowork" });
   // Local app: pick a workspace first (and whenever "Change" is clicked). The hosted replay never shows setup.
   // In the post-deadline preview, the setup screen plays back a recorded run (see lib/preview.ts).
   if ((setupOpen && (!state.replay || state.preview)) || (!state.replay && state.setup && !state.setup.root)) {
@@ -53,7 +56,7 @@ function Shell() {
         </div>
       )}
       {state.replay && <Tour openSignal={tourSignal} preview={state.preview} />}
-      <main className="view">{view === "follow" ? <FollowView /> : view === "map" ? <MapView /> : <FailuresView />}</main>
+      <main className="view">{view === "follow" ? <FollowView /> : view === "map" ? <MapView /> : view === "cowork" && !state.replay ? <CoworkView /> : <FailuresView />}</main>
     </div>
   );
 }

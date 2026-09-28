@@ -11,6 +11,12 @@ export type ReplaySpeed = 1 | 2 | 4;
  */
 export type ThreadReplay = { sessionId: string; index: number; playing: boolean; speed: ReplaySpeed; detail: ReplayDetail; atStep?: string };
 
+/**
+ * Map display prefs read by the canvas layers (live agents, thread replay) on every frame.
+ * Kept in sync with the `showReads` nav state; mutate only through setShowReads.
+ */
+export const mapPrefs: { showReads: boolean } = { showReads: true };
+
 /** The step id at the replay cursor, published by the replay layer while rendering, so the URL can point at a step (stable across detail modes). */
 export const replayCursor: { stepId: string | null } = { stepId: null };
 
@@ -43,10 +49,18 @@ type Nav = {
   hiddenAgents: ReadonlySet<string>;
   toggleAgent: (id: string) => void;
   setHiddenAgents: (ids: Iterable<string>) => void;
+
+  /** Map: draw reads (lines of sight, read flashes) or only writes. Remembered per browser. */
+  showReads: boolean;
+  setShowReads: (v: boolean) => void;
 };
 const Ctx = createContext<Nav | null>(null);
 
 const HIDDEN_KEY = "brainstorm-hidden-agents";
+const READS_KEY = "brainstorm-map-show-reads";
+function loadShowReads(): boolean {
+  try { return localStorage.getItem(READS_KEY) !== "0"; } catch { return true; }
+}
 function loadHidden(): Set<string> {
   try { return new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? "[]") as string[]); } catch { return new Set(); }
 }
@@ -65,6 +79,12 @@ export function NavProvider({ children }: { children: ReactNode }) {
     return { sessionId: t, index: Math.max(0, Number(params.get("beat")) || 0), playing: false, speed: 1, detail, atStep: params.get("step") ?? undefined };
   });
   const [hiddenAgents, setHidden] = useState<Set<string>>(loadHidden);
+  const [showReads, setShowReadsState] = useState<boolean>(() => (mapPrefs.showReads = loadShowReads()));
+  const setShowReads = useCallback((v: boolean) => {
+    mapPrefs.showReads = v;
+    setShowReadsState(v);
+    try { localStorage.setItem(READS_KEY, v ? "1" : "0"); } catch { /* storage blocked: resets on reload */ }
+  }, []);
 
   // Keep the view (and a replay) in the URL so a reload (e.g. the dev server reacting to agents editing this very repo) stays put.
   useEffect(() => {
@@ -110,7 +130,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider value={{
       view, setView, sessionId, setSessionId, focusFile, setFocusFile, openFile, focusStep, setFocusStep, openStep,
       replay, startReplay, setReplayIndex, setReplayPlaying, setReplaySpeed, setReplayDetail, landReplay, stopReplay,
-      hiddenAgents, toggleAgent, setHiddenAgents,
+      hiddenAgents, toggleAgent, setHiddenAgents, showReads, setShowReads,
     }}>{children}</Ctx.Provider>
   );
 }

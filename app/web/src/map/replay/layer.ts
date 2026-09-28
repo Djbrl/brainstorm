@@ -2,7 +2,7 @@
 // camera follow, playback, keyboard and wheel-to-scrub.
 import { useCallback, useEffect, useRef, type RefObject } from "react";
 import type { ForceGraphMethods } from "react-force-graph-2d";
-import { replayCursor, useNav } from "../../lib/nav";
+import { mapPrefs, replayCursor, useNav } from "../../lib/nav";
 import { useThread, type Thread } from "../../lib/thread";
 import { replayCamera, USER_CAMERA_MS } from "./store";
 
@@ -273,7 +273,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     }
 
     // Read flash: a hollow ring on each file read (a group of reads flashes them all); the tracer stays put.
-    if (beat.action === "read") for (const readFile of beat.files) {
+    if (beat.action === "read" && mapPrefs.showReads) for (const readFile of beat.files) {
       const n = pos(readFile);
       if (n) {
         const p = Math.min(1, (t - a.beatAt) / FLASH_MS);

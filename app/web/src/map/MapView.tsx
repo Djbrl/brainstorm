@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const RIPPLE_MS = 700; // one ripple per edit
 import ForceGraph2D, { type ForceGraphMethods, type LinkObject, type NodeObject } from "react-force-graph-2d";
-import type { AgentPresence, FileNode, ProjectMap, Step } from "@contract";
+import type { AgentPresence, Edge, FileNode, ProjectMap, Step } from "@contract";
 import { useLive } from "../lib/live";
-import { useNav } from "../lib/nav";
+import { mapPrefs, useNav } from "../lib/nav";
 import { AskBox } from "../ask/AskBox";
 import { mockAgents, mockMap } from "./mock";
 import { drawAgents, visibleAgents, type AgentAnim } from "./agents";
@@ -138,10 +138,21 @@ function moduleForce(strength: number) {
   return f;
 }
 
+// ---------- import links ----------
+const IMPORTS_COLOR = "rgba(91,91,214,0.7)";   // this file → what it imports
+const USED_BY_COLOR = "rgba(15,157,138,0.7)";  // files that import this one → this file
+const endId = (e: unknown) => (typeof e === "object" && e ? (e as GNode).id : (e as string));
+function linkRole(l: GLink, focus: string | null): "imports" | "usedBy" | null {
+  if (!focus) return null;
+  if (endId(l.source) === focus) return "imports";
+  if (endId(l.target) === focus) return "usedBy";
+  return null;
+}
+
 // ---------- view ----------
 export function MapView() {
   const { state } = useLive();
-  const { focusFile, setFocusFile, hiddenAgents, replay } = useNav();
+  const { focusFile, setFocusFile, hiddenAgents, replay, showReads, setShowReads } = useNav();
   const mock = useMemo(() => new URLSearchParams(location.search).has("mockmap"), []);
   const map = useMemo(() => (mock ? mockMap() : state.map), [mock, state.map]);
   const graph = useGraph(map);
@@ -190,7 +201,7 @@ export function MapView() {
     replayRef.current.draw(ctx, scale);
     drawAgents({
       ctx, scale, agents: agentsRef.current, anim: anim.current, accent: tokens.accent, font: tokens.body,
-      hoverFile: hoverRef.current, followId: followRef.current, resolveId,
+      hoverFile: hoverRef.current, followId: followRef.current, resolveId, showReads: mapPrefs.showReads,
       resolve: (id) => { const n = nodeIndexRef.current.get(id); return n && n.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y, r: n.r } : undefined; },
     });
   }, [tokens, resolveId]);
@@ -255,6 +266,8 @@ export function MapView() {
     if (n.x === undefined) setTimeout(go, 800); else go();
   }, [focusFile, graph.nodes, setFocusFile]);
 
+  // Import links show only around the file you hover (or, failing that, the selected one).
+  const linkFocus = hover ?? selected;
   const activePaths = useMemo(() => new Set((map?.files ?? []).filter((f) => f.activeSessionId).map((f) => f.path)), [map?.files]);
 
   // One-shot ripples: start one when a file receives a new agent edit (not on first load).
@@ -381,12 +394,10 @@ export function MapView() {
           nodePointerAreaPaint={(n, color, ctx) => { const g = n as GNode; ctx.fillStyle = color; ctx.beginPath(); ctx.arc(g.x ?? 0, g.y ?? 0, g.r + 3, 0, Math.PI * 2); ctx.fill(); }}
           onRenderFramePre={drawModules}
           onRenderFramePost={drawAgentLayer}
-          linkColor={(l) => (activePaths.has(((l as GLink).source as GNode).id) || activePaths.has(((l as GLink).target as GNode).id) ? "rgba(91,91,214,0.35)" : "rgba(29,29,31,0.08)")}
-          linkWidth={0.6}
-          linkDirectionalParticles={(l) => (activePaths.has(((l as GLink).source as GNode).id) || activePaths.has(((l as GLink).target as GNode).id) ? 2 : 0)}
-          linkDirectionalParticleWidth={2.2}
-          linkDirectionalParticleSpeed={0.008}
-          linkDirectionalParticleColor={() => tokens.accent}
+          linkColor={(l) => linkRole(l as GLink, linkFocus) === "imports" ? IMPORTS_COLOR : linkRole(l as GLink, linkFocus) === "usedBy" ? USED_BY_COLOR : linkFocus ? "rgba(29,29,31,0.04)" : "rgba(29,29,31,0.08)"}
+          linkWidth={(l) => (linkRole(l as GLink, linkFocus) ? 1.6 : 0.6)}
+          linkDirectionalArrowLength={(l) => (linkRole(l as GLink, linkFocus) ? 3.5 : 0)}
+          linkDirectionalArrowRelPos={0.92}
           autoPauseRedraw={false}
           cooldownTicks={400}
           d3VelocityDecay={0.35}
@@ -411,15 +422,25 @@ export function MapView() {
         <span><i style={{ background: "var(--warm)" }} />This hour</span>
         <span><i style={{ background: "var(--cool)" }} />Earlier</span>
         <span><i className="ring" />Agent editing</span>
+        <span title="Hover or select a file to see what it imports and what uses it"><i className="line" style={{ background: IMPORTS_COLOR }} />Imports</span>
+        <div className="map-seg" role="radiogroup" aria-label="Agent activity shown">
+          <button role="radio" aria-checked={!showReads} onClick={() => setShowReads(false)}>Writes</button>
+          <button role="radio" aria-checked={showReads} onClick={() => setShowReads(true)}>Reads + writes</button>
+        </div>
       </div>
 
-      <FilePanel file={sel} root={root} steps={state.steps} onClose={() => setSelected(null)} />
+      <FilePanel file={sel} root={root} steps={state.steps} edges={map?.edges ?? []} onFocus={focusOnFile} onClose={() => setSelected(null)} />
     </div>
   );
 }
 
-function FilePanel({ file, root, steps, onClose }: { file?: FileNode; root: string; steps: Record<string, Step[]>; onClose: () => void }) {
+function FilePanel({ file, root, steps, edges, onFocus, onClose }: {
+  file?: FileNode; root: string; steps: Record<string, Step[]>; edges: Edge[]; onFocus: (path: string) => void; onClose: () => void;
+}) {
   const now = useNow();
+  // Unique: a file can import from the same module in several statements.
+  const imports = useMemo(() => (file ? [...new Set(edges.filter((e) => e.from === file.path).map((e) => e.to))] : []), [file?.path, edges]);
+  const usedBy = useMemo(() => (file ? [...new Set(edges.filter((e) => e.to === file.path).map((e) => e.from))] : []), [file?.path, edges]);
   const touching = useMemo(() => {
     if (!file) return [];
     const out: Step[] = [];
@@ -443,6 +464,19 @@ function FilePanel({ file, root, steps, onClose }: { file?: FileNode; root: stri
             <h3>What it does</h3>
             {file.summary ? <p className="map-summary">{file.summary}</p> : <p className="map-quiet">Summarizing…</p>}
           </section>
+
+          {(imports.length > 0 || usedBy.length > 0) && (
+            <section className="map-deps">
+              {imports.length > 0 && (<>
+                <h3><i style={{ background: IMPORTS_COLOR }} />Imports</h3>
+                <ul>{imports.map((p) => <li key={p}><button onClick={() => onFocus(p)} title={relPath(p, root)}>{baseName(p)}</button></li>)}</ul>
+              </>)}
+              {usedBy.length > 0 && (<>
+                <h3><i style={{ background: USED_BY_COLOR }} />Used by</h3>
+                <ul>{usedBy.map((p) => <li key={p}><button onClick={() => onFocus(p)} title={relPath(p, root)}>{baseName(p)}</button></li>)}</ul>
+              </>)}
+            </section>
+          )}
 
           {touching.length > 0 && (
             <section>

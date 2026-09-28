@@ -97,25 +97,42 @@ export function AgentTracker({ agents, accent, followId, onFollow, onFocusFile }
 }
 
 // ---------- canvas layer ----------
-export type AgentAnim = { x: number; y: number; fromX: number; fromY: number; t0: number; file: string; alpha: number };
+// Writes are movement: the marker sits on the last file the agent changed and glides there on each edit/write,
+// and its trail links only write positions. Reads are a line of sight: the marker stays put and a thin line to
+// the file read fades out. A step with no file (a search or a command) is a short pulse on the marker.
+export type AgentAnim = {
+  x: number; y: number; fromX: number; fromY: number; t0: number; file: string; alpha: number;
+  seen: Set<string>; seeded: boolean;           // trail entries already accounted for (no flash on first sight)
+  flashes: { file: string; t0: number }[];      // recent reads to draw as lines of sight
+  lastTs: string; pulseT0: number;              // activity without a new file → pulse
+};
 type Pt = { x: number; y: number; r: number };
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const GLIDE_MS = 650;
+const READ_MS = 1500;
+const PULSE_MS = 700;
+export const isWrite = (action?: string) => action === "edit" || action === "write";
+
+/** Where the marker stands: the last file written, or before any write, the first file touched. */
+export function anchorFile(a: AgentPresence): string | undefined {
+  for (let i = a.trail.length - 1; i >= 0; i--) if (isWrite(a.trail[i].action)) return a.trail[i].file;
+  return a.trail[0]?.file ?? a.file;
+}
 
 export function drawAgents(opts: {
   ctx: CanvasRenderingContext2D; scale: number; agents: AgentPresence[]; anim: Map<string, AgentAnim>;
   resolve: (file: string) => Pt | undefined; accent: string; font: string; hoverFile: string | null; followId: string | null;
-  resolveId: (file: string) => string | undefined;
+  resolveId: (file: string) => string | undefined; showReads: boolean;
 }) {
-  const { ctx, scale, agents, anim, resolve, accent, font, hoverFile, followId, resolveId } = opts;
+  const { ctx, scale, agents, anim, resolve, accent, font, hoverFile, followId, resolveId, showReads } = opts;
   const t = performance.now();
   const now = clock();
 
-  // Fan out agents sharing a file.
+  // Fan out agents standing on the same file.
   const groups = new Map<string, AgentPresence[]>();
   for (const a of agents) {
-    if (!a.file) continue;
-    const key = resolveId(a.file);
+    const f = anchorFile(a);
+    const key = f && resolveId(f);
     if (!key) continue;
     (groups.get(key) ?? groups.set(key, []).get(key)!).push(a);
   }
@@ -130,7 +147,10 @@ export function drawAgents(opts: {
       const tx = node.x + Math.cos(angle) * dist, ty = node.y + Math.sin(angle) * dist;
 
       let st = anim.get(a.id);
-      if (!st) { st = { x: tx, y: ty, fromX: tx, fromY: ty, t0: -1e9, file: key, alpha: 0 }; anim.set(a.id, st); }
+      if (!st) {
+        st = { x: tx, y: ty, fromX: tx, fromY: ty, t0: -1e9, file: key, alpha: 0, seen: new Set(), seeded: false, flashes: [], lastTs: a.ts, pulseT0: -1e9 };
+        anim.set(a.id, st);
+      }
       if (st.file !== key) { st.fromX = st.x; st.fromY = st.y; st.t0 = t; st.file = key; }
       const p = Math.min(1, (t - st.t0) / GLIDE_MS);
       const e = ease(p);
@@ -139,13 +159,29 @@ export function drawAgents(opts: {
       const idle = now - Date.parse(a.ts);
       const target = a.active ? 1 : Math.max(0, 0.35 * (1 - (idle - 2 * 60_000) / (8 * 60_000)));
       st.alpha += (target - st.alpha) * 0.08;
+
+      // New trail entries: reads become lines of sight. Activity with no new file becomes a pulse.
+      let fresh = false;
+      for (const m of a.trail) {
+        const k = `${m.file}|${m.action}|${m.ts}`;
+        if (st.seen.has(k)) continue;
+        st.seen.add(k); fresh = true;
+        if (st.seeded && !isWrite(m.action)) st.flashes.push({ file: m.file, t0: t });
+      }
+      if (st.seeded && a.ts !== st.lastTs && !fresh) st.pulseT0 = t;
+      st.lastTs = a.ts; st.seeded = true;
+      if (st.seen.size > 200) st.seen = new Set([...st.seen].slice(-60));
       if (st.alpha < 0.01) return;
 
       const color = agentColor(a, accent);
 
-      // Trail through its last distinct files, newest strongest.
+      // Trail through the last distinct files it wrote, newest strongest.
       const files: string[] = [];
-      for (const m of a.trail) { const id = resolveId(m.file); if (id && files[files.length - 1] !== id) files.push(id); }
+      for (const m of a.trail) {
+        if (!isWrite(m.action)) continue;
+        const id = resolveId(m.file);
+        if (id && files[files.length - 1] !== id) files.push(id);
+      }
       const pts = files.slice(-7).map((f) => resolve(f)).filter((x): x is Pt => !!x);
       if (pts.length) pts[pts.length - 1] = { x: st.x, y: st.y, r: 0 }; // end at the marker
       if (pts.length > 1) {
@@ -156,7 +192,6 @@ export function drawAgents(opts: {
           ctx.globalAlpha = st.alpha * (0.1 + 0.55 * w);
           ctx.strokeStyle = color;
           ctx.lineWidth = (1.2 + 1.6 * w) / scale;
-          // gentle curve
           const mx = (a0.x + a1.x) / 2, my = (a0.y + a1.y) / 2;
           const dx = a1.x - a0.x, dy = a1.y - a0.y;
           ctx.beginPath();
@@ -170,13 +205,30 @@ export function drawAgents(opts: {
         }
       }
 
-      // Marker
-      if (a.active) {
-        const q = ((t + i * 400) % 1800) / 1800;
-        ctx.globalAlpha = st.alpha * (1 - q) * 0.45;
+      // Reads: a thin line from the marker to the file read and a small ring on it, fading out.
+      st.flashes = st.flashes.filter((f) => t - f.t0 < READ_MS);
+      if (showReads) for (const f of st.flashes) {
+        const id = resolveId(f.file);
+        const n = id ? resolve(id) : undefined;
+        if (!n) continue;
+        const fade = 1 - (t - f.t0) / READ_MS;
+        ctx.globalAlpha = st.alpha * fade * 0.75;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.2 / scale;
+        ctx.beginPath(); ctx.moveTo(st.x, st.y); ctx.lineTo(n.x, n.y); ctx.stroke();
+        ctx.lineWidth = 1.6 / scale;
+        ctx.beginPath(); ctx.arc(n.x, n.y, n.r + 4 / scale, 0, Math.PI * 2); ctx.stroke();
+      }
+
+      // A search or command without a file: one short pulse on the marker.
+      const q = (t - st.pulseT0) / PULSE_MS;
+      if (q >= 0 && q < 1) {
+        ctx.globalAlpha = st.alpha * (1 - q) * 0.55;
         ctx.beginPath(); ctx.arc(st.x, st.y, (9 + q * 12) / scale, 0, Math.PI * 2);
         ctx.strokeStyle = color; ctx.lineWidth = 1.6 / scale; ctx.stroke();
       }
+
+      // Marker
       ctx.globalAlpha = st.alpha;
       ctx.shadowColor = "rgba(0,0,0,0.18)"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 1;
       ctx.beginPath(); ctx.arc(st.x, st.y, 9 / scale, 0, Math.PI * 2);

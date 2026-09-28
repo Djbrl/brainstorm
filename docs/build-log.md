@@ -57,6 +57,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 01:55 (28 Sep) [lead] POST-DEADLINE: at the human's request, the brainstorm-next recording now stops at the 16:30 deadline (1,066 steps, 77 agent moves, 9 failure groups; the map is the hackathon-time snapshot plus the 4 docs written before 16:30). All post-deadline features and the redaction stay. Replay export gained `until=<ISO time>`.
 
+- 02:30 (28 Sep) [lead] POST-DEADLINE, local only (not deployed): Map clarity. Agents move only on writes (the trail links write positions); reads are a fading line of sight to the file; a step with no file is a single pulse on the marker, and the constant marker pulse is gone. A "Writes / Reads + writes" switch by the legend (remembered; nav `showReads`, canvas `mapPrefs.showReads`, also gates read flashes in the thread replay). The always-on import particles are gone: import links show only around the hovered or selected file (imports vs used by), with an "Imports" legend entry and Imports / Used by lists in the file panel.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

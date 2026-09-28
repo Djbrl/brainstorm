@@ -2,10 +2,19 @@
   "name": "brainstorm",
   "version": "0.1.0",
   "description": "A live map and replay of what your coding agents do: every session, every file they touch, what broke.",
-  "author": { "name": "Djbrl", "url": "https://github.com/Djbrl" },
+  "author": {
+    "name": "Djbrl",
+    "url": "https://github.com/Djbrl"
+  },
   "homepage": "https://brainstorm-landing.vercel.app",
   "repository": "https://github.com/Djbrl/brainstorm",
-  "keywords": ["replay", "map", "agents", "observability"],
+  "license": "FSL-1.1-ALv2",
+  "keywords": [
+    "replay",
+    "map",
+    "agents",
+    "observability"
+  ],
   "userConfig": {
     "anthropic_api_key": {
       "type": "string",

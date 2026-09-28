@@ -133,3 +133,4 @@ To settle before building. Record each decision here with the date.
 | 28 Sep 2026 | Local-first: recording and viewing stay on the machine; the cloud is only for replays the user chooses to share. |
 | 28 Sep 2026 | First package: a Claude Code plugin (replay + map), built on the same bundle a later `npx brainstorm` will use. |
 | 28 Sep 2026 | AI: bring your own, detected automatically; default is the user's Claude Code. We provide AI only in the paid, hosted parts, paid per token rather than on our own GPUs. |
+| 28 Sep 2026 | License: FSL-1.1-ALv2 (Functional Source License). Free to use, change and self-host; no competing product or service; each release becomes Apache 2.0 after two years. The future cloud service stays in a separate, closed repo. |

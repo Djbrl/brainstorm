@@ -70,3 +70,7 @@ Full guide, Brev setup and troubleshooting: [docs/run-locally.md](docs/run-local
 ## Known limits
 
 Claude Code only today (Codex is next). The history slider, pause/steer and Markdown export are not built yet; see [What's next](docs/next-steps.md).
+
+## License
+
+[Functional Source License 1.1, Apache 2.0 future license](LICENSE.md) (`FSL-1.1-ALv2`). You can use, read, change and self-host Brainstorm, including at work. You can't offer it, or something built from it, as a competing product or service. Two years after each release, that release is also available under the Apache License 2.0.

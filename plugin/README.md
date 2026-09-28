@@ -41,3 +41,7 @@ Summaries of files and labels written by a model are off in this release. They'l
 - `build/server.js` is the Brainstorm server (`app/server`) bundled into one file, and `build/web/` is the web app (`app/web`), which the server serves. Rebuild both from `app/` with `node scripts/build-plugin.mjs`, and commit `build/` with each release.
 - `scripts/launch.mjs` starts the server or reuses the running one, restarts it when the plugin version changed, and opens the browser. The `SessionStart` hook runs it with `--background`.
 - Releasing: bump `version` in `.claude-plugin/plugin.json`, rebuild, commit, push. Users on a pinned version don't get new commits until the version changes.
+
+## License
+
+[FSL-1.1-ALv2](../LICENSE.md): use, change and self-host it freely; no competing product or service. Each release also becomes Apache 2.0 two years later.

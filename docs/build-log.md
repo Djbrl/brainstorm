@@ -59,6 +59,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 02:30 (28 Sep) [lead] POST-DEADLINE, local only (not deployed): Map clarity. Agents move only on writes (the trail links write positions); reads are a fading line of sight to the file; a step with no file is a single pulse on the marker, and the constant marker pulse is gone. A "Writes / Reads + writes" switch by the legend (remembered; nav `showReads`, canvas `mapPrefs.showReads`, also gates read flashes in the thread replay). The always-on import particles are gone: import links show only around the hovered or selected file (imports vs used by), with an "Imports" legend entry and Imports / Used by lists in the file panel.
 
+- 02:58 (28 Sep) [lead] POST-DEADLINE: Map clarity (writes move agents, reads as lines of sight, Writes / Reads + writes switch, import links on hover or selection with Imports / Used by lists) pushed to post-deadline and deployed to brainstorm-next, same 16:30 recording.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

@@ -9,7 +9,7 @@ import { EventsGateway } from "../core/events.gateway";
 import { ConfigService } from "../core/config.service";
 
 const IGNORE_DIRS = new Set([
-  "node_modules", ".git", "dist", "out", "data", ".claude", ".vercel",
+  "node_modules", ".git", "dist", "build", "out", "data", ".claude", ".vercel",
   "__pycache__", ".venv", "venv", ".next", ".turbo", "coverage", ".cache",
 ]);
 const LOCKFILES = new Set(["package-lock.json", "yarn.lock", "pnpm-lock.yaml", "Cargo.lock", "poetry.lock", "composer.lock"]);

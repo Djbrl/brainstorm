@@ -74,6 +74,14 @@ export class WorkspaceService implements OnModuleInit {
 
   onModuleInit() {
     this.dbs.db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
+    // Started by the plugin for a project: that project wins over the saved one.
+    const given = process.env.BRAINSTORM_ROOT;
+    if (given && this.isValidDir(given)) {
+      this.log.log(`boot: workspace from the launcher ${given}`);
+      this.setSetting("workspace", resolve(given));
+      this.activate(resolve(given));
+      return;
+    }
     const saved = this.getSetting("workspace");
     if (saved && this.isValidDir(saved)) {
       this.log.log(`boot: applying saved workspace ${saved}`);
@@ -313,6 +321,7 @@ export class WorkspaceService implements OnModuleInit {
 
   private async checkNemotron(): Promise<SetupStep> {
     const label = "Nemotron on NVIDIA Brev";
+    if (!process.env.NEMOTRON_URL) return { id: "nemotron", label, state: "warn", detail: "not set up: file summaries are off" };
     try {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 3000);

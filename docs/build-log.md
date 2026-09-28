@@ -61,6 +61,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 02:58 (28 Sep) [lead] POST-DEADLINE: Map clarity (writes move agents, reads as lines of sight, Writes / Reads + writes switch, import links on hover or selection with Imports / Used by lists) pushed to post-deadline and deployed to brainstorm-next, same 16:30 recording.
 
+- 16:30 (28 Sep) [lead] POST-DEADLINE: Brainstorm as a Claude Code plugin (v0.1, local, not released yet). `plugin/` holds the manifest, a SessionStart hook that starts Brainstorm in the background, `/brainstorm:open` and `/brainstorm:stop`, and a launcher that reuses the running server and restarts it after an update. The server is bundled into one file and serves the web app itself (one process, port 4747), keeps its data in the plugin's folder, maps the project Claude Code runs in, listens on 127.0.0.1 only and refuses other host names and cross-site WebSocket connections. Nemotron is skipped when not configured. Thread titles no longer show Claude Code's command tags. Checked in a real Claude Code session with `--plugin-dir`: the hook started the server, the skill switched it to the session's project, and the map loaded. Product decisions in docs/roadmap.md.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

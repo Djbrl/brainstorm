@@ -48,6 +48,9 @@ export class NemotronService {
 
   constructor(private cfg: ConfigService) {}
 
+  /** Off unless NEMOTRON_URL is set (the plugin doesn't ship with a Nemotron endpoint): callers skip it, keeping heuristic labels. */
+  get enabled(): boolean { return !!process.env.NEMOTRON_URL; }
+
   private get api(): OpenAI {
     this.client ??= new OpenAI({ apiKey: this.cfg.nemotron.key || "none", baseURL: this.cfg.nemotron.url, timeout: 20_000, maxRetries: 0 });
     return this.client;

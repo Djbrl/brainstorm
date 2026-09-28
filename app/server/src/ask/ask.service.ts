@@ -74,6 +74,10 @@ export class AskService implements OnModuleInit {
       res = { answer: r.text, model: r.model, tokensIn: r.tokensIn, tokensOut: r.tokensOut, costUsd, fallback: false };
     } catch (e) {
       this.log.warn(`Claude failed, falling back to Nemotron: ${(e as Error).message}`);
+      if (!this.nemotron.enabled) {
+        const answer = this.cfg.claude.key ? "Could not reach Claude right now. Try again in a moment." : "To ask questions, add an Anthropic API key to Brainstorm's settings in Claude Code's /plugin menu.";
+        return { answer, model: "none", tokensIn: 0, tokensOut: 0, costUsd: 0, fallback: true };
+      }
       try {
         const r = await this.nemotron.complete(SYSTEM, user, 500);
         res = { answer: r.text, model: this.cfg.nemotron.model, tokensIn: r.tokensIn, tokensOut: r.tokensOut, costUsd: 0, fallback: true };

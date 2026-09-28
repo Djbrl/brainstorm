@@ -139,6 +139,7 @@ export class FailuresService implements OnModuleInit {
 
   /** Background: one Nemotron call per unnamed group; results land in the next list(). */
   private nameMissing(groups: FailureGroup[]) {
+    if (!this.nemotron.enabled) return;
     for (const g of groups) {
       if (this.naming.has(g.key)) continue;
       this.naming.add(g.key);

@@ -1,20 +1,39 @@
 import "reflect-metadata";
-import { resolve } from "node:path";
-import { existsSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { existsSync, writeFileSync } from "node:fs";
 import { NestFactory } from "@nestjs/core";
 import { WsAdapter } from "@nestjs/platform-ws";
+import type { NestExpressApplication } from "@nestjs/platform-express";
+import type { NextFunction, Request, Response } from "express";
 import { AppModule } from "./app.module";
+import { dataDir, isLocalHost } from "./core/local";
 
 const envFile = resolve(__dirname, "../../.env");
-if (existsSync(envFile)) process.loadEnvFile(envFile);
+// Dev only: the plugin passes its settings in the environment, and must not pick up some .env above its install folder.
+if (!process.env.BRAINSTORM_DATA_DIR && existsSync(envFile)) process.loadEnvFile(envFile);
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { logger: ["log", "warn", "error"] });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger: ["log", "warn", "error"] });
   app.useWebSocketAdapter(new WsAdapter(app));
   app.setGlobalPrefix("api");
-  app.enableCors();
-  const port = Number(process.env.PORT ?? 4000);
-  await app.listen(port);
-  console.log(`Brainstorm server on http://localhost:${port}/api  ws://localhost:${port}/ws`);
+
+  // Local only: refuse requests addressed to any other host name (DNS rebinding), and no CORS, so other sites can't read the API.
+  app.use((req: Request, res: Response, next: NextFunction) => (isLocalHost(req.headers.host) ? next() : res.status(403).send("Brainstorm only answers on localhost")));
+
+  // Plugin build: the server also serves the web app, so it's one process on one port.
+  const web = process.env.BRAINSTORM_WEB_DIR;
+  if (web && existsSync(join(web, "index.html"))) {
+    app.useStaticAssets(web);
+    app.use((req: Request, res: Response, next: NextFunction) =>
+      req.method === "GET" && !req.path.startsWith("/api") && !req.path.startsWith("/ws") ? res.sendFile(join(web, "index.html")) : next());
+  }
+
+  const version = process.env.BRAINSTORM_VERSION ?? "dev";
+  const port = Number(process.env.BRAINSTORM_PORT ?? process.env.PORT ?? 4000);
+  await app.listen(port, "127.0.0.1");
+  if (process.env.BRAINSTORM_DATA_DIR) {
+    writeFileSync(join(dataDir(), "server.json"), JSON.stringify({ pid: process.pid, port, version, startedAt: new Date().toISOString() }));
+  }
+  console.log(`Brainstorm ${version} on http://localhost:${port}  (api /api, ws /ws)`);
 }
 bootstrap();

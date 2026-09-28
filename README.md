@@ -18,6 +18,8 @@ AI coding agents make it easy to stop understanding your own code. Brainstorm ru
 
 **Try the recorded demo:** https://brainstorm-demo-black.vercel.app (Brainstorm following its own build: one lead agent and four subagents, plus the landing page session) · **Landing page:** https://brainstorm-landing.vercel.app
 
+**New, post-deadline: install it as a Claude Code plugin (preview).** In Claude Code, run `/plugin marketplace add Djbrl/brainstorm@post-deadline`, then `/plugin install brainstorm@brainstorm`, then `/brainstorm:open`. Details: [plugin/README.md](plugin/README.md).
+
 ![Map: the repo's modules and files, glowing by how recently they changed](docs/screenshots/map.png)
 
 ## What it does

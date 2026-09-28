@@ -150,6 +150,7 @@ export class ReaderService implements OnModuleInit {
   }
 
   private async retryMissingSummaries() {
+    if (!this.nemotron.enabled) return;
     const map = this.mapper.getMap(this.cfg.defaultRoot);
     const missing = map.files.filter((f) => !f.summary);
     if (!missing.length) return;
@@ -174,6 +175,7 @@ export class ReaderService implements OnModuleInit {
   }
 
   private async labelWithNemotron(step: Step, arrivedAt: number) {
+    if (!this.nemotron.enabled) return;
     try {
       const user = this.describeStepForPrompt(step);
       const { text } = await this.nemotron.complete(LABEL_SYSTEM, user, 24, isBadLabel);
@@ -268,6 +270,7 @@ export class ReaderService implements OnModuleInit {
   // ---- summaries ----
 
   private async summarizeAll() {
+    if (!this.nemotron.enabled) { this.summaryTotal = 0; return; }
     const map = this.mapper.getMap(this.cfg.defaultRoot);
     const files = [...map.files].sort((a, b) => (b.lastChangedAt ?? "").localeCompare(a.lastChangedAt ?? ""));
     this.summaryTotal = files.length;

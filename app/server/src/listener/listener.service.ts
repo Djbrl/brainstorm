@@ -385,8 +385,9 @@ export class ListenerService implements OnModuleInit {
     }
   }
 
-  private upsertSession(sessionId: string, cwd: string, ts: string, promptTextForTitle?: string) {
+  private upsertSession(sessionId: string, cwd: string, ts: string, rawPrompt?: string) {
     const db = this.dbs.db;
+    const promptTextForTitle = rawPrompt ? promptTitle(rawPrompt) : undefined;
     const row = db.prepare(`SELECT * FROM sessions WHERE id = ?`).get(sessionId) as SessionRow | undefined;
     if (!row) {
       const title = promptTextForTitle ? promptTextForTitle.slice(0, 80) : "(untitled session)";
@@ -446,7 +447,8 @@ export class ListenerService implements OnModuleInit {
   /** Only sessions whose cwd is the active workspace root or inside it (owner: S). */
   listSessions(): Session[] {
     const rows = this.dbs.db.prepare(`SELECT * FROM sessions ORDER BY last_event_at DESC`).all() as SessionRow[];
-    const sessions = rows.map((r) => this.rowToSession(r));
+    // Titles stored before promptTitle() existed can still start with Claude Code's wrapper tags.
+    const sessions = rows.map((r) => this.rowToSession(r.custom_title ? r : { ...r, title: promptTitle(r.title) ?? "(untitled session)" }));
     if (!this.activeRoot) return sessions;
     return sessions.filter((s) => this.isWithinRoot(s.cwd));
   }
@@ -509,4 +511,20 @@ export class ListenerService implements OnModuleInit {
       .all(limit);
     return rows.map((r) => this.rowToStep(r));
   }
+}
+
+/**
+ * A readable thread title from the first prompt. Claude Code wraps slash commands and local output in tags
+ * (<command-name>, <local-command-caveat>, <local-command-stdout>...): keep the command, drop the rest.
+ * Undefined when nothing readable is left, so a later prompt can title the thread.
+ */
+export function promptTitle(text: string): string | undefined {
+  const command = /<command-name>([^<]*)/.exec(text)?.[1]?.trim();
+  const args = /<command-args>([^<]*)<\/command-args>/.exec(text)?.[1]?.trim();
+  if (command) return `${command}${args ? " " + args : ""}`.slice(0, 80);
+  const plain = text
+    .replace(/<(local-command-caveat|local-command-stdout|local-command-stderr|system-reminder|command-message|command-args)>[\s\S]*?(<\/\1>|$)/g, "")
+    .replace(/<\/?[a-z-]+>/g, "")
+    .trim();
+  return plain ? plain.slice(0, 80) : undefined;
 }

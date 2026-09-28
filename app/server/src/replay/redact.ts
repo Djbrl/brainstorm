@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { dataDir } from "../core/local";
 
 // Owned by the lead. Removes everything unrelated to the project from a replay before it is published: titles of the
 // user's other Claude threads, other project names and folders, private files, personal emails. The list lives in
@@ -17,7 +18,7 @@ const REMOVED = "[removed: private content]";
 
 /** Redacts every string value (not the serialized JSON, so line starts and word boundaries behave). */
 export function redactReplayJson(json: string): { json: string; count: number } {
-  const file = resolve(__dirname, "../../data/redact.json");
+  const file = resolve(dataDir(), "redact.json");
   if (!existsSync(file)) return { json, count: 0 };
   const list = JSON.parse(readFileSync(file, "utf8")) as RedactList;
   let count = 0;

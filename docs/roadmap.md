@@ -86,14 +86,50 @@ Watching agents is hard to charge a single developer for. Brainstorm becomes wor
 
 This also gives the stage demo, all live: install in a fresh repo, start 3 agents, the map lights up, Failures catches a loop, and an agent avoids a collision by asking Brainstorm.
 
+## Product vision (28 Sep 2026)
+
+**Brainstorm records AI-built code: every agent session becomes a replay you can watch, question and share.**
+
+It records locally and automatically, with no setup per session. Three kinds of people use a replay:
+
+- **You**, to catch up: watch it live on the map, or replay what happened while you were away.
+- **Your agents**, as context: through the MCP server they learn who is editing what, what depends on a file, and why it was last changed.
+- **Other people**, to understand: a share link, or a replay attached to a pull request.
+
+The Map, Follow, Ask and Failures are ways of reading a replay. Local use is free and open source. The paid product is replays that leave your machine: hosted links, pull request replays, teams.
+
+## Packaging: the Claude Code plugin
+
+- **One bundle, two ways in.** The plugin contains the local app (server and web in one process). `npx brainstorm` ships the same bundle later, for Codex and Cursor users.
+- **Install:** `/plugin marketplace add Djbrl/brainstorm@post-deadline`, then `/plugin install brainstorm@brainstorm`. The marketplace lives on `post-deadline` so `main` stays the judged entry.
+- **Start:** a `SessionStart` hook starts Brainstorm in the background (or reuses the running one). Claude Code's logs stay on disk, so it catches up on anything it missed.
+- **Viewing:** `/brainstorm:open` opens the map in a browser tab on `localhost`, focused on the current project. To try: Claude's desktop browser pane. Later: a desktop app with a shortcut.
+- **Node:** the plugin needs Node 22 or later. If it's missing, the open command asks Claude to install it (the "agent installer" idea).
+- **Keys:** plugin settings (`userConfig`). The Anthropic key is marked sensitive, so it's stored in the system's credential store and only reaches Brainstorm through the hook's environment. Default AI: the user's own Claude Code (`claude -p`), so no key is needed on day one. Other choices later: Anthropic key, NVIDIA (Nemotron), local (Ollama), off.
+- **Security:** the server listens on 127.0.0.1 only, accepts only localhost `Host` headers (against DNS rebinding) and rejects WebSocket connections from other sites.
+- **Releases:** the plugin pins a `version`. A release is a version bump plus a push. Auto-update is off by default for third-party marketplaces, so the page shows "Update available" when GitHub has a newer version. The launcher restarts a running server whose version differs from the plugin's. The database lives in the plugin's data folder, which survives updates, so schema changes need migrations.
+
+### Plugin milestones
+
+1. **v0.1 (half a day):** one process serving the web app, data in the plugin folder, workspace from the project, one shared server, `/brainstorm:open` and `/brainstorm:stop`, `SessionStart` hook, marketplace file. Map, Follow, Failures and replays work; no AI summaries unless a key is set.
+2. **Day 1:** AI through `claude -p` (lazy summaries: files agents touch or the user opens), `/brainstorm:recap`.
+3. **Day 2:** MCP server (`who_is_editing`, `impact`, `history`, `past_failures`, `overview`) and a skill telling agents when to use it.
+4. **Day 3:** real-time hooks, `/brainstorm:share` (redacted replay file), clean-machine test.
+5. **Later:** hosted encrypted share links, pull request replays, pause and steer, the official marketplace.
+
 ## Open product questions
 
 To settle before building. Record each decision here with the date.
 
-- Is the replay the core of the product, with the other views built around it?
+- Pricing and what exactly sits in Pro vs Team.
+- Share links: anonymous (no account) or tied to GitHub sign-in?
 
 ## Decisions
 
 | Date | Decision |
 | --- | --- |
 | 27 Sep 2026 | After the deadline, new code goes to the `post-deadline` branch; `main` stays the judged entry. |
+| 28 Sep 2026 | The replay is the core of the product; the other views are ways to read one. |
+| 28 Sep 2026 | Local-first: recording and viewing stay on the machine; the cloud is only for replays the user chooses to share. |
+| 28 Sep 2026 | First package: a Claude Code plugin (replay + map), built on the same bundle a later `npx brainstorm` will use. |
+| 28 Sep 2026 | AI: bring your own, detected automatically; default is the user's Claude Code. We provide AI only in the paid, hosted parts, paid per token rather than on our own GPUs. |

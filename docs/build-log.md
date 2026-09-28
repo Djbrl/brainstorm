@@ -75,6 +75,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 18:45 (28 Sep) [lead] Tasks v0 on `feature/tasks` (local only): every session as a task with a filmstrip replay of the screenshots its tools took (kept in the local db), how it did it (the agent's own words, then the calls; FFmpeg options explained), what it made (edits and command outputs, with image, video, PDF and text previews), what it did outside this computer, and where it got things (sites, searches, input files). Checked on real sessions (91 frames on the landing page session) and a real FFmpeg edit. Screenshots and previews are never in replay exports. Notes in docs/tasks.md.
 
+- 23:40 (28 Sep) [lead] `feature/tasks`: one Map tab with Map | Track. Threads play on click (running ones live, pulsing blue); the selected thread expands in the sidebar with Open in Follow at the current step. Vertical Track with place icons, returns folded, requests as chapters, pinned window (screenshot, output, code written, command). Errors everywhere: red marker and ring on the map (live and replay), red rows with the error line in Follow, red ticks on the replay bar, red stops in the Track. Checked live on a separate copy (this session followed live on Map and Track).
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

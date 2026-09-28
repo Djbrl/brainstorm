@@ -21,7 +21,8 @@ type Stop = {
   frame?: number;             // screenshot to show (its own, or the last one before)
   action: "new" | "edit" | "read" | "search" | "run" | "web" | "tool";
 };
-type Row = { type: "chapter"; id: string; text: string; ts: string } | { type: "stop"; id: string; stop: Stop; index: number };
+type StopRow = { type: "stop"; id: string; stop: Stop; index: number };
+type Row = { type: "chapter"; id: string; text: string; ts: string } | StopRow | { type: "bounce"; id: string; rows: StopRow[] };
 
 const WEB = /^(navigate|computer|find|browser batch|get page text|read page|form input|javascript tool|preview start|preview screenshot|read console messages|read network requests|WebFetch|screenshot|scroll|click)$/i;
 const FILES = /^(Read|Edit|Write|MultiEdit|Grep|Glob|NotebookEdit|LS)$/;
@@ -80,7 +81,25 @@ function buildRows(task: TaskDetail): Row[] {
     }
   }
   for (const r of rows) if (r.type === "stop") r.stop.action = actionOf(r.stop);
-  return rows;
+  return foldBounces(rows);
+}
+
+/** Three or more returns in a row (the agent bouncing between places it already knows) fold into one row. */
+function foldBounces(rows: Row[]): Row[] {
+  const out: Row[] = [];
+  let run: StopRow[] = [];
+  const flush = () => {
+    if (run.length >= 3) out.push({ type: "bounce", id: `b:${run[0].id}`, rows: run });
+    else out.push(...run);
+    run = [];
+  };
+  for (const r of rows) {
+    if (r.type === "stop" && r.stop.returning && !r.stop.failed.length && !r.stop.made.length) { run.push(r); continue; }
+    flush();
+    out.push(r);
+  }
+  flush();
+  return out;
 }
 function actionOf(s: Stop): Stop["action"] {
   if (s.made.length) return "new";
@@ -126,6 +145,14 @@ function useTask(id: string | null, live: boolean) {
 // ---- the window: what the agent saw or made at this stop ----
 function Window({ task, stop, onMap }: { task: TaskDetail; stop: Stop; onMap: () => void }) {
   const { openStep } = useNav();
+  const { state } = useLive();
+  // A code edit shows what it wrote (the last edit at this stop), from the full steps the app already has.
+  const written = useMemo(() => {
+    if (stop.area !== "files") return undefined;
+    const all = state.steps[task.sessionId];
+    const edit = [...stop.steps].reverse().map((t) => all?.find((x) => x.id === t.id)).find((x) => x?.diff?.after);
+    return edit?.diff?.after.split("\n").slice(0, 40).join("\n");
+  }, [stop, state.steps, task.sessionId]);
   const frame = stop.frame !== undefined ? task.frames[stop.frame] : undefined;
   const media = stop.made.find((a) => a.src && (a.kind === "image" || a.kind === "video"));
   const cmds = stop.area === "commands" ? stop.steps.map((s) => s.detail).filter(Boolean).slice(0, 3) : [];
@@ -144,6 +171,7 @@ function Window({ task, stop, onMap }: { task: TaskDetail; stop: Stop; onMap: ()
           : media ? <img key={media.src} src={media.src} alt={media.name} />
           : frame ? <img key={frame.src} src={frame.src} alt={frame.caption} />
           : cmds.length ? <pre className="trk-term">{cmds.map((c) => `$ ${c}`).join("\n\n")}</pre>
+          : written ? <pre className="trk-code">{written}</pre>
           : <div className="trk-blank"><Icon k={stop.action} /><span>{[...counts].map(([t, n]) => `${t}${n > 1 ? ` ×${n}` : ""}`).join(" · ")}</span></div>}
       </div>
       {stop.failed.map((s) => <p key={s.id} className="trk-error"><b>Failed:</b> {s.error || s.label}</p>)}
@@ -158,6 +186,16 @@ function Window({ task, stop, onMap }: { task: TaskDetail; stop: Stop; onMap: ()
   );
 }
 
+
+function ReturnRow({ r, cur, goTo }: { r: StopRow; cur: number; goTo: (i: number) => void }) {
+  return (
+    <li key={r.id} data-stop={r.index} className={`trk-return ${r.index === cur ? "on" : ""} ${r.stop.failed.length ? "failed" : ""}`} onClick={() => goTo(r.index)}>
+      <i className="trk-dot" /><Icon k={r.stop.failed.length ? "error" : "return"} /><span>Back to <b>{r.stop.name}</b>{r.stop.failed.length ? " · failed" : ""}</span>
+      {r.stop.firstIndex !== undefined && <button onClick={(e) => { e.stopPropagation(); goTo(r.stop.firstIndex!); }} title="Go to the first visit">first visit</button>}
+    </li>
+  );
+}
+
 // ---- the view ----
 export function TrackView() {
   const { state } = useLive();
@@ -165,7 +203,8 @@ export function TrackView() {
   const session = state.sessions.find((s) => s.id === replay?.sessionId);
   const task = useTask(replay?.sessionId ?? null, session?.status === "running");
   const rows = useMemo(() => (task ? buildRows(task) : []), [task]);
-  const stops = useMemo(() => rows.filter((r): r is Extract<Row, { type: "stop" }> => r.type === "stop"), [rows]);
+  const stops = useMemo(() => rows.flatMap((r) => (r.type === "stop" ? [r] : r.type === "bounce" ? r.rows : [])), [rows]);
+  const [open, setOpen] = useState<Set<string>>(new Set());
   const scroller = useRef<HTMLDivElement>(null);
   const [cur, setCur] = useState(0);
   const landed = useRef<string | null>(null);
@@ -234,12 +273,14 @@ export function TrackView() {
               <ol className="trk-line">
                 {rows.map((r) => r.type === "chapter" ? (
                   <li key={r.id} className="trk-chapter"><span>You</span><p>{r.text}</p></li>
-                ) : r.stop.returning ? (
-                  <li key={r.id} data-stop={r.index} className={`trk-return ${r.index === cur ? "on" : ""} ${r.stop.failed.length ? "failed" : ""}`} onClick={() => goTo(r.index)}>
-                    <i className="trk-dot" /><Icon k={r.stop.failed.length ? "error" : "return"} /><span>Back to <b>{r.stop.name}</b>{r.stop.failed.length ? " · failed" : ""}</span>
-                    {r.stop.firstIndex !== undefined && <button onClick={(e) => { e.stopPropagation(); goTo(r.stop.firstIndex!); }} title="Go to the first visit">first visit</button>}
+                ) : r.type === "bounce" && !open.has(r.id) ? (
+                  <li key={r.id} data-stop={r.rows[0].index} className={`trk-return trk-bounce ${r.rows.some((x) => x.index === cur) ? "on" : ""}`} onClick={() => setOpen((o) => new Set(o).add(r.id))} title="Show each step">
+                    <i className="trk-dot" /><Icon k="return" /><span>Back and forth between <b>{[...new Set(r.rows.map((x) => x.stop.name))].slice(0, 3).join(", ")}</b>{new Set(r.rows.map((x) => x.stop.name)).size > 3 ? "…" : ""}</span><em>{r.rows.length}</em>
                   </li>
-                ) : (
+                ) : r.type === "bounce" ? (
+                  r.rows.map((x) => <ReturnRow key={x.id} r={x} cur={cur} goTo={goTo} />)
+                ) : r.stop.returning ? (
+                  <ReturnRow key={r.id} r={r} cur={cur} goTo={goTo} />                ) : (
                   <li key={r.id} data-stop={r.index} className={`trk-stop a-${r.stop.area} ${r.index === cur ? "on" : ""} ${r.stop.failed.length ? "failed" : ""} ${r.stop.made.length ? "made" : ""}`} onClick={() => goTo(r.index)}>
                     <i className="trk-dot" />
                     <span className={`trk-ico a-${r.stop.area} ${r.stop.failed.length ? "err" : ""}`}><Icon k={r.stop.failed.length ? "error" : r.stop.action} /></span>

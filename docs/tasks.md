@@ -4,22 +4,19 @@ Every agent session told as a task you can replay: the goal, a filmstrip of what
 
 Branch: `feature/tasks` (from `main`, with `feature/cowork` merged in). Local app only.
 
-## What you see
+## What you see (updated 28 Sep, evening)
 
-- **Task list:** every session in the workspace, newest first, with its first request as the title, a kind (Code, Web, Media, Writing, Other), and how many frames and files it has. A green dot means the agent is working now.
-- **The goal:** the first request, and how many more requests followed.
-- **Filmstrip player:** the screenshots the agent's tools took (in-app browser, Chrome, computer use, simulator), in order, with the step that took each one.
-  - Play, pause, frame by frame (the arrow keys work), speed 1×, 2× or 4×.
-  - On a live task, **Follow live** keeps the newest frame in view: a picture-in-picture of what the agent is looking at, refreshed every 3 seconds.
-- **How it did it:** the work in stretches. Each stretch is one of your requests (highlighted) or the agent saying what it's about to do, followed by the calls it made in plain words.
-  - Commands use the agent's own one-line description.
-  - FFmpeg commands have a **How this command works** list, with every option in plain words.
-  - ◉ jumps the player to what the agent saw at that step, and the step shown in the player is highlighted.
-- **What it made:** files it wrote or edited, and files commands produced (FFmpeg, ImageMagick, pandoc, `cp`, `mv`, `zip`, `tar`, `curl -o`, `>` redirects), filterable by Media, Writing, Code and Data.
-  - Images, video stills, PDFs and text open in a preview.
-  - Videos and sound play in the preview.
-- **Outside this computer:** what it sent, published, deployed or pushed, from the places classifier.
-- **Where it got things:** the websites it visited or searched, with page titles and links, and the files it used as inputs.
+There is no separate Tasks tab anymore. A thread is picked once, and the Map tab shows it two ways, switched at the top: **Map** (where in the code it happened) and **Track** (the story, top to bottom).
+
+- **Sidebar, same on both:**
+  - Clicking a thread plays it. A running thread pulses blue and plays live, following its newest step; opening the Map picks the newest running thread by itself.
+  - The selected thread expands with **Open in Follow** (at the step you're on), **Live** and **Close**, then its steps.
+- **Track:**
+  - One vertical line. Each stop is a stretch of work in one place (a file, a website, a command-line tool, a service), with an icon for what happened: made a file, edited, read, searched, ran, browsed, used a service.
+  - Going back to an earlier place is a compact "Back to …" row; three or more in a row fold into "Back and forth between …".
+  - Your requests are chapters. New files are square stops with their names.
+  - The window on the right stays in view and shows the stop you're on: the screenshot, the image or video it made, the code it wrote, or the command (FFmpeg explained). It also has Open in Follow and Show on map.
+- **Errors:** a failed tool call turns the agent's marker red with one red ring (live and in replay). It shows red in Follow with the first line of the error, as red ticks on the replay bar, and as red stops with the error text in the Track.
 
 ## How it works
 

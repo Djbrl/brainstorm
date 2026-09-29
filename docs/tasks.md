@@ -10,7 +10,8 @@ There is no separate Tasks tab anymore. A thread is picked once, and the Map tab
 
 - **Sidebar, same on both:**
   - Clicking a thread plays it. A running thread pulses blue and plays live, following its newest step; opening the Map picks the newest running thread by itself.
-  - The selected thread expands with **Open in Follow** (at the step you're on), **Live** and **Close**, then its steps.
+  - The open thread's steps fill the sidebar. Clicking the open thread again, or × on the player, closes it. **Open in Follow** is on the player and opens Follow at the step you're on.
+  - Going to the newest step of a running thread (the end of the slider, or the bottom of the Track) follows it live again.
 - **Track:**
   - One vertical line. Each stop is a stretch of work in one place (a file, a website, a command-line tool, a service), with an icon for what happened: made a file, edited, read, searched, ran, browsed, used a service.
   - Going back to an earlier place is a compact "Back to …" row; three or more in a row fold into "Back and forth between …".

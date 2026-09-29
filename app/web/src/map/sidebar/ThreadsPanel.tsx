@@ -1,9 +1,9 @@
-// Owner: sidebar agent. Threads tab: every thread; clicking one plays it (a running one live), and the selected
-// thread opens its step list, Open in Follow (at the current step), Live and Close. Agents: follow the camera, show/hide.
+// Owner: sidebar agent. Threads tab: every thread; clicking one plays it (a running one live) and opens its step list,
+// which fills the sidebar's height; clicking it again closes it. Agents: follow the camera, show/hide.
 import { useEffect, useState } from "react";
 import type { AgentPresence, Session } from "@contract";
 import { clock, useLive } from "../../lib/live";
-import { replayCursor, useNav } from "../../lib/nav";
+import { useNav } from "../../lib/nav";
 import { agentColor, baseName, initial, shortName, verbIng } from "../agents";
 import { ReplaySteps } from "../replay/ReplaySteps";
 
@@ -43,7 +43,7 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }
   useTick(5000);
   const now = clock();
   const { state } = useLive();
-  const { replay, hiddenAgents, toggleAgent, setHiddenAgents, startReplay, setReplayPlaying, setReplayLive, stopReplay, openStep, setSessionId, setView } = useNav();
+  const { replay, hiddenAgents, toggleAgent, setHiddenAgents, startReplay, setReplayPlaying, stopReplay } = useNav();
 
   const sessions = [...state.sessions].sort((a, b) => {
     const running = (a.status === "running" ? 0 : 1) - (b.status === "running" ? 0 : 1);
@@ -59,18 +59,13 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }
 
   // Clicking a thread plays it: a running thread follows its newest step, a finished one plays from the start.
   const select = (s: Session) => {
-    if (replay?.sessionId === s.id) return;
+    if (replay?.sessionId === s.id) { stopReplay(); return; } // clicking the open thread closes it
     startReplay(s.id, 0, { live: s.status === "running" });
     if (s.status !== "running") setReplayPlaying(true);
   };
-  // Follow opens at the step the replay is on (the live step, or where it was paused).
-  const openFollow = (sid: string) => {
-    const at = replay?.sessionId === sid ? replayCursor.stepId : null;
-    if (at) openStep(sid, at); else { setSessionId(sid); setView("follow"); }
-  };
 
   return (
-    <div className="sidebar-threads">
+    <div className={`sidebar-threads ${replay ? "has-open" : ""}`}>
       {allIds.length > 0 && (
         <div className="sidebar-threads-toolbar">
           <button onClick={() => setHiddenAgents(allHidden ? [] : allIds)}>{allHidden ? "Show all" : "Hide all"}</button>
@@ -84,7 +79,6 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }
               key={session.id}
               session={session}
               selected={selected}
-              live={selected && !!replay?.live}
               agents={agents.filter((a) => a.sessionId === session.id)}
               accent={accent}
               followId={followId}
@@ -94,9 +88,6 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }
               toggleAgent={toggleAgent}
               now={now}
               onSelect={() => select(session)}
-              onClose={stopReplay}
-              onGoLive={() => setReplayLive(true)}
-              onOpenFollow={() => openFollow(session.id)}
             />
           );
         })}
@@ -105,10 +96,9 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }
   );
 }
 
-function ThreadRow({ session, selected, live, agents, accent, followId, onFollow, onFocusFile, hiddenAgents, toggleAgent, now, onSelect, onClose, onGoLive, onOpenFollow }: {
+function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFocusFile, hiddenAgents, toggleAgent, now, onSelect }: {
   session: Session;
   selected: boolean;
-  live: boolean;
   agents: AgentPresence[];
   accent: string;
   followId: string | null;
@@ -118,26 +108,16 @@ function ThreadRow({ session, selected, live, agents, accent, followId, onFollow
   toggleAgent: (id: string) => void;
   now: number;
   onSelect: () => void;
-  onClose: () => void;
-  onGoLive: () => void;
-  onOpenFollow: () => void;
 }) {
   const sorted = [...agents].sort((a, b) => (a.isSubagent ? 1 : 0) - (b.isSubagent ? 1 : 0) || a.id.localeCompare(b.id));
   const running = session.status === "running";
   return (
     <li className={`sidebar-thread ${selected ? "selected" : ""}`}>
-      <button className="sidebar-thread-head" onClick={onSelect} aria-pressed={selected} title={selected ? undefined : running ? "Watch this thread live" : "Replay this thread"}>
+      <button className="sidebar-thread-head" onClick={onSelect} aria-pressed={selected} title={selected ? "Close this thread" : running ? "Watch this thread live" : "Replay this thread"}>
         <span className={`sidebar-thread-status ${session.status}`} aria-hidden="true" />
         <span className="sidebar-thread-title">{session.title || "Untitled thread"}</span>
         <time>{running ? "live" : ago(session.lastEventAt, now)}</time>
       </button>
-      {selected && (
-        <div className="sidebar-thread-actions">
-          <button onClick={onOpenFollow} title="Open Follow at the step you're on">Open in Follow</button>
-          {running && <button className={live ? "on" : ""} aria-pressed={live} onClick={onGoLive} title={live ? "Following the newest step" : "Jump to the newest step and follow it"}><i className="sidebar-live-dot" aria-hidden="true" />Live</button>}
-          <button onClick={onClose} title="Stop replaying (Esc)">Close</button>
-        </div>
-      )}
       {sorted.length > 0 && (
         <ul className="sidebar-thread-agents">
           {sorted.map((a) => {

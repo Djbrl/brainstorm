@@ -77,6 +77,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 23:40 (28 Sep) [lead] `feature/tasks`: one Map tab with Map | Track. Threads play on click (running ones live, pulsing blue); the selected thread expands in the sidebar with Open in Follow at the current step. Vertical Track with place icons, returns folded, requests as chapters, pinned window (screenshot, output, code written, command). Errors everywhere: red marker and ring on the map (live and replay), red rows with the error line in Follow, red ticks on the replay bar, red stops in the Track. Checked live on a separate copy (this session followed live on Map and Track).
 
+- 00:55 (29 Sep) [lead] `feature/tasks`, at the human's request: Failures tab removed from the local app (errors show on the map, in Follow and in the Track; the hosted demos keep it for their tour). No project title on the map; the sidebar runs the full height, centered. The open thread's steps fill the sidebar so expanded steps have room. Player: no zoom buttons or Live chip, Open in Follow moved onto it, it sits above the legend (which stays visible). Sidebar: no Open in Follow, Live or Close under the title; clicking the open thread closes it. Reaching the newest step of a running thread (end of the slider, bottom of the Track) follows it live again.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

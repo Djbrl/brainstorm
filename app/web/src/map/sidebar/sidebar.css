@@ -1,7 +1,7 @@
 /* Owner: sidebar agent. Floating left sidebar on the map: Threads | Files tabs, collapsible.
    Same frosted sheet as the old .map-agents tracker it replaces. */
 .map-sidebar {
-  position: absolute; left: 24px; top: 120px; bottom: 24px; width: 340px; max-width: calc(100% - 32px);
+  position: absolute; left: 24px; top: 24px; bottom: 24px; width: 340px; max-width: calc(100% - 32px);
   display: flex; flex-direction: column;
   background: rgba(255,255,255,.86); backdrop-filter: saturate(180%) blur(20px);
   border: 1px solid var(--line); border-radius: 18px;
@@ -19,7 +19,7 @@
 .sidebar-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 14px 14px; }
 
 .sidebar-collapsed {
-  position: absolute; left: 24px; top: 120px; width: 38px; padding: 14px 0 16px;
+  position: absolute; left: 24px; top: 50%; transform: translateY(-50%); width: 38px; padding: 14px 0 16px;
   background: rgba(255,255,255,.86); backdrop-filter: saturate(180%) blur(20px);
   border: 1px solid var(--line); border-radius: 14px;
   display: flex; flex-direction: column; align-items: center; gap: 10px;
@@ -105,7 +105,10 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .sidebar-thread.selected button.sidebar-thread-head { background: var(--accent-soft); cursor: default; }
 .sidebar-thread-status.running { background: var(--accent); box-shadow: 0 0 0 0 rgba(91,91,214,.55); animation: sidebar-pulse 1.6s infinite; }
 .sidebar-thread-head time { font-variant-numeric: tabular-nums; }
-.sidebar-thread-actions button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
-.sidebar-live-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: 1px; }
-.sidebar-thread-actions button:not(.on) .sidebar-live-dot { background: var(--accent); }
-.sidebar-thread-steps { height: min(52vh, 520px); margin: 10px -2px 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+/* With a thread open, the body stops scrolling as a whole: the open thread takes the height left by the other rows. */
+.sidebar-body:has(.sidebar-threads.has-open) { overflow: hidden; display: flex; flex-direction: column; }
+.sidebar-threads.has-open { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.sidebar-threads.has-open .sidebar-thread-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.sidebar-threads.has-open .sidebar-thread { flex: none; }
+.sidebar-threads.has-open .sidebar-thread.selected { flex: 1 0 58%; min-height: 0; display: flex; flex-direction: column; }
+.sidebar-thread-steps { flex: 1; min-height: 0; margin: 10px -2px 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); }

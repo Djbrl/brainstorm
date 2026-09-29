@@ -201,6 +201,7 @@ export function TrackView() {
   const { state } = useLive();
   const { replay, setLens, startReplay, setReplayLive } = useNav();
   const session = state.sessions.find((s) => s.id === replay?.sessionId);
+  const running = session?.status === "running";
   const task = useTask(replay?.sessionId ?? null, session?.status === "running");
   const rows = useMemo(() => (task ? buildRows(task) : []), [task]);
   const stops = useMemo(() => rows.flatMap((r) => (r.type === "stop" ? [r] : r.type === "bounce" ? r.rows : [])), [rows]);
@@ -217,8 +218,11 @@ export function TrackView() {
     let best = 0;
     el.querySelectorAll<HTMLElement>("[data-stop]").forEach((n) => { if (n.getBoundingClientRect().top <= line) best = Number(n.dataset.stop); });
     setCur(best);
-    if (replay?.live && el.scrollHeight - el.scrollTop - el.clientHeight > 240) setReplayLive(false);
-  }, [replay?.live, setReplayLive]);
+    // Scrolling up stops following a running thread; scrolling back to the bottom follows it again.
+    const fromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (replay?.live && fromBottom > 240) setReplayLive(false);
+    else if (replay && !replay.live && running && fromBottom < 60) setReplayLive(true);
+  }, [replay, running, setReplayLive]);
 
   useEffect(() => {
     const el = scroller.current;

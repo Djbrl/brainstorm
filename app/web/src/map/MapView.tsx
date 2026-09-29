@@ -410,10 +410,6 @@ export function MapView() {
         />
       )}
 
-      <div className="map-head">
-        <h1>{projectName(root)}</h1>
-        <p>{graph.nodes.length} files · {graph.anchors.size} modules{activePaths.size ? ` · ${activePaths.size} being edited now` : ""}</p>
-      </div>
 
       <MapSidebar agents={agents} accent={tokens.accent} followId={followId}
         onFollow={(id) => setFollowId(id)} onFocusFile={focusOnFile} map={map} />

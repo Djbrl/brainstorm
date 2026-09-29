@@ -16,9 +16,11 @@ function Shell() {
   const [setupOpen, setSetupOpen] = useState(false);
   const { view, setView, lens } = useNav();
   const [tourSignal, setTourSignal] = useState(0);
-  const tabs: { id: View; label: string }[] = [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }, { id: "failures", label: `Failures${state.failures.length ? ` ${state.failures.length}` : ""}` }];
-  // Places: local only (the hosted replays carry no cowork data). The Track view of the Map tab is local only too.
-  if (!state.replay) tabs.push({ id: "cowork", label: "Places" });
+  // Local app: Follow, Map (with its Map | Track views) and Places. Failures was a hackathon view: errors now show on the map,
+  // in Follow and in the Track. The hosted demos keep it, their tour points at it.
+  const tabs: { id: View; label: string }[] = state.replay
+    ? [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }, { id: "failures", label: `Failures${state.failures.length ? ` ${state.failures.length}` : ""}` }]
+    : [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }, { id: "cowork", label: "Places" }];
   // Local app: pick a workspace first (and whenever "Change" is clicked). The hosted replay never shows setup.
   // In the post-deadline preview, the setup screen plays back a recorded run (see lib/preview.ts).
   if ((setupOpen && (!state.replay || state.preview)) || (!state.replay && state.setup && !state.setup.root)) {
@@ -59,7 +61,7 @@ function Shell() {
       )}
       {state.replay && <Tour openSignal={tourSignal} preview={state.preview} />}
       {!state.replay && <LiveReplay />}
-      <main className="view">{view === "follow" ? <FollowView /> : view === "map" ? (lens === "track" && !state.replay ? <TrackView /> : <MapView />) : view === "cowork" && !state.replay ? <CoworkView /> : <FailuresView />}</main>
+      <main className="view">{view === "follow" ? <FollowView /> : view === "map" ? (lens === "track" && !state.replay ? <TrackView /> : <MapView />) : view === "cowork" && !state.replay ? <CoworkView /> : state.replay ? <FailuresView /> : <FollowView />}</main>
     </div>
   );
 }
@@ -70,10 +72,15 @@ function Shell() {
  */
 function LiveReplay() {
   const { state } = useLive();
-  const { replay, view, startReplay, followLive } = useNav();
+  const { replay, view, startReplay, followLive, setReplayLive } = useNav();
   const thread = useThread(replay?.live ? replay.sessionId : null, replay?.detail ?? "light");
   const beats = thread?.beats.length ?? 0;
   useEffect(() => { if (replay?.live && beats) followLive(beats - 1); }, [replay?.live, beats, followLive]);
+  const running = state.sessions.find((s) => s.id === replay?.sessionId)?.status === "running";
+  const all = useThread(replay && !replay.live && running ? replay.sessionId : null, replay?.detail ?? "light");
+  useEffect(() => {
+    if (replay && !replay.live && running && all && replay.index >= all.beats.length - 1 && !replay.playing) setReplayLive(true);
+  }, [replay, running, all, setReplayLive]);
 
   const closed = useRef(false), had = useRef(false);
   useEffect(() => { if (had.current && !replay) closed.current = true; had.current = !!replay; }, [replay]);

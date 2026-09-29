@@ -1,7 +1,7 @@
 // Owner: replay agent. Bottom playback bar on the map during a thread replay.
 import { memo, useMemo } from "react";
 import { isReplay, useLive } from "../../lib/live";
-import { useNav, type ReplaySpeed } from "../../lib/nav";
+import { replayCursor, useNav, type ReplaySpeed } from "../../lib/nav";
 import { beatLabel, useThread, type Thread } from "../../lib/thread";
 import { togglePlay } from "./layer";
 import { replayCamera } from "./store";
@@ -48,7 +48,7 @@ const FailTicks = memo(function FailTicks({ thread }: { thread: Thread }) {
 });
 
 export function ReplayBar() {
-  const { replay, setReplayIndex, setReplayPlaying, setReplaySpeed, setReplayDetail, stopReplay } = useNav();
+  const { replay, setReplayIndex, setReplayPlaying, setReplaySpeed, setReplayDetail, stopReplay, openStep, setSessionId, setView } = useNav();
   const { state } = useLive();
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
   if (!replay) return null;
@@ -80,7 +80,6 @@ export function ReplayBar() {
       <div className="rp-top">
         <span className="rp-count">{index + 1} / {len}</span>
         <span className="rp-label" title={`${title}\n${label}`}>{label}</span>
-        {replay.live && <span className="rp-chip live"><i />Live</span>}
         {beat.failed > 0 && <span className="rp-chip fail">{beat.failed} failed</span>}
         <button className={`rp-text rp-detail-toggle${full ? " on" : ""}`} aria-pressed={full}
           onClick={() => setReplayDetail(full ? "light" : "full", beat.step.id)}
@@ -88,13 +87,10 @@ export function ReplayBar() {
           All steps
         </button>
         <button className="rp-text" onClick={() => replayCamera.recenter()} title="Follow the tracer again">{Icon.target}<span>Recenter</span></button>
+        <button className="rp-text" onClick={() => { const at = replayCursor.stepId; if (at) openStep(replay.sessionId, at); else { setSessionId(replay.sessionId); setView("follow"); } }} title="Open this step in Follow">Open in Follow</button>
         {stop}
       </div>
       <div className="rp-controls">
-        <div className="rp-group">
-          <button className="rp-icon" onClick={() => replayCamera.zoomBy(1 / 1.4)} aria-label="Zoom out" title="Zoom out (or pinch, ⌘ scroll)">{Icon.minus}</button>
-          <button className="rp-icon" onClick={() => replayCamera.zoomBy(1.4)} aria-label="Zoom in" title="Zoom in (or pinch, ⌘ scroll)">{Icon.plus}</button>
-        </div>
         <div className="rp-group">
           <button className="rp-icon" onClick={() => set(index - 1)} disabled={index === 0} aria-label="Previous step" title="Previous step (←)">{Icon.back}</button>
           <button className="rp-icon rp-play" onClick={() => togglePlay(index, len, replay.playing, setReplayIndex, setReplayPlaying)}

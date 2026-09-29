@@ -308,6 +308,7 @@ html { scroll-padding-top: 96px; }
 .band-link::after { content: " ›"; }
 nav { top: 40px; }
 [data-waitlist][hidden] { display: none; }
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
 .wl-done { font-weight: 700; }
 
 /* roadmap */
@@ -444,7 +445,7 @@ footer a:hover { text-decoration: underline; }
 <div class="band" id="band">
   <div class="wrap">
     <span><b>Brainstorm is a prototype.</b> <span class="dim">The full release lands in late October.</span></span>
-    <form class="wl-mini" data-waitlist hidden><input type="email" name="email" required placeholder="Your email" aria-label="Your email" autocomplete="email"><button type="submit">Join the waitlist</button></form>
+    <form class="wl-mini" data-waitlist hidden><input type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" class="hp"><input type="email" name="email" required placeholder="Your email" aria-label="Your email" autocomplete="email"><button type="submit">Join the waitlist</button></form>
     <a class="band-link" href="#roadmap">Join the waitlist</a>
   </div>
 </div>
@@ -654,7 +655,7 @@ footer a:hover { text-decoration: underline; }
       <div class="later rv d2"><span class="dot"></span><h3>After</h3><p class="when">What we're building toward</p>
         <ul><li>Codex, Cursor and Gemini CLI</li><li>Find the step that broke it, like git bisect</li><li>Replays on pull requests</li><li>Pause and steer an agent from the map</li></ul></div>
     </div>
-    <form class="wl-big rv" id="waitlist" data-waitlist hidden><input type="email" name="email" required placeholder="you@example.com" aria-label="Your email" autocomplete="email"><button class="btn" type="submit">Join the waitlist</button></form>
+    <form class="wl-big rv" id="waitlist" data-waitlist hidden><input type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" class="hp"><input type="email" name="email" required placeholder="you@example.com" aria-label="Your email" autocomplete="email"><button class="btn" type="submit">Join the waitlist</button></form>
     <p class="wl-note rv" id="wlNote"></p>
   </div>
 </section>
@@ -731,9 +732,9 @@ const SITE = {
     numbers: "https://github.com/Djbrl/brainstorm/blob/main/docs/numbers.md",
     video: null,   // a film link, when there is one
   },
-  // Where the waitlist forms POST the email (a form field named "email"): a Formspree, Buttondown or Loops form URL,
-  // or our own endpoint. While it's null the forms stay hidden and the band only announces the release.
-  waitlist: null,
+  // Where the waitlist forms POST the email (form-encoded, field "email"). /api/waitlist is site/api/waitlist.js,
+  // which keeps it in a private Vercel Blob store. null hides the forms; the band then only announces the release.
+  waitlist: "/api/waitlist",
 };
 
 
@@ -758,10 +759,15 @@ if (SITE.waitlist) {
       e.preventDefault();
       const btn = form.querySelector("button"); btn.disabled = true;
       try {
-        await fetch(SITE.waitlist, { method: "POST", body: new FormData(form), mode: "no-cors" });  // form services don't all send CORS headers
+        const r = await fetch(SITE.waitlist, { method: "POST", body: new URLSearchParams(new FormData(form)) });
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Couldn't save that. Try again in a minute.");
         const done = document.createElement("span"); done.className = "wl-done"; done.textContent = "You're on the list. See you in late October.";
         form.replaceWith(done);
-      } catch { btn.disabled = false; btn.textContent = "Try again"; }
+      } catch (err) {
+        btn.disabled = false; btn.textContent = "Try again";
+        const input = form.querySelector("input[type=email]"); input.setCustomValidity(err.message); input.reportValidity();
+        input.addEventListener("input", () => input.setCustomValidity(""), { once: true });
+      }
     });
   });
 }

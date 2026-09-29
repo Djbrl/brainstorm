@@ -4,7 +4,7 @@ One static file, `index.html`. No build step. Preview with `python3 -m http.serv
 
 **Links:** edit the `SITE` object at the top of the `<script>` in `index.html` (`demo`, `install`, `guide`, `repo`, `award`, `numbers`, `video`). Every button that uses a link set to `null` is hidden.
 
-**Waitlist:** `SITE.waitlist` is the URL the two waitlist forms (header band, Roadmap section) POST to, with one field named `email` (works with Formspree, Buttondown and Loops form URLs). While it's `null`, the forms stay hidden and the band only says the full release lands in late October.
+**Waitlist:** both forms (header band, Roadmap section) POST `email` to `/api/waitlist` (`api/waitlist.js`, no dependencies), which saves `waitlist/<email>.json` in a private Vercel Blob store connected to the project. Set up once from `site/`: `vercel blob create-store brainstorm-waitlist --access private --yes`, then redeploy. Read the list: `vercel blob list --prefix waitlist/ --limit 1000`. Set `SITE.waitlist` to `null` to hide the forms. A temporary list until a proper waitlist tool.
 
 **What's on it:** a live map of your agents. The hero scroll story (an illustration), the problem, the research, a carousel of real screenshots, "Not just code" (an illustration of the Track view: one agent cutting a video with FFmpeg, with a failed step; the video frames are one SVG scene, `#stageScene`, reused), Ask, NVIDIA (the planned first read on Nemotron, with the numbers measured at the hackathon), the roadmap with the waitlist, the install steps, privacy, and the closing call to install.
 

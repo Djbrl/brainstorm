@@ -75,7 +75,7 @@ nav .links a:hover { color: var(--text); }
 .stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; }
 
 /* hero */
-#hero { height: 560vh; }
+#hero { height: 660vh; }
 #hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero-type {
   position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -97,6 +97,17 @@ nav .links a:hover { color: var(--text); }
   background: linear-gradient(to top, #fff 45%, rgba(255,255,255,0));
 }
 .hero-end h2 { font-size: clamp(34px, 5vw, 64px); line-height: 1; }
+.hplayer { display: flex; align-items: center; gap: 14px; width: min(640px, 100%); margin: 0 auto 30px; padding: 10px 16px 10px 10px; border-radius: 16px; background: rgba(255,255,255,.96); box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 16px 44px -16px rgba(0,0,0,.25); text-align: left; }
+.hplayer .play { flex: none; width: 34px; height: 34px; border-radius: 50%; background: #5b5bd6; display: grid; place-items: center; }
+.hplayer .play svg { width: 12px; height: 12px; fill: #fff; margin-left: 2px; }
+.hplayer .mid { flex: 1; min-width: 0; }
+.hplayer .row { display: flex; gap: 10px; align-items: baseline; font-size: 13.5px; }
+.hplayer .row b { font-variant-numeric: tabular-nums; flex: none; }
+.hplayer .row span { color: var(--muted); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hplayer .row span.fail { color: var(--risk); }
+.hplayer .track2 { position: relative; height: 4px; border-radius: 2px; background: #e8e8ed; margin-top: 8px; }
+.hplayer .track2 i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: #5b5bd6; }
+.hplayer .track2 u { position: absolute; top: -3px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: #fff; border: 2px solid #5b5bd6; box-sizing: border-box; }
 .hcap {
   position: absolute; left: 0; right: 0; bottom: 13vh; padding: 0 24px; text-align: center; pointer-events: none; opacity: 0;
   font: 800 clamp(30px, 4.6vw, 60px)/1.05 var(--display); letter-spacing: -0.035em; text-wrap: balance;
@@ -295,16 +306,19 @@ nav .links a:hover { color: var(--text); }
 
 /* waitlist band, above the nav */
 html { scroll-padding-top: 96px; }
-.band { position: fixed; inset: 0 0 auto; z-index: 51; height: 40px; background: #1d1d1f; color: #f5f5f7; font-size: 13.5px; font-weight: 500; }
+.band { position: fixed; inset: 0 0 auto; z-index: 51; height: 40px; background: var(--alt); color: var(--text); font-size: 13.5px; font-weight: 500; border-bottom: 1px solid rgba(0,0,0,.05); }
 .band .wrap { display: flex; align-items: center; justify-content: center; gap: 18px; height: 100%; }
-.band b { font-weight: 700; }
-.band .dim { color: #a1a1a6; }
-.wl-mini { display: flex; align-items: center; gap: 6px; }
-.wl-mini input { width: 200px; height: 28px; border: 0; border-radius: 999px; padding: 0 12px; background: rgba(255,255,255,.12); color: #fff; font: 500 13px var(--body); outline: none; }
-.wl-mini input::placeholder { color: #a1a1a6; }
-.wl-mini input:focus { background: rgba(255,255,255,.2); }
-.wl-mini button { height: 28px; border: 0; border-radius: 999px; padding: 0 14px; background: var(--grad); color: #fff; font: 700 13px var(--body); cursor: pointer; white-space: nowrap; }
-.band-link { color: #fff; font-weight: 700; white-space: nowrap; display: none; }
+.band b { font-weight: 600; }
+.band .dim { color: var(--muted); }
+.wl-mini { display: flex; align-items: center; gap: 8px; }
+.wl-mini input { width: 190px; height: 26px; border: 1px solid #d2d2d7; border-radius: 999px; padding: 0 12px; background: #fff; color: var(--text); font: 500 13px var(--body); outline: none; transition: border-color .2s, box-shadow .2s; }
+.wl-mini input::placeholder { color: var(--faint); }
+.wl-mini input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,113,227,.15); }
+.wl-mini button { border: 0; background: none; padding: 0; color: var(--blue); font: 600 13.5px var(--body); cursor: pointer; white-space: nowrap; }
+.wl-mini button::after { content: " ›"; }
+.wl-mini button:hover { text-decoration: underline; }
+.band .wl-done { color: var(--text); }
+.band-link { color: var(--blue); font-weight: 600; white-space: nowrap; display: none; }
 .band-link::after { content: " ›"; }
 nav { top: 40px; }
 [data-waitlist][hidden] { display: none; }
@@ -485,11 +499,16 @@ footer a:hover { text-decoration: underline; }
     <p class="hcap" data-in=".29" data-out=".47">Three, you can't.</p>
     <p class="hcap" data-in=".5" data-out=".64">Each one is somewhere in your work.</p>
     <div class="hero-end" id="heroEnd">
+      <div class="hplayer" aria-hidden="true">
+        <span class="play"><svg viewBox="0 0 12 12"><path d="M2 1l9 5-9 5z"/></svg></span>
+        <div class="mid"><div class="row"><b id="hpCount">0 / 9</b><span id="hpLabel">Replay</span></div><div class="track2"><i id="hpFill"></i><u id="hpKnob"></u></div></div>
+      </div>
       <h2>Brainstorm shows you where.</h2>
       <div class="legend">
         <span><i style="background:var(--cool)"></i>unchanged</span>
         <span><i style="background:var(--warm)"></i>changed recently</span>
         <span><i style="background:var(--hot)"></i>agent working now</span>
+        <span><i style="background:var(--risk)"></i>failed</span>
       </div>
       <div class="btns" style="margin-top:28px">
         <a class="btn" data-link="demo" href="#">Try the live demo</a>
@@ -761,7 +780,7 @@ if (SITE.waitlist) {
       try {
         const r = await fetch(SITE.waitlist, { method: "POST", body: new URLSearchParams(new FormData(form)) });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Couldn't save that. Try again in a minute.");
-        const done = document.createElement("span"); done.className = "wl-done"; done.textContent = "You're on the list. See you in late October.";
+        const done = document.createElement("span"); done.className = "wl-done"; done.textContent = "You're in!";
         form.replaceWith(done);
       } catch (err) {
         btn.disabled = false; btn.textContent = "Try again";
@@ -826,20 +845,35 @@ function typeQuestion() {
 })();
 
 /* ---------- hero story (an illustration, not product data) ----------
-   One agent's line draws on white while the camera follows it. Two more agents
-   join in parallel lanes, all three enter a codebase graph and touch files,
-   then the camera zooms out to show the whole map. Everything is driven by p (0..1). */
+   Three agents doing three kinds of work: code, research on the web, a video edit. One agent's line
+   draws on white while the camera follows it; two more join and the three tangle ("Three, you can't"),
+   then they separate into the map and work: reads are dashed lines of sight, edits ripple, the video
+   agent fails once (red), reads the docs and retries. The camera pulls back to the whole map, and the
+   last stretch of scroll replays it on a player bar. Everything is driven by p (0..1). */
 const hero = (() => {
   const cv = $("#map"), ctx = cv.getContext("2d");
-  const COOL = [180, 194, 212], WARM = [255, 159, 10], HOT = [255, 55, 95];
+  const COOL = [180, 194, 212], WARM = [255, 159, 10], HOT = [255, 55, 95], RED = [217, 48, 37];
   const AG = [
-    { name: "Agent 1", col: [10, 132, 255], swoop: [.06, .34], end: .78 },
-    { name: "Agent 2", col: [191, 90, 242], swoop: [.24, .34], end: .8 },
-    { name: "Agent 3", col: [48, 176, 199], swoop: [.255, .34], end: .82 },
+    { name: "Coding agent", col: [10, 132, 255], swoop: [.06, .34], end: .74 },
+    { name: "Research agent", col: [191, 90, 242], swoop: [.24, .34], end: .76 },
+    { name: "Video agent", col: [48, 176, 199], swoop: [.255, .34], end: .78 },
   ];
-  const PS = .34;                                  // the moment all three run side by side
-  const MODS = ["src/auth", "src/api", "src/billing", "src/ui", "src/db", "workers", "src/lib", "tests", "config", "src/search", "src/hooks", "src/pages"];
-  let W, H, dpr, S, nodes = [], edges = [], clusters = [], seed;
+  const PS = .34;                                   // the moment all three run side by side
+  const MAP_IN = .42;                               // about when they reach the map
+  const REPLAY = [.84, .97];                        // scroll window of the replay at the end
+  // Modules on a 4 × 3 grid (3 × 4 on tall screens). Kinds: code files, docs, web pages, videos.
+  const MODS = [
+    ["src/auth", "file"], ["the web", "page"], ["src/billing", "file"], ["docs", "doc"],
+    ["src/db", "file"], ["src/api", "file"], ["src/lib", "file"], ["the web", "page"],
+    ["videos", "video"], ["src/ui", "file"], ["tests", "file"], ["src/pages", "file"],
+  ];
+  // Where each agent works: [x, y as a fraction of the map, kind of place, what it did, failed?]
+  const STOPS = [
+    [[-.12, .02, "file", "Edit api/users.ts"], [.12, -.02, "file", "Edit lib/cache.ts"], [.13, -.33, "file", "Edit billing/invoice.ts"]],
+    [[-.13, -.33, "page", "Read a pricing page"], [.37, .02, "page", "Read a changelog"], [.37, -.33, "doc", "Write notes.md"]],
+    [[-.37, .33, "video", "Burn in captions", true], [-.1, -.3, "page", "Read ffmpeg.org"], [-.37, .31, "video", "Make teaser.mp4"]],
+  ];
+  let W, H, dpr, S, nodes = [], edges = [], clusters = [], events = [], seed;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const r = (a, b) => a + rnd() * (b - a);
   const mixN = (a, b, t) => a + (b - a) * t;
@@ -863,12 +897,14 @@ const hero = (() => {
     const k = clamp((len - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1));
     return { x: mixN(pts[i - 1][0], pts[i][0], k), y: mixN(pts[i - 1][1], pts[i][1], k), i };
   }
-  /* how far along its path each agent is at scroll progress p */
+  /* how far along its path each agent is at (agent) progress p */
   function lenAt(a, p) {
     const sy = a.sync;
     if (p < PS) return sy * (a === AG[0] ? win(p, a.swoop[0], a.swoop[1]) : ease(win(p, a.swoop[0], a.swoop[1])));
     return sy + (a.path.L - sy) * win(p, PS, a.end);
   }
+  /* agent progress: the scroll itself, then the replay re-runs the map part of the story */
+  const agentP = p => p < REPLAY[0] - .02 ? p : mixN(MAP_IN, .8, win(p, REPLAY[0], REPLAY[1]));
 
   function build() {
     dpr = Math.min(devicePixelRatio || 1, 2); W = cv.clientWidth; H = cv.clientHeight;
@@ -878,65 +914,88 @@ const hero = (() => {
     clusters = [];
     const grid = [];
     for (let row = 0; row < rows; row++) for (let c = 0; c < cols; c++) {
+      const [name, kind] = MODS[row * cols + c];
       const cx = ((c + .5) / cols - .5) * 2 * rx + r(-30, 30) * S, cy = ((row + .5) / rows - .5) * 2 * ry + r(-24, 24) * S;
-      const k = Math.round(r(5, 10)), first = nodes.length;
+      const k = Math.round(r(kind === "video" ? 4 : 5, kind === "page" || kind === "video" ? 7 : 10)), first = nodes.length;
       for (let i = 0; i < k; i++) {
-        const ang = r(0, 6.28), d = r(6, 62) * S;
-        nodes.push({ x: cx + Math.cos(ang) * d, y: cy + Math.sin(ang) * d, rad: r(3, 7) * S, ph: r(0, 6.28), base: rnd() < .12 ? 1 : 0, rp: 1, touch: [] });
+        const ang = r(0, 6.28), d = r(kind === "file" || kind === "doc" ? 6 : 20, 62) * S;
+        nodes.push({ x: cx + Math.cos(ang) * d, y: cy + Math.sin(ang) * d, rad: r(3, 7) * S * (kind === "page" || kind === "video" ? 1.25 : 1), ph: r(0, 6.28), kind, base: rnd() < .12 ? 1 : 0, rp: 1, touch: [] });
         if (i) edges.push([first + i, first + Math.floor(r(0, i))]);
       }
       grid[row * cols + c] = first;
-      clusters.push({ first, k, name: MODS[row * cols + c] });
+      clusters.push({ first, k, name });
     }
     for (let row = 0; row < rows; row++) for (let c = 0; c < cols; c++) {
       const a = grid[row * cols + c];
       if (c < cols - 1 && rnd() < .75) edges.push([a, grid[row * cols + c + 1] + 1]);
       if (row < rows - 1 && rnd() < .6) edges.push([a + 2, grid[(row + 1) * cols + c]]);
     }
-    const near = (fx, fy, used) => {
+    const near = (fx, fy, kind, used) => {
       let best = -1, bd = 1e9;
-      nodes.forEach((n, i) => { if (used.has(i)) return; const d = Math.hypot(n.x - fx * 2 * rx, n.y - fy * 2 * ry); if (d < bd) { bd = d; best = i; } });
+      nodes.forEach((n, i) => { if (used.has(i) || n.kind !== kind) return; const d = Math.hypot(n.x - fx * 2 * rx, n.y - fy * 2 * ry); if (d < bd) { bd = d; best = i; } });
       used.add(best); return best;
     };
     const used = new Set(), lane = 46 * S;
-    const plans = [
-      // start: [entry, approach, lane point (sync), end of the parallel run]
-      { start: [[-W * .8, 0], [-W * .6, 0], [-W * .5, 0], [-W * .38, 0]], stops: [[-.3, .02], [-.02, -.06], [.3, -.28]] },
-      { start: [[-W * .76, -H * .34], [-W * .6, -lane * 1.1], [-W * .5, -lane], [-W * .38, -lane]], stops: [[-.28, -.26], [.04, -.34], [.36, .02]] },
-      { start: [[-W * .76, H * .34], [-W * .6, lane * 1.1], [-W * .5, lane], [-W * .38, lane]], stops: [[-.26, .28], [.06, .3], [.32, .3]] },
+    // Entry, approach, lane point (sync), then a braid where the three cross each other, then the map.
+    const X = f => -W * f;
+    const starts = [
+      [[X(.95), 0], [X(.8), 0], [X(.68), 0], [X(.62), lane * .9], [X(.56), -lane * .9], [X(.5), lane * .45], [X(.44), 0]],
+      [[X(.9), -H * .34], [X(.78), -lane * 1.1], [X(.68), -lane], [X(.62), -lane * .15], [X(.56), lane * .9], [X(.5), -lane * .8], [X(.44), -lane]],
+      [[X(.9), H * .34], [X(.78), lane * 1.1], [X(.68), lane], [X(.62), -lane * .9], [X(.56), lane * .1], [X(.5), -lane * .1], [X(.44), lane]],
     ];
+    events = [];
     AG.forEach((a, k) => {
-      const pl = plans[k];
-      a.stops = pl.stops.map(([fx, fy]) => near(fx, fy, used));
-      const pts = [...pl.start, ...a.stops.map(i => [nodes[i].x, nodes[i].y])];
+      a.stops = STOPS[k].map(([fx, fy, kind, label, fail]) => ({ node: near(fx, fy, kind, used), label, fail: !!fail }));
+      const pts = [...starts[k], ...a.stops.map(s => [nodes[s.node].x, nodes[s.node].y])];
       a.path = spline(pts);
       a.sync = a.path.cum[2 * a.path.n];                               // arclength at the lane point
-      a.stopLen = a.stops.map((_, j) => a.path.cum[(j + pl.start.length) * a.path.n] ?? a.path.L);
+      a.stops.forEach((s, j) => { s.len = a.path.cum[(j + starts[k].length) * a.path.n] ?? a.path.L; });
     });
-    /* precompute when each node is revealed (an agent passes nearby) and when stops are touched */
+    /* precompute when each node is revealed (an agent passes nearby) and when each stop is reached */
     const R = 150 * S;
-    for (let p = 0; p <= .9; p += .004) AG.forEach(a => {
+    for (let p = 0; p <= .9; p += .002) AG.forEach(a => {
       const L = lenAt(a, p), h = at(a.path, L);
       nodes.forEach(n => { if (n.rp === 1 && Math.hypot(n.x - h.x, n.y - h.y) < R) n.rp = p; });
-      a.stops.forEach((ni, j) => { if (L >= a.stopLen[j] - 1 && !nodes[ni].touch.some(t => t.a === a)) nodes[ni].touch.push({ a, p }); });
+      a.stops.forEach(s => {
+        if (s.p === undefined && L >= s.len - 1) { s.p = p; nodes[s.node].touch.push({ a, p, fail: s.fail }); events.push({ a, p, label: s.label, fail: s.fail }); }
+      });
     });
-    nodes.forEach(n => { n.rp = Math.min(n.rp, .64 + r(0, .16)); });
+    events.sort((x, y) => x.p - y.p);
+    nodes.forEach(n => { n.rp = Math.min(n.rp, .6 + r(0, .16)); });
+  }
+
+  /* a place on the map: files and docs are dots, web pages small cards, videos small frames */
+  function shape(n, rad, col, a) {
+    ctx.globalAlpha = a; ctx.fillStyle = `rgb(${col})`;
+    if (n.kind === "page") {
+      const w = rad * 2.6, h = rad * 2;
+      ctx.beginPath(); ctx.roundRect(n.x - w / 2, n.y - h / 2, w, h, rad * .35); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,.75)"; ctx.fillRect(n.x - w / 2 + rad * .3, n.y - h / 2 + rad * .35, w - rad * .6, rad * .28);
+    } else if (n.kind === "video") {
+      const w = rad * 2.8, h = rad * 1.9;
+      ctx.beginPath(); ctx.roundRect(n.x - w / 2, n.y - h / 2, w, h, rad * .3); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.beginPath();
+      ctx.moveTo(n.x - rad * .35, n.y - rad * .5); ctx.lineTo(n.x + rad * .55, n.y); ctx.lineTo(n.x - rad * .35, n.y + rad * .5); ctx.fill();
+    } else { ctx.beginPath(); ctx.arc(n.x, n.y, rad, 0, 7); ctx.fill(); }
+    ctx.globalAlpha = 1;
   }
 
   let p = 0, visible = true;
   function draw(t) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-    const heads = AG.map(a => { const L = lenAt(a, p); return { a, L, ...at(a.path, L) }; });
+    const pa = agentP(p), replaying = p >= REPLAY[0] - .02;
+    const heads = AG.map(a => { const L = lenAt(a, pa); return { a, L, ...at(a.path, L) }; });
     const live = heads.filter(h => h.L > 0);
+    const failing = h => h.a.stops.find(s => s.fail && s.p !== undefined && pa >= s.p && pa < s.p + .045);
 
     /* camera: follow agent 1, widen to fit all three, then pull back to the whole map */
-    const zo = ease(win(p, .64, .88));
+    const zo = ease(win(p, .6, .8));
     const cen = { x: live.reduce((s, h) => s + h.x, 0) / (live.length || 1), y: live.reduce((s, h) => s + h.y, 0) / (live.length || 1) };
     const fk = ease(win(p, .23, .36));
     const fx = mixN(heads[0].x, cen.x, fk), fy = mixN(heads[0].y, cen.y, fk);
     const zf = mixN(3, 2.1, fk) * (W < 700 ? .8 : 1);
     const z = mixN(zf, 1, zo), camX = mixN(fx, 0, zo), camY = mixN(fy, H * .06, zo);
-    const ax = W / 2 + W * .06 * (1 - zo), ay = H * .46 + H * .04 * zo;
+    const ax = W / 2 + W * .06 * (1 - zo), ay = H * .46 + H * .04 * zo - H * .08 * ease(win(p, .8, .86));
     ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * (ax - camX * z), dpr * (ay - camY * z));
     const px = 1 / z;                                                    // one screen pixel in world units
 
@@ -949,39 +1008,62 @@ const hero = (() => {
       ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(mixN(A.x, B.x, al), mixN(A.y, B.y, al)); ctx.stroke();
     });
 
-    /* agent trails */
+    /* reads: dashed lines of sight from each agent to the nearest places it passes */
+    if (pa > MAP_IN - .03) heads.forEach(h => {
+      if (h.L <= 0) return;
+      const R = 120 * S, seen = [];
+      nodes.forEach(n => { if (n.a <= 0) return; const d = Math.hypot(n.x - h.x, n.y - h.y); if (d > 6 * S && d < R) seen.push([d, n]); });
+      seen.sort((x, y) => x[0] - y[0]);
+      ctx.setLineDash([4 * px, 5 * px]); ctx.lineWidth = 1.3 * px;
+      seen.slice(0, 2).forEach(([d, n]) => {
+        ctx.strokeStyle = `rgba(${h.a.col},${.55 * (1 - d / R) * n.a})`;
+        ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.lineTo(n.x, n.y); ctx.stroke();
+      });
+      ctx.setLineDash([]);
+    });
+
+    /* trails: the whole route faint, the last stretch as a bright comet tail */
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     heads.forEach(h => {
       if (h.L <= 0) return;
-      const pts = h.a.path.pts;
-      ctx.strokeStyle = `rgba(${h.a.col},.9)`; ctx.lineWidth = 2.6 * px;
+      const pts = h.a.path.pts, cum = h.a.path.cum;
+      ctx.strokeStyle = `rgba(${h.a.col},.16)`; ctx.lineWidth = 2 * px;
       ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
       for (let i = 1; i < h.i; i++) ctx.lineTo(pts[i][0], pts[i][1]);
       ctx.lineTo(h.x, h.y); ctx.stroke();
+      const TAIL = 340 * px;
+      let prev = [h.x, h.y];
+      ctx.lineWidth = 2.8 * px;
+      for (let i = h.i - 1; i >= 0; i--) {
+        const back = h.L - cum[i]; if (back > TAIL) break;
+        ctx.strokeStyle = `rgba(${h.a.col},${.95 * (1 - back / TAIL)})`;
+        ctx.beginPath(); ctx.moveTo(prev[0], prev[1]); ctx.lineTo(pts[i][0], pts[i][1]); ctx.stroke();
+        prev = pts[i];
+      }
     });
 
-    /* files */
+    /* places */
     nodes.forEach(n => {
-      if (n.a <= 0 && !n.touch.length) return;
-      const tk = n.touch.filter(tc => p >= tc.p);
-      const touched = tk.length ? win(p, tk[0].p, tk[0].p + .03) : 0;
+      const tk = n.touch.filter(tc => pa >= tc.p);
+      if (n.a <= 0 && !tk.length) return;
+      const ok = tk.filter(tc => !tc.fail);
+      const touched = ok.length ? win(pa, ok[0].p, ok[0].p + .03) : 0;
+      const failNow = tk.find(tc => tc.fail && pa < tc.p + .06);
       const current = tk.some(tc => heads.find(h => h.a === tc.a && Math.hypot(h.x - n.x, h.y - n.y) < 2));
-      const heat = Math.max(touched, n.base * win(p, .7, .85));
-      const col = current ? HOT : mixC(COOL, WARM, heat);
-      const a = Math.max(n.a, touched);
-      if (current) {
+      const heat = Math.max(touched, n.base * win(p, .66, .8));
+      const col = failNow ? RED : current ? HOT : mixC(COOL, WARM, heat);
+      if (current && !failNow) {
         const pulse = (still ? 24 : 24 + Math.sin(t / 170 + n.ph) * 8) * px;
         const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.rad + pulse);
         g.addColorStop(0, "rgba(255,55,95,.55)"); g.addColorStop(.5, "rgba(255,55,95,.22)"); g.addColorStop(1, "rgba(255,55,95,0)");
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(n.x, n.y, n.rad + pulse, 0, 7); ctx.fill();
       }
-      tk.forEach(tc => {                                                 // ripple when an agent edits the file
-        const k = win(p, tc.p, tc.p + .05); if (k <= 0 || k >= 1) return;
-        ctx.strokeStyle = `rgba(${tc.a.col},${1 - k})`; ctx.lineWidth = 2 * px;
-        ctx.beginPath(); ctx.arc(n.x, n.y, n.rad + 36 * k * px + 4 * px, 0, 7); ctx.stroke();
+      tk.forEach(tc => {                                                 // a ripple on each edit, one red ring on a failure
+        const k = win(pa, tc.p, tc.p + (tc.fail ? .06 : .05)); if (k <= 0 || k >= 1) return;
+        ctx.strokeStyle = tc.fail ? `rgba(${RED},${1 - k})` : `rgba(${tc.a.col},${1 - k})`; ctx.lineWidth = (tc.fail ? 3 : 2) * px;
+        ctx.beginPath(); ctx.arc(n.x, n.y, n.rad + (tc.fail ? 52 : 36) * k * px + 4 * px, 0, 7); ctx.stroke();
       });
-      ctx.globalAlpha = a; ctx.fillStyle = `rgb(${col})`;
-      ctx.beginPath(); ctx.arc(n.x, n.y, n.rad * (current ? 1.25 : 1), 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+      shape(n, n.rad * (current ? 1.25 : 1), col, Math.max(n.a, tk.length ? 1 : 0));
     });
 
     /* module names above each cluster, at screen size */
@@ -989,29 +1071,31 @@ const hero = (() => {
     ctx.font = "500 12px ui-monospace, 'SF Mono', Menlo, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     clusters.forEach(cl => {
       let a = 0, top = 1e9, cx = 0;
-      for (let i = cl.first; i < cl.first + cl.k; i++) { a = Math.max(a, nodes[i].a); top = Math.min(top, nodes[i].y - nodes[i].rad); cx += nodes[i].x; }
+      for (let i = cl.first; i < cl.first + cl.k; i++) { a = Math.max(a, nodes[i].a); top = Math.min(top, nodes[i].y - nodes[i].rad * 1.3); cx += nodes[i].x; }
       if (a <= 0) return;
       ctx.fillStyle = `rgba(110,110,115,${.9 * a})`;
       ctx.fillText(cl.name, ax + (cx / cl.k - camX) * z, ay + (top - camY) * z - 12);
     });
     ctx.textAlign = "left";
 
-    /* heads and their labels, drawn at screen size */
+    /* heads and their labels, drawn at screen size; red while a step is failing */
     ctx.font = "600 13px Satoshi, system-ui, sans-serif"; ctx.textBaseline = "middle";
     heads.forEach(h => {
       if (h.L <= 0) return;
+      const fail = failing(h), col = fail ? RED : h.a.col;
       const sx = ax + (h.x - camX) * z, sy = ay + (h.y - camY) * z;
       const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, 16);
-      g.addColorStop(0, `rgba(${h.a.col},.35)`); g.addColorStop(1, `rgba(${h.a.col},0)`);
+      g.addColorStop(0, `rgba(${col},.35)`); g.addColorStop(1, `rgba(${col},0)`);
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, 16, 0, 7); ctx.fill();
-      ctx.fillStyle = `rgb(${h.a.col})`; ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 7); ctx.fill();
+      ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 7); ctx.fill();
       ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(sx, sy, 2, 0, 7); ctx.fill();
-      const tw = ctx.measureText(h.a.name).width, bw = tw + 30, bh = 26, by = sy - 30;
+      const name = fail ? h.a.name + " · failed" : h.a.name;
+      const tw = ctx.measureText(name).width, bw = tw + 30, bh = 26, by = sy - 30;
       const bx = sx + 12 + bw > W - 8 ? sx - 12 - bw : sx + 12;          // flip left near the right edge
       ctx.save(); ctx.shadowColor = "rgba(0,0,0,.12)"; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3;
       ctx.fillStyle = "rgba(255,255,255,.96)"; ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 13); ctx.fill(); ctx.restore();
-      ctx.fillStyle = `rgb(${h.a.col})`; ctx.beginPath(); ctx.arc(bx + 13, by + bh / 2, 4, 0, 7); ctx.fill();
-      ctx.fillStyle = "#1d1d1f"; ctx.fillText(h.a.name, bx + 22, by + bh / 2 + .5);
+      ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(bx + 13, by + bh / 2, 4, 0, 7); ctx.fill();
+      ctx.fillStyle = fail ? `rgb(${RED})` : "#1d1d1f"; ctx.fillText(name, bx + 22, by + bh / 2 + .5);
     });
   }
   function loop(t) { if (visible) draw(t); requestAnimationFrame(loop); }
@@ -1019,7 +1103,14 @@ const hero = (() => {
   addEventListener("resize", build);
   document.fonts && document.fonts.ready.then(() => draw(performance.now()));
   new IntersectionObserver(([e]) => visible = e.isIntersecting).observe(cv);
-  return { set(v) { p = v; } };
+  return {
+    set(v) { p = v; },
+    /* the replay bar: how far along, how many steps, and the latest step */
+    replay() {
+      const pa = agentP(p), done = p < REPLAY[0] - .02 ? [] : events.filter(e => e.p <= pa), last = done[done.length - 1];
+      return { r: win(p, REPLAY[0], REPLAY[1]), n: done.length, total: events.length, last };
+    },
+  };
 })();
 
 /* ---------- beyond code: the agent walks down the track, the window shows each stop ---------- */
@@ -1064,6 +1155,7 @@ const tasks = (() => {
 /* ---------- scroll-driven scenes ---------- */
 const tasksEl = $("#tasks");
 const heroEl = $("#hero"), heroType = $("#heroType"), heroEnd = $("#heroEnd"), cue = $("#cue");
+const hpFill = $("#hpFill"), hpKnob = $("#hpKnob"), hpCount = $("#hpCount"), hpLabel = $("#hpLabel");
 const hcaps = [...document.querySelectorAll(".hcap")];
 const probEl = $("#problem"), wall = $("#wall"), pDone = $("#pDone"), pNobody = $("#pNobody"), pCity = $("#pCity");
 const prodEl = $("#product"), track = $("#track"), dots = [...document.querySelectorAll("#dots i")];
@@ -1082,8 +1174,14 @@ function onScroll() {
     const k = win(hp, +c.dataset.in, +c.dataset.in + .03) - win(hp, +c.dataset.out - .03, +c.dataset.out);
     c.style.opacity = k; c.style.transform = `translateY(${(1 - k) * 16}px)`;
   });
-  const ep = ease(win(hp, .87, .95));
+  const ep = ease(win(hp, .8, .86));
   heroEnd.style.opacity = ep; heroEnd.style.transform = `translateY(${(1 - ep) * 40}px)`;
+  heroEnd.style.pointerEvents = ep > .5 ? "" : "none";
+  const rp = hero.replay();                                          /* the replay bar follows the scroll */
+  hpFill.style.width = hpKnob.style.left = (rp.r * 100) + "%";
+  hpCount.textContent = `${rp.n} / ${rp.total}`;
+  hpLabel.textContent = rp.last ? `${rp.last.a.name}: ${rp.last.label}${rp.last.fail ? ", failed" : ""}` : "Replay";
+  hpLabel.classList.toggle("fail", !!(rp.last && rp.last.fail));
 
   /* problem: files pour past, "Updated 47 files", then the punchline */
   const pp = progress(probEl);

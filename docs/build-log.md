@@ -83,6 +83,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 10:40 (29 Sep) [lead] Plugin 0.2.0: `feature/tasks` merged into `main` (one Map tab with Map | Track, threads play on click, errors in red everywhere, no Failures tab locally). brainstorm-next redeployed with the new interface and neutral copy (no "post-deadline" banner or Failures tab; the welcome and banner point to the plugin). The judged demo is unchanged. Landing page rewritten around "a live map of your agents", with install steps.
 
+- 12:10 (29 Sep) [lead] Landing: waitlist live (private Vercel Blob store `brainstorm-waitlist`, `site/api/waitlist.js`), light grey band. Hero animation redone: a coding, a research and a video agent; the three tangle, then split into a map of code, web pages and videos; reads as dashed lines of sight, edits ripple, the video agent fails once in red and retries after reading the docs; comet-tail trails; the end replays the story on a player bar as you scroll.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

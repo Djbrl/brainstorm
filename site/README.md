@@ -1,16 +1,13 @@
-# Site (landing page for the jury)
+# Site (landing page)
 
 One static file, `index.html`. No build step. Preview with `python3 -m http.server 4321 -d site`.
 
-**To update on the day, edit only the `SITE` object at the top of the `<script>` in `index.html`:**
-- `links.video`, `links.demo`, `links.repo`: buttons stay hidden while a link is `null`.
-- `stats`: copy values from `docs/numbers.md` only. A `null` value is hidden, never guessed.
-- `brev`: GPU, $/hour and vLLM version from `docs/brev-setup.md`.
-- `team`: list of names, shown as "Made by ..." under the closing CTA.
-- The closing "Try Brainstorm now" button uses `links.demo`, else `links.repo`, and stays greyed out until one is set.
+**Links:** edit the `SITE` object at the top of the `<script>` in `index.html` (`demo`, `install`, `guide`, `repo`, `award`, `video`). Every button that uses a link set to `null` is hidden.
 
-**Screenshots:** drop real PNGs (16:10, taken from the running app) at `img/follow.png`, `img/map.png`, `img/history.png`. Missing files show a placeholder frame.
+**What's on it:** a live map of your agents. The hero scroll story (an illustration), the problem, the research, a carousel of real screenshots, "Not just code" (an illustration of the Track view: one agent cutting a video with FFmpeg, with a failed step), Ask, the install steps, privacy, and the closing call to install.
+
+**Screenshots** in `img/` come from the redacted demo recording, never from a live local session: `replay.jpg` (Map replaying a thread), `follow.png`, `map.png`. `failures.png` is the hackathon's Failures view, no longer shown.
 
 **Live:** https://brainstorm-landing.vercel.app (Vercel project `bountbi/brainstorm-landing`).
 
-**Redeploy:** `cd site && vercel deploy --prod --yes`. `site/.vercel/` holds the project link and is gitignored.
+**Redeploy:** `cd site && vercel deploy --prod --yes`. `site/.vercel/` holds the project link and is gitignored; if it's missing, run `vercel link --project brainstorm-landing` first.

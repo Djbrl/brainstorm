@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Brainstorm</title>
-<meta name="description" content="A live map of your code and of the AI agents writing it. Follow every agent step, ask why, and see your codebase light up where agents are working.">
-<meta property="og:title" content="Brainstorm: a live map of your code and of the AI agents writing it">
-<meta property="og:description" content="Let the agents type. Keep your brain in the loop.">
+<title>Brainstorm: a live map of your agents</title>
+<meta name="description" content="See where your AI agents go, what they touch and where they break, in code or any other work. Replay any session step by step. A free Claude Code plugin that runs on your machine.">
+<meta property="og:title" content="Brainstorm: a live map of your agents">
+<meta property="og:description" content="Let the agents work. Keep your brain in the loop.">
 <meta name="theme-color" content="#ffffff">
 <link rel="preconnect" href="https://api.fontshare.com">
 <link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@500,700,800&f[]=satoshi@1&display=swap" rel="stylesheet">
@@ -22,9 +22,8 @@
   --cool: #b4c2d4;   /* unchanged file */
   --warm: #ff9f0a;   /* changed recently */
   --hot: #ff375f;    /* agent editing now */
-  --nvidia: #76b900;
-  --grad: linear-gradient(95deg, #3f8c00 0%, #76b900 50%, #9ccc1c 100%);  /* NVIDIA green */
-  --claude: #d97757;
+  --grad: linear-gradient(95deg, #ff9f0a 0%, #ff6a3d 45%, #ff375f 100%);  /* the map's heat: recent to live */
+  --risk: #d93025;
   --display: "Cabinet Grotesk", -apple-system, system-ui, sans-serif;
   --body: "Satoshi", -apple-system, system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, monospace;
@@ -164,46 +163,85 @@ nav .links a:hover { color: var(--text); }
 .caret { display: inline-block; width: 2px; height: 1.1em; background: var(--blue); vertical-align: -0.15em; margin-left: 2px; animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 
-/* cost: where the money goes */
-.money { display: grid; grid-template-columns: 1fr minmax(240px, 380px); margin-top: 90px; text-align: left; }
-.money canvas { grid-column: 1; grid-row: 1 / 4; width: 100%; height: 100%; min-height: 420px; }
-.lane { grid-column: 2; padding: 30px 0 30px 28px; }
-.lane .who { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 9px; white-space: nowrap; }
-.lane .who i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
-.lane h3 { font-size: clamp(24px, 2.4vw, 30px); margin-top: 10px; letter-spacing: -0.03em; }
-.lane p { color: var(--muted); margin-top: 8px; font-weight: 500; }
-.swap { display: inline-block; overflow: hidden; height: 1.35em; line-height: 1.35em; vertical-align: top; }
-.swap span { display: inline-block; transition: transform .35s var(--ease), opacity .35s; }
+/* tasks: one agent's work outside code, as a track of stops with a window */
+#tasks { height: 460vh; }
+#tasks .stage { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 64px 24px 24px; }
+.tasks-head { text-align: center; }
+.tasks-head .h2 { font-size: clamp(36px, 5vw, 64px); }
+.tasks-head .sub { max-width: 40ch; margin-top: 16px; font-size: clamp(17px, 1.6vw, 21px); }
+.tk { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 560px); gap: 48px; align-items: center; margin-top: 5svh; width: 100%; max-width: 1010px; }
+.tk-track { position: relative; }
+.tk-line { list-style: none; margin: 0; padding: 0; position: relative; }
+.tk-line::before { content: ""; position: absolute; left: 13px; top: 20px; bottom: 20px; width: 2px; background: var(--line); }
+.tk-line li { position: relative; display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 36px; border-radius: 12px; opacity: .28; transition: opacity .45s var(--ease), background .3s, box-shadow .3s; }
+.tk-line li.past { opacity: .75; }
+.tk-line li.on { opacity: 1; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 10px 30px -12px rgba(0,0,0,.18); }
+.tk-line li::before { content: ""; position: absolute; left: 8px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; background: #fff; border: 2px solid currentColor; box-sizing: border-box; }
+.tk-line li.made::before { border-radius: 4px; background: currentColor; }
+.tk-line li.ask { color: var(--blue); }
+.tk-line li.ask::before { background: currentColor; }
+.tk-ico { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: color-mix(in srgb, currentColor 12%, transparent); }
+.tk-ico svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tk-body { min-width: 0; color: var(--text); }
+.tk-body b { display: block; font-size: 15.5px; font-weight: 700; line-height: 1.3; }
+.tk-body small { display: block; font-size: 13px; color: var(--muted); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.c-cmd { color: #e0673a; } .c-file { color: #1f9d7a; } .c-web { color: #5b5bd6; }
+.tk-line li.fail { color: var(--risk); }
+.tk-line li.fail b { color: var(--risk); }
+.tk-line li.fail.on::before { background: var(--risk); animation: tk-err 1.4s ease-out 1; }
+@keyframes tk-err { 0% { box-shadow: 0 0 0 0 rgba(217,48,37,.55); } 100% { box-shadow: 0 0 0 14px rgba(217,48,37,0); } }
+.tk-agent { position: absolute; left: 6px; top: 0; width: 16px; height: 16px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 5px rgba(0,113,227,.18); transition: top .5s var(--ease), background .3s, box-shadow .3s; z-index: 1; pointer-events: none; }
+.tk-agent.err { background: var(--risk); box-shadow: 0 0 0 5px rgba(217,48,37,.2); }
 
-/* brev: dark, in NVIDIA's colors */
-#brev { background: #000; color: #fff; position: relative; overflow: hidden; }
-#brev::before {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background-image: linear-gradient(rgba(118,185,0,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(118,185,0,.08) 1px, transparent 1px);
-  background-size: 56px 56px;
-  -webkit-mask-image: radial-gradient(ellipse 70% 55% at 50% 45%, #000, transparent); mask-image: radial-gradient(ellipse 70% 55% at 50% 45%, #000, transparent);
-}
-#brev .wrap { position: relative; }
-#brev .h2 .g { color: var(--nvidia); }
-#brev .sub { color: #a1a1a6; }
-.chip { display: block; width: min(560px, 100%); height: auto; margin: 90px auto 0; overflow: visible; }
-.chip .trace { fill: none; stroke: #1d2710; stroke-width: 2; }
-.chip .pulse { fill: none; stroke: var(--nvidia); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: .07 .93; animation: flow 2.6s linear infinite; filter: drop-shadow(0 0 3px #76b900); }
-@keyframes flow { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 1; } }
-.chip .pkg { fill: #080b04; stroke: #2c3a14; stroke-width: 1.5; }
-.chip .die { fill: #0d1307; stroke: rgba(118,185,0,.55); stroke-width: 1.2; }
-.chip .core { fill: #18220d; transition: fill .45s; }
-.chip .core.on { fill: var(--nvidia); }
-.why3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 90px; text-align: left; }
-.why3 > div { border-top: 3px solid var(--nvidia); padding-top: 22px; }
-.why3 h3 { font-size: 26px; letter-spacing: -0.025em; }
-.why3 p { color: #a1a1a6; margin-top: 10px; font-weight: 500; }
-.nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 64px 48px; margin-top: 110px; }
-.nums:empty { display: none; }
-.num .v { font: 800 clamp(48px, 5.5vw, 76px)/1 var(--display); letter-spacing: -0.045em; color: var(--nvidia); }
-.num .k { color: #a1a1a6; font-weight: 500; margin-top: 12px; }
-.brev-foot { margin-top: 80px; display: flex; justify-content: center; flex-wrap: wrap; gap: 10px 28px; font-size: 14px; color: #86868b; font-weight: 500; }
-.brev-foot a { color: var(--nvidia); }
+.tk-win { background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 30px 80px -30px rgba(0,0,0,.22); transition: box-shadow .3s; }
+.tk-win.err { box-shadow: 0 0 0 1.5px #f3b7b2, 0 30px 80px -30px rgba(217,48,37,.3); }
+.tk-win header { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.tk-win header b { font-weight: 700; }
+.tk-win header span { color: var(--muted); margin-left: auto; font-variant-numeric: tabular-nums; }
+.tk-screen { position: relative; aspect-ratio: 16 / 10; background: #f5f5f7; }
+.tk-pane { position: absolute; inset: 0; opacity: 0; transition: opacity .45s var(--ease); display: flex; flex-direction: column; }
+.tk-pane.on { opacity: 1; }
+.term { flex: 1; margin: 0; padding: 22px 24px; background: #16161a; color: #e8e8ea; font: 13px/1.7 var(--mono); white-space: pre-wrap; overflow: hidden; }
+.term .pr { color: #8a8a93; } .term .ok { color: #7bd88f; } .term .bad { color: #ff7a70; } .term .dim { color: #8a8a93; }
+.plain { list-style: none; margin: 0; padding: 14px 24px 18px; background: #fff; font-size: 14px; color: var(--muted); font-weight: 500; }
+.plain li { padding: 2px 0; }
+.plain code { font: 12.5px var(--mono); color: var(--text); background: #f0f0f3; border-radius: 5px; padding: 1px 6px; margin-right: 8px; }
+.srt { flex: 1; padding: 20px 26px; font: 13px/1.6 var(--mono); color: var(--faint); overflow: hidden; background: #fff; }
+.srt p { margin: 0 0 8px; }
+.srt .hl { color: var(--text); background: #eaf7f1; box-shadow: -8px 0 0 #eaf7f1, 8px 0 0 #eaf7f1; border-left: 3px solid #1f9d7a; }
+.film { flex: 1; position: relative; overflow: hidden; background: radial-gradient(ellipse 60% 80% at 50% 110%, #3a2a55 0%, #120f1c 60%, #09080d 100%); }
+.film::before { content: ""; position: absolute; left: 50%; bottom: -8%; width: 30%; aspect-ratio: 1 / 1.35; transform: translateX(-50%); border-radius: 48% 48% 18% 18%; background: linear-gradient(#2a2238, #1a1524); box-shadow: 0 -64% 0 -30% #2a2238; }
+.film::after { content: ""; position: absolute; left: 50%; top: 18%; width: 11%; aspect-ratio: 1; transform: translateX(-50%); border-radius: 50%; background: #2c2439; }
+.film .spot { position: absolute; inset: 0; background: radial-gradient(circle at 50% 30%, rgba(255,170,90,.18), transparent 45%); }
+.film .capt { position: absolute; left: 50%; bottom: 13%; transform: translateX(-50%); z-index: 1; font: 700 clamp(13px, 1.5vw, 19px)/1.3 var(--body); color: #fff; background: rgba(0,0,0,.55); padding: 6px 14px; border-radius: 8px; white-space: nowrap; }
+.film .bar { position: absolute; left: 16px; right: 16px; bottom: 12px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.2); z-index: 1; }
+.film .bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 38%; border-radius: 2px; background: #fff; }
+.film .badge { position: absolute; top: 14px; left: 14px; z-index: 1; font: 700 12px var(--body); color: #fff; background: rgba(255,255,255,.14); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-radius: 999px; padding: 4px 11px; }
+.film .badge.new { background: #1f9d7a; }
+.web { flex: 1; background: #fff; display: flex; flex-direction: column; }
+.web .url { margin: 12px 14px 0; padding: 7px 14px; border-radius: 999px; background: #f0f0f3; font: 13px var(--mono); color: var(--muted); }
+.web .doc { padding: 22px 30px; }
+.web h4 { margin: 0; font: 800 26px/1.1 var(--display); letter-spacing: -0.02em; }
+.web p { margin-top: 10px; color: var(--muted); font-size: 14.5px; max-width: 46ch; }
+.web .hl { background: #eeeefe; border-left: 3px solid #5b5bd6; padding: 10px 14px; margin-top: 14px; border-radius: 4px; color: var(--text); font: 13px/1.6 var(--mono); }
+
+/* install */
+
+.steps3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 48px; margin-top: 90px; text-align: left; }
+.steps3 .n { font: 800 64px/1 var(--display); letter-spacing: -0.04em; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.steps3 h3 { font-size: 26px; margin-top: 14px; letter-spacing: -0.025em; }
+.steps3 p { color: var(--muted); margin-top: 10px; font-weight: 500; }
+.cmd { display: flex; align-items: flex-start; gap: 10px; margin-top: 16px; padding: 12px 12px 12px 16px; border-radius: 14px; background: #1d1d1f; color: #f5f5f7; font: 13.5px/1.55 var(--mono); }
+.cmd code { flex: 1; min-width: 0; overflow-wrap: break-word; padding-top: 2px; }
+.cmd .nw { white-space: nowrap; }
+.cmd button { flex: none; border: 0; border-radius: 8px; background: rgba(255,255,255,.12); color: #f5f5f7; font: 600 12px var(--body); padding: 5px 10px; cursor: pointer; transition: background .2s; }
+.cmd button:hover { background: rgba(255,255,255,.22); }
+.steps3 .alt-cmd { font-size: 14px; margin-top: 14px; }
+.steps3 .alt-cmd code { font: 12.5px var(--mono); color: var(--text); background: var(--alt); border-radius: 5px; padding: 1px 5px; overflow-wrap: anywhere; }
+.needs { margin-top: 64px; color: var(--muted); font-weight: 500; }
+.award { display: inline-block; margin-top: 56px; color: var(--muted); font-weight: 500; font-size: 15px; }
+.award:hover { color: var(--text); }
+.award b { color: var(--text); font-weight: 700; }
 
 /* privacy */
 .four { display: grid; grid-template-columns: repeat(4, 1fr); gap: 48px; margin-top: 110px; }
@@ -236,11 +274,21 @@ footer a:hover { text-decoration: underline; }
   nav .btn.small { margin-left: auto; }
   .stats3 { grid-template-columns: 1fr; }
   .stat3 { grid-area: 1 / 1; }                        /* one at a time on phones */
-  .nums, .why3 { grid-template-columns: 1fr; gap: 48px; }
-  .money { grid-template-columns: 30% 1fr; }
-  .money canvas { min-height: 0; }
-  .lane { padding: 24px 0 24px 14px; }
-  .lane .who { white-space: normal; font-size: 14px; }
+  .steps3 { grid-template-columns: 1fr; gap: 56px; margin-top: 64px; }
+  #tasks .stage { justify-content: flex-start; padding-top: 72px; }
+  .tasks-head .sub { display: none; }
+  .tk { grid-template-columns: 1fr; gap: 16px; margin-top: 20px; }
+  .tk-win { order: -1; }
+  .tk-screen { aspect-ratio: 16 / 9; }
+  .tk-win header { padding: 10px 14px; font-size: 13px; }
+  .term { padding: 14px 16px; font-size: 11.5px; }
+  .plain { display: none; }
+  .srt { padding: 14px 16px; font-size: 11.5px; }
+  .web .doc { padding: 12px 16px; } .web h4 { font-size: 20px; } .web p { display: none; }
+  .tk-line li { padding: 5px 8px 5px 34px; }
+  .tk-line li small { display: none; }
+  .tk-ico { width: 26px; height: 26px; }
+  .tk-body b { font-size: 14px; }
   .four { grid-template-columns: 1fr 1fr; gap: 48px 24px; }
   #product .stage { --sw: 84vw; }
   .counts { gap: 40px; }
@@ -252,7 +300,7 @@ footer a:hover { text-decoration: underline; }
 }
 @media (prefers-reduced-motion: reduce) {
   .rv { opacity: 1; transform: none; transition: none; }
-  .chip .pulse { animation: none; opacity: 0; }
+  .tk-line li, .tk-pane, .tk-agent { transition: none; }
   .hero-type h1 .line span, .hero-type p, .cue { animation: none; transform: none; opacity: 1; }
 }
 </style>
@@ -270,39 +318,38 @@ footer a:hover { text-decoration: underline; }
       Brainstorm
     </a>
     <div class="links">
-      <a href="#problem">Why</a>
       <a href="#product">Product</a>
-      <a href="#cost">Cost</a>
-      <a href="#brev">NVIDIA Brev</a>
+      <a href="#tasks">Beyond code</a>
       <a href="#privacy">Privacy</a>
+      <a data-link="demo" href="#">Live demo</a>
     </div>
-    <a class="btn small" data-link="demo" href="#">Try Brainstorm</a>
+    <a class="btn small" data-link="install" href="#">Install</a>
   </div>
 </nav>
 
 <main>
-<!-- 1. Hero: big type dissolves, we follow one agent, then three, into the codebase, then zoom out -->
+<!-- 1. Hero: big type dissolves, we follow one agent, then three, into the work, then zoom out -->
 <section class="scene" id="hero">
   <div class="stage">
     <canvas id="map" aria-hidden="true"></canvas>
     <div class="hero-type" id="heroType">
-      <h1><span class="line"><span>A live map</span></span><span class="line"><span class="grad">of your code.</span></span></h1>
-      <p>And of the AI agents writing it.</p>
+      <h1><span class="line"><span>A live map</span></span><span class="line"><span class="grad">of your agents.</span></span></h1>
+      <p>Where they go, what they touch, where they break.</p>
     </div>
     <div class="cue" id="cue" aria-hidden="true"></div>
     <p class="hcap" data-in=".1" data-out=".25">One agent, you can follow.</p>
     <p class="hcap" data-in=".29" data-out=".47">Three, you can't.</p>
-    <p class="hcap" data-in=".5" data-out=".64">Each one is somewhere in your code.</p>
+    <p class="hcap" data-in=".5" data-out=".64">Each one is somewhere in your work.</p>
     <div class="hero-end" id="heroEnd">
       <h2>Brainstorm shows you where.</h2>
       <div class="legend">
         <span><i style="background:var(--cool)"></i>unchanged</span>
         <span><i style="background:var(--warm)"></i>changed recently</span>
-        <span><i style="background:var(--hot)"></i>agent editing now</span>
+        <span><i style="background:var(--hot)"></i>agent working now</span>
       </div>
       <div class="btns" style="margin-top:28px">
-        <a class="btn" data-link="demo" href="#">Try the live replay</a>
-        <a class="more" data-link="video" href="#">Watch the film</a>
+        <a class="btn" data-link="demo" href="#">Try the live demo</a>
+        <a class="more" data-link="install" href="#">Install for Claude Code</a>
       </div>
     </div>
   </div>
@@ -344,145 +391,162 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- 4. Product: horizontal carousel driven by scroll -->
+<!-- 4. Product: horizontal carousel driven by scroll (real screenshots, from the redacted demo recording) -->
 <section class="scene" id="product">
   <div class="stage">
     <div class="product-head">
-      <h2 class="h2">Follow. Ask. Zoom out.</h2>
+      <h2 class="h2">Replay. Follow. Zoom out.</h2>
     </div>
     <div class="track" id="track">
       <div class="slide">
+        <div class="frame"><img src="img/replay.jpg" alt="Map view replaying a thread: the agent's numbered path across the project's files, with its steps in the sidebar" data-ph="Replay"></div>
+        <div class="cap"><h3>Every thread, replayed.</h3><p>Click a thread and watch the agent's path, step by step. Running ones play live.</p></div>
+      </div>
+      <div class="slide">
         <div class="frame"><img src="img/follow.png" alt="Follow view: a labeled timeline of a Claude Code session" data-ph="Follow"></div>
-        <div class="cap"><h3>Every step, labeled.</h3><p>Follow any Claude Code session live. Click an edit to see its diff.</p></div>
+        <div class="cap"><h3>Every step, labeled.</h3><p>Any Claude Code session as a timeline. Click an edit to see its diff.</p></div>
       </div>
       <div class="slide">
         <div class="frame"><img src="img/map.png" alt="Map view: files and imports as a graph, lit by recency" data-ph="Map"></div>
-        <div class="cap"><h3>Your codebase, lit up.</h3><p>Files and imports as a graph, glowing where agents work right now.</p></div>
-      </div>
-      <div class="slide">
-        <div class="frame"><img src="img/failures.png" alt="Failures view: recurring tool-call errors grouped and ranked with evidence" data-ph="Failures"></div>
-        <div class="cap"><h3>Failures, ranked.</h3><p>Recurring tool-call errors grouped, with the evidence steps.</p></div>
+        <div class="cap"><h3>Your project, lit up.</h3><p>Files glow where agents worked. Errors flash red.</p></div>
       </div>
     </div>
     <div class="dots" id="dots"><i class="on"></i><i></i><i></i></div>
   </div>
 </section>
 
-<!-- 5. Ask why -->
-<section class="block">
+<!-- 5. Beyond code: one agent editing a video, told as a track of stops (an illustration of the Track view) -->
+<section class="scene" id="tasks">
+  <div class="stage">
+    <div class="tasks-head">
+      <h2 class="h2">Not just code.</h2>
+      <p class="sub">Agents cut videos, write reports and research the web. Brainstorm follows them there too, and shows you how it was done.</p>
+    </div>
+    <div class="tk">
+      <div class="tk-track">
+      <span class="tk-agent" id="tkAgent" aria-hidden="true"></span>
+      <ol class="tk-line" id="tkLine">
+        <li class="ask"><span class="tk-ico"><svg viewBox="0 0 16 16"><circle cx="8" cy="5.5" r="2.6"/><path d="M3 14c.6-2.6 2.6-4 5-4s4.4 1.4 5 4"/></svg></span><span class="tk-body"><b>Cut a 30-second teaser from talk.mp4</b><small>You asked · with captions</small></span></li>
+        <li class="c-cmd"><span class="tk-ico"><svg viewBox="0 0 16 16"><path d="M3 4.5 6.5 8 3 11.5M8.5 12H13"/></svg></span><span class="tk-body"><b>Checked the video</b><small>Ran ffprobe · talk.mp4</small></span></li>
+        <li class="c-file"><span class="tk-ico"><svg viewBox="0 0 16 16"><path d="M4 2h5l3 3v9H4z"/><path d="M9 2v3h3M6 8.5h4M6 11h4"/></svg></span><span class="tk-body"><b>Picked the best 30 seconds</b><small>Read transcript.srt</small></span></li>
+        <li class="c-cmd"><span class="tk-ico"><svg viewBox="0 0 16 16"><path d="M3 4.5 6.5 8 3 11.5M8.5 12H13"/></svg></span><span class="tk-body"><b>Cut 4:12 to 4:42</b><small>Ran ffmpeg · cut.mp4</small></span></li>
+        <li class="c-cmd fail"><span class="tk-ico"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M8 4.8v3.8M8 11.1v.1"/></svg></span><span class="tk-body"><b>Burn in the captions</b><small>Failed · no subtitles filter</small></span></li>
+        <li class="c-web"><span class="tk-ico"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c1.8 1.7 2.6 3.7 2.6 6S9.8 12.3 8 14M8 2C6.2 3.7 5.4 5.7 5.4 8s.8 4.3 2.6 6"/></svg></span><span class="tk-body"><b>Looked up another way</b><small>ffmpeg.org · drawtext filter</small></span></li>
+        <li class="c-cmd made"><span class="tk-ico"><svg viewBox="0 0 16 16"><rect x="2" y="3.5" width="12" height="9" rx="1.5"/><path d="m7 6.3 3 1.7-3 1.7z"/></svg></span><span class="tk-body"><b>Made teaser.mp4</b><small>Ran ffmpeg · captions with drawtext</small></span></li>
+      </ol>
+      </div>
+      <div class="tk-win" id="tkWin">
+        <header><b id="tkTitle">talk.mp4</b><span id="tkTime">10:02</span></header>
+        <div class="tk-screen">
+          <div class="tk-pane on"><div class="film"><div class="spot"></div><span class="badge">talk.mp4 · 12:41</span><div class="bar"><i style="width:0"></i></div></div></div>
+          <div class="tk-pane"><pre class="term"><span class="pr">$</span> ffprobe talk.mp4
+<span class="dim">Input #0, mov,mp4, from 'talk.mp4':</span>
+  Duration: <span class="ok">00:12:41</span>
+  Video: h264, <span class="ok">1920x1080</span>, 30 fps
+  Audio: aac, 48000 Hz, stereo</pre></div>
+          <div class="tk-pane"><div class="srt">
+            <p>141<br>00:04:05 --&gt; 00:04:11<br>so that's the setup, now the fun part</p>
+            <p class="hl">142<br>00:04:12 --&gt; 00:04:18<br>Agents should show their work.</p>
+            <p class="hl">143<br>00:04:18 --&gt; 00:04:25<br>Not a wall of diffs. A map you can follow.</p>
+            <p>144<br>00:04:43 --&gt; 00:04:50<br>okay, questions?</p>
+          </div></div>
+          <div class="tk-pane"><pre class="term"><span class="pr">$</span> ffmpeg -ss 04:12 -t 30 -i talk.mp4 -c copy cut.mp4
+<span class="dim">Output #0, mp4, to 'cut.mp4'</span>
+<span class="ok">video:5.1MiB audio:470KiB</span></pre>
+            <ul class="plain"><li><code>-ss 04:12</code>start at 4:12</li><li><code>-t 30</code>keep 30 seconds</li><li><code>-c copy</code>don't re-encode, so it's instant</li></ul></div>
+          <div class="tk-pane"><pre class="term"><span class="pr">$</span> ffmpeg -i cut.mp4 -vf subtitles=teaser.srt teaser.mp4
+<span class="bad">No such filter: 'subtitles'</span>
+<span class="bad">Error opening output files: Filter not found</span>
+<span class="dim">exit 8</span></pre>
+            <ul class="plain"><li>This ffmpeg was built without subtitle support, so the agent looks for another way.</li></ul></div>
+          <div class="tk-pane"><div class="web"><div class="url">ffmpeg.org/ffmpeg-filters.html#drawtext</div><div class="doc"><h4>drawtext</h4><p>Draw a text string on top of a video, with the font, size and position you choose.</p><div class="hl">drawtext=text='Agents should show their work.'</div></div></div></div>
+          <div class="tk-pane"><div class="film"><div class="spot"></div><span class="badge new">New · teaser.mp4 · 0:30</span><span class="capt">Agents should show their work.</span><div class="bar"><i></i></div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Ask why -->
+<section class="block alt">
   <div class="wrap center">
     <h2 class="h2 rv">Ask why.</h2>
-    <p class="sub rv d1">Click any step or file. Get an answer grounded in the diff and the code around it, with its cost shown.</p>
+    <p class="sub rv d1">Click any step or file and ask Claude, with your own key. Answers stay grounded in the diff and the code around it.</p>
     <div class="ask-pill rv d2" id="askPill"><span class="q"></span><span id="askText"></span><span class="caret"></span></div>
   </div>
 </section>
 
-<!-- 6. Cost: where the money goes -->
-<section class="block alt" id="cost">
+<!-- 7. Install -->
+<section class="block" id="install">
   <div class="wrap center">
-    <h2 class="h2 rv">Where your<br>money goes.</h2>
-    <p class="sub rv d1">Most of the work is reading, so reading runs on a flat-rate GPU. You only pay per token when you ask.</p>
-    <div class="money rv" id="money">
-      <canvas id="flowCv" aria-hidden="true"></canvas>
-      <div class="lane" data-col="118,185,0" data-rate="1">
-        <div class="who" style="color:#4a7a00"><i style="background:var(--nvidia)"></i>NVIDIA Nemotron on Brev</div>
-        <h3>Reading everything.</h3>
-        <p>Summaries, step labels and risk flags. Thousands of small calls, one GPU billed by the hour.</p>
-      </div>
-      <div class="lane" data-col="217,119,87" data-rate=".1">
-        <div class="who" style="color:#b85a3c"><i style="background:var(--claude)"></i>Your LLM: <span class="swap"><span id="model">Claude</span></span></div>
-        <h3>Answering why.</h3>
-        <p>Only when you ask, with your own key. Claude today, any model you like next.</p>
-      </div>
-      <div class="lane" data-col="161,161,166" data-rate="0">
-        <div class="who" style="color:var(--muted)"><i style="background:var(--faint)"></i>No AI</div>
-        <h3>Drawing the map.</h3>
-        <p>Timeline, imports, heat and history come straight from logs and git. Free.</p>
-      </div>
+    <h2 class="h2 rv">Install it in<br>Claude Code.</h2>
+    <p class="sub rv d1">Free. Everything runs on your machine.</p>
+    <div class="steps3">
+      <div class="rv"><div class="n">1</div><h3>Add the plugin.</h3><p>In Claude Code, run:</p>
+        <div class="cmd"><code>/plugin install brainstorm <span class="nw">--marketplace</span> Djbrl/brainstorm</code><button type="button" data-copy>Copy</button></div>
+        <p class="alt-cmd">On an older Claude Code: <code>/plugin marketplace add Djbrl/brainstorm</code>, then <code>/plugin install brainstorm@brainstorm</code>.</p></div>
+      <div class="rv d1"><div class="n">2</div><h3>Start a new session.</h3><p>Brainstorm starts in the background with it, and tells you where it's running.</p></div>
+      <div class="rv d2"><div class="n">3</div><h3>Open the map.</h3><p>It opens in your browser, for the project you're in.</p>
+        <div class="cmd"><code>/brainstorm:open</code><button type="button" data-copy>Copy</button></div></div>
     </div>
-  </div>
-</section>
-
-<!-- 7. Brev: dark, in NVIDIA's colors -->
-<section class="block" id="brev">
-  <div class="wrap center">
-    <h2 class="h2 rv">One open model.<br><span class="g">Our own GPU.</span></h2>
-    <p class="sub rv d1">Reading a codebase is thousands of small calls. On a GPU rented by the hour, the thousandth costs the same as the first.</p>
-    <svg class="chip rv d2" id="chip" viewBox="0 0 520 300" aria-hidden="true"></svg>
-    <div class="why3">
-      <div class="rv"><h3>Flat price.</h3><p>Pay for the hour, not the token. So Brainstorm can read every file and label every step.</p></div>
-      <div class="rv d1"><h3>Open weights.</h3><p>NVIDIA Nemotron 3 Nano, served with vLLM on our own Brev instance.</p></div>
-      <div class="rv d2"><h3>Private by design.</h3><p>Your code goes to a GPU you control, not someone else's API.</p></div>
+    <p class="needs rv">You need Claude Code and Node.js 22.13 or later.</p>
+    <div class="btns rv" style="margin-top:28px">
+      <a class="btn" data-link="install" href="#">Install from GitHub</a>
+      <a class="more" data-link="guide" href="#">Settings, updates and uninstall</a>
     </div>
-    <div class="nums" id="nums"></div>
-    <div class="brev-foot rv" id="brevFoot"></div>
   </div>
 </section>
 
 <!-- 8. Privacy -->
-<section class="block" id="privacy">
+<section class="block alt" id="privacy">
   <div class="wrap center">
     <h2 class="h2 rv">Your code<br>stays yours.</h2>
     <div class="four">
-      <div class="rv"><svg viewBox="0 0 44 44"><path d="M8 20 22 8l14 12v16a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2z"/><path d="M18 38V27h8v11"/></svg><h3>Local-first</h3><p>Everything is stored on your machine.</p></div>
+      <div class="rv"><svg viewBox="0 0 44 44"><path d="M8 20 22 8l14 12v16a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2z"/><path d="M18 38V27h8v11"/></svg><h3>On your machine</h3><p>It reads your agents' logs where they are. No account, no cloud.</p></div>
       <div class="rv d1"><svg viewBox="0 0 44 44"><rect x="6" y="14" width="32" height="16" rx="8"/><path d="M14 19v6M11.4 20.5l5.2 3M11.4 23.5l5.2-3M22 19v6M19.4 20.5l5.2 3M19.4 23.5l5.2-3M30 19v6M27.4 20.5l5.2 3M27.4 23.5l5.2-3"/></svg><h3>Secrets masked</h3><p>Keys and tokens are redacted before anything is stored or sent.</p></div>
-      <div class="rv d2"><svg viewBox="0 0 44 44"><path d="M22 6 37 14v16L22 38 7 30V14z"/><path d="M7 14l15 8 15-8M22 22v16"/></svg><h3>Small packages</h3><p>Questions send only what's needed, with your own key.</p></div>
-      <div class="rv d3"><svg viewBox="0 0 44 44"><rect x="11" y="11" width="22" height="22" rx="3"/><rect x="17" y="17" width="10" height="10" rx="1.5"/><path d="M17 5v6M27 5v6M17 33v6M27 33v6M5 17h6M5 27h6M33 17h6M33 27h6"/></svg><h3>Private mode</h3><p>Run all the reading on your own GPU.</p></div>
+      <div class="rv d2"><svg viewBox="0 0 44 44"><path d="M22 6 37 14v16L22 38 7 30V14z"/><path d="M7 14l15 8 15-8M22 22v16"/></svg><h3>Your key, your call</h3><p>Questions go to Claude only when you ask, with only what's needed.</p></div>
+      <div class="rv d3"><svg viewBox="0 0 44 44"><path d="M22 6 8 11v10c0 8.5 6 14.5 14 17 8-2.5 14-8.5 14-17V11z"/><path d="m16 22 4.5 4.5L29 18"/></svg><h3>Locked to you</h3><p>It listens on your computer only. Other websites can't reach it.</p></div>
     </div>
   </div>
 </section>
 
 <!-- 9. Closing -->
-<section class="closing alt">
+<section class="closing">
   <div class="wrap center">
-    <h2 class="rv"><span>Let the agents type.</span><span class="grad">Keep your brain in the loop.</span></h2>
+    <h2 class="rv"><span>Let the agents work.</span><span class="grad">Keep your brain in the loop.</span></h2>
     <div class="btns rv d1">
-      <a class="btn big" id="tryNow" href="#">Try Brainstorm now</a>
+      <a class="btn big" data-link="install" href="#">Install for Claude Code</a>
     </div>
     <div class="btns rv d2" style="margin-top:22px">
+      <a class="more" data-link="demo" href="#">Try the live demo</a>
       <a class="more" data-link="video" href="#">Watch the film</a>
-      <a class="more" data-link="repo" href="#">View on GitHub</a>
     </div>
-    <p class="team-line rv d2" id="teamLine"></p>
+    <a class="award rv d2" data-link="award" href="#"><b>3rd place</b> at GOMYCODE × NVIDIA “Come Build with AI” 2026</a>
   </div>
 </section>
 </main>
 
 <footer>
   <div class="wrap">
-    <span>Brainstorm. Built in one day with Claude Code, Claude and NVIDIA Nemotron on Brev.</span>
+    <span>Brainstorm. Source-available under FSL-1.1. Built with Claude Code.</span>
     <span id="footLinks"></span>
   </div>
 </footer>
 
 <script>
 /* ============================================================
-   EDIT HERE. Everything the jury sees that changes on the day.
-   null = hidden on the page. Never put a guessed number here;
-   copy only from docs/numbers.md and docs/brev-setup.md.
+   EDIT HERE. The links on the page.
+   A link set to null hides every button that uses it.
    ============================================================ */
 const SITE = {
   links: {
-    video: null,   // unlisted YouTube / Drive link
-    demo: "https://brainstorm-demo-black.vercel.app",    // Vercel replay demo
-    repo: "https://github.com/Djbrl/brainstorm",    // public GitHub repo
+    demo: "https://brainstorm-next.vercel.app/?view=map",                          // hosted replay of a real, redacted session
+    install: "https://github.com/Djbrl/brainstorm#install-claude-code-plugin-preview", // the README's install section
+    guide: "https://github.com/Djbrl/brainstorm/blob/main/plugin/README.md",
+    repo: "https://github.com/Djbrl/brainstorm",
+    award: "https://hackathon.gomycode.com/onboarding/winners",
+    video: null,   // a film link, when there is one
   },
-  brev: {
-    gpu: null,          // e.g. "L40S"
-    pricePerHour: null, // e.g. "$1.20/h"
-    model: "Nemotron 3 Nano 30B-A3B FP8",
-    vllm: null,         // e.g. "0.11.0"
-  },
-  // from docs/numbers.md: value is shown big, label under it
-  stats: [
-    { label: "files read per minute", value: null },
-    { label: "to map the demo repo", value: null },
-    { label: "GPU cost of that read", value: null },
-    { label: "per question, on average", value: null },
-    { label: "from agent step to label", value: null },
-    { label: "summary quality vs Claude", value: null },
-  ],
-  team: [],   // e.g. ["Full Name", "Full Name"], shown as "Made by ..." under the closing CTA
 };
 
 /* ---------- fill the page from SITE ---------- */
@@ -493,27 +557,16 @@ document.querySelectorAll("[data-link]").forEach(a => {
   const url = SITE.links[a.dataset.link];
   if (url) { a.href = url; a.target = "_blank"; a.rel = "noopener"; } else a.hidden = true;
 });
-
-const stats = SITE.stats.filter(s => s.value);
-$("#nums").innerHTML = stats.map((s, i) => `<div class="num rv d${i % 3}"><div class="v">${esc(s.value)}</div><div class="k">${esc(s.label)}</div></div>`).join("");
-if (stats.length && stats.length < 3) $("#nums").style.gridTemplateColumns = `repeat(${stats.length}, 1fr)`;
-
-const b = SITE.brev, foot = [];
-if (b.model) foot.push(esc(b.model));
-if (b.gpu) foot.push(esc(b.gpu) + (b.pricePerHour ? " at " + esc(b.pricePerHour) : ""));
-if (b.vllm) foot.push("vLLM " + esc(b.vllm));
-if (SITE.links.repo) foot.push(`<a href="${esc(SITE.links.repo)}/blob/main/docs/brev-setup.md" target="_blank" rel="noopener">Every Brev command we ran ›</a>`);
-$("#brevFoot").innerHTML = foot.map(f => `<span>${f}</span>`).join("");
-
-/* closing CTA: the replay demo, else the repo; greyed out until one exists */
-const tryUrl = SITE.links.demo || SITE.links.repo;
-if (tryUrl) { $("#tryNow").href = tryUrl; $("#tryNow").target = "_blank"; $("#tryNow").rel = "noopener"; }
-else $("#tryNow").classList.add("pending");
-const tm = SITE.team.map(esc);
-$("#teamLine").textContent = tm.length ? "Made by " + (tm.length > 1 ? tm.slice(0, -1).join(", ") + " and " + tm.at(-1) : tm[0]) + "." : "";
-
-$("#footLinks").innerHTML = [["repo", "GitHub"], ["video", "Film"], ["demo", "Replay demo"]]
+$("#footLinks").innerHTML = [["repo", "GitHub"], ["demo", "Live demo"], ["video", "Film"]]
   .filter(([k]) => SITE.links[k]).map(([k, t]) => `<a href="${esc(SITE.links[k])}" target="_blank" rel="noopener">${t}</a>`).join(" · ");
+
+/* copy buttons on the install commands */
+document.querySelectorAll("[data-copy]").forEach(btn => btn.addEventListener("click", async () => {
+  const text = btn.previousElementSibling.textContent;
+  try { await navigator.clipboard.writeText(text); btn.textContent = "Copied"; }
+  catch { getSelection().selectAllChildren(btn.previousElementSibling); btn.textContent = "Press ⌘C"; }
+  setTimeout(() => btn.textContent = "Copy", 1600);
+}));
 
 /* screenshots: soft placeholder until the real PNG exists */
 document.querySelectorAll(".frame img").forEach(img => {
@@ -757,85 +810,29 @@ const hero = (() => {
   return { set(v) { p = v; } };
 })();
 
-/* ---------- cost: tokens stream from your code into three lanes ---------- */
-(() => {
-  const box = $("#money"), cv = $("#flowCv"), ctx = cv.getContext("2d"), lanes = [...box.querySelectorAll(".lane")];
-  let W, H, dpr, L = [], parts = [], on = false;
-  const bez = (l, t) => { const u = 1 - t; return [0, 1].map(j => u*u*u*l.p[0][j] + 3*u*u*t*l.p[1][j] + 3*u*t*t*l.p[2][j] + t*t*t*l.p[3][j]); };
-  function build() {
-    dpr = Math.min(devicePixelRatio || 1, 2); W = cv.clientWidth; H = cv.clientHeight;
-    cv.width = W * dpr; cv.height = H * dpr;
-    const br = cv.getBoundingClientRect(), sy = H / 2, sx = 14;
-    L = lanes.map(l => {
-      const r = l.querySelector("h3").getBoundingClientRect(), ty = r.top + r.height / 2 - br.top;
-      const rate = +l.dataset.rate;
-      return { col: l.dataset.col, rate, w: rate >= 1 ? 22 : rate > 0 ? 5 : 1, p: [[sx, sy], [W * .45, sy], [W * .55, ty], [W - 6, ty]] };
-    });
-    parts = [];
+/* ---------- beyond code: the agent walks down the track, the window shows each stop ---------- */
+const tasks = (() => {
+  const el = $("#tasks"), stops = [...document.querySelectorAll("#tkLine li")], panes = [...document.querySelectorAll(".tk-pane")];
+  const agent = $("#tkAgent"), winEl = $("#tkWin"), title = $("#tkTitle"), time = $("#tkTime");
+  const META = [["talk.mp4", "10:02"], ["ffprobe", "10:02"], ["transcript.srt", "10:03"], ["ffmpeg", "10:04"], ["ffmpeg · failed", "10:05"], ["ffmpeg.org", "10:05"], ["teaser.mp4", "10:06"]];
+  let cur = -1;
+  function show(i) {
+    if (i === cur) return; cur = i;
+    stops.forEach((li, k) => { li.classList.toggle("on", k === i); li.classList.toggle("past", k < i); });
+    panes.forEach((pn, k) => pn.classList.toggle("on", k === i));
+    const li = stops[i];
+    agent.style.top = (li.offsetTop + li.offsetHeight / 2 - 8) + "px";
+    const failed = li.classList.contains("fail");
+    agent.classList.toggle("err", failed); winEl.classList.toggle("err", failed);
+    title.textContent = META[i][0]; time.textContent = META[i][1];
   }
-  function draw() {
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-    L.forEach(l => {
-      ctx.beginPath(); ctx.moveTo(...l.p[0]); ctx.bezierCurveTo(...l.p[1], ...l.p[2], ...l.p[3]);
-      ctx.lineCap = "round"; ctx.setLineDash(l.rate ? [] : [3, 6]);
-      ctx.strokeStyle = l.rate ? `rgba(${l.col},.16)` : "rgba(161,161,166,.7)"; ctx.lineWidth = l.w; ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = `rgb(${l.col})`; ctx.beginPath(); ctx.arc(l.p[3][0], l.p[3][1], 4, 0, 7); ctx.fill();
-      if (!still && Math.random() < l.rate * .9) parts.push({ l, t: 0, v: .0045 + Math.random() * .0025, o: (Math.random() - .5) * l.w * .8 });
-    });
-    parts = parts.filter(q => (q.t += q.v) < 1);
-    parts.forEach(q => {
-      const [x, y] = bez(q.l, q.t), [x2, y2] = bez(q.l, Math.min(1, q.t + .01)), d = Math.hypot(x2 - x, y2 - y) || 1;
-      ctx.fillStyle = `rgba(${q.l.col},${.9 * Math.min(1, (1 - q.t) * 6)})`;
-      ctx.beginPath(); ctx.arc(x - (y2 - y) / d * q.o, y + (x2 - x) / d * q.o, 2.2, 0, 7); ctx.fill();
-    });
-    ctx.fillStyle = "#1d1d1f"; ctx.beginPath(); ctx.arc(14, H / 2, 8, 0, 7); ctx.fill();
-    ctx.fillStyle = "#6e6e73"; ctx.font = "500 13px Satoshi, system-ui, sans-serif"; ctx.textAlign = "left";
-    ctx.fillText(W < 220 ? "Your code" : "Your code + every agent step", 2, H / 2 + 30);
-  }
-  function loop() { if (on) draw(); requestAnimationFrame(loop); }
-  build(); requestAnimationFrame(loop);
-  addEventListener("resize", build);
-  document.fonts && document.fonts.ready.then(build);
-  new IntersectionObserver(([e]) => { on = e.isIntersecting; if (on) build(); }).observe(box);
-})();
-
-/* the answer model is swappable: cycle names, resting on Claude */
-(() => {
-  const names = ["Claude", "GPT", "Gemini", "Llama", "Mistral"], el = $("#model");
-  if (still) return;
-  let i = 0;
-  (function next() {
-    setTimeout(() => {
-      el.style.transform = "translateY(-100%)"; el.style.opacity = 0;
-      setTimeout(() => {
-        i = (i + 1) % names.length; el.textContent = names[i];
-        el.style.transition = "none"; el.style.transform = "translateY(100%)"; el.offsetHeight;
-        el.style.transition = ""; el.style.transform = ""; el.style.opacity = 1; next();
-      }, 350);
-    }, i === 0 ? 3200 : 1100);
-  })();
-})();
-
-/* brev: a GPU with data running along its traces and cores lighting up */
-(() => {
-  const svg = $("#chip");
-  const T = ["M190 110H120L100 90H0", "M190 140H0", "M190 170H110L90 190H0", "M190 198H130L112 216V300",
-    "M330 110H400L420 90H520", "M330 140H520", "M330 170H410L430 190H520", "M330 198H390L408 216V300",
-    "M230 90V40L210 20V0", "M260 90V0", "M290 90V40L310 20V0", "M232 210V250L214 268V300", "M288 210V250L306 268V300"];
-  let h = T.map(d => `<path class="trace" d="${d}"/>`).join("")
-    + T.map((d, i) => `<path class="pulse" pathLength="1" d="${d}" style="animation-delay:-${(i * .61) % 2.6}s"/>`).join("")
-    + `<rect class="pkg" x="186" y="86" width="148" height="128" rx="8"/><rect class="die" x="194" y="94" width="132" height="112" rx="4"/>`;
-  for (let r = 0; r < 5; r++) for (let c = 0; c < 7; c++) h += `<rect class="core" x="${199 + c * 18}" y="${101 + r * 20}" width="14" height="16" rx="2"/>`;
-  svg.innerHTML = h;
-  const cores = [...svg.querySelectorAll(".core")];
-  let vis = false;
-  new IntersectionObserver(([e]) => vis = e.isIntersecting).observe(svg);
-  cores.forEach(c => c.classList.toggle("on", Math.random() < .3));
-  if (!still) setInterval(() => { if (vis) cores.forEach(c => c.classList.toggle("on", Math.random() < .3)); }, 450);
+  show(0);
+  addEventListener("resize", () => { const i = cur; cur = -1; show(i); });
+  return { set(p) { show(Math.min(stops.length - 1, Math.floor(win(p, .06, .9) * stops.length))); } };
 })();
 
 /* ---------- scroll-driven scenes ---------- */
+const tasksEl = $("#tasks");
 const heroEl = $("#hero"), heroType = $("#heroType"), heroEnd = $("#heroEnd"), cue = $("#cue");
 const hcaps = [...document.querySelectorAll(".hcap")];
 const probEl = $("#problem"), wall = $("#wall"), pDone = $("#pDone"), pNobody = $("#pNobody"), pCity = $("#pCity");
@@ -876,6 +873,9 @@ function onScroll() {
   track.style.transform = `translateX(${-max * k}px)`;
   const idx = Math.round(k * (dots.length - 1));
   dots.forEach((dt, i) => dt.classList.toggle("on", i === idx));
+
+  /* beyond code: one stop per slice of the scroll */
+  tasks.set(progress(tasksEl));
 
   /* stats: each finding arrives in turn (one at a time on phones) */
   const sp = progress(statsEl), narrow = innerWidth <= 820;

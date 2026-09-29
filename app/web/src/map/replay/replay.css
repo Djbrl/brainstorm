@@ -68,7 +68,11 @@
 .rp-steps { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .rp-steps-sum { margin: 0 0 6px; font-size: 13px; color: var(--ink-3); }
 .rp-list { position: relative; flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; overscroll-behavior: contain; }
+/* Room below the last step so it can reach the center line; none above, so the start of a thread isn't a blank gap. */
 .rp-spacer { height: calc(50% - 26px); }
+.rp-spacer.top { height: 4px; }
+/* Rows fade as they scroll under the summary line instead of being cut. */
+.rp-list { -webkit-mask-image: linear-gradient(transparent, #000 16px); mask-image: linear-gradient(transparent, #000 16px); }
 .rp-pad { padding: 12px 0; }
 .rp-quiet { margin: 0; color: var(--ink-3); font-size: 13.5px; }
 

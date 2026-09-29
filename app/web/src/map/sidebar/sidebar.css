@@ -100,7 +100,7 @@
 .map-wrap:has(.sidebar-collapsed) .map-legend { left: 86px; }
 
 /* Threads: click to play. The selected thread expands with its actions and step list; a running one pulses blue. */
-button.sidebar-thread-head { width: 100%; border: 0; background: transparent; padding: 6px 8px; margin: -6px -8px; border-radius: 10px; text-align: left; color: var(--ink); cursor: pointer; box-sizing: content-box; }
+button.sidebar-thread-head { width: calc(100% + 16px); border: 0; background: transparent; padding: 7px 8px; margin: -7px -8px; border-radius: 10px; text-align: left; color: var(--ink); cursor: pointer; box-sizing: border-box; }
 button.sidebar-thread-head:hover { background: #f4f4f7; }
 .sidebar-thread.selected button.sidebar-thread-head { background: var(--accent-soft); cursor: default; }
 .sidebar-thread-status.running { background: var(--accent); box-shadow: 0 0 0 0 rgba(91,91,214,.55); animation: sidebar-pulse 1.6s infinite; }
@@ -108,7 +108,7 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 /* With a thread open, the body stops scrolling as a whole: the open thread takes the height left by the other rows. */
 .sidebar-body:has(.sidebar-threads.has-open) { overflow: hidden; display: flex; flex-direction: column; }
 .sidebar-threads.has-open { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.sidebar-threads.has-open .sidebar-thread-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.sidebar-threads.has-open .sidebar-thread-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; margin: 0 -8px; padding: 0 8px; } /* room for the pill's rounded edges */
 .sidebar-threads.has-open .sidebar-thread { flex: none; }
 .sidebar-threads.has-open .sidebar-thread.selected { flex: 1 0 58%; min-height: 0; display: flex; flex-direction: column; }
 .sidebar-thread-steps { flex: 1; min-height: 0; margin: 10px -2px 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); }

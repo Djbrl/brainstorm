@@ -186,6 +186,10 @@ export function ReplaySteps() {
     raf.current = requestAnimationFrame(() => {
       const el = listRef.current;
       if (!el) return;
+      if (el.scrollTop <= 2) { // at the very top: the first step (it can't reach the center line)
+        if (indexRef.current !== 0) { if (playingRef.current) setReplayPlaying(false); setReplayIndex(0); }
+        return;
+      }
       const r = el.getBoundingClientRect();
       const cy = r.top + r.height / 2;
       let row: Element | null = null;
@@ -238,7 +242,7 @@ export function ReplaySteps() {
       <div className="rp-list" ref={listRef} onScroll={onScroll} onWheel={markUser} onTouchMove={markUser}
         onKeyDown={(e) => { if (["PageUp", "PageDown", "ArrowUp", "ArrowDown"].includes(e.key)) markUser(); }}
         onPointerDown={(e) => { if (e.target === e.currentTarget) { dragging.current = true; markUser(); } }}>
-        <div className="rp-spacer" aria-hidden="true" />
+        <div className="rp-spacer top" aria-hidden="true" />
         {thread.beats.map((b) => (
           <Row key={b.step.id} beat={b} sessionId={thread.sessionId} onPick={onPick}
             state={b.index < index ? "done" : b.index === index ? "current" : "todo"}

@@ -9,6 +9,7 @@ import { replayCursor, useNav } from "../lib/nav";
 import { clockTime, stripInjected } from "../follow/format";
 import { MapSidebar } from "../map/sidebar/MapSidebar";
 import { LensSwitch } from "../map/LensSwitch";
+import { MapStats } from "../map/MapStats";
 import "./track.css";
 
 type Area = "files" | "web" | "commands" | "services";
@@ -259,12 +260,13 @@ export function TrackView() {
 
   const sidebar = <MapSidebar agents={Object.values(state.agents)} accent="#5b5bd6" followId={null} onFollow={() => setLens("map")} onFocusFile={() => setLens("map")} map={state.map} />;
   if (!replay) {
-    return <div className="trk-wrap">{sidebar}<LensSwitch /><div className="trk-empty"><h2>Pick a thread</h2><p>Choose a thread in the sidebar to see its track: every place the agent went, in order, with what it saw and made.</p></div></div>;
+    return <div className="trk-wrap">{sidebar}<MapStats /><LensSwitch /><div className="trk-empty"><h2>Pick a thread</h2><p>Choose a thread in the sidebar to see its track: every place the agent went, in order, with what it saw and made.</p></div></div>;
   }
   const errors = stops.reduce((n, r) => n + r.stop.failed.length, 0);
   return (
     <div className="trk-wrap">
       {sidebar}
+      <MapStats />
       <LensSwitch />
       <div className="trk-scroll" ref={scroller}>
         {!task ? <p className="trk-loading">Loading the thread…</p> : (

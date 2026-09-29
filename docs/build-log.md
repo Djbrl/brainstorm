@@ -79,6 +79,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 00:55 (29 Sep) [lead] `feature/tasks`, at the human's request: Failures tab removed from the local app (errors show on the map, in Follow and in the Track; the hosted demos keep it for their tour). No project title on the map; the sidebar runs the full height, centered. The open thread's steps fill the sidebar so expanded steps have room. Player: no zoom buttons or Live chip, Open in Follow moved onto it, it sits above the legend (which stays visible). Sidebar: no Open in Follow, Live or Close under the title; clicking the open thread closes it. Reaching the newest step of a running thread (end of the slider, bottom of the Track) follows it live again.
 
+- 02:20 (29 Sep) [lead] `feature/tasks`: the legend hides again while the player is up (and fades back); the player slides in and out; the sidebar is back to its old size, with a stats line above it (threads, files, modules, being edited now) instead of the big project title.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

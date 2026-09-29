@@ -1,5 +1,5 @@
 // Owner: replay agent. Bottom playback bar on the map during a thread replay.
-import { memo, useMemo } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { isReplay, useLive } from "../../lib/live";
 import { replayCursor, useNav, type ReplaySpeed } from "../../lib/nav";
 import { beatLabel, useThread, type Thread } from "../../lib/thread";
@@ -48,10 +48,23 @@ const FailTicks = memo(function FailTicks({ thread }: { thread: Thread }) {
 });
 
 export function ReplayBar() {
-  const { replay, setReplayIndex, setReplayPlaying, setReplaySpeed, setReplayDetail, stopReplay, openStep, setSessionId, setView } = useNav();
+  const { replay: current, setReplayIndex, setReplayPlaying, setReplaySpeed, setReplayDetail, stopReplay, openStep, setSessionId, setView } = useNav();
   const { state } = useLive();
+  // After the replay closes, keep showing its last state while the bar slides out.
+  const last = useRef(current);
+  if (current) last.current = current;
+  const [leaving, setLeaving] = useState(false);
+  useEffect(() => {
+    if (current) { setLeaving(false); return; }
+    if (!last.current) return;
+    setLeaving(true);
+    const t = setTimeout(() => { last.current = null; setLeaving(false); }, 260);
+    return () => clearTimeout(t);
+  }, [current]);
+  const replay = current ?? (leaving ? last.current : null);
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
   if (!replay) return null;
+  const cls = leaving ? " leaving" : "";
 
   const stop = <button className="rp-icon" onClick={stopReplay} aria-label="Stop replay" title="Stop replay (Esc)">{Icon.close}</button>;
   const session = state.sessions.find((s) => s.id === replay.sessionId);
@@ -60,7 +73,7 @@ export function ReplayBar() {
   if (!thread || thread.beats.length === 0) {
     const missing = !thread && isReplay() && state.sessions.length > 0;
     return (
-      <div className="rp-bar rp-bar-empty" role="region" aria-label="Thread replay">
+      <div className={`rp-bar rp-bar-empty${cls}`} role="region" aria-label="Thread replay">
         <p className="rp-empty">{thread ? "This thread has no steps yet." : missing ? "No steps were recorded for this thread." : "Loading the thread…"}</p>
         {stop}
       </div>
@@ -76,7 +89,7 @@ export function ReplayBar() {
   const pct = len > 1 ? (index / (len - 1)) * 100 : 100;
 
   return (
-    <div className="rp-bar" role="region" aria-label="Thread replay">
+    <div className={`rp-bar${cls}`} role="region" aria-label="Thread replay">
       <div className="rp-top">
         <span className="rp-count">{index + 1} / {len}</span>
         <span className="rp-label" title={`${title}\n${label}`}>{label}</span>

@@ -1,7 +1,7 @@
 /* Owner: sidebar agent. Floating left sidebar on the map: Threads | Files tabs, collapsible.
    Same frosted sheet as the old .map-agents tracker it replaces. */
 .map-sidebar {
-  position: absolute; left: 24px; top: 24px; bottom: 24px; width: 340px; max-width: calc(100% - 32px);
+  position: absolute; left: 24px; top: 120px; bottom: 24px; width: 340px; max-width: calc(100% - 32px);
   display: flex; flex-direction: column;
   background: rgba(255,255,255,.86); backdrop-filter: saturate(180%) blur(20px);
   border: 1px solid var(--line); border-radius: 18px;
@@ -19,7 +19,7 @@
 .sidebar-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 14px 14px; }
 
 .sidebar-collapsed {
-  position: absolute; left: 24px; top: 50%; transform: translateY(-50%); width: 38px; padding: 14px 0 16px;
+  position: absolute; left: 24px; top: 120px; width: 38px; padding: 14px 0 16px;
   background: rgba(255,255,255,.86); backdrop-filter: saturate(180%) blur(20px);
   border: 1px solid var(--line); border-radius: 14px;
   display: flex; flex-direction: column; align-items: center; gap: 10px;
@@ -112,3 +112,6 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .sidebar-threads.has-open .sidebar-thread { flex: none; }
 .sidebar-threads.has-open .sidebar-thread.selected { flex: 1 0 58%; min-height: 0; display: flex; flex-direction: column; }
 .sidebar-thread-steps { flex: 1; min-height: 0; margin: 10px -2px 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+
+/* The stats line sits just above the sidebar. */
+.map-stats { position: absolute; left: 40px; top: 84px; margin: 0; color: var(--ink-3); font-size: 14.5px; pointer-events: none; z-index: 3; white-space: nowrap; }

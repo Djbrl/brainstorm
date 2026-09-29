@@ -1,5 +1,6 @@
 // Owner: D. Force graph of files/modules, glow by recency, a ripple per agent edit + outline while active, side panel + AskBox.
 import { LensSwitch } from "./LensSwitch";
+import { MapStats } from "./MapStats";
 import "../tasks/track.css";
 import { clock } from "../lib/live";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -64,7 +65,6 @@ export function relTime(iso: string | undefined, now = clock()): string {
 }
 const relPath = (p: string, root: string) => (p.startsWith(root) ? p.slice(root.length).replace(/^\/+/, "") : p);
 const modName = (m: string) => (!m || m === "." ? "root" : m);
-const projectName = (root: string) => (root ? baseName(root.replace(/\/\.claude\/worktrees\/.*$/, "").replace(/\/+$/, "")) : "Map");
 const baseName = (p: string) => p.split("/").pop() || p;
 const radius = (lines: number) => Math.min(22, 3.5 + Math.sqrt(Math.max(0, lines)) * 0.55);
 
@@ -413,7 +413,8 @@ export function MapView() {
 
       <MapSidebar agents={agents} accent={tokens.accent} followId={followId}
         onFollow={(id) => setFollowId(id)} onFocusFile={focusOnFile} map={map} />
-      {replay && <ReplayBar />}
+      <MapStats />
+      <ReplayBar />
       <LensSwitch />
 
       <div className="map-legend" aria-label="Legend">

@@ -6,9 +6,6 @@
 .map-empty h2 { font-size: 34px; font-weight: 700; color: var(--ink); }
 .map-empty p { margin: 0; font-size: 16px; }
 
-.map-head { position: absolute; top: 32px; left: 40px; pointer-events: none; }
-.map-head h1 { font-size: 40px; font-weight: 800; line-height: 1.05; }
-.map-head p { margin: 6px 0 0; color: var(--ink-3); font-size: 15px; }
 
 .map-legend { position: absolute; left: 40px; bottom: 32px; display: flex; gap: 22px; font-size: 13px; color: var(--ink-2);
   background: rgba(251,251,253,.8); backdrop-filter: blur(12px); padding: 8px 14px; border-radius: 999px; }

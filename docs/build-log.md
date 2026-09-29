@@ -87,6 +87,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 14:32 (29 Sep) [landing agent] Landing: "Not just code" now comes before the product section (tasks on grey, product on white, nav reordered). The product section is no longer a carousel: one browser window over three new screenshots from the redacted recording (thread replay, Follow with a diff, the live Map); as you scroll, the camera zooms to the agent's path, the steps sidebar, the Follow timeline, then zooms out of the Map, with one short caption per beat.
 
+- 15:30 (29 Sep) [lead] `feature/map-labels`: map folder labels without the pile-up. Labels are drawn by priority (pointer or selection, agents working there, recent edits, size) and skipped when they'd overlap; file names too. Subfolders gather around their parent on the map, fold into one parent label while the group is small on screen, and drop the parent's name when it has 4+ subfolders. Checked on the demo recording and on a 30-folder stress map.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

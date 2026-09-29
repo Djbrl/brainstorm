@@ -17,6 +17,7 @@ import { MapSidebar } from "./sidebar/MapSidebar";
 import { ReplayBar } from "./replay/ReplayBar";
 import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
 import { makeFileResolver } from "../lib/paths";
+import { drawModuleLabels, LabelSpace } from "./labels";
 import "./map.css";
 
 type GNode = NodeObject & { id: string; file: FileNode; r: number; ax: number; ay: number };
@@ -99,16 +100,24 @@ function useGraph(map: ProjectMap | null) {
       for (const f of map.files) { const n = nodesRef.current.get(f.path); if (n) { n.file = f; n.r = radius(f.lines); } }
       return lastRef.current.graph;
     }
-    // Module anchors on a sunflower spiral, biggest modules in the middle.
+    // Module anchors: top-level folders on a sunflower spiral, biggest in the middle; the subfolders of one folder
+    // gather around its spot (a small spiral of their own), so "app/server" sits next to "app/web".
     const counts = new Map<string, number>();
     for (const f of map.files) counts.set(f.module, (counts.get(f.module) ?? 0) + 1);
-    const mods = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([m]) => m);
+    const top = new Map<string, string[]>();
+    for (const m of counts.keys()) { const p = m === "." ? "." : m.split("/")[0]; top.set(p, [...(top.get(p) ?? []), m]); }
+    const size = (ms: string[]) => ms.reduce((s, m) => s + (counts.get(m) ?? 0), 0);
+    const groups = [...top.values()].map((ms) => ms.sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0))).sort((a, b) => size(b) - size(a));
     const anchors = new Map<string, { x: number; y: number }>();
-    const spread = 70 + Math.sqrt(map.files.length) * 4;
-    mods.forEach((m, i) => {
-      const r = i === 0 ? 0 : spread * Math.sqrt(i + 0.5);
-      const a = i * 2.39996;
-      anchors.set(m, { x: Math.cos(a) * r, y: Math.sin(a) * r });
+    const spread = 70 + Math.sqrt(map.files.length) * 4, inner = 46;
+    const extent = (ms: string[]) => (ms.length > 1 ? inner * Math.sqrt(ms.length) : 0);
+    groups.forEach((ms, i) => {
+      const r = i === 0 ? 0 : extent(groups[0]) + spread * Math.sqrt(i + 0.5), a = i * 2.39996;
+      const gx = Math.cos(a) * r, gy = Math.sin(a) * r;
+      ms.forEach((m, j) => {
+        const rr = j === 0 ? 0 : inner * Math.sqrt(j + 0.5), aa = j * 2.39996 + a;
+        anchors.set(m, { x: gx + Math.cos(aa) * rr, y: gy + Math.sin(aa) * rr });
+      });
     });
     const prev = nodesRef.current;
     const next = new Map<string, GNode>();
@@ -183,6 +192,9 @@ export function MapView() {
   useEffect(() => { if (replay) setFollowId(null); }, [replay?.sessionId]);
   const followRef = useRef(followId); followRef.current = followId;
   const hoverRef = useRef(hover); hoverRef.current = hover;
+  const selectedRef = useRef(selected); selectedRef.current = selected;
+  const moduleSpace = useRef(new LabelSpace());   // folder names taken this frame
+  const fileSpace = useRef(new LabelSpace());     // file names taken this frame
   const nodeIndex = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n])), [graph.nodes]);
   const nodeIndexRef = useRef(nodeIndex); nodeIndexRef.current = nodeIndex;
   /** Map an agent's file (or a searched directory) to a node id on the map. */
@@ -334,14 +346,20 @@ export function MapView() {
       ctx.stroke();
     }
 
-    const showLabel = isSel || isHover || active || r * scale > 9 || scale > 3.2;
+    const forced = isSel || isHover || active;
+    let showLabel = forced || r * scale > 9 || scale > 3.2;
+    const fs = Math.max(11, Math.min(14, 11 + r * scale * 0.08)) / scale;
+    const label = baseName(n.id);
+    const ty = y + r + 3 / scale;
     if (showLabel) {
-      const fs = Math.max(11, Math.min(14, 11 + r * scale * 0.08)) / scale;
+      // Skip a file name that would print over one already drawn this frame (the ones you point at always win).
       ctx.font = `${isSel || active ? 600 : 500} ${fs}px ${tokens.body}`;
+      const w = ctx.measureText(label).width, pad = 3 / scale;
+      showLabel = fileSpace.current.claim({ x0: x - w / 2 - pad, x1: x + w / 2 + pad, y0: ty - pad, y1: ty + fs + pad }, forced);
+    }
+    if (showLabel) {
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      const label = baseName(n.id);
-      const ty = y + r + 3 / scale;
       ctx.lineWidth = 3 / scale;
       ctx.strokeStyle = "rgba(251,251,253,0.9)";
       ctx.strokeText(label, x, ty);
@@ -352,23 +370,19 @@ export function MapView() {
   }, [tokens, selected, hover]);
 
   const drawModules = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
-    const acc = new Map<string, { x: number; y: number; n: number; minY: number }>();
-    for (const n of graph.nodes) {
-      if (n.x === undefined || n.y === undefined) continue;
-      const a = acc.get(n.file.module) ?? { x: 0, y: 0, n: 0, minY: Infinity };
-      a.x += n.x; a.y += n.y; a.n++; a.minY = Math.min(a.minY, n.y - n.r);
-      acc.set(n.file.module, a);
+    moduleSpace.current.reset(); fileSpace.current.reset();
+    const idx = nodeIndexRef.current;
+    const focus = new Set<string>();
+    for (const id of [hoverRef.current, selectedRef.current]) { const n = id ? idx.get(id) : undefined; if (n) focus.add(n.file.module); }
+    const busy = new Set<string>();
+    for (const a of agentsRef.current) {
+      if (!a.active || !a.file) continue;
+      const id = resolveId(a.file), n = id ? idx.get(id) : undefined;
+      if (n) busy.add(n.file.module);
     }
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    for (const [m, a] of acc) {
-      const px = Math.max(20, Math.min(40, 16 + Math.sqrt(a.n) * 3.5));
-      ctx.font = `700 ${px / scale}px ${tokens.display}`;
-      ctx.fillStyle = "rgba(29,29,31,0.2)";
-      ctx.textBaseline = "bottom";
-      ctx.fillText(modName(m), a.x / a.n, a.minY - 10 / scale);
-    }
-  }, [graph.nodes, tokens]);
+    drawModuleLabels(ctx, scale, graph.nodes.map((n) => ({ x: n.x, y: n.y, r: n.r, module: n.file.module, lastChangedAt: n.file.lastChangedAt, active: !!n.file.activeSessionId })),
+      { font: tokens.display, now: clock(), focus, busy, space: moduleSpace.current });
+  }, [graph.nodes, tokens, resolveId]);
 
   const sel = selected ? graph.nodes.find((n) => n.id === selected)?.file : undefined;
 

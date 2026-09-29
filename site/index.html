@@ -22,7 +22,7 @@
   --cool: #b4c2d4;   /* unchanged file */
   --warm: #ff9f0a;   /* changed recently */
   --hot: #ff375f;    /* agent editing now */
-  --grad: linear-gradient(95deg, #ff9f0a 0%, #ff6a3d 45%, #ff375f 100%);  /* the map's heat: recent to live */
+  --grad: linear-gradient(95deg, #2aa4ff 0%, #0a74ff 50%, #4f5bff 100%);  /* brand blue */
   --risk: #d93025;
   --nvidia: #76b900;
   --display: "Cabinet Grotesk", -apple-system, system-ui, sans-serif;
@@ -316,12 +316,12 @@ nav { top: 40px; }
 
 /* roadmap */
 .road { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 96px; text-align: left; }
-.road::before { content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 2px; background: linear-gradient(90deg, var(--text) 0 20%, #ff9f0a 45%, #ff375f 60%, var(--line) 85%); }
+.road::before { content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 2px; background: linear-gradient(90deg, var(--text) 0 20%, #2aa4ff 45%, #4f5bff 60%, var(--line) 85%); }
 .road > div { position: relative; }
 .road .dot { display: block; position: relative; z-index: 1; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid var(--line); box-sizing: border-box; }
 .road .now .dot { background: var(--text); border-color: var(--text); }
-.road .next .dot { background: #ff5a4a; border-color: #ff5a4a; animation: road-pulse 2.2s ease-out infinite; }
-@keyframes road-pulse { 0% { box-shadow: 0 0 0 0 rgba(255,90,74,.45); } 100% { box-shadow: 0 0 0 16px rgba(255,90,74,0); } }
+.road .next .dot { background: #0a74ff; border-color: #0a74ff; animation: road-pulse 2.2s ease-out infinite; }
+@keyframes road-pulse { 0% { box-shadow: 0 0 0 0 rgba(10,116,255,.45); } 100% { box-shadow: 0 0 0 16px rgba(10,116,255,0); } }
 .road h3 { font-size: clamp(28px, 3vw, 38px); margin-top: 26px; letter-spacing: -0.03em; }
 .road .next h3 { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .road .when { color: var(--muted); font-weight: 500; margin-top: 4px; }
@@ -330,7 +330,7 @@ nav { top: 40px; }
 .road .later li { color: var(--muted); }
 .wl-big { display: flex; justify-content: center; gap: 10px; margin: 96px auto 0; max-width: 520px; }
 .wl-big input { flex: 1; min-width: 0; height: 52px; border: 1px solid var(--line); border-radius: 999px; padding: 0 22px; font: 500 17px var(--body); background: #fff; outline: none; transition: border-color .2s, box-shadow .2s; }
-.wl-big input:focus { border-color: #ff9f0a; box-shadow: 0 0 0 4px rgba(255,159,10,.15); }
+.wl-big input:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(0,113,227,.15); }
 .wl-big .btn { border: 0; cursor: pointer; font-family: var(--body); background: var(--grad); }
 .wl-note { margin-top: 16px; color: var(--muted); font-size: 14px; font-weight: 500; }
 .wl-big + .wl-note:empty { display: none; }
@@ -371,7 +371,7 @@ footer a:hover { text-decoration: underline; }
   .wl-mini, .has-waitlist .band .dim { display: none; }
   .has-waitlist .band-link { display: inline; }
   .road { grid-template-columns: 1fr; gap: 40px; margin-top: 64px; padding-left: 36px; }
-  .road::before { left: 7px; right: auto; top: 8px; bottom: 0; width: 2px; height: auto; background: linear-gradient(180deg, var(--text) 0 20%, #ff9f0a 40%, #ff375f 60%, var(--line) 85%); }
+  .road::before { left: 7px; right: auto; top: 8px; bottom: 0; width: 2px; height: auto; background: linear-gradient(180deg, var(--text) 0 20%, #2aa4ff 40%, #4f5bff 60%, var(--line) 85%); }
   .road .dot { position: absolute; left: -36px; top: 8px; }
   .road h3 { margin-top: 0; }
   .wl-big { flex-direction: column; margin-top: 64px; }

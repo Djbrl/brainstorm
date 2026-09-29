@@ -24,6 +24,7 @@
   --hot: #ff375f;    /* agent editing now */
   --grad: linear-gradient(95deg, #ff9f0a 0%, #ff6a3d 45%, #ff375f 100%);  /* the map's heat: recent to live */
   --risk: #d93025;
+  --nvidia: #76b900;
   --display: "Cabinet Grotesk", -apple-system, system-ui, sans-serif;
   --body: "Satoshi", -apple-system, system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, monospace;
@@ -209,15 +210,34 @@ nav .links a:hover { color: var(--text); }
 .srt { flex: 1; padding: 20px 26px; font: 13px/1.6 var(--mono); color: var(--faint); overflow: hidden; background: #fff; }
 .srt p { margin: 0 0 8px; }
 .srt .hl { color: var(--text); background: #eaf7f1; box-shadow: -8px 0 0 #eaf7f1, 8px 0 0 #eaf7f1; border-left: 3px solid #1f9d7a; }
-.film { flex: 1; position: relative; overflow: hidden; background: radial-gradient(ellipse 60% 80% at 50% 110%, #3a2a55 0%, #120f1c 60%, #09080d 100%); }
-.film::before { content: ""; position: absolute; left: 50%; bottom: -8%; width: 30%; aspect-ratio: 1 / 1.35; transform: translateX(-50%); border-radius: 48% 48% 18% 18%; background: linear-gradient(#2a2238, #1a1524); box-shadow: 0 -64% 0 -30% #2a2238; }
-.film::after { content: ""; position: absolute; left: 50%; top: 18%; width: 11%; aspect-ratio: 1; transform: translateX(-50%); border-radius: 50%; background: #2c2439; }
-.film .spot { position: absolute; inset: 0; background: radial-gradient(circle at 50% 30%, rgba(255,170,90,.18), transparent 45%); }
-.film .capt { position: absolute; left: 50%; bottom: 13%; transform: translateX(-50%); z-index: 1; font: 700 clamp(13px, 1.5vw, 19px)/1.3 var(--body); color: #fff; background: rgba(0,0,0,.55); padding: 6px 14px; border-radius: 8px; white-space: nowrap; }
-.film .bar { position: absolute; left: 16px; right: 16px; bottom: 12px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.2); z-index: 1; }
-.film .bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 38%; border-radius: 2px; background: #fff; }
-.film .badge { position: absolute; top: 14px; left: 14px; z-index: 1; font: 700 12px var(--body); color: #fff; background: rgba(255,255,255,.14); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-radius: 999px; padding: 4px 11px; }
+.film { flex: 1; position: relative; overflow: hidden; background: #08070c; display: flex; flex-direction: column; }
+.film .shot { position: relative; flex: 1; overflow: hidden; }
+.film .shot svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.film .shot::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 80% 70% at 50% 45%, transparent 55%, rgba(0,0,0,.55)); }
+.teaser .shot svg { transform: scale(1.3); transform-origin: 50% 22%; animation: kenburns 9s ease-in-out infinite alternate; }
+@keyframes kenburns { from { transform: scale(1.3); } to { transform: scale(1.4) translate(-1.5%, 0); } }
+.film .badge { position: absolute; top: 14px; left: 14px; z-index: 2; font: 700 12px var(--body); color: #fff; background: rgba(0,0,0,.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-radius: 999px; padding: 4px 11px; }
 .film .badge.new { background: #1f9d7a; }
+.film .capt { position: absolute; left: 50%; bottom: 9%; transform: translateX(-50%); z-index: 2; font: 700 clamp(13px, 1.6vw, 20px)/1.3 var(--body); color: #fff; background: rgba(0,0,0,.62); padding: 6px 14px; border-radius: 8px; white-space: nowrap; }
+.film .player { flex: none; display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: #121118; color: #c7c7cc; font: 600 12px var(--mono); }
+.film .player svg { width: 12px; height: 12px; fill: #fff; flex: none; }
+.film .player .bar { flex: 1; position: relative; height: 4px; border-radius: 2px; background: rgba(255,255,255,.16); }
+.film .player .bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 33%; border-radius: 2px; background: #fff; }
+.film .player .bar b { position: absolute; left: 33%; top: -3px; width: 7.5%; height: 10px; border-radius: 3px; background: rgba(255,159,10,.35); border: 1px solid #ff9f0a; }
+.film .strip { flex: none; position: relative; display: flex; gap: 3px; padding: 8px 14px 10px; background: #121118; }
+.film .strip svg { flex: 1; min-width: 0; aspect-ratio: 16 / 10; border-radius: 3px; display: block; }
+.film .strip .ph { position: absolute; top: 4px; bottom: 6px; left: 14px; width: 2px; background: #ff375f; box-shadow: 0 0 6px #ff375f; animation: playhead 7s linear infinite; }
+@keyframes playhead { from { left: 14px; } to { left: calc(100% - 16px); } }
+/* the scene's own motion */
+.sc-cone { animation: flicker 5s ease-in-out infinite alternate; }
+.sc-cone.b { animation-duration: 6.5s; animation-delay: -2s; }
+@keyframes flicker { 0% { opacity: .75; } 40% { opacity: 1; } 70% { opacity: .85; } 100% { opacity: .95; } }
+.sc-hot { transform-box: fill-box; transform-origin: center; animation: hotpulse 1.6s ease-out infinite; }
+@keyframes hotpulse { 0% { transform: scale(1); opacity: .9; } 100% { transform: scale(3.2); opacity: 0; } }
+.sc-trail { stroke-dasharray: 160; stroke-dashoffset: 160; animation: trail 4s var(--ease) infinite; }
+@keyframes trail { 0% { stroke-dashoffset: 160; } 60%, 100% { stroke-dashoffset: 0; } }
+.sc-speaker { transform-box: fill-box; transform-origin: 50% 100%; animation: sway 4.5s ease-in-out infinite alternate; }
+@keyframes sway { from { transform: rotate(-1.2deg); } to { transform: rotate(1.4deg); } }
 .web { flex: 1; background: #fff; display: flex; flex-direction: column; }
 .web .url { margin: 12px 14px 0; padding: 7px 14px; border-radius: 999px; background: #f0f0f3; font: 13px var(--mono); color: var(--muted); }
 .web .doc { padding: 22px 30px; }
@@ -242,6 +262,74 @@ nav .links a:hover { color: var(--text); }
 .award { display: inline-block; margin-top: 56px; color: var(--muted); font-weight: 500; font-size: 15px; }
 .award:hover { color: var(--text); }
 .award b { color: var(--text); font-weight: 700; }
+
+/* brev: dark, in NVIDIA's colors */
+#brev { background: #000; color: #fff; position: relative; overflow: hidden; }
+#brev::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(rgba(118,185,0,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(118,185,0,.08) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 55% at 50% 45%, #000, transparent); mask-image: radial-gradient(ellipse 70% 55% at 50% 45%, #000, transparent);
+}
+#brev .wrap { position: relative; }
+#brev .h2 .g { color: var(--nvidia); }
+#brev .sub { color: #a1a1a6; }
+.chip { display: block; width: min(560px, 100%); height: auto; margin: 90px auto 0; overflow: visible; }
+.chip .trace { fill: none; stroke: #1d2710; stroke-width: 2; }
+.chip .pulse { fill: none; stroke: var(--nvidia); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: .07 .93; animation: flow 2.6s linear infinite; filter: drop-shadow(0 0 3px #76b900); }
+@keyframes flow { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 1; } }
+.chip .pkg { fill: #080b04; stroke: #2c3a14; stroke-width: 1.5; }
+.chip .die { fill: #0d1307; stroke: rgba(118,185,0,.55); stroke-width: 1.2; }
+.chip .core { fill: #18220d; transition: fill .45s; }
+.chip .core.on { fill: var(--nvidia); }
+.why3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 90px; text-align: left; }
+.why3 > div { border-top: 3px solid var(--nvidia); padding-top: 22px; }
+.why3 h3 { font-size: 26px; letter-spacing: -0.025em; }
+.why3 p { color: #a1a1a6; margin-top: 10px; font-weight: 500; }
+.nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 64px 48px; margin-top: 110px; }
+.nums:empty { display: none; }
+.num .v { font: 800 clamp(48px, 5.5vw, 76px)/1 var(--display); letter-spacing: -0.045em; color: var(--nvidia); }
+.num .k { color: #a1a1a6; font-weight: 500; margin-top: 12px; }
+.brev-foot { margin-top: 80px; display: flex; justify-content: center; flex-wrap: wrap; gap: 10px 28px; font-size: 14px; color: #86868b; font-weight: 500; }
+.brev-foot a { color: var(--nvidia); }
+
+/* waitlist band, above the nav */
+html { scroll-padding-top: 96px; }
+.band { position: fixed; inset: 0 0 auto; z-index: 51; height: 40px; background: #1d1d1f; color: #f5f5f7; font-size: 13.5px; font-weight: 500; }
+.band .wrap { display: flex; align-items: center; justify-content: center; gap: 18px; height: 100%; }
+.band b { font-weight: 700; }
+.band .dim { color: #a1a1a6; }
+.wl-mini { display: flex; align-items: center; gap: 6px; }
+.wl-mini input { width: 200px; height: 28px; border: 0; border-radius: 999px; padding: 0 12px; background: rgba(255,255,255,.12); color: #fff; font: 500 13px var(--body); outline: none; }
+.wl-mini input::placeholder { color: #a1a1a6; }
+.wl-mini input:focus { background: rgba(255,255,255,.2); }
+.wl-mini button { height: 28px; border: 0; border-radius: 999px; padding: 0 14px; background: var(--grad); color: #fff; font: 700 13px var(--body); cursor: pointer; white-space: nowrap; }
+.band-link { color: #fff; font-weight: 700; white-space: nowrap; display: none; }
+.band-link::after { content: " ›"; }
+nav { top: 40px; }
+[data-waitlist][hidden] { display: none; }
+.wl-done { font-weight: 700; }
+
+/* roadmap */
+.road { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 96px; text-align: left; }
+.road::before { content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 2px; background: linear-gradient(90deg, var(--text) 0 20%, #ff9f0a 45%, #ff375f 60%, var(--line) 85%); }
+.road > div { position: relative; }
+.road .dot { display: block; position: relative; z-index: 1; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid var(--line); box-sizing: border-box; }
+.road .now .dot { background: var(--text); border-color: var(--text); }
+.road .next .dot { background: #ff5a4a; border-color: #ff5a4a; animation: road-pulse 2.2s ease-out infinite; }
+@keyframes road-pulse { 0% { box-shadow: 0 0 0 0 rgba(255,90,74,.45); } 100% { box-shadow: 0 0 0 16px rgba(255,90,74,0); } }
+.road h3 { font-size: clamp(28px, 3vw, 38px); margin-top: 26px; letter-spacing: -0.03em; }
+.road .next h3 { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.road .when { color: var(--muted); font-weight: 500; margin-top: 4px; }
+.road ul { list-style: none; margin: 22px 0 0; padding: 0; }
+.road li { padding: 12px 0; border-top: 1px solid var(--line); font-weight: 500; line-height: 1.4; }
+.road .later li { color: var(--muted); }
+.wl-big { display: flex; justify-content: center; gap: 10px; margin: 96px auto 0; max-width: 520px; }
+.wl-big input { flex: 1; min-width: 0; height: 52px; border: 1px solid var(--line); border-radius: 999px; padding: 0 22px; font: 500 17px var(--body); background: #fff; outline: none; transition: border-color .2s, box-shadow .2s; }
+.wl-big input:focus { border-color: #ff9f0a; box-shadow: 0 0 0 4px rgba(255,159,10,.15); }
+.wl-big .btn { border: 0; cursor: pointer; font-family: var(--body); background: var(--grad); }
+.wl-note { margin-top: 16px; color: var(--muted); font-size: 14px; font-weight: 500; }
+.wl-big + .wl-note:empty { display: none; }
 
 /* privacy */
 .four { display: grid; grid-template-columns: repeat(4, 1fr); gap: 48px; margin-top: 110px; }
@@ -275,6 +363,15 @@ footer a:hover { text-decoration: underline; }
   .stats3 { grid-template-columns: 1fr; }
   .stat3 { grid-area: 1 / 1; }                        /* one at a time on phones */
   .steps3 { grid-template-columns: 1fr; gap: 56px; margin-top: 64px; }
+  .band .wrap { gap: 10px; font-size: 12.5px; }
+  .wl-mini, .has-waitlist .band .dim { display: none; }
+  .has-waitlist .band-link { display: inline; }
+  .road { grid-template-columns: 1fr; gap: 40px; margin-top: 64px; padding-left: 36px; }
+  .road::before { left: 7px; right: auto; top: 8px; bottom: 0; width: 2px; height: auto; background: linear-gradient(180deg, var(--text) 0 20%, #ff9f0a 40%, #ff375f 60%, var(--line) 85%); }
+  .road .dot { position: absolute; left: -36px; top: 8px; }
+  .road h3 { margin-top: 0; }
+  .wl-big { flex-direction: column; margin-top: 64px; }
+  .nums, .why3 { grid-template-columns: 1fr; gap: 48px; }
   #tasks .stage { justify-content: flex-start; padding-top: 72px; }
   .tasks-head .sub { display: none; }
   .tk { grid-template-columns: 1fr; gap: 16px; margin-top: 20px; }
@@ -301,11 +398,56 @@ footer a:hover { text-decoration: underline; }
 @media (prefers-reduced-motion: reduce) {
   .rv { opacity: 1; transform: none; transition: none; }
   .tk-line li, .tk-pane, .tk-agent { transition: none; }
+  .sc-cone, .sc-hot, .sc-trail, .sc-speaker, .teaser .shot svg, .film .strip .ph { animation: none; }
+  .sc-trail { stroke-dashoffset: 0; }
+  .chip .pulse { animation: none; opacity: 0; }
   .hero-type h1 .line span, .hero-type p, .cue { animation: none; transform: none; opacity: 1; }
 }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="scBg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c1633"/><stop offset=".62" stop-color="#110e1d"/><stop offset="1" stop-color="#07060b"/></linearGradient>
+    <linearGradient id="scCone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd7a3" stop-opacity=".5"/><stop offset="1" stop-color="#ffd7a3" stop-opacity="0"/></linearGradient>
+    <linearGradient id="scConeB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b9c7ff" stop-opacity=".35"/><stop offset="1" stop-color="#b9c7ff" stop-opacity="0"/></linearGradient>
+    <radialGradient id="scGlow"><stop offset="0" stop-color="#dfe6ff" stop-opacity=".55"/><stop offset="1" stop-color="#dfe6ff" stop-opacity="0"/></radialGradient>
+    <linearGradient id="scRim" x1="0" y1="0" x2="1" y2="0"><stop offset=".55" stop-color="#1a1526"/><stop offset="1" stop-color="#6b4a3a"/></linearGradient>
+    <symbol id="stageScene" viewBox="0 0 560 350">
+      <rect width="560" height="350" fill="url(#scBg)"/>
+      <g stroke="#ffffff" stroke-opacity=".035"><path d="M70 0V250M140 0V250M420 0V250M490 0V250"/></g>
+      <ellipse cx="275" cy="120" rx="210" ry="120" fill="url(#scGlow)"/>
+      <rect x="140" y="38" width="270" height="160" rx="5" fill="#fbfbfd"/>
+      <text x="158" y="62" font-family="Cabinet Grotesk, system-ui, sans-serif" font-weight="800" font-size="13" fill="#1d1d1f">A live map of your agents</text>
+      <g stroke="#c9ced9" stroke-width="1.2" fill="none"><path d="M180 110 214 94 250 120 292 100 330 132 366 112M214 94 226 150 270 164 330 132M180 110 196 158 226 150M292 100 302 150 270 164M366 112 380 160 330 132"/></g>
+      <path class="sc-trail" d="M196 158 C230 170 250 128 292 100 S350 126 366 112" fill="none" stroke="#0a84ff" stroke-width="2.4" stroke-linecap="round"/>
+      <g fill="#b4c2d4"><circle cx="180" cy="110" r="5"/><circle cx="214" cy="94" r="4"/><circle cx="250" cy="120" r="5"/><circle cx="226" cy="150" r="4"/><circle cx="302" cy="150" r="4"/><circle cx="380" cy="160" r="5"/><circle cx="270" cy="164" r="4"/></g>
+      <g fill="#ff9f0a"><circle cx="196" cy="158" r="5"/><circle cx="292" cy="100" r="6"/><circle cx="330" cy="132" r="5"/></g>
+      <circle class="sc-hot" cx="366" cy="112" r="6" fill="#ff375f"/><circle cx="366" cy="112" r="6" fill="#ff375f"/>
+      <rect x="0" y="236" width="560" height="114" fill="#0b0912"/>
+      <path d="M0 236H560" stroke="#3a2f52" stroke-width="1.5"/>
+      <polygon class="sc-cone" points="200,0 232,0 330,300 150,300" fill="url(#scCone)"/>
+      <polygon class="sc-cone b" points="420,0 446,0 520,300 350,300" fill="url(#scConeB)"/>
+      <path d="M296 214h52l-6 64h-40z" fill="#241c35"/><rect x="292" y="208" width="60" height="8" rx="2" fill="#2e2542"/>
+      <g class="sc-speaker">
+        <path d="M398 300c1-40 11-58 29-60 18 2 28 20 29 60z" fill="url(#scRim)"/>
+        <circle cx="427" cy="222" r="15" fill="url(#scRim)"/>
+      </g>
+      <g fill="#050408">
+        <circle cx="40" cy="336" r="19"/><circle cx="96" cy="342" r="17"/><circle cx="150" cy="334" r="20"/><circle cx="214" cy="344" r="18"/><circle cx="276" cy="336" r="19"/>
+        <circle cx="334" cy="344" r="17"/><circle cx="392" cy="336" r="20"/><circle cx="452" cy="343" r="18"/><circle cx="512" cy="335" r="19"/>
+      </g>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="band" id="band">
+  <div class="wrap">
+    <span><b>Brainstorm is a prototype.</b> <span class="dim">The full release lands in late October.</span></span>
+    <form class="wl-mini" data-waitlist hidden><input type="email" name="email" required placeholder="Your email" aria-label="Your email" autocomplete="email"><button type="submit">Join the waitlist</button></form>
+    <a class="band-link" href="#roadmap">Join the waitlist</a>
+  </div>
+</div>
 
 <nav>
   <div class="wrap">
@@ -320,7 +462,8 @@ footer a:hover { text-decoration: underline; }
     <div class="links">
       <a href="#product">Product</a>
       <a href="#tasks">Beyond code</a>
-      <a href="#privacy">Privacy</a>
+      <a href="#brev">NVIDIA</a>
+      <a href="#roadmap">Roadmap</a>
       <a data-link="demo" href="#">Live demo</a>
     </div>
     <a class="btn small" data-link="install" href="#">Install</a>
@@ -438,7 +581,8 @@ footer a:hover { text-decoration: underline; }
       <div class="tk-win" id="tkWin">
         <header><b id="tkTitle">talk.mp4</b><span id="tkTime">10:02</span></header>
         <div class="tk-screen">
-          <div class="tk-pane on"><div class="film"><div class="spot"></div><span class="badge">talk.mp4 · 12:41</span><div class="bar"><i style="width:0"></i></div></div></div>
+          <div class="tk-pane on"><div class="film"><div class="shot"><svg viewBox="0 0 560 350" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><span class="badge">talk.mp4 · 12:41</span></div>
+            <div class="player"><svg viewBox="0 0 12 12"><path d="M2 1l9 5-9 5z"/></svg><div class="bar"><i></i><b></b></div><span>04:12 / 12:41</span></div></div></div>
           <div class="tk-pane"><pre class="term"><span class="pr">$</span> ffprobe talk.mp4
 <span class="dim">Input #0, mov,mp4, from 'talk.mp4':</span>
   Duration: <span class="ok">00:12:41</span>
@@ -460,7 +604,8 @@ footer a:hover { text-decoration: underline; }
 <span class="dim">exit 8</span></pre>
             <ul class="plain"><li>This ffmpeg was built without subtitle support, so the agent looks for another way.</li></ul></div>
           <div class="tk-pane"><div class="web"><div class="url">ffmpeg.org/ffmpeg-filters.html#drawtext</div><div class="doc"><h4>drawtext</h4><p>Draw a text string on top of a video, with the font, size and position you choose.</p><div class="hl">drawtext=text='Agents should show their work.'</div></div></div></div>
-          <div class="tk-pane"><div class="film"><div class="spot"></div><span class="badge new">New · teaser.mp4 · 0:30</span><span class="capt">Agents should show their work.</span><div class="bar"><i></i></div></div></div>
+          <div class="tk-pane"><div class="film teaser"><div class="shot"><svg viewBox="0 0 560 350" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><span class="badge new">New · teaser.mp4 · 0:30</span><span class="capt">Agents should show their work.</span></div>
+            <div class="strip"><svg viewBox="0 0 560 350" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><svg viewBox="130 30 290 181" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><svg viewBox="60 10 440 275" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><svg viewBox="130 30 290 181" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><svg viewBox="0 0 560 350" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><svg viewBox="100 20 360 225" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><span class="ph"></span></div></div></div>
         </div>
       </div>
     </div>
@@ -476,8 +621,46 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- 7. Install -->
-<section class="block" id="install">
+<!-- 7. NVIDIA: the first read of a codebase, on Nemotron -->
+<section class="block" id="brev">
+  <div class="wrap center">
+    <h2 class="h2 rv">Read everything.<br><span class="g">On NVIDIA Nemotron.</span></h2>
+    <p class="sub rv d1">Coming in the full release: Brainstorm reads your whole project once, so every file and every agent step gets a short summary.</p>
+    <svg class="chip rv d2" id="chip" viewBox="0 0 520 300" aria-hidden="true"></svg>
+    <div class="why3">
+      <div class="rv"><h3>Flat price.</h3><p>A GPU rented by the hour, not billed by the token. The thousandth file costs the same as the first.</p></div>
+      <div class="rv d1"><h3>Open weights.</h3><p>NVIDIA Nemotron 3 Nano, served with vLLM on NVIDIA Brev.</p></div>
+      <div class="rv d2"><h3>Your choice.</h3><p>Rather use your own Claude Code, or a local model? That will be a setting.</p></div>
+    </div>
+    <div class="nums">
+      <div class="num rv"><div class="v">81k</div><div class="k">lines of code read, 311 files</div></div>
+      <div class="num rv d1"><div class="v">73 s</div><div class="k">for the whole read</div></div>
+      <div class="num rv d2"><div class="v">$0.02</div><div class="k">of GPU time, about 35× less than Claude Haiku</div></div>
+    </div>
+    <div class="brev-foot rv"><span>Measured on the Hono web framework at the GOMYCODE × NVIDIA hackathon</span><a data-link="numbers" href="#">How we measured ›</a></div>
+  </div>
+</section>
+
+<!-- 8. Roadmap and the waitlist -->
+<section class="block" id="roadmap">
+  <div class="wrap center">
+    <h2 class="h2 rv">What's next.</h2>
+    <p class="sub rv d1">Brainstorm is a prototype today. The full release lands in late October.</p>
+    <div class="road">
+      <div class="now rv"><span class="dot"></span><h3>Today</h3><p class="when">Prototype, version 0.2</p>
+        <ul><li>A live map of your agents, and a replay of every thread</li><li>The Track, for work beyond code</li><li>Errors in red, wherever they happen</li><li>A plugin for Claude Code</li></ul></div>
+      <div class="next rv d1"><span class="dot"></span><h3>Late October</h3><p class="when">Full release</p>
+        <ul><li>A short summary of every file and every step</li><li>Share a replay, with secrets and screenshots removed</li><li>A recap of what happened while you were away</li><li>Your agents ask Brainstorm too, through MCP</li></ul></div>
+      <div class="later rv d2"><span class="dot"></span><h3>After</h3><p class="when">What we're building toward</p>
+        <ul><li>Codex, Cursor and Gemini CLI</li><li>Find the step that broke it, like git bisect</li><li>Replays on pull requests</li><li>Pause and steer an agent from the map</li></ul></div>
+    </div>
+    <form class="wl-big rv" id="waitlist" data-waitlist hidden><input type="email" name="email" required placeholder="you@example.com" aria-label="Your email" autocomplete="email"><button class="btn" type="submit">Join the waitlist</button></form>
+    <p class="wl-note rv" id="wlNote"></p>
+  </div>
+</section>
+
+<!-- 9. Install -->
+<section class="block alt" id="install">
   <div class="wrap center">
     <h2 class="h2 rv">Install it in<br>Claude Code.</h2>
     <p class="sub rv d1">Free. Everything runs on your machine.</p>
@@ -497,8 +680,8 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- 8. Privacy -->
-<section class="block alt" id="privacy">
+<!-- 10. Privacy -->
+<section class="block" id="privacy">
   <div class="wrap center">
     <h2 class="h2 rv">Your code<br>stays yours.</h2>
     <div class="four">
@@ -510,8 +693,8 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- 9. Closing -->
-<section class="closing">
+<!-- 11. Closing -->
+<section class="closing alt">
   <div class="wrap center">
     <h2 class="rv"><span>Let the agents work.</span><span class="grad">Keep your brain in the loop.</span></h2>
     <div class="btns rv d1">
@@ -545,9 +728,14 @@ const SITE = {
     guide: "https://github.com/Djbrl/brainstorm/blob/main/plugin/README.md",
     repo: "https://github.com/Djbrl/brainstorm",
     award: "https://hackathon.gomycode.com/onboarding/winners",
+    numbers: "https://github.com/Djbrl/brainstorm/blob/main/docs/numbers.md",
     video: null,   // a film link, when there is one
   },
+  // Where the waitlist forms POST the email (a form field named "email"): a Formspree, Buttondown or Loops form URL,
+  // or our own endpoint. While it's null the forms stay hidden and the band only announces the release.
+  waitlist: null,
 };
+
 
 /* ---------- fill the page from SITE ---------- */
 const $ = s => document.querySelector(s);
@@ -559,6 +747,24 @@ document.querySelectorAll("[data-link]").forEach(a => {
 });
 $("#footLinks").innerHTML = [["repo", "GitHub"], ["demo", "Live demo"], ["video", "Film"]]
   .filter(([k]) => SITE.links[k]).map(([k, t]) => `<a href="${esc(SITE.links[k])}" target="_blank" rel="noopener">${t}</a>`).join(" · ");
+
+/* waitlist: shown only once there's somewhere to send the email */
+if (SITE.waitlist) {
+  document.body.classList.add("has-waitlist");
+  $("#wlNote").textContent = "One email when the full release is out. Nothing else.";
+  document.querySelectorAll("[data-waitlist]").forEach(form => {
+    form.hidden = false;
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+      const btn = form.querySelector("button"); btn.disabled = true;
+      try {
+        await fetch(SITE.waitlist, { method: "POST", body: new FormData(form), mode: "no-cors" });  // form services don't all send CORS headers
+        const done = document.createElement("span"); done.className = "wl-done"; done.textContent = "You're on the list. See you in late October.";
+        form.replaceWith(done);
+      } catch { btn.disabled = false; btn.textContent = "Try again"; }
+    });
+  });
+}
 
 /* copy buttons on the install commands */
 document.querySelectorAll("[data-copy]").forEach(btn => btn.addEventListener("click", async () => {
@@ -829,6 +1035,24 @@ const tasks = (() => {
   show(0);
   addEventListener("resize", () => { const i = cur; cur = -1; show(i); });
   return { set(p) { show(Math.min(stops.length - 1, Math.floor(win(p, .06, .9) * stops.length))); } };
+})();
+
+/* brev: a GPU with data running along its traces and cores lighting up */
+(() => {
+  const svg = $("#chip");
+  const T = ["M190 110H120L100 90H0", "M190 140H0", "M190 170H110L90 190H0", "M190 198H130L112 216V300",
+    "M330 110H400L420 90H520", "M330 140H520", "M330 170H410L430 190H520", "M330 198H390L408 216V300",
+    "M230 90V40L210 20V0", "M260 90V0", "M290 90V40L310 20V0", "M232 210V250L214 268V300", "M288 210V250L306 268V300"];
+  let h = T.map(d => `<path class="trace" d="${d}"/>`).join("")
+    + T.map((d, i) => `<path class="pulse" pathLength="1" d="${d}" style="animation-delay:-${(i * .61) % 2.6}s"/>`).join("")
+    + `<rect class="pkg" x="186" y="86" width="148" height="128" rx="8"/><rect class="die" x="194" y="94" width="132" height="112" rx="4"/>`;
+  for (let r = 0; r < 5; r++) for (let c = 0; c < 7; c++) h += `<rect class="core" x="${199 + c * 18}" y="${101 + r * 20}" width="14" height="16" rx="2"/>`;
+  svg.innerHTML = h;
+  const cores = [...svg.querySelectorAll(".core")];
+  let vis = false;
+  new IntersectionObserver(([e]) => vis = e.isIntersecting).observe(svg);
+  cores.forEach(c => c.classList.toggle("on", Math.random() < .3));
+  if (!still) setInterval(() => { if (vis) cores.forEach(c => c.classList.toggle("on", Math.random() < .3)); }, 450);
 })();
 
 /* ---------- scroll-driven scenes ---------- */

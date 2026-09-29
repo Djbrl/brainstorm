@@ -832,11 +832,11 @@ function typeQuestion() {
    Three agents doing three kinds of work: code, research on the web, a video edit. One agent's line
    draws on white while the camera follows it; two more join and the three tangle ("Three, you can't"),
    then they separate into the map and work: reads are dashed lines of sight, edits ripple, the video
-   agent fails once (red), reads the docs and retries. Then the camera pulls back to the whole map.
+   agent reads the docs between two edits. Then the camera pulls back to the whole map.
    Everything is driven by p (0..1). */
 const hero = (() => {
   const cv = $("#map"), ctx = cv.getContext("2d");
-  const COOL = [180, 194, 212], WARM = [255, 159, 10], HOT = [255, 55, 95], RED = [217, 48, 37];
+  const COOL = [180, 194, 212], WARM = [255, 159, 10], HOT = [255, 55, 95];
   const AG = [
     { name: "Coding agent", col: [10, 132, 255], swoop: [.06, .34], end: .74 },
     { name: "Research agent", col: [191, 90, 242], swoop: [.24, .34], end: .76 },
@@ -850,11 +850,11 @@ const hero = (() => {
     ["src/db", "file"], ["src/api", "file"], ["src/lib", "file"], ["the web", "page"],
     ["videos", "video"], ["src/ui", "file"], ["tests", "file"], ["src/pages", "file"],
   ];
-  // Where each agent works: [x, y as a fraction of the map, kind of place, what it did, failed?]
+  // Where each agent works: [x, y as a fraction of the map, kind of place, what it did]
   const STOPS = [
     [[-.12, .02, "file", "Edit api/users.ts"], [.12, -.02, "file", "Edit lib/cache.ts"], [.13, -.33, "file", "Edit billing/invoice.ts"]],
     [[-.13, -.33, "page", "Read a pricing page"], [.37, .02, "page", "Read a changelog"], [.37, -.33, "doc", "Write notes.md"]],
-    [[-.37, .33, "video", "Burn in captions", true], [-.1, -.3, "page", "Read ffmpeg.org"], [-.37, .31, "video", "Make teaser.mp4"]],
+    [[-.37, .33, "video", "Cut talk.mp4"], [-.1, -.3, "page", "Read ffmpeg.org"], [-.37, .31, "video", "Make teaser.mp4"]],
   ];
   let W, H, dpr, S, nodes = [], edges = [], clusters = [], seed;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -925,7 +925,7 @@ const hero = (() => {
       [[X(.9), H * .34], [X(.78), lane * 1.1], [X(.68), lane], [X(.62), -lane * .9], [X(.56), lane * .1], [X(.5), -lane * .1], [X(.44), lane]],
     ];
     AG.forEach((a, k) => {
-      a.stops = STOPS[k].map(([fx, fy, kind, label, fail]) => ({ node: near(fx, fy, kind, used), label, fail: !!fail }));
+      a.stops = STOPS[k].map(([fx, fy, kind, label]) => ({ node: near(fx, fy, kind, used), label }));
       const pts = [...starts[k], ...a.stops.map(s => [nodes[s.node].x, nodes[s.node].y])];
       a.path = spline(pts);
       a.sync = a.path.cum[2 * a.path.n];                               // arclength at the lane point
@@ -937,7 +937,7 @@ const hero = (() => {
       const L = lenAt(a, p), h = at(a.path, L);
       nodes.forEach(n => { if (n.rp === 1 && Math.hypot(n.x - h.x, n.y - h.y) < R) n.rp = p; });
       a.stops.forEach(s => {
-        if (s.p === undefined && L >= s.len - 1) { s.p = p; nodes[s.node].touch.push({ a, p, fail: s.fail }); }
+        if (s.p === undefined && L >= s.len - 1) { s.p = p; nodes[s.node].touch.push({ a, p }); }
       });
     });
     nodes.forEach(n => { n.rp = Math.min(n.rp, .6 + r(0, .16)); });
@@ -965,7 +965,6 @@ const hero = (() => {
     const pa = p;
     const heads = AG.map(a => { const L = lenAt(a, pa); return { a, L, ...at(a.path, L) }; });
     const live = heads.filter(h => h.L > 0);
-    const failing = h => h.a.stops.find(s => s.fail && s.p !== undefined && pa >= s.p && pa < s.p + .045);
 
     /* camera: follow agent 1, widen to fit all three, then pull back to the whole map */
     const zo = ease(win(p, .6, .8));
@@ -1025,21 +1024,19 @@ const hero = (() => {
     nodes.forEach(n => {
       const tk = n.touch.filter(tc => pa >= tc.p);
       if (n.a <= 0 && !tk.length) return;
-      const ok = tk.filter(tc => !tc.fail);
-      const touched = ok.length ? win(pa, ok[0].p, ok[0].p + .03) : 0;
-      const failNow = tk.find(tc => tc.fail && pa < tc.p + .06);
+      const touched = tk.length ? win(pa, tk[0].p, tk[0].p + .03) : 0;
       const current = tk.some(tc => heads.find(h => h.a === tc.a && Math.hypot(h.x - n.x, h.y - n.y) < 2));
       const heat = Math.max(touched, n.base * win(p, .66, .8));
-      const col = failNow ? RED : current ? HOT : mixC(COOL, WARM, heat);
-      if (current && !failNow) {                                         // a thin ring that pulses out every 1.6 s
+      const col = current ? HOT : mixC(COOL, WARM, heat);
+      if (current) {                                         // a thin ring that pulses out every 1.6 s
         const k = still ? .35 : (t / 1600 + n.ph) % 1;
         ctx.strokeStyle = `rgba(255,55,95,${.4 * (1 - k)})`; ctx.lineWidth = 1.5 * px;
         ctx.beginPath(); ctx.arc(n.x, n.y, n.rad * 1.25 + (3 + 20 * ease(k)) * px, 0, 7); ctx.stroke();
       }
-      tk.forEach(tc => {                                                 // a ripple on each edit, one red ring on a failure
-        const k = win(pa, tc.p, tc.p + (tc.fail ? .06 : .05)); if (k <= 0 || k >= 1) return;
-        ctx.strokeStyle = tc.fail ? `rgba(${RED},${1 - k})` : `rgba(${tc.a.col},${1 - k})`; ctx.lineWidth = (tc.fail ? 3 : 2) * px;
-        ctx.beginPath(); ctx.arc(n.x, n.y, n.rad + (tc.fail ? 52 : 36) * k * px + 4 * px, 0, 7); ctx.stroke();
+      tk.forEach(tc => {                                                 // a ripple on each edit
+        const k = win(pa, tc.p, tc.p + .05); if (k <= 0 || k >= 1) return;
+        ctx.strokeStyle = `rgba(${tc.a.col},${1 - k})`; ctx.lineWidth = 2 * px;
+        ctx.beginPath(); ctx.arc(n.x, n.y, n.rad + 36 * k * px + 4 * px, 0, 7); ctx.stroke();
       });
       shape(n, n.rad * (current ? 1.25 : 1), col, Math.max(n.a, tk.length ? 1 : 0));
     });
@@ -1056,24 +1053,24 @@ const hero = (() => {
     });
     ctx.textAlign = "left";
 
-    /* heads and their labels, drawn at screen size; red while a step is failing */
+    /* heads and their labels, drawn at screen size */
     ctx.font = "600 13px Satoshi, system-ui, sans-serif"; ctx.textBaseline = "middle";
     heads.forEach(h => {
       if (h.L <= 0) return;
-      const fail = failing(h), col = fail ? RED : h.a.col;
+      const col = h.a.col;
       const sx = ax + (h.x - camX) * z, sy = ay + (h.y - camY) * z;
       const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, 12);
       g.addColorStop(0, `rgba(${col},.22)`); g.addColorStop(1, `rgba(${col},0)`);
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, 12, 0, 7); ctx.fill();
       ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 7); ctx.fill();
       ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(sx, sy, 2, 0, 7); ctx.fill();
-      const name = fail ? h.a.name + " · failed" : h.a.name;
+      const name = h.a.name;
       const tw = ctx.measureText(name).width, bw = tw + 30, bh = 26, by = sy - 30;
       const bx = sx + 12 + bw > W - 8 ? sx - 12 - bw : sx + 12;          // flip left near the right edge
       ctx.save(); ctx.shadowColor = "rgba(0,0,0,.12)"; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3;
       ctx.fillStyle = "rgba(255,255,255,.96)"; ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 13); ctx.fill(); ctx.restore();
       ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(bx + 13, by + bh / 2, 4, 0, 7); ctx.fill();
-      ctx.fillStyle = fail ? `rgb(${RED})` : "#1d1d1f"; ctx.fillText(name, bx + 22, by + bh / 2 + .5);
+      ctx.fillStyle = "#1d1d1f"; ctx.fillText(name, bx + 22, by + bh / 2 + .5);
     });
   }
   function loop(t) { if (visible) draw(t); requestAnimationFrame(loop); }

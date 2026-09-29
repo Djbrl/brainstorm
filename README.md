@@ -2,7 +2,7 @@
 
 **A live map of your agents: where they go, what they touch, where they break.**
 
-🥉 **3rd place** at [GOMYCODE × NVIDIA "Come Build with AI" 2026](https://hackathon.gomycode.com/onboarding/winners) (listed as "Brainstorm.ap"). Website: [brainstorm-landing.vercel.app](https://brainstorm-landing.vercel.app).
+🥉 **3rd place** at [GOMYCODE × NVIDIA "Come Build with AI" 2026](https://hackathon.gomycode.com/onboarding/winners) (listed as "Brainstorm.ap").
 
 AI agents make it easy to stop understanding your own work. Brainstorm runs next to Claude Code and shows what the agents did, where, and why, so a human stays in the loop. Every session becomes a replay you can watch live or catch up on later, for code and for work that isn't code.
 
@@ -27,9 +27,10 @@ Then start a new session in your project and run `/brainstorm:open`: the map ope
 
 ## Try the live demo
 
-**[brainstorm-next.vercel.app](https://brainstorm-next.vercel.app)** plays back a real recording: Claude Code agents (one lead and four subagents) building Brainstorm itself. Click a thread to replay it on the map, or open Follow to read it step by step. Nothing to install.
+- **[brainstorm-next.vercel.app](https://brainstorm-next.vercel.app)**: a real recording of Claude Code agents (one lead and four subagents) building Brainstorm itself, played back. Click a thread to replay it on the map, or open Follow to read it step by step. Nothing to install.
+- **[brainstorm-landing.vercel.app](https://brainstorm-landing.vercel.app)**: what Brainstorm does, the roadmap, and the waitlist for the full release.
 
-![Map: a thread replaying, the agent's numbered path across the project's files, its steps in the sidebar](site/img/replay.jpg)
+![Map: a thread replaying, the agent's numbered path across the project's files, its steps in the sidebar](docs/screenshots/replay.jpg)
 
 ## Run it from source
 
@@ -53,7 +54,6 @@ Full guide, Brev setup and troubleshooting: [docs/run-locally.md](docs/run-local
 - **Errors**: a failed tool call turns the agent's marker red with one red ring, and shows red in Follow (with the first line of the error), on the replay bar and in the Track. (At the hackathon, a separate Failures view grouped and ranked them.)
 - **Ask**: questions go to Claude with a small, grounded context (the step, its diff, the steps before it, the file and module summaries, at most 150 lines of the file). Every answer shows its model, tokens and cost.
 
-![Follow: a live session timeline with Nemotron step labels](docs/screenshots/follow.png)
 
 ## AI models
 

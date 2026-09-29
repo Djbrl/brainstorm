@@ -493,7 +493,6 @@ footer a:hover { text-decoration: underline; }
         <span><i style="background:var(--cool)"></i>unchanged</span>
         <span><i style="background:var(--warm)"></i>changed recently</span>
         <span><i style="background:var(--hot)"></i>agent working now</span>
-        <span><i style="background:var(--risk)"></i>failed</span>
       </div>
       <div class="btns" style="margin-top:28px">
         <a class="btn" data-link="demo" href="#">Try the live demo</a>
@@ -975,7 +974,7 @@ const hero = (() => {
     const fx = mixN(heads[0].x, cen.x, fk), fy = mixN(heads[0].y, cen.y, fk);
     const zf = mixN(3, 2.1, fk) * (W < 700 ? .8 : 1);
     const z = mixN(zf, 1, zo), camX = mixN(fx, 0, zo), camY = mixN(fy, H * .06, zo);
-    const ax = W / 2 + W * .06 * (1 - zo), ay = H * .46 + H * .04 * zo - H * .08 * ease(win(p, .8, .86));
+    const ax = W / 2 + W * .06 * (1 - zo), ay = H * .46 + H * .04 * zo;
     ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * (ax - camX * z), dpr * (ay - camY * z));
     const px = 1 / z;                                                    // one screen pixel in world units
 

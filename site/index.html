@@ -75,7 +75,7 @@ nav .links a:hover { color: var(--text); }
 .stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; }
 
 /* hero */
-#hero { height: 660vh; }
+#hero { height: 580vh; }
 #hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero-type {
   position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -97,17 +97,6 @@ nav .links a:hover { color: var(--text); }
   background: linear-gradient(to top, #fff 45%, rgba(255,255,255,0));
 }
 .hero-end h2 { font-size: clamp(34px, 5vw, 64px); line-height: 1; }
-.hplayer { display: flex; align-items: center; gap: 14px; width: min(640px, 100%); margin: 0 auto 30px; padding: 10px 16px 10px 10px; border-radius: 16px; background: rgba(255,255,255,.96); box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 16px 44px -16px rgba(0,0,0,.25); text-align: left; }
-.hplayer .play { flex: none; width: 34px; height: 34px; border-radius: 50%; background: #5b5bd6; display: grid; place-items: center; }
-.hplayer .play svg { width: 12px; height: 12px; fill: #fff; margin-left: 2px; }
-.hplayer .mid { flex: 1; min-width: 0; }
-.hplayer .row { display: flex; gap: 10px; align-items: baseline; font-size: 13.5px; }
-.hplayer .row b { font-variant-numeric: tabular-nums; flex: none; }
-.hplayer .row span { color: var(--muted); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hplayer .row span.fail { color: var(--risk); }
-.hplayer .track2 { position: relative; height: 4px; border-radius: 2px; background: #e8e8ed; margin-top: 8px; }
-.hplayer .track2 i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: #5b5bd6; }
-.hplayer .track2 u { position: absolute; top: -3px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: #fff; border: 2px solid #5b5bd6; box-sizing: border-box; }
 .hcap {
   position: absolute; left: 0; right: 0; bottom: 13vh; padding: 0 24px; text-align: center; pointer-events: none; opacity: 0;
   font: 800 clamp(30px, 4.6vw, 60px)/1.05 var(--display); letter-spacing: -0.035em; text-wrap: balance;
@@ -499,10 +488,6 @@ footer a:hover { text-decoration: underline; }
     <p class="hcap" data-in=".29" data-out=".47">Three, you can't.</p>
     <p class="hcap" data-in=".5" data-out=".64">Each one is somewhere in your work.</p>
     <div class="hero-end" id="heroEnd">
-      <div class="hplayer" aria-hidden="true">
-        <span class="play"><svg viewBox="0 0 12 12"><path d="M2 1l9 5-9 5z"/></svg></span>
-        <div class="mid"><div class="row"><b id="hpCount">0 / 9</b><span id="hpLabel">Replay</span></div><div class="track2"><i id="hpFill"></i><u id="hpKnob"></u></div></div>
-      </div>
       <h2>Brainstorm shows you where.</h2>
       <div class="legend">
         <span><i style="background:var(--cool)"></i>unchanged</span>
@@ -848,8 +833,8 @@ function typeQuestion() {
    Three agents doing three kinds of work: code, research on the web, a video edit. One agent's line
    draws on white while the camera follows it; two more join and the three tangle ("Three, you can't"),
    then they separate into the map and work: reads are dashed lines of sight, edits ripple, the video
-   agent fails once (red), reads the docs and retries. The camera pulls back to the whole map, and the
-   last stretch of scroll replays it on a player bar. Everything is driven by p (0..1). */
+   agent fails once (red), reads the docs and retries. Then the camera pulls back to the whole map.
+   Everything is driven by p (0..1). */
 const hero = (() => {
   const cv = $("#map"), ctx = cv.getContext("2d");
   const COOL = [180, 194, 212], WARM = [255, 159, 10], HOT = [255, 55, 95], RED = [217, 48, 37];
@@ -860,7 +845,6 @@ const hero = (() => {
   ];
   const PS = .34;                                   // the moment all three run side by side
   const MAP_IN = .42;                               // about when they reach the map
-  const REPLAY = [.84, .97];                        // scroll window of the replay at the end
   // Modules on a 4 × 3 grid (3 × 4 on tall screens). Kinds: code files, docs, web pages, videos.
   const MODS = [
     ["src/auth", "file"], ["the web", "page"], ["src/billing", "file"], ["docs", "doc"],
@@ -873,7 +857,7 @@ const hero = (() => {
     [[-.13, -.33, "page", "Read a pricing page"], [.37, .02, "page", "Read a changelog"], [.37, -.33, "doc", "Write notes.md"]],
     [[-.37, .33, "video", "Burn in captions", true], [-.1, -.3, "page", "Read ffmpeg.org"], [-.37, .31, "video", "Make teaser.mp4"]],
   ];
-  let W, H, dpr, S, nodes = [], edges = [], clusters = [], events = [], seed;
+  let W, H, dpr, S, nodes = [], edges = [], clusters = [], seed;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const r = (a, b) => a + rnd() * (b - a);
   const mixN = (a, b, t) => a + (b - a) * t;
@@ -903,8 +887,6 @@ const hero = (() => {
     if (p < PS) return sy * (a === AG[0] ? win(p, a.swoop[0], a.swoop[1]) : ease(win(p, a.swoop[0], a.swoop[1])));
     return sy + (a.path.L - sy) * win(p, PS, a.end);
   }
-  /* agent progress: the scroll itself, then the replay re-runs the map part of the story */
-  const agentP = p => p < REPLAY[0] - .02 ? p : mixN(MAP_IN, .8, win(p, REPLAY[0], REPLAY[1]));
 
   function build() {
     dpr = Math.min(devicePixelRatio || 1, 2); W = cv.clientWidth; H = cv.clientHeight;
@@ -943,7 +925,6 @@ const hero = (() => {
       [[X(.9), -H * .34], [X(.78), -lane * 1.1], [X(.68), -lane], [X(.62), -lane * .15], [X(.56), lane * .9], [X(.5), -lane * .8], [X(.44), -lane]],
       [[X(.9), H * .34], [X(.78), lane * 1.1], [X(.68), lane], [X(.62), -lane * .9], [X(.56), lane * .1], [X(.5), -lane * .1], [X(.44), lane]],
     ];
-    events = [];
     AG.forEach((a, k) => {
       a.stops = STOPS[k].map(([fx, fy, kind, label, fail]) => ({ node: near(fx, fy, kind, used), label, fail: !!fail }));
       const pts = [...starts[k], ...a.stops.map(s => [nodes[s.node].x, nodes[s.node].y])];
@@ -957,10 +938,9 @@ const hero = (() => {
       const L = lenAt(a, p), h = at(a.path, L);
       nodes.forEach(n => { if (n.rp === 1 && Math.hypot(n.x - h.x, n.y - h.y) < R) n.rp = p; });
       a.stops.forEach(s => {
-        if (s.p === undefined && L >= s.len - 1) { s.p = p; nodes[s.node].touch.push({ a, p, fail: s.fail }); events.push({ a, p, label: s.label, fail: s.fail }); }
+        if (s.p === undefined && L >= s.len - 1) { s.p = p; nodes[s.node].touch.push({ a, p, fail: s.fail }); }
       });
     });
-    events.sort((x, y) => x.p - y.p);
     nodes.forEach(n => { n.rp = Math.min(n.rp, .6 + r(0, .16)); });
   }
 
@@ -983,7 +963,7 @@ const hero = (() => {
   let p = 0, visible = true;
   function draw(t) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-    const pa = agentP(p), replaying = p >= REPLAY[0] - .02;
+    const pa = p;
     const heads = AG.map(a => { const L = lenAt(a, pa); return { a, L, ...at(a.path, L) }; });
     const live = heads.filter(h => h.L > 0);
     const failing = h => h.a.stops.find(s => s.fail && s.p !== undefined && pa >= s.p && pa < s.p + .045);
@@ -1052,11 +1032,10 @@ const hero = (() => {
       const current = tk.some(tc => heads.find(h => h.a === tc.a && Math.hypot(h.x - n.x, h.y - n.y) < 2));
       const heat = Math.max(touched, n.base * win(p, .66, .8));
       const col = failNow ? RED : current ? HOT : mixC(COOL, WARM, heat);
-      if (current && !failNow) {
-        const pulse = (still ? 24 : 24 + Math.sin(t / 170 + n.ph) * 8) * px;
-        const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.rad + pulse);
-        g.addColorStop(0, "rgba(255,55,95,.55)"); g.addColorStop(.5, "rgba(255,55,95,.22)"); g.addColorStop(1, "rgba(255,55,95,0)");
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(n.x, n.y, n.rad + pulse, 0, 7); ctx.fill();
+      if (current && !failNow) {                                         // a thin ring that pulses out every 1.6 s
+        const k = still ? .35 : (t / 1600 + n.ph) % 1;
+        ctx.strokeStyle = `rgba(255,55,95,${.4 * (1 - k)})`; ctx.lineWidth = 1.5 * px;
+        ctx.beginPath(); ctx.arc(n.x, n.y, n.rad * 1.25 + (3 + 20 * ease(k)) * px, 0, 7); ctx.stroke();
       }
       tk.forEach(tc => {                                                 // a ripple on each edit, one red ring on a failure
         const k = win(pa, tc.p, tc.p + (tc.fail ? .06 : .05)); if (k <= 0 || k >= 1) return;
@@ -1084,9 +1063,9 @@ const hero = (() => {
       if (h.L <= 0) return;
       const fail = failing(h), col = fail ? RED : h.a.col;
       const sx = ax + (h.x - camX) * z, sy = ay + (h.y - camY) * z;
-      const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, 16);
-      g.addColorStop(0, `rgba(${col},.35)`); g.addColorStop(1, `rgba(${col},0)`);
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, 16, 0, 7); ctx.fill();
+      const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, 12);
+      g.addColorStop(0, `rgba(${col},.22)`); g.addColorStop(1, `rgba(${col},0)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, 12, 0, 7); ctx.fill();
       ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 7); ctx.fill();
       ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(sx, sy, 2, 0, 7); ctx.fill();
       const name = fail ? h.a.name + " · failed" : h.a.name;
@@ -1103,14 +1082,7 @@ const hero = (() => {
   addEventListener("resize", build);
   document.fonts && document.fonts.ready.then(() => draw(performance.now()));
   new IntersectionObserver(([e]) => visible = e.isIntersecting).observe(cv);
-  return {
-    set(v) { p = v; },
-    /* the replay bar: how far along, how many steps, and the latest step */
-    replay() {
-      const pa = agentP(p), done = p < REPLAY[0] - .02 ? [] : events.filter(e => e.p <= pa), last = done[done.length - 1];
-      return { r: win(p, REPLAY[0], REPLAY[1]), n: done.length, total: events.length, last };
-    },
-  };
+  return { set(v) { p = v; } };
 })();
 
 /* ---------- beyond code: the agent walks down the track, the window shows each stop ---------- */
@@ -1155,7 +1127,6 @@ const tasks = (() => {
 /* ---------- scroll-driven scenes ---------- */
 const tasksEl = $("#tasks");
 const heroEl = $("#hero"), heroType = $("#heroType"), heroEnd = $("#heroEnd"), cue = $("#cue");
-const hpFill = $("#hpFill"), hpKnob = $("#hpKnob"), hpCount = $("#hpCount"), hpLabel = $("#hpLabel");
 const hcaps = [...document.querySelectorAll(".hcap")];
 const probEl = $("#problem"), wall = $("#wall"), pDone = $("#pDone"), pNobody = $("#pNobody"), pCity = $("#pCity");
 const prodEl = $("#product"), track = $("#track"), dots = [...document.querySelectorAll("#dots i")];
@@ -1177,11 +1148,6 @@ function onScroll() {
   const ep = ease(win(hp, .8, .86));
   heroEnd.style.opacity = ep; heroEnd.style.transform = `translateY(${(1 - ep) * 40}px)`;
   heroEnd.style.pointerEvents = ep > .5 ? "" : "none";
-  const rp = hero.replay();                                          /* the replay bar follows the scroll */
-  hpFill.style.width = hpKnob.style.left = (rp.r * 100) + "%";
-  hpCount.textContent = `${rp.n} / ${rp.total}`;
-  hpLabel.textContent = rp.last ? `${rp.last.a.name}: ${rp.last.label}${rp.last.fail ? ", failed" : ""}` : "Replay";
-  hpLabel.classList.toggle("fail", !!(rp.last && rp.last.fail));
 
   /* problem: files pour past, "Updated 47 files", then the punchline */
   const pp = progress(probEl);

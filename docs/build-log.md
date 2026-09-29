@@ -85,6 +85,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 12:10 (29 Sep) [lead] Landing: waitlist live (private Vercel Blob store `brainstorm-waitlist`, `site/api/waitlist.js`), light grey band. Hero animation redone: a coding, a research and a video agent; the three tangle, then split into a map of code, web pages and videos; reads as dashed lines of sight, edits ripple, the video agent fails once in red and retries after reading the docs; comet-tail trails; the end replays the story on a player bar as you scroll.
 
+- 14:32 (29 Sep) [landing agent] Landing: "Not just code" now comes before the product section (tasks on grey, product on white, nav reordered). The product section is no longer a carousel: one browser window over three new screenshots from the redacted recording (thread replay, Follow with a diff, the live Map); as you scroll, the camera zooms to the agent's path, the steps sidebar, the Follow timeline, then zooms out of the Map, with one short caption per beat.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

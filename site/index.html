@@ -132,24 +132,33 @@ nav .links a:hover { color: var(--text); }
 .study cite { display: block; font-style: normal; color: var(--text); font-weight: 700; margin-bottom: 4px; }
 .study:hover cite { text-decoration: underline; text-underline-offset: 3px; }
 
-/* product carousel */
-#product { height: 360vh; background: var(--alt); }
-#product .stage { display: flex; flex-direction: column; justify-content: center; padding-top: 52px; --sw: min(80vw, calc(52svh * 16 / 9)); }
-.product-head { text-align: center; padding: 0 24px; }
+/* product: one browser window, the camera moves over real screenshots as you scroll */
+#product { height: 520vh; }
+#product .stage { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 92px 24px 16px; --pw: min(1100px, 88vw, calc((100svh - 400px) * 1.6)); }
+.product-head { text-align: center; }
 .product-head .h2 { font-size: clamp(36px, 5vw, 64px); }
-.track { display: flex; gap: 4vw; padding: 0 calc((100vw - var(--sw)) / 2); margin-top: 4svh; will-change: transform; }
-.slide { flex: 0 0 var(--sw); }
-.frame {
-  aspect-ratio: 16 / 9; border-radius: 22px; background: #fff; overflow: hidden; position: relative;
-  box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 30px 80px -30px rgba(0,0,0,.18);
+.pv {
+  width: var(--pw); margin-top: 4svh; border-radius: 14px; background: #fff; overflow: hidden; position: relative;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.07), 0 2px 6px rgba(0,0,0,.04), 0 40px 100px -40px rgba(0,0,0,.3);
+  will-change: transform; transform-origin: 50% 0;
 }
-.frame img { width: 100%; height: 100%; object-fit: cover; object-position: top left; display: block; }
-.frame .ph { position: absolute; inset: 0; display: grid; place-items: center; color: var(--faint); font-weight: 500; font-size: 15px;
-  background: radial-gradient(circle at 30% 30%, #fff, #f0f0f3); }
-.cap { display: flex; align-items: baseline; gap: 6px 18px; margin-top: 22px; flex-wrap: wrap; }
-.cap h3 { font-size: clamp(26px, 2.6vw, 34px); letter-spacing: -0.03em; }
-.cap p { color: var(--muted); font-size: 18px; font-weight: 500; }
-.dots { display: flex; justify-content: center; gap: 10px; margin-top: 3svh; }
+.pv-bar { display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; background: #f3f3f6; border-bottom: 1px solid var(--line); }
+.pv-bar i { width: 11px; height: 11px; border-radius: 50%; background: #dcdce1; }
+.pv-screen { position: relative; aspect-ratio: 16 / 10; overflow: hidden; background: #fafafc; }
+.pv-shot { position: absolute; inset: 0; opacity: 0; }
+.pv-shot:first-child { opacity: 1; }
+.pv-img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 0 0; will-change: transform; }
+.pv-img img { display: block; width: 100%; height: 100%; }
+.pv-pulse { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; border: 2px solid #5b5bd6; opacity: 0; animation: pv-pulse 2s ease-out infinite; pointer-events: none; }
+.pv-pulse.hot { border-color: var(--hot); }
+@keyframes pv-pulse { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(2.6); opacity: 0; } }
+.pv-foot { width: var(--pw); display: flex; align-items: center; gap: 24px; margin-top: 26px; }
+.pv-caps { flex: 1; min-width: 0; display: grid; }
+.pv-cap { grid-area: 1 / 1; opacity: 0; transform: translateY(10px); transition: opacity .5s var(--ease), transform .6s var(--ease); }
+.pv-cap.on { opacity: 1; transform: none; }
+.pv-cap h3 { font-size: clamp(24px, 2.6vw, 34px); letter-spacing: -0.03em; }
+.pv-cap p { color: var(--muted); font-size: clamp(16px, 1.5vw, 18px); font-weight: 500; margin-top: 4px; }
+.dots { display: flex; justify-content: center; gap: 8px; flex: none; }
 .dots i { width: 8px; height: 8px; border-radius: 99px; background: #c7c7cc; transition: width .4s var(--ease), background .4s; }
 .dots i.on { width: 28px; background: var(--text); }
 
@@ -165,7 +174,7 @@ nav .links a:hover { color: var(--text); }
 @keyframes blink { 50% { opacity: 0; } }
 
 /* tasks: one agent's work outside code, as a track of stops with a window */
-#tasks { height: 460vh; }
+#tasks { height: 460vh; background: var(--alt); }
 #tasks .stage { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 64px 24px 24px; }
 .tasks-head { text-align: center; }
 .tasks-head .h2 { font-size: clamp(36px, 5vw, 64px); }
@@ -391,7 +400,14 @@ footer a:hover { text-decoration: underline; }
   .tk-ico { width: 26px; height: 26px; }
   .tk-body b { font-size: 14px; }
   .four { grid-template-columns: 1fr 1fr; gap: 48px 24px; }
-  #product .stage { --sw: 84vw; }
+  #product .stage { padding: 88px 16px 12px; --pw: calc(100vw - 32px); }
+  .pv { border-radius: 12px; margin-top: 20px; }
+  .pv-bar { height: 26px; gap: 5px; padding: 0 10px; }
+  .pv-bar i { width: 8px; height: 8px; }
+  .pv-screen { aspect-ratio: auto; height: min(112vw, calc(100svh - 390px)); }
+  .pv-foot { flex-direction: column; align-items: flex-start; gap: 14px; margin-top: 18px; }
+  .pv-cap h3 { font-size: 24px; }
+  .pv-cap p { font-size: 16px; }
   .counts { gap: 40px; }
 }
 @media (max-width: 480px) {
@@ -401,7 +417,8 @@ footer a:hover { text-decoration: underline; }
 }
 @media (prefers-reduced-motion: reduce) {
   .rv { opacity: 1; transform: none; transition: none; }
-  .tk-line li, .tk-pane, .tk-agent { transition: none; }
+  .tk-line li, .tk-pane, .tk-agent, .pv-cap { transition: none; }
+  .pv-pulse { animation: none; }
   .sc-cone, .sc-hot, .sc-trail, .sc-speaker, .teaser .shot svg, .film .strip .ph { animation: none; }
   .sc-trail { stroke-dashoffset: 0; }
   .chip .pulse { animation: none; opacity: 0; }
@@ -464,8 +481,8 @@ footer a:hover { text-decoration: underline; }
       Brainstorm
     </a>
     <div class="links">
-      <a href="#product">Product</a>
       <a href="#tasks">Beyond code</a>
+      <a href="#product">Product</a>
       <a href="#brev">NVIDIA</a>
       <a href="#roadmap">Roadmap</a>
       <a data-link="demo" href="#">Live demo</a>
@@ -538,31 +555,7 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- 4. Product: horizontal carousel driven by scroll (real screenshots, from the redacted demo recording) -->
-<section class="scene" id="product">
-  <div class="stage">
-    <div class="product-head">
-      <h2 class="h2">Replay. Follow. Zoom out.</h2>
-    </div>
-    <div class="track" id="track">
-      <div class="slide">
-        <div class="frame"><img src="img/replay.jpg" alt="Map view replaying a thread: the agent's numbered path across the project's files, with its steps in the sidebar" data-ph="Replay"></div>
-        <div class="cap"><h3>Every thread, replayed.</h3><p>Click a thread and watch the agent's path, step by step. Running ones play live.</p></div>
-      </div>
-      <div class="slide">
-        <div class="frame"><img src="img/follow.png" alt="Follow view: a labeled timeline of a Claude Code session" data-ph="Follow"></div>
-        <div class="cap"><h3>Every step, labeled.</h3><p>Any Claude Code session as a timeline. Click an edit to see its diff.</p></div>
-      </div>
-      <div class="slide">
-        <div class="frame"><img src="img/map.png" alt="Map view: files and imports as a graph, lit by recency" data-ph="Map"></div>
-        <div class="cap"><h3>Your project, lit up.</h3><p>Files glow where agents worked. Errors flash red.</p></div>
-      </div>
-    </div>
-    <div class="dots" id="dots"><i class="on"></i><i></i><i></i></div>
-  </div>
-</section>
-
-<!-- 5. Beyond code: one agent editing a video, told as a track of stops (an illustration of the Track view) -->
+<!-- 4. Beyond code: one agent editing a video, told as a track of stops (an illustration of the Track view) -->
 <section class="scene" id="tasks">
   <div class="stage">
     <div class="tasks-head">
@@ -612,6 +605,32 @@ footer a:hover { text-decoration: underline; }
             <div class="strip"><svg viewBox="0 0 560 350" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><svg viewBox="130 30 290 181" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><svg viewBox="60 10 440 275" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><svg viewBox="130 30 290 181" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><svg viewBox="0 0 560 350" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><svg viewBox="100 20 360 225" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><span class="ph"></span></div></div></div>
         </div>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Product: one browser window; as you scroll, the camera moves to what matters (real screenshots, from the redacted demo recording) -->
+<section class="scene" id="product">
+  <div class="stage">
+    <div class="product-head">
+      <h2 class="h2">Replay. Follow. Zoom out.</h2>
+    </div>
+    <div class="pv" id="pv">
+      <div class="pv-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="pv-screen" id="pvScreen">
+        <div class="pv-shot"><div class="pv-img"><img src="img/shot-replay.jpg" width="2400" height="1500" alt="Map view replaying a thread: the agent's numbered path across the project's files, with its steps and the current diff in the sidebar"><span class="pv-pulse" style="left:50%;top:53.4%"></span></div></div>
+        <div class="pv-shot"><div class="pv-img"><img src="img/shot-follow.jpg" width="2400" height="1500" alt="Follow view: a session as a timeline of labeled steps, with one edit open to show its diff" loading="lazy"></div></div>
+        <div class="pv-shot"><div class="pv-img"><img src="img/shot-map.jpg" width="2400" height="1500" alt="Map view: the project's files as a graph, four agents at work, recently changed files in orange and red" loading="lazy"><span class="pv-pulse hot" style="left:54%;top:66.2%"></span><span class="pv-pulse hot" style="left:70.5%;top:45.2%;animation-delay:-.9s"></span></div></div>
+      </div>
+    </div>
+    <div class="pv-foot">
+      <div class="pv-caps" id="pvCaps">
+        <div class="pv-cap on"><h3>Every thread, replayed.</h3><p>Watch an agent's path through your files, step by step.</p></div>
+        <div class="pv-cap"><h3>Every step, in order.</h3><p>What it read, ran and wrote, with the diff.</p></div>
+        <div class="pv-cap"><h3>Every session, labeled.</h3><p>A timeline in plain words. Open an edit to see what changed.</p></div>
+        <div class="pv-cap"><h3>Your project, lit up.</h3><p>Every agent, live. Files glow where they just worked.</p></div>
+      </div>
+      <div class="dots" id="dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i></div>
     </div>
   </div>
 </section>
@@ -782,12 +801,6 @@ document.querySelectorAll("[data-copy]").forEach(btn => btn.addEventListener("cl
   catch { getSelection().selectAllChildren(btn.previousElementSibling); btn.textContent = "Press ⌘C"; }
   setTimeout(() => btn.textContent = "Copy", 1600);
 }));
-
-/* screenshots: soft placeholder until the real PNG exists */
-document.querySelectorAll(".frame img").forEach(img => {
-  const ph = () => { const d = document.createElement("div"); d.className = "ph"; d.textContent = img.dataset.ph + " view"; img.replaceWith(d); };
-  if (img.complete && !img.naturalWidth) ph(); else img.addEventListener("error", ph);
-});
 
 /* ---------- helpers ---------- */
 const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1102,6 +1115,61 @@ const tasks = (() => {
   return { set(p) { show(Math.min(stops.length - 1, Math.floor(win(p, .06, .9) * stops.length))); } };
 })();
 
+/* ---------- product: a camera over three real screenshots ----------
+   Each shot has camera keys [p, fx, fy, z]: at section progress p, centre the point (fx, fy) of the image
+   (fractions of its width and height) at zoom z (1 = the whole screenshot). Between keys the camera eases. */
+const product = (() => {
+  const el = $("#product"), frame = $("#pv"), screen = $("#pvScreen");
+  const shots = [...el.querySelectorAll(".pv-shot")], imgs = shots.map(s => s.querySelector(".pv-img"));
+  const caps = [...el.querySelectorAll(".pv-cap")], dots = [...el.querySelectorAll("#dots i")];
+  const CAM = [
+    [[0, .5, .5, 1], [.06, .5, .5, 1], [.2, .45, .36, 2], [.3, .45, .36, 2], [.42, .2, .6, 1.7], [.56, .2, .6, 1.7]], // replay: the path, then the steps
+    [[.5, .5, .5, 1.06], [.56, .5, .5, 1], [.66, .7, .5, 1.3], [.8, .7, .5, 1.3]],                            // follow: the timeline and a diff
+    [[.74, .56, .7, 2.1], [.8, .56, .7, 2.1], [.95, .5, .5, 1], [1, .5, .5, 1]],                                   // map: zoom out to the whole project
+  ];
+  const FADE = [null, [.5, .54], [.75, .79]];   // when each shot fades in over the one before
+  const BEATS = [.34, .52, .76];                 // caption changes
+  const HOLD = [.27, .5, .74, 1];                // reduced motion: jump straight to each beat's settled view
+  const smooth = t => t * t * (3 - 2 * t);
+  let W = 0, H = 0, bw = 0, bh = 0, narrow = false, beat = -1;
+  function measure() {
+    W = screen.clientWidth; H = screen.clientHeight; narrow = innerWidth <= 820;
+    if (W / H > 1.6) { bw = W; bh = W / 1.6; } else { bh = H; bw = H * 1.6; }   // cover the screen
+    imgs.forEach(im => { im.style.width = bw + "px"; im.style.height = bh + "px"; });
+  }
+  function camera(keys, p) {
+    let i = 0;
+    while (i < keys.length - 2 && p > keys[i + 1][0]) i++;
+    const a = keys[i], b = keys[i + 1], t = smooth(win(p, a[0], b[0]));
+    return [1, 2, 3].map(j => a[j] + (b[j] - a[j]) * t);
+  }
+  function set(p) {
+    if (!W) measure();
+    const b = BEATS.filter(x => p >= x).length;
+    if (still) p = HOLD[b];
+    shots.forEach((s, i) => {
+      // later shots sit on top: each fades in over the one before, which hides once it's covered
+      const op = FADE[i] ? win(p, ...FADE[i]) : 1, next = FADE[i + 1], covered = next && win(p, ...next) >= 1;
+      s.style.opacity = op;
+      s.style.visibility = op > 0 && !covered ? "" : "hidden";
+      if (s.style.visibility) return;
+      const [fx, fy, zd] = camera(CAM[i], p);
+      const z = Math.max(1, (W / bw) * zd * (narrow && zd > 1.01 ? 1.4 : 1)), iw = bw * z, ih = bh * z;
+      const x = clamp(W / 2 - fx * iw, W - iw, 0), y = clamp(H / 2 - fy * ih, H - ih, 0);
+      imgs[i].style.transform = `translate(${x}px, ${y}px) scale(${z})`;
+    });
+    const e = still ? 1 : ease(win(p, 0, .06));
+    frame.style.transform = `scale(${.94 + .06 * e})`;
+    if (b !== beat) {
+      beat = b;
+      caps.forEach((c, i) => c.classList.toggle("on", i === b));
+      dots.forEach((d, i) => d.classList.toggle("on", i === b));
+    }
+  }
+  addEventListener("resize", () => { W = 0; });
+  return { el, set };
+})();
+
 /* brev: a GPU with data running along its traces and cores lighting up */
 (() => {
   const svg = $("#chip");
@@ -1125,7 +1193,6 @@ const tasksEl = $("#tasks");
 const heroEl = $("#hero"), heroType = $("#heroType"), heroEnd = $("#heroEnd"), cue = $("#cue");
 const hcaps = [...document.querySelectorAll(".hcap")];
 const probEl = $("#problem"), wall = $("#wall"), pDone = $("#pDone"), pNobody = $("#pNobody"), pCity = $("#pCity");
-const prodEl = $("#product"), track = $("#track"), dots = [...document.querySelectorAll("#dots i")];
 const statsEl = $("#stats"), statEls = [...document.querySelectorAll(".stat3")];
 
 function onScroll() {
@@ -1156,16 +1223,11 @@ function onScroll() {
   pNobody.style.opacity = nb; pNobody.style.transform = `translateY(${(1 - nb) * 30}px)`;
   pCity.style.opacity = ease(win(pp, .72, .84));
 
-  /* product: horizontal track */
-  const cp = progress(prodEl);
-  const max = track.scrollWidth - innerWidth;
-  const k = ease(win(cp, .08, .92));
-  track.style.transform = `translateX(${-max * k}px)`;
-  const idx = Math.round(k * (dots.length - 1));
-  dots.forEach((dt, i) => dt.classList.toggle("on", i === idx));
-
   /* beyond code: one stop per slice of the scroll */
   tasks.set(progress(tasksEl));
+
+  /* product: the camera moves over the screenshots, one caption per beat */
+  product.set(progress(product.el));
 
   /* stats: each finding arrives in turn (one at a time on phones) */
   const sp = progress(statsEl), narrow = innerWidth <= 820;

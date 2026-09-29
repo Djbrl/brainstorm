@@ -17,7 +17,7 @@ In Claude Code:
 
 Or in one command (Claude Code 2.1.275 or later): `/plugin install brainstorm --marketplace Djbrl/brainstorm`.
 
-Then start a new session in your project and run `/brainstorm:open`: the map opens in your browser. You need Node.js 22.13 or later. Everything runs on your machine. Details, settings and uninstall: [plugin/README.md](plugin/README.md).
+Then start a new session in your project and run `/brainstorm:open`: the map opens in your browser. This is a preview (0.2); the full release is planned for late October 2026. You need Node.js 22.13 or later. Everything runs on your machine. Details, settings and uninstall: [plugin/README.md](plugin/README.md).
 
 ## Demos
 
@@ -31,7 +31,8 @@ Then start a new session in your project and run `/brainstorm:open`: the map ope
 
 - **Follow**: a live timeline of a Claude Code session: prompts, messages, tool calls and edits, each with a short label. Click a step to see its diff and ask "why?".
 - **Map**: the project's modules and files as a graph. Files glow by how recently they changed. Each agent is a marker that moves to the file it writes, with a trail, and reads show as short lines of sight. Replay any thread on the map, step by step. Hover or select a file to see what it imports and what uses it; click it for its summary, the steps that touched it, and a question box.
-- **Failures**: failing tool calls across agent sessions, grouped by cause and ranked by how often and how recently they happen, with the evidence one click away. Nemotron names each group and suggests a fix.
+- **Track**: the same thread as a story, top to bottom. Each stop is a place the agent worked (a file, a website, a command-line tool, a service), with a window that shows the screenshot, the file it made, the code it wrote or the command explained in plain words. It works for work that isn't code, like cutting a video with FFmpeg.
+- **Errors**: a failed tool call turns the agent's marker red with one red ring, and shows red in Follow (with the first line of the error), on the replay bar and in the Track. (At the hackathon, a separate Failures view grouped and ranked them; it's still in the demos.)
 - **Ask**: questions go to Claude with a small, grounded context (the step, its diff, the steps before it, the file and module summaries, at most 150 lines of the file). Every answer shows its model, tokens and cost.
 
 ![Follow: a live session timeline with Nemotron step labels](docs/screenshots/follow.png)

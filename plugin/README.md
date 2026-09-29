@@ -1,8 +1,13 @@
 # Brainstorm plugin for Claude Code
 
-A live map and replay of what your coding agents do: every session, every file they touch, what broke. Everything runs on your machine.
+A live map and replay of what your agents do: every session, every file and place they touch, what broke. Everything runs on your machine.
 
-Preview release (0.1).
+Preview release (0.2). The full release is planned for late October 2026.
+
+- **Map:** your project's files as a graph. Each agent is a marker that moves to the file it's working on. Click a thread to replay it step by step; a running one plays live.
+- **Track:** the same thread as a story, top to bottom: each place the agent worked (a file, a website, a command-line tool), with a window showing the screenshot, the file it made, the code it wrote or the command explained. Works for non-code work too, like editing a video with FFmpeg.
+- **Follow:** every step of a session as a timeline. Click an edit to see its diff.
+- **Errors:** a failed step turns the agent's marker red, and shows red in Follow, on the replay bar and in the Track.
 
 ## Install
 

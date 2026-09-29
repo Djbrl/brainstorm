@@ -81,6 +81,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 02:20 (29 Sep) [lead] `feature/tasks`: the legend hides again while the player is up (and fades back); the player slides in and out; the sidebar is back to its old size, with a stats line above it (threads, files, modules, being edited now) instead of the big project title.
 
+- 10:40 (29 Sep) [lead] Plugin 0.2.0: `feature/tasks` merged into `main` (one Map tab with Map | Track, threads play on click, errors in red everywhere, no Failures tab locally). brainstorm-next redeployed with the new interface and neutral copy (no "post-deadline" banner or Failures tab; the welcome and banner point to the plugin). The judged demo is unchanged. Landing page rewritten around "a live map of your agents", with install steps.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

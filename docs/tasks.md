@@ -2,7 +2,7 @@
 
 Every agent session told as a task you can replay: the goal, a filmstrip of what the agent saw, how it did it, what it made, and where it got things. It's for work that isn't code as much as for code: editing a video with FFmpeg, writing a document, researching the web, testing an app in a browser. The product thinking is in [roadmap.md](roadmap.md) ("Tasks"). It builds on the places classifier from the Cowork prototype ([cowork.md](cowork.md)).
 
-Branch: `feature/tasks` (from `main`, with `feature/cowork` merged in). Local app only.
+Shipped in plugin 0.2 (29 Sep 2026), merged from `feature/tasks`. Local app only: the hosted demos have no Tasks API.
 
 ## What you see (updated 28 Sep, evening)
 
@@ -35,7 +35,7 @@ There is no separate Tasks tab anymore. A thread is picked once, and the Map tab
   - `GET /api/tasks/:sessionId`: one task (`TaskDetail` in `types.ts`).
   - `GET /api/tasks/shot/:stepId/:idx`: a screenshot.
   - `GET /api/tasks/:sessionId/file?path=[&frame=1]`: a file the task made or used. `frame=1` returns a still of a video, made with FFmpeg if it's installed and cached in `data/previews`.
-- `app/web/src/tasks/`: `TasksView.tsx` and `tasks.css`.
+- `app/web/src/tasks/`: `TrackView.tsx` and `track.css`. The Map | Track switch is `app/web/src/map/LensSwitch.tsx`.
 
 ## Privacy
 

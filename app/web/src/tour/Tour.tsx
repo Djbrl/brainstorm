@@ -9,9 +9,10 @@ const REPO = "https://github.com/Djbrl/brainstorm";
 
 type Step = { target?: string; view?: View; title: string; body: string };
 const PREVIEW_STEPS: Step[] = [
-  { target: ".ws-chip", title: "Setup", body: "Pick a workspace, then watch Brainstorm read the code, map imports, find Claude Code and check the models. Click it to play back a recorded run." },
-  { target: '[data-tour="tab-map"]', view: "map", title: "Live agents", body: "Each agent is a marker on the file it is working on. It glides to the next file and leaves a trail. These are the real moves recorded while the agents built Brainstorm." },
-  { target: ".map-agents", view: "map", title: "Agent tracker", body: "Every agent's route, file by file. Click an agent to follow it with the camera, or a step to jump to that file." },
+  { target: '[data-tour="tab-map"]', view: "map", title: "Live agents", body: "Each agent is a marker on the file it is working on. It glides to the next file and leaves a trail. A failed step flashes red. These are real moves, recorded while agents built Brainstorm." },
+  { target: ".map-sidebar", view: "map", title: "Threads", body: "Click a thread to replay it on the map, step by step. Its steps fill the sidebar; click one to jump there." },
+  { target: '[data-tour="tab-follow"]', view: "follow", title: "Follow", body: "Every step of a session as a timeline. Click an edit to see its diff." },
+  { title: "Watch your own agents", body: "Brainstorm is a Claude Code plugin. Install it from github.com/Djbrl/brainstorm and run /brainstorm:open." },
 ];
 
 const STEPS: Step[] = [
@@ -32,7 +33,7 @@ function markSeen() {
 type Rect = { top: number; left: number; width: number; height: number };
 
 export function Tour({ openSignal, preview = false }: { openSignal: number; preview?: boolean }) {
-  const steps = preview ? [...PREVIEW_STEPS, STEPS[STEPS.length - 1]] : STEPS;
+  const steps = preview ? PREVIEW_STEPS : STEPS;
   const { setView } = useNav();
   const [mode, setMode] = useState<"welcome" | "tour" | null>(() => (seen() ? null : "welcome"));
   const [i, setI] = useState(0);
@@ -84,7 +85,7 @@ export function Tour({ openSignal, preview = false }: { openSignal: number; prev
         <div className="tour-card tour-welcome" role="dialog" aria-modal="true" aria-labelledby="tour-title" onClick={(e) => e.stopPropagation()}>
           <h2 id="tour-title">Welcome to Brainstorm</h2>
           {preview
-            ? <p>This is the post-deadline preview: a few features we added a few hours after the GOMYCODE × NVIDIA hackathon cutoff, to show where Brainstorm is going. The judged version is at brainstorm-demo-black.vercel.app.</p>
+            ? <p>A live map of your agents. You're watching a recording: Claude Code agents building Brainstorm itself, played back step by step. Install the plugin to watch your own.</p>
             : <p>A live map of your code and of the AI agents writing it. You're watching a recording of Brainstorm following its own build, live during the GOMYCODE × NVIDIA hackathon on 27 Sep 2026.</p>}
           <div className="tour-actions">
             <button className="tour-ghost" onClick={close}>Skip</button>

@@ -17,9 +17,10 @@ function Shell() {
   const { view, setView, lens } = useNav();
   const [tourSignal, setTourSignal] = useState(0);
   // Local app: Follow, Map (with its Map | Track views) and Places. Failures was a hackathon view: errors now show on the map,
-  // in Follow and in the Track. The hosted demos keep it, their tour points at it.
-  const tabs: { id: View; label: string }[] = state.replay
+  // in Follow and in the Track. The judged hackathon demo keeps it, its tour points at it.
+  const tabs: { id: View; label: string }[] = state.replay && !state.preview
     ? [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }, { id: "failures", label: `Failures${state.failures.length ? ` ${state.failures.length}` : ""}` }]
+    : state.replay ? [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }] // the post-deadline demo
     : [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }, { id: "cowork", label: "Places" }];
   // Local app: pick a workspace first (and whenever "Change" is clicked). The hosted replay never shows setup.
   // In the post-deadline preview, the setup screen plays back a recorded run (see lib/preview.ts).
@@ -55,8 +56,8 @@ function Shell() {
       </header>
       {state.preview && (
         <div className="preview-banner">
-          Post-deadline preview: a few features added a few hours after the hackathon cutoff. Agent moves and setup are played back from a real recording.{" "}
-          <a href="https://brainstorm-demo-black.vercel.app">See the judged version</a>
+          A recording of Claude Code agents building Brainstorm, played back. To see your own agents live,{" "}
+          <a href="https://github.com/Djbrl/brainstorm#install-claude-code-plugin-preview" target="_blank" rel="noopener">install the plugin</a>.
         </div>
       )}
       {state.replay && <Tour openSignal={tourSignal} preview={state.preview} />}

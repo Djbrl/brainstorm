@@ -143,7 +143,7 @@ export function PlacesView() {
   const { state } = useLive();
   const { replay, setLens } = useNav();
   const session = state.sessions.find((s) => s.id === replay?.sessionId);
-  const { data, error } = useCowork(replay?.sessionId ?? null, session?.status === "running");
+  const { data, error } = useCowork(replay?.sessionId ?? null, session?.status === "running", state.connected); // a recording is "connected" once loaded
   const [areas, setAreas] = useState<ReadonlySet<CoworkArea>>(new Set(AREAS));
   const [selected, setSelected] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);

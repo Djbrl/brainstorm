@@ -1,20 +1,25 @@
 // Owner: cowork. Loads GET /api/cowork?sessionId= for one thread and shapes it for the view: change groups, verb names, area names.
 import { useEffect, useState } from "react";
 import type { CoworkArea, CoworkEvent, CoworkSummary, CoworkVerb } from "@contract";
+import { isReplay, replayCowork } from "../lib/live";
 
 /** The places of one thread (its subagents included). Refreshes while the thread is running. */
-export function useCowork(sessionId: string | null, running: boolean) {
+export function useCowork(sessionId: string | null, running: boolean, loaded = true) {
   const [data, setData] = useState<CoworkSummary | null>(null);
   const [error, setError] = useState(false);
   useEffect(() => {
     setData(null);
-    if (!sessionId) return;
+    if (!sessionId || !loaded) return;
+    if (isReplay()) {                                   // hosted demo: the recording carries each thread's places
+      setData(replayCowork(sessionId) ?? { areas: { web: 0, local: 0, services: 0, apps: 0 }, codeSteps: 0, sites: [], pages: [], events: [] });
+      return;
+    }
     let stop = false;
     const load = () => fetch(`/api/cowork?sessionId=${encodeURIComponent(sessionId)}`).then((r) => r.json()).then((d: CoworkSummary) => { if (!stop) { setData(d); setError(false); } }).catch(() => !stop && setError(true));
     load();
     const t = running ? setInterval(load, 8000) : undefined;
     return () => { stop = true; if (t) clearInterval(t); };
-  }, [sessionId, running]);
+  }, [sessionId, running, loaded]);
   return { data, error };
 }
 

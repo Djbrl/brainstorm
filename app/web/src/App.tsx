@@ -62,7 +62,7 @@ function Shell() {
       )}
       {state.replay && <Tour openSignal={tourSignal} preview={state.preview} />}
       {!state.replay && <LiveReplay />}
-      <main className="view">{view === "follow" ? <FollowView /> : view === "map" ? (lens === "track" && !state.replay ? <TrackView /> : lens === "places" && !state.replay ? <PlacesView /> : <MapView />) : state.replay ? <FailuresView /> : <FollowView />}</main>
+      <main className="view">{view === "follow" ? <FollowView /> : view === "map" ? (lens === "track" && !state.replay ? <TrackView /> : lens === "places" ? <PlacesView /> : <MapView />) : state.replay ? <FailuresView /> : <FollowView />}</main>
     </div>
   );
 }

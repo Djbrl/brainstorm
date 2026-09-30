@@ -83,6 +83,8 @@ export type FailureGroup = {
 
 /** Static export for the hosted demo (GET /api/replay). The web loads it with ?replay=/replay.json */
 export type Replay = {
+  /** Places per thread (sessionId → summary), so the hosted demo can show the Places view without a server. */
+  cowork?: Record<string, CoworkSummary>;
   exportedAt: string;
   sessions: Session[];
   steps: Step[];

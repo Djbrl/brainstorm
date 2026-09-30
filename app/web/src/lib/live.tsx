@@ -82,6 +82,8 @@ const replayUrl = () => new URLSearchParams(location.search).get("replay") ?? (i
 export const isReplay = () => !!replayUrl();
 
 let replayData: Replay | null = null;
+/** Places of a recorded thread (the hosted demos have no server to ask). */
+export const replayCowork = (sessionId: string) => replayData?.cowork?.[sessionId] ?? null;
 
 /** App clock. In replay mode it runs from the export time, so "just now" and recency colors look as they did when recorded. */
 let clockOffset = 0;

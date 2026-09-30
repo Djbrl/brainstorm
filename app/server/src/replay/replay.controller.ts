@@ -9,6 +9,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Replay, Step } from "../types";
 import { redactReplayJson } from "./redact";
+import { summarizePlaces } from "../cowork/cowork.service";
 
 type Move = NonNullable<Replay["agentMoves"]>[number];
 
@@ -83,7 +84,8 @@ export class ReplayController {
     const map = this.mapper.getMap(root || this.cfg.defaultRoot);
     const answers = this.askService.listAnswers();
     const failures = this.failures.list(sessions.map((s) => s.id).join(","), until);
-    const base: Replay = { exportedAt: until ?? new Date().toISOString(), sessions: sessions.map((s) => ({ ...s, status: "idle" })), steps, map: { ...map, files: map.files.map(({ activeSessionId: _a, ...f }) => f) }, answers, failures };
+    const cowork = Object.fromEntries(sessions.map((s) => [s.id, summarizePlaces([s.id], (id) => steps.filter((st) => st.sessionId === id))]));
+    const base: Replay = { exportedAt: until ?? new Date().toISOString(), sessions: sessions.map((s) => ({ ...s, status: "idle" })), steps, map: { ...map, files: map.files.map(({ activeSessionId: _a, ...f }) => f) }, answers, failures, cowork };
     if (!preview) return base;
     // Post-deadline preview extras: recorded agent moves and a recorded setup run (only this workspace, no other projects).
     const status = this.workspace.status();

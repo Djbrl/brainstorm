@@ -21,6 +21,8 @@ export const mapPrefs: { showReads: boolean } = { showReads: true };
 
 /** The step id at the replay cursor, published by the replay layer while rendering, so the URL can point at a step (stable across detail modes). */
 export const replayCursor: { stepId: string | null } = { stepId: null };
+/** The thread and step open in Follow, for the Map to pick up when you switch back to it. */
+export const followCursor: { sessionId: string | null; stepId: string | null } = { sessionId: null, stepId: null };
 
 type Nav = {
   view: View; setView: (v: View) => void;
@@ -75,9 +77,8 @@ function loadHidden(): Set<string> {
 export function NavProvider({ children }: { children: ReactNode }) {
   const params = new URLSearchParams(location.search);
   // "cowork" was the old all-sessions Places tab: it now opens the Map tab on the Places view of the selected thread.
-  // The hosted demos open on the Map; the local app on Follow.
-  const demo = !!(params.get("replay") ?? import.meta.env.VITE_REPLAY_URL);
-  const [view, setView] = useState<View>(() => { const v = (params.get("view") as View) || (demo ? "map" : "follow"); return v === "cowork" ? "map" : v; });
+  // Everything opens on the Map, where agents move: Follow is where a click on a step takes you.
+  const [view, setView] = useState<View>(() => { const v = (params.get("view") as View) || "map"; return v === "cowork" ? "map" : v; });
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [focusFile, setFocusFile] = useState<string | null>(null);
   const [focusStep, setFocusStep] = useState<string | null>(null);

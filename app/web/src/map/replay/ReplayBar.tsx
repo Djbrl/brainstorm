@@ -101,7 +101,7 @@ export function ReplayBar() {
 
   const stop = <button className="rp-icon" onClick={stopReplay} aria-label="Stop replay" title="Stop replay (Esc)">{Icon.close}</button>;
   const session = state.sessions.find((s) => s.id === replay.sessionId);
-  const title = session?.title || "Untitled session";
+  const title = session?.title || "Untitled thread";
 
   if (!thread || thread.beats.length === 0) {
     const missing = !thread && isReplay() && state.sessions.length > 0;

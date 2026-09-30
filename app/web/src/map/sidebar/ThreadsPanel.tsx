@@ -108,6 +108,8 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
 }) {
   const sorted = [...agents].sort((a, b) => (a.isSubagent ? 1 : 0) - (b.isSubagent ? 1 : 0) || a.id.localeCompare(b.id));
   const running = session.status === "running";
+  // Which git worktree the thread ran in ("hackathon-landing-page", without Claude Code's random suffix).
+  const tree = /\/\.claude\/worktrees\/([^/]+)/.exec(session.cwd ?? "")?.[1]?.replace(/-[0-9a-f]{6}$/, "");
   const { lens } = useNav();
   const [agentsOpen, setAgentsOpen] = useState(false);
   useEffect(() => { if (!selected) setAgentsOpen(false); }, [selected]);
@@ -121,6 +123,7 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
         <button className="sidebar-thread-head" onClick={onSelect} aria-pressed={selected} title={selected ? "Close this thread" : running ? "Watch this thread live" : "Replay this thread"}>
           <span className={`sidebar-thread-status ${session.status}`} aria-hidden="true" />
           <span className="sidebar-thread-title">{session.title || "Untitled thread"}</span>
+          {tree && <span className="sidebar-thread-tree" title={session.cwd}>{tree}</span>}
           <time>{running ? "live" : ago(session.lastEventAt, now)}</time>
         </button>
         {ids.length > 0 && (

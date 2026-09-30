@@ -61,17 +61,28 @@ function GroupDetail({ beat, sessionId }: { beat: Beat; sessionId: string }) {
     return ids;
   }, [beat]);
   const notable = useMemo(() => beat.steps.filter((st) => st.kind !== "tool_result" && !(st.kind === "thinking" && !st.text?.trim()) && !(st.kind === "text" && !st.text?.trim() && !st.label)), [beat]);
-  const shown = notable.slice(0, SUMMARY_ROWS);
-  const more = notable.length - shown.length;
+  // Steps that read the same in a row ("Take a screenshot" five times) are one row with a count.
+  const runs = useMemo(() => {
+    const out: { st: Step; label: string; n: number; failed: boolean }[] = [];
+    for (const st of notable) {
+      const label = displayLabel(st), last = out[out.length - 1];
+      if (last && last.label === label) { last.n++; last.failed ||= failedCalls.has(st.id); }
+      else out.push({ st, label, n: 1, failed: failedCalls.has(st.id) });
+    }
+    return out;
+  }, [notable, failedCalls]);
+  const shown = runs.slice(0, SUMMARY_ROWS);
+  const more = notable.length - shown.reduce((n, r) => n + r.n, 0);
   return (
     <div className="rp-detail">
       <ul className="rp-sub">
-        {shown.map((st) => (
+        {shown.map(({ st, label, n, failed }) => (
           <li key={st.id}>
-            <button className={failedCalls.has(st.id) ? "fail" : ""} onClick={() => openStep(sessionId, st.id)} title="Open in Follow">
+            <button className={failed ? "fail" : ""} onClick={() => openStep(sessionId, st.id)} title="Open in Follow">
               <span className="rp-glyph sm" aria-hidden="true"><Glyph kind={st.kind} tool={st.tool} size={12} /></span>
-              <span className="rp-sub-label">{displayLabel(st)}</span>
-              {failedCalls.has(st.id) && <span className="rp-fail-dot" aria-label="failed" />}
+              <span className="rp-sub-label">{label}</span>
+              {n > 1 && <span className="rp-sub-count">×{n}</span>}
+              {failed && <span className="rp-fail-dot" aria-label="failed" />}
             </button>
           </li>
         ))}
@@ -235,9 +246,7 @@ export function ReplaySteps() {
   return (
     <div className="rp-steps">
       <p className="rp-steps-sum">
-        {thread.detail === "light"
-          ? <>{len.toLocaleString()} moments from {thread.stepCount.toLocaleString()} steps · {thread.editCount} edits · {thread.files.length} files</>
-          : <>{thread.stepCount.toLocaleString()} steps · {thread.editCount} edits · {thread.files.length} files</>}
+        {thread.stepCount.toLocaleString()} steps · {thread.editCount} edits · {thread.files.length} files
       </p>
       <div className="rp-list" ref={listRef} onScroll={onScroll} onWheel={markUser} onTouchMove={markUser}
         onKeyDown={(e) => { if (["PageUp", "PageDown", "ArrowUp", "ArrowDown"].includes(e.key)) markUser(); }}

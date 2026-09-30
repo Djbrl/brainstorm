@@ -1,6 +1,6 @@
 // Owned by the lead.
 import { isReplay, useLive } from "./lib/live";
-import { NavProvider, useNav, type View } from "./lib/nav";
+import { NavProvider, followCursor, useNav, type View } from "./lib/nav";
 import { FollowView } from "./follow/FollowView";
 
 import { useThread } from "./lib/thread";
@@ -74,6 +74,7 @@ function Shell() {
       {state.replay && !state.shared && <Tour openSignal={tourSignal} preview={state.preview} />}
       {state.shared && <OpenShared />}
       {!state.replay && <LiveReplay />}
+      <FromFollow />
       <main className="view"><Suspense fallback={null}>{view === "follow" ? <FollowView /> : view === "map" ? (lens === "track" && !state.replay ? <TrackView /> : lens === "places" ? <PlacesView /> : <MapView />) : state.replay ? <FailuresView /> : <FollowView />}</Suspense></main>
     </div>
   );
@@ -97,12 +98,13 @@ function OpenShared() {
 }
 
 /**
- * A running thread plays live by default: when the Map tab opens with no thread selected, the newest running thread
- * is picked and followed (until the user closes a replay). A live replay stays on the thread's newest beat.
+ * The Map never opens still: with no thread selected, the newest running thread is picked and followed live; with none
+ * running, the newest thread plays from its start at 4× (once per visit, and not after the user closes a replay).
+ * A live replay stays on the thread's newest beat.
  */
 function LiveReplay() {
   const { state } = useLive();
-  const { replay, view, startReplay, followLive, setReplayLive } = useNav();
+  const { replay, view, startReplay, followLive, setReplayLive, setReplayPlaying, setReplaySpeed } = useNav();
   const thread = useThread(replay?.live ? replay.sessionId : null, replay?.detail ?? "light");
   const beats = thread?.beats.length ?? 0;
   useEffect(() => { if (replay?.live && beats) followLive(beats - 1); }, [replay?.live, beats, followLive]);
@@ -114,11 +116,34 @@ function LiveReplay() {
 
   const closed = useRef(false), had = useRef(false);
   useEffect(() => { if (had.current && !replay) closed.current = true; had.current = !!replay; }, [replay]);
+  const autoplayed = useRef(false);
   useEffect(() => {
-    if (replay || closed.current || view !== "map") return;
-    const running = state.sessions.filter((s) => s.status === "running").sort((a, b) => b.lastEventAt.localeCompare(a.lastEventAt))[0];
-    if (running) startReplay(running.id, 0, { live: true });
-  }, [state.sessions, replay, view, startReplay]);
+    if (replay || closed.current || view !== "map" || !state.sessions.length) return;
+    const newest = [...state.sessions].sort((a, b) => b.lastEventAt.localeCompare(a.lastEventAt));
+    const running = newest.find((s) => s.status === "running");
+    if (running) { startReplay(running.id, 0, { live: true }); return; }
+    if (autoplayed.current) return;
+    autoplayed.current = true;
+    startReplay(newest[0].id, 0);
+    setReplaySpeed(4);
+    setReplayPlaying(true);
+  }, [state.sessions, replay, view, startReplay, setReplaySpeed, setReplayPlaying]);
+  return null;
+}
+
+/** Back from Follow, the Map shows the thread you were reading, at the step you had open. */
+function FromFollow() {
+  const { view, replay, startReplay } = useNav();
+  const prev = useRef(view);
+  useEffect(() => {
+    const was = prev.current;
+    prev.current = view;
+    if (was !== "follow" || view !== "map") return;
+    const { sessionId, stepId } = followCursor;
+    if (!sessionId || (replay?.sessionId === sessionId && !stepId)) return;
+    startReplay(sessionId, stepId ?? 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
   return null;
 }
 

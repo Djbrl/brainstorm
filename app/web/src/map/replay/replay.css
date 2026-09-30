@@ -144,3 +144,18 @@
 .rp-share-menu span { display: block; font-size: 13px; color: var(--ink-2); line-height: 1.4; margin-top: 2px; }
 .rp-share-note { margin: 6px 12px 6px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-3); line-height: 1.45; }
 @media (max-width: 600px) { .rp-share-menu { width: min(330px, calc(100vw - 32px)); } }
+
+.rp-sub-count { flex: none; margin-left: 4px; font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+/* A thread with no files: its conversation on one card over the map (TalkCard). */
+.rp-talk { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); width: min(520px, calc(100% - 820px)); min-width: 320px; z-index: 5;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 22px 16px; box-shadow: 0 12px 40px rgba(0,0,0,0.08); pointer-events: auto; }
+.rp-talk-who { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--ink-3); }
+.rp-talk-text { margin: 0; font-size: 16px; line-height: 1.5; color: var(--ink); white-space: pre-line; animation: rp-talk-in 260ms ease; }
+.rp-talk-text.you { color: var(--accent); }
+.rp-talk-meta { margin: 12px 0 0; font-size: 12.5px; color: var(--ink-2); display: flex; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+.rp-talk-link { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; cursor: pointer; }
+.rp-talk-link:hover { text-decoration: underline; }
+.rp-talk-note { margin: 12px 0 0; font-size: 11.5px; color: var(--ink-3); }
+@keyframes rp-talk-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (max-width: 1100px) { .rp-talk { width: min(520px, calc(100% - 48px)); } }

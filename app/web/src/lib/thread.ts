@@ -7,7 +7,7 @@ import { useEffect, useMemo } from "react";
 import type { Step } from "@contract";
 import { useLive } from "./live";
 import { makeFileResolver, type FileResolver } from "./paths";
-import { displayLabel, realLabel } from "../follow/format";
+import { displayLabel, isVisible, realLabel } from "../follow/format";
 
 export type BeatAction = "edit" | "read" | "other";
 export type ReplayDetail = "light" | "full";
@@ -65,7 +65,7 @@ export type Thread = {
   files: string[];        // map files the thread touches (any action), in first-touch order
   touched: Map<string, { edits: number; reads: number }>;
   stepBeat: Map<string, number>; // step id → beat index (every step, results included)
-  stepCount: number;
+  stepCount: number;      // steps as Follow lists them (tool results and empty thinking left out), so both views agree
   editCount: number;
 };
 
@@ -246,7 +246,7 @@ export function buildThread(sessionId: string, steps: Step[], resolve: FileResol
   }
   for (const b of beats) if (b.kind === "summary") b.headline = headlineOf(b.steps, b.counts!);
 
-  return { sessionId, detail, beats, moves, files, touched, stepBeat, stepCount: steps.length, editCount };
+  return { sessionId, detail, beats, moves, files, touched, stepBeat, stepCount: steps.filter(isVisible).length, editCount };
 }
 
 /** The thread for a session, built against the current map. Loads the session's steps if needed (live app). */

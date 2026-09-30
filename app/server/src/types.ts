@@ -14,7 +14,8 @@ export type Step = {
 };
 export type FileNode = { path: string; module: string; lines: number; lastChangedAt?: string; activeSessionId?: string; summary?: string };
 export type Edge = { from: string; to: string };
-export type ProjectMap = { root: string; files: FileNode[]; edges: Edge[]; modules: { id: string; summary?: string }[] };
+/** `formerRoots`: where the repo lived before it moved, so paths in older threads still land on today's files. */
+export type ProjectMap = { root: string; files: FileNode[]; edges: Edge[]; modules: { id: string; summary?: string }[]; formerRoots?: string[] };
 export type Snapshot = { ts: string; map: ProjectMap };
 export type AskRequest = { question: string; stepId?: string; filePath?: string; root?: string };
 export type AskResponse = { answer: string; model: string; tokensIn: number; tokensOut: number; costUsd: number; fallback: boolean };

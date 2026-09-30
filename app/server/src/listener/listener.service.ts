@@ -8,10 +8,12 @@ import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";
 import { ConfigService } from "../core/config.service";
 import { maskSecrets } from "../privacy/mask";
+import { encodeRoot, formerRoots, underPrefix } from "./moved";
 
 // Owner: A. Tail ~/.claude/projects/**/*.jsonl, parse into Steps, store, emit on bus, broadcast over ws.
 
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+// Threads touched in the last two weeks: enough to find yesterday's and last week's work, not the whole history.
+const HISTORY_MS = 14 * 24 * 60 * 60 * 1000;
 const IDLE_AFTER_MS = 2 * 60 * 1000;
 const TEXT_LIMIT = 20_000;
 const TOOL_RESULT_LIMIT = 2_000;
@@ -51,8 +53,10 @@ export class ListenerService implements OnModuleInit {
   // SESSION_FILTER env is a permanent override (substring match, old behavior). Otherwise the
   // active workspace's Claude Code project folder prefix is used (set on "workspace", owner: S).
   private readonly sessionFilterOverride = process.env.SESSION_FILTER || undefined;
-  private projectFilterPrefix: string | null = null;
+  private projectFilterPrefixes: string[] = [];
   private activeRoot: string | null = null;
+  /** The active root and the folders the repo lived in before it moved (see moved.ts). */
+  private roots: string[] = [];
   private offsets = new Map<string, number>();
   private nextSeq = new Map<string, number>();
   private ready = false;
@@ -92,8 +96,7 @@ export class ListenerService implements OnModuleInit {
 
     // Start out scoped to the configured default root (repo root, or MAP_ROOT) until a workspace
     // is explicitly chosen (WorkspaceService then emits "workspace" and we re-scope, see below).
-    this.activeRoot = resolve(this.cfg.defaultRoot);
-    this.projectFilterPrefix = this.sessionFilterOverride ? null : this.encodeRoot(this.activeRoot);
+    this.setRoot(this.cfg.defaultRoot);
     this.bus.on("workspace", ({ root }) => this.onWorkspaceChanged(root));
 
     this.watcher = chokidar.watch(this.cfg.claudeProjectsDir, {
@@ -106,33 +109,33 @@ export class ListenerService implements OnModuleInit {
     this.watcher.on("error", (e) => this.log.warn(`watcher error: ${(e as Error).message}`));
     this.watcher.on("ready", () => {
       this.ready = true;
-      this.log.log(`backfill complete, watching ${this.cfg.claudeProjectsDir} live (filter="${this.sessionFilterOverride ?? this.projectFilterPrefix}")`);
+      this.log.log(`backfill complete, watching ${this.cfg.claudeProjectsDir} live (filter="${this.sessionFilterOverride ?? this.projectFilterPrefixes.join(", ")}")`);
     });
   }
 
   // ---- workspace switching (owner: S) ----
 
-  /** `root.replace(/[^A-Za-z0-9-]/g, "-")` — matches Claude Code's own project-folder naming. */
-  private encodeRoot(root: string): string {
-    return resolve(root).replace(/[^A-Za-z0-9-]/g, "-");
+  private setRoot(root: string) {
+    this.activeRoot = resolve(root);
+    this.roots = [this.activeRoot, ...formerRoots(this.cfg.claudeProjectsDir, this.activeRoot)];
+    this.projectFilterPrefixes = this.sessionFilterOverride ? [] : this.roots.map(encodeRoot);
   }
 
   /** True if `projectDir` (a top-level folder name under claudeProjectsDir) belongs to the active workspace. */
   private matchesFilter(projectDir: string): boolean {
     if (this.sessionFilterOverride) return projectDir.includes(this.sessionFilterOverride);
-    return this.projectFilterPrefix ? projectDir.startsWith(this.projectFilterPrefix) : false;
+    return this.projectFilterPrefixes.some((p) => underPrefix(projectDir, p));
   }
 
   private onWorkspaceChanged(root: string) {
-    this.activeRoot = resolve(root);
+    this.setRoot(root);
     if (this.sessionFilterOverride) return; // permanent override, ignore workspace changes
-    this.projectFilterPrefix = this.encodeRoot(this.activeRoot);
-    this.log.log(`workspace changed: now filtering Claude Code projects by prefix "${this.projectFilterPrefix}"`);
+    this.log.log(`workspace changed: now filtering Claude Code projects by prefix "${this.projectFilterPrefixes.join(", ")}"`);
     this.backfillForNewFilter();
   }
 
   /** Scan (not watch) every project folder now matching the filter for jsonl files from the last
-   * 24h that we haven't tailed yet. Reuses handleFile's offset bookkeeping, so nothing duplicates. */
+   * two weeks that we haven't tailed yet. Reuses handleFile's offset bookkeeping, so nothing duplicates. */
   private backfillForNewFilter() {
     let dirs: string[];
     try { dirs = readdirSync(this.cfg.claudeProjectsDir); } catch (e) {
@@ -157,7 +160,7 @@ export class ListenerService implements OnModuleInit {
       try { st = statSync(p); } catch { continue; }
       if (st.isDirectory()) { count += this.scanDirForJsonl(p); continue; } // e.g. <session>/subagents/
       if (!name.endsWith(".jsonl")) continue;
-      if (Date.now() - st.mtimeMs > ONE_DAY_MS) continue;
+      if (Date.now() - st.mtimeMs > HISTORY_MS) continue;
       this.handleFile(p);
       count++;
     }
@@ -175,7 +178,7 @@ export class ListenerService implements OnModuleInit {
       const projectDir = rel.split(sep)[0] ?? "";
       if (!this.matchesFilter(projectDir)) return;
       const stat = statSync(file);
-      if (Date.now() - stat.mtimeMs > ONE_DAY_MS) return;
+      if (Date.now() - stat.mtimeMs > HISTORY_MS) return;
 
       const prevOffset = this.offsets.get(file) ?? 0;
       const { text, newOffset } = this.readAppended(file, prevOffset, stat.size);
@@ -455,15 +458,19 @@ export class ListenerService implements OnModuleInit {
     const rows = this.dbs.db.prepare(`SELECT * FROM sessions ORDER BY last_event_at DESC`).all() as SessionRow[];
     // Titles stored before promptTitle() existed can still start with Claude Code's wrapper tags.
     const sessions = rows.map((r) => this.rowToSession(r.custom_title ? r : { ...r, title: promptTitle(r.title) ?? "(untitled session)" }));
-    if (!this.activeRoot) return sessions;
-    return sessions.filter((s) => this.isWithinRoot(s.cwd));
+    // A thread where no agent did anything but answer a slash command (opening this app, /compact) isn't work to show.
+    const worked = new Set((this.dbs.db.prepare(`SELECT DISTINCT session_id FROM steps WHERE kind IN ('tool_call', 'edit')`).all() as { session_id: string }[]).map((r) => r.session_id));
+    const idle = (s: Session) => !worked.has(s.id) && (s.title.startsWith("/") || s.title === "(untitled session)");
+    const shown = sessions.filter((s) => !idle(s));
+    if (!this.activeRoot) return shown;
+    return shown.filter((s) => this.isWithinRoot(s.cwd));
   }
 
   private isWithinRoot(cwd: string): boolean {
     if (!cwd || !this.activeRoot) return false;
     let abs: string;
     try { abs = resolve(cwd); } catch { return false; }
-    return abs === this.activeRoot || abs.startsWith(this.activeRoot + sep);
+    return this.roots.some((r) => abs === r || abs.startsWith(r + sep));
   }
 
   private rowToStep(row: any): Step {
@@ -520,6 +527,15 @@ export class ListenerService implements OnModuleInit {
   }
 }
 
+const PASTE = /<pasted_content\b[^>]*>([\s\S]*?)(<\/pasted_content>|$)/g;
+
+/** Text pasted into a prompt arrives wrapped in `<pasted_content id="…">`. What the person typed around it makes the
+ * better title ("help me draft it?"); with nothing typed around it, the pasted text itself. Same rule as the web's. */
+export function withoutPastes(text: string): string {
+  const typed = text.replace(PASTE, " ").trim();
+  return typed || text.replace(PASTE, "$1");
+}
+
 /**
  * A readable thread title from the first prompt. Claude Code wraps slash commands and local output in tags
  * (<command-name>, <local-command-caveat>, <local-command-stdout>...): keep the command, drop the rest.
@@ -529,9 +545,9 @@ export function promptTitle(text: string, max = 80): string | undefined {
   const command = /<command-name>([^<]*)/.exec(text)?.[1]?.trim();
   const args = /<command-args>([^<]*)<\/command-args>/.exec(text)?.[1]?.trim();
   if (command) return `${command}${args ? " " + args : ""}`.slice(0, max);
-  const plain = text
+  const plain = withoutPastes(text)
     .replace(/<(local-command-caveat|local-command-stdout|local-command-stderr|system-reminder|command-message|command-args)>[\s\S]*?(<\/\1>|$)/g, "")
-    .replace(/<\/?[a-z-]+>/g, "")
+    .replace(/<\/?[a-z_-]+(\s[^>]*)?>/g, "")
     .trim();
   return plain ? plain.slice(0, max) : undefined;
 }

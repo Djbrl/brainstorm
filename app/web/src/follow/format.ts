@@ -2,6 +2,7 @@
 import { clock } from "../lib/live";
 import type { Step } from "@contract";
 import { CallPairer } from "../lib/pairing";
+import { commandLabel, toolLabel } from "@shared/labels";
 
 export const basename = (p?: string) => (p ? p.split(/[\\/]/).filter(Boolean).pop() ?? p : "");
 
@@ -24,9 +25,20 @@ export const clockTime = (iso: string) => {
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 };
 
+const PASTE = /<pasted_content\b[^>]*>([\s\S]*?)(<\/pasted_content>|$)/g;
+
+/** Text the person pasted into a prompt arrives wrapped in `<pasted_content id="…">`. For a one-line label, what they
+ * typed around it says more ("help me draft it?"); with nothing typed around it, the pasted text itself. */
+export const withoutPastes = (t = "") => {
+  const typed = t.replace(PASTE, " ").trim();
+  return typed || t.replace(PASTE, "$1");
+};
+/** The full prompt: pasted text stays, its wrapper tag goes. */
+export const unwrapPastes = (t = "") => t.replace(PASTE, "\n$1\n");
+
 /** Drop blocks Claude Code injects into the log (e.g. `<system-reminder>…</system-reminder>`); they aren't what the person or agent wrote. */
 export const stripInjected = (t = "") =>
-  t.replace(/<(system-reminder|command-[a-z-]+|local-command-[a-z-]+|task-notification)>[\s\S]*?(<\/\1>|$)/g, " ")
+  withoutPastes(t).replace(/<(system-reminder|command-[a-z-]+|local-command-[a-z-]+|task-notification)>[\s\S]*?(<\/\1>|$)/g, " ")
     .replace(/^\[Image[:#][^\]]*\]\s*$/gm, "") // Claude Code's note on an image a tool returned
     .trim();
 
@@ -55,7 +67,7 @@ export function fallbackLabel(s: Step): string {
       const t = s.tool ?? "Tool";
       const file = basename(s.filePath ?? str(input.file_path) ?? str(input.path));
       switch (t) {
-        case "Bash": return str(input.description) || `Run ${firstLine(str(input.command), 80)}`;
+        case "Bash": return str(input.description) || commandLabel(str(input.command));
         case "Read": return file ? `Read ${file}` : "Read a file";
         case "Grep": return `Search for “${firstLine(str(input.pattern), 60)}”`;
         case "Glob": return `Find files ${firstLine(str(input.pattern), 60)}`;
@@ -64,7 +76,7 @@ export function fallbackLabel(s: Step): string {
         case "WebSearch": return `Search the web for “${firstLine(str(input.query), 60)}”`;
         case "TodoWrite": return "Update the plan";
         case "ToolSearch": return "Look up tools";
-        default: return file ? `${t} ${file}` : t.replace(/^mcp__.+?__/, "").replace(/_/g, " ");
+        default: return file ? `${t} ${file}` : toolLabel(t, input);
       }
     }
   }
@@ -74,7 +86,7 @@ export function fallbackLabel(s: Step): string {
 function readerHeuristic(s: Step): string | undefined {
   if (s.kind === "edit") return `Edit ${s.filePath ? s.filePath.split("/").pop() : "file"}`;
   if (s.kind === "tool_call") {
-    if (s.tool === "Bash") { const cmd = str(obj(s.input).command); return cmd ? `Run: ${cmd.slice(0, 40)}` : "Run: shell command"; }
+    if (s.tool === "Bash") { const cmd = str(obj(s.input).command); return cmd ? `Run: ${cmd.replace(/\s+/g, " ").trim().slice(0, 40)}` : "Run: shell command"; }
     if (s.filePath) return `${s.tool ?? "Tool"} ${s.filePath.split("/").pop()}`;
     return `Run: ${s.tool ?? "tool"}`;
   }
@@ -85,7 +97,8 @@ function readerHeuristic(s: Step): string | undefined {
 /** The model-written label, or undefined while only the heuristic one exists. */
 export function realLabel(s: Step): string | undefined {
   const l = s.label?.trim();
-  if (!l || l === readerHeuristic(s)) return undefined;
+  // Any "Run: …" on a command is the reader's placeholder, whichever version of it wrote the label.
+  if (!l || l === readerHeuristic(s) || (s.tool === "Bash" && l.startsWith("Run: "))) return undefined;
   return l;
 }
 

@@ -1,12 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { existsSync, statSync } from "node:fs";
 import { basename, relative } from "node:path";
-import { ListenerService } from "../listener/listener.service";
+import { ListenerService, withoutPastes } from "../listener/listener.service";
 import { CallPairer } from "../listener/pairing";
 import { CoworkTracker } from "../cowork/classify";
 import type { CoworkEvent, Step, TaskArtifact, TaskBeat, TaskDetail, TaskFileKind, TaskFrame, TaskKind, TaskListItem, TaskOutside, TaskSourceFile, TaskSourceSite, TaskStep } from "../types";
 import { ShotsService } from "./shots.service";
 import { commandFiles, explainFfmpeg, fileKind } from "./commands";
+import { commandLabel, toolLabel } from "../shared/labels";
 
 // Owned by the lead. Tells any agent session as a task: the goal, how the agent did it (its own explanations,
 // then the calls in plain words), what it made, where it got things, and a filmstrip of its tools' screenshots.
@@ -22,9 +23,9 @@ function cleanPrompt(text: string): string {
   const command = /<command-name>([^<]*)/.exec(text)?.[1]?.trim();
   const args = /<command-args>([^<]*)/.exec(text)?.[1]?.trim();
   if (command) return `${command}${args ? " " + args : ""}`;
-  return text
+  return withoutPastes(text)
     .replace(/<(local-command-caveat|local-command-stdout|local-command-stderr|system-reminder|command-message|task-notification|bash-notification|user-prompt-submit-hook)>[\s\S]*?(<\/\1>|$)/g, "")
-    .replace(/<\/?[a-z-]+>/g, "")
+    .replace(/<\/?[a-z_-]+(\s[^>]*)?>/g, "")
     .replace(/^\[Image[:#][^\]]*\]\s*$/gm, "") // Claude Code's note on an image a tool returned, not a request
     .trim();
 }
@@ -116,7 +117,7 @@ export class TasksService {
         // The agent's own one-line description of a command reads best; generic "Run: <command>" labels repeat the detail.
         const own = typeof input.description === "string" && input.description.trim() ? input.description.trim() : undefined;
         const generic = !st.label || /^Run: /.test(st.label);
-        const label = own ?? (generic ? (tool.startsWith("mcp__") ? toolName(tool).replace(/^./, (c) => c.toUpperCase()) : tool === "Bash" ? "Ran a command" : toolName(tool)) : st.label!);
+        const label = own ?? (generic ? (tool === "Bash" ? commandLabel(String(input.command ?? "")) : toolLabel(tool, input)) : st.label!);
         const ts: TaskStep = { id: st.id, ts: st.ts, tool: toolName(tool), label, ...(detail ? { detail } : {}), ...(explain ? { explain } : {}), ...(st.isSubagent ? { subagent: true } : {}) };
         taskSteps.set(st.id, ts);
         beat().steps.push(ts);

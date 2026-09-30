@@ -27,6 +27,7 @@ export type FileResolver = (abs: string | undefined) => string | null;
 export function makeFileResolver(map: ProjectMap | null): FileResolver {
   if (!map) return () => null;
   const base = repoBase(map.root);
+  const bases = [base, ...(map.formerRoots ?? [])]; // older threads name files where the repo used to live
   const ids = new Set(map.files.map((f) => f.path));
   const byRel = new Map<string, string>();
   for (const f of map.files) {
@@ -36,7 +37,10 @@ export function makeFileResolver(map: ProjectMap | null): FileResolver {
   return (abs) => {
     if (!abs) return null;
     if (ids.has(abs)) return abs;
-    const rel = repoRelative(abs, base);
-    return rel === null ? null : byRel.get(rel) ?? null;
+    for (const b of bases) {
+      const rel = repoRelative(abs, b);
+      if (rel !== null) return byRel.get(rel) ?? null;
+    }
+    return null;
   };
 }

@@ -1,12 +1,12 @@
-// Owner: C. Sessions list + live timeline of steps. Click a step → diff + AskBox.
+// Owner: C. Threads list + live timeline of steps. Click a step → diff + AskBox.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Session, Step } from "@contract";
 import { clock, useLive } from "../lib/live";
-import { useNav } from "../lib/nav";
+import { followCursor, replayCursor, useNav } from "../lib/nav";
 import { FileIcon, Glyph, RiskIcon } from "./Glyph";
 import { StepDetail } from "./StepDetail";
 import { ReplayOnMapButton } from "../map/replay/ReplayButton";
-import { basename, clockTime, displayLabel, isVisible, pairResults, realLabel, relTime, stepFile } from "./format";
+import { basename, clockTime, displayLabel, isVisible, pairResults, realLabel, relTime, stepFile, stripInjected } from "./format";
 import { isFailedResult } from "../lib/thread";
 import "./follow.css";
 
@@ -18,18 +18,24 @@ function useNow(ms = 15000) {
   return now;
 }
 
+/** Where a thread ran, short: its git worktree's name, else its folder's. */
+export const placeOf = (cwd?: string) => (cwd ? /\/\.claude\/worktrees\/([^/]+)/.exec(cwd)?.[1]?.replace(/-[0-9a-f]{6}$/, "") ?? basename(cwd) : "");
+
+/** Same threads, same order as the Map's sidebar: running first, then the most recent. */
+export const byActivity = (a: Session, b: Session) => (a.status === "running" ? 0 : 1) - (b.status === "running" ? 0 : 1) || b.lastEventAt.localeCompare(a.lastEventAt);
+
 function SessionList({ sessions, selected, onSelect }: { sessions: Session[]; selected: string | null; onSelect: (id: string) => void }) {
   const now = useNow();
   return (
     <nav className="fl-sessions">
-      <h2 className="fl-sessions-title">Sessions</h2>
+      <h2 className="fl-sessions-title">Threads</h2>
       <div className="fl-sessions-list">
-        {sessions.map((s) => (
+        {[...sessions].sort(byActivity).map((s) => (
           <button key={s.id} className={`fl-session ${s.id === selected ? "on" : ""}`} onClick={() => onSelect(s.id)}>
-            <div className="fl-session-title">{s.title || "Untitled session"}</div>
+            <div className="fl-session-title">{s.title || "Untitled thread"}</div>
             <div className="fl-session-meta">
               {s.status === "running" && <span className="fl-live" />}
-              {s.cwd && <><span className="fl-session-cwd">{basename(s.cwd) || s.cwd}</span><span className="sep">·</span></>}
+              {s.cwd && <><span className="fl-session-cwd" title={s.cwd}>{placeOf(s.cwd)}</span><span className="sep">·</span></>}
               <span>{s.status === "running" ? "running" : relTime(s.lastEventAt, now)}</span>
             </div>
           </button>
@@ -56,7 +62,7 @@ function StepRow({ step, selected, fresh, flash, onSelect, error }: { step: Step
       <div className={cls} data-step-id={step.id} onClick={() => onSelect(step)}>
         <div className="tl-glyph"><Glyph kind="prompt" size={17} /></div>
         <div className="tl-body">
-          <div className="tl-prompt">{step.text?.trim() || label}</div>
+          <div className="tl-prompt">{stripInjected(step.text) || label}</div>
           <div className="tl-meta"><span>You</span><span className="sep">·</span><span>{clockTime(step.ts)}</span></div>
         </div>
       </div>
@@ -143,10 +149,10 @@ function Timeline({ session, steps, selectedId, onSelect, reveal }: { session: S
   return (
     <section className="fl-timeline">
       <header className="tl-head">
-        <h1 className="tl-title">{session.title || "Untitled session"}</h1>
+        <h1 className="tl-title">{session.title || "Untitled thread"}</h1>
         <div className="tl-sub">
           {session.status === "running" ? <span className="tl-running"><span className="fl-live" />Live</span> : <span>Last active {relTime(session.lastEventAt, now)}</span>}
-          {session.cwd && <><span className="sep">·</span><span className="tl-cwd" title={session.cwd}>{session.cwd}</span></>}
+          {session.cwd && <><span className="sep">·</span><span className="tl-cwd" title={session.cwd}>{placeOf(session.cwd)}</span></>}
           {steps && <><span className="sep">·</span><span>{visible.length} steps, {edits} edits</span></>}
         </div>
         {steps && steps.length > 0 && <ReplayOnMapButton sessionId={session.id} stepId={selectedId} />}
@@ -178,17 +184,28 @@ function Timeline({ session, steps, selectedId, onSelect, reveal }: { session: S
 
 export function FollowView() {
   const { state, loadSteps } = useLive();
-  const { sessionId, setSessionId, focusStep, setFocusStep } = useNav();
+  const { sessionId, setSessionId, focusStep, setFocusStep, replay } = useNav();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Coming from the Map: open on the thread it was playing, at the step it was on (not at the bottom of another thread).
+  useEffect(() => {
+    if (!replay) return;
+    setSessionId(replay.sessionId);
+    const at = replayCursor.stepId ?? replay.atStep;
+    if (at) setFocusStep(at);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Going back to the Map: it picks up this thread at this step (see followCursor).
+  useEffect(() => { followCursor.sessionId = sessionId; followCursor.stepId = selectedId; }, [sessionId, selectedId]);
   const [reveal, setReveal] = useState<{ id: string; n: number } | null>(null);
   const retried = useRef<string | null>(null);
 
-  // Auto-select the most recent running session (sessions are sorted newest first).
+  // Auto-select the most recent running thread, else the most recent one.
   useEffect(() => {
     if (sessionId && state.sessions.some((s) => s.id === sessionId)) return;
-    const pick = state.sessions.find((s) => s.status === "running") ?? state.sessions[0];
+    const pick = state.sessions.find((s) => s.id === replay?.sessionId) ?? [...state.sessions].sort(byActivity)[0];
     if (pick) setSessionId(pick.id);
-  }, [state.sessions, sessionId, setSessionId]);
+  }, [state.sessions, sessionId, setSessionId, replay?.sessionId]);
 
   useEffect(() => {
     if (sessionId && !state.steps[sessionId]) loadSteps(sessionId);
@@ -229,7 +246,7 @@ export function FollowView() {
         <div className="fl-empty">
           <span className="fl-empty-pulse" />
           <p className="fl-empty-title">{state.connected ? "Waiting for an agent" : "Connecting…"}</p>
-          <p>Start a Claude Code session in any project. It shows up here, live, step by step.</p>
+          <p>Start Claude Code in this project. Each thread shows up here, live, step by step.</p>
         </div>
       </div>
     );

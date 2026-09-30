@@ -10,7 +10,7 @@
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
-    "paths": { "@contract": ["../server/src/types.ts"] }
+    "paths": { "@contract": ["../server/src/types.ts"], "@shared/*": ["../server/src/shared/*"] }
   },
   "include": ["src"]
 }

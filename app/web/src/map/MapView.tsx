@@ -15,6 +15,7 @@ import { mockAgents, mockMap } from "./mock";
 import { drawAgents, visibleAgents, type AgentAnim } from "./agents";
 import { MapSidebar } from "./sidebar/MapSidebar";
 import { ReplayBar } from "./replay/ReplayBar";
+import { TalkCard } from "./replay/TalkCard";
 import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
 import { makeFileResolver } from "../lib/paths";
 import { drawModuleLabels, LabelSpace } from "./labels";
@@ -430,6 +431,7 @@ export function MapView() {
         onFollow={(id) => setFollowId(id)} onFocusFile={focusOnFile} map={map} />
       <MapStats />
       <ReplayBar />
+      <TalkCard />
       <LensSwitch />
 
       <div className="map-legend" aria-label="Legend">

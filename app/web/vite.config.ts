@@ -7,7 +7,7 @@ const api = process.env.API_PORT ?? "4000";
 
 export default defineConfig({
   plugins: [react()],
-  resolve: { alias: { "@contract": fileURLToPath(new URL("../server/src/types.ts", import.meta.url)) } },
+  resolve: { alias: { "@contract": fileURLToPath(new URL("../server/src/types.ts", import.meta.url)), "@shared": fileURLToPath(new URL("../server/src/shared", import.meta.url)) } },
   server: {
     port: 5173,
     proxy: {

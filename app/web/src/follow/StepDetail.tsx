@@ -6,7 +6,7 @@ import { AskBox } from "../ask/AskBox";
 import { Markdown } from "../ask/Markdown";
 import { useNav } from "../lib/nav";
 import { CloseIcon, FileIcon, Glyph, RiskIcon } from "./Glyph";
-import { basename, clockTime, displayLabel, resultText, stepFile, toolName } from "./format";
+import { basename, clockTime, displayLabel, resultText, stepFile, toolName, unwrapPastes } from "./format";
 
 const BIG_DIFF = 400; // lines; above this the diff starts collapsed
 
@@ -135,7 +135,7 @@ export function StepDetail({ step, result, onClose }: { step: Step; result?: Ste
         <div className="sd-body">
           {step.kind === "edit" ? <EditBody step={step} />
             : step.kind === "tool_call" ? <ToolBody step={step} result={result} />
-            : step.text ? <div className={`sd-text ${step.kind === "thinking" ? "thinking" : ""}`}><Markdown text={step.text} /></div>
+            : step.text ? <div className={`sd-text ${step.kind === "thinking" ? "thinking" : ""}`}><Markdown text={unwrapPastes(step.text)} /></div>
             : null}
         </div>
 

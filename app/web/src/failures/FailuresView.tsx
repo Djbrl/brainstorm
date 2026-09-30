@@ -88,7 +88,7 @@ export function FailuresView() {
             <svg width="22" height="22" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </span>
           <p className="fx-empty-title">No failures found</p>
-          <p>Every tool call in the watched sessions succeeded. When one fails, it shows up here, grouped with the ones like it and ranked by what needs attention first.</p>
+          <p>Every tool call in the watched threads succeeded. When one fails, it shows up here, grouped with the ones like it and ranked by what needs attention first.</p>
         </div>
       </div>
     );
@@ -100,7 +100,7 @@ export function FailuresView() {
         <header className="fx-head">
           <h1 className="fx-h1">Recurring failures</h1>
           <p className="fx-sub">
-            <strong>{plural(total, "failure")}</strong> in {plural(groups.length, "group")} across {plural(sessions, "session")}, most urgent first.
+            <strong>{plural(total, "failure")}</strong> in {plural(groups.length, "group")} across {plural(sessions, "thread")}, most urgent first.
           </p>
         </header>
         <div className="fx-list">

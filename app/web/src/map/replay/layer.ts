@@ -188,7 +188,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
 
   const nodeAlpha = useCallback((id: string) => {
     const s = st.current;
-    if (!s.active || !s.thread) return 1;
+    if (!s.active || !s.thread || !s.thread.touched.size) return 1; // a thread with no files leaves the map as it is (see TalkCard)
     return s.thread.touched.has(id) ? 1 : DIM;
   }, []);
 

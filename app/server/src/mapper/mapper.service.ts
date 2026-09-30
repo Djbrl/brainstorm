@@ -7,6 +7,7 @@ import type { Edge, FileNode, ProjectMap, Snapshot } from "../types";
 import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";
 import { ConfigService } from "../core/config.service";
+import { formerRoots } from "../listener/moved";
 
 const IGNORE_DIRS = new Set([
   "node_modules", ".git", "dist", "build", "out", "data", ".claude", ".vercel",
@@ -113,7 +114,7 @@ export class MapperService implements OnModuleInit {
       for (const to of this.importsOf(abs, content, fileSet)) edges.push({ from: abs, to });
     }
 
-    const map: ProjectMap = { root, files: nodes, edges, modules: [...moduleIds.values()] };
+    const map: ProjectMap = { root, files: nodes, edges, modules: [...moduleIds.values()], formerRoots: formerRoots(this.cfg.claudeProjectsDir, root) };
     return { map, gitTimes, byPath };
   }
 

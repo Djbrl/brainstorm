@@ -1,7 +1,7 @@
 // Owner: replay agent. Scrollable step list shown in the sidebar's Threads tab during a replay.
 // The list follows the replay cursor, and scrolling the list moves the cursor (beat nearest the center line).
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import DiffViewer from "react-diff-viewer-continued";
+import { Diff } from "../../lib/Diff";
 import type { Step } from "@contract";
 import { isReplay, useLive } from "../../lib/live";
 import { useNav } from "../../lib/nav";
@@ -96,7 +96,7 @@ function BeatDetail({ beat, sessionId }: { beat: Beat; sessionId: string }) {
         pair ? (
           <div className="rp-diff">
             {lines > 600 ? <p className="rp-quiet">Large change, {lines} lines. Open it in Follow to read it.</p>
-              : <DiffViewer oldValue={pair.before} newValue={pair.after} splitView={false} showDiffOnly extraLinesSurroundingDiff={1} hideSummary styles={diffStyles} />}
+              : <Diff oldValue={pair.before} newValue={pair.after} splitView={false} showDiffOnly extraLinesSurroundingDiff={1} hideSummary styles={diffStyles} />}
           </div>
         ) : <p className="rp-quiet">No diff recorded for this edit.</p>
       ) : text ? <pre className="rp-pre">{text}</pre> : null}

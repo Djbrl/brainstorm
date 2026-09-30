@@ -2,14 +2,17 @@
 import { isReplay, useLive } from "./lib/live";
 import { NavProvider, useNav, type View } from "./lib/nav";
 import { FollowView } from "./follow/FollowView";
-import { MapView } from "./map/MapView";
-import { FailuresView } from "./failures/FailuresView";
-import { CoworkView } from "./cowork/CoworkView";
-import { TrackView } from "./tasks/TrackView";
+
 import { useThread } from "./lib/thread";
 import { Tour } from "./tour/Tour";
 import { SetupView } from "./setup/SetupView";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+
+// Follow opens first; the other views (and the graph library the Map needs) load when they're opened.
+const MapView = lazy(() => import("./map/MapView").then((m) => ({ default: m.MapView })));
+const TrackView = lazy(() => import("./tasks/TrackView").then((m) => ({ default: m.TrackView })));
+const CoworkView = lazy(() => import("./cowork/CoworkView").then((m) => ({ default: m.CoworkView })));
+const FailuresView = lazy(() => import("./failures/FailuresView").then((m) => ({ default: m.FailuresView })));
 
 function Shell() {
   const { state, reload } = useLive();
@@ -62,7 +65,7 @@ function Shell() {
       )}
       {state.replay && <Tour openSignal={tourSignal} preview={state.preview} />}
       {!state.replay && <LiveReplay />}
-      <main className="view">{view === "follow" ? <FollowView /> : view === "map" ? (lens === "track" && !state.replay ? <TrackView /> : <MapView />) : view === "cowork" && !state.replay ? <CoworkView /> : state.replay ? <FailuresView /> : <FollowView />}</main>
+      <main className="view"><Suspense fallback={null}>{view === "follow" ? <FollowView /> : view === "map" ? (lens === "track" && !state.replay ? <TrackView /> : <MapView />) : view === "cowork" && !state.replay ? <CoworkView /> : state.replay ? <FailuresView /> : <FollowView />}</Suspense></main>
     </div>
   );
 }

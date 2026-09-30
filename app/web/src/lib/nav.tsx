@@ -4,8 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import type { ReplayDetail } from "./thread";
 
 export type View = "follow" | "map" | "failures" | "cowork";
-/** How the Map tab shows the selected thread: where it happened in the code, or the story as a vertical track. */
-export type Lens = "map" | "track";
+/** How the Map tab shows the selected thread: where it happened in the code, the story as a vertical track, or the places it went outside the code. */
+export type Lens = "map" | "track" | "places";
 export type ReplaySpeed = 1 | 2 | 4;
 /**
  * A thread being replayed on the map. `index` is the current beat (see lib/thread.ts) in `detail` mode.
@@ -74,7 +74,8 @@ function loadHidden(): Set<string> {
 
 export function NavProvider({ children }: { children: ReactNode }) {
   const params = new URLSearchParams(location.search);
-  const [view, setView] = useState<View>(() => ((params.get("view") as View) || "follow"));
+  // "cowork" was the old all-sessions Places tab: it now opens the Map tab on the Places view of the selected thread.
+  const [view, setView] = useState<View>(() => { const v = (params.get("view") as View) || "follow"; return v === "cowork" ? "map" : v; });
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [focusFile, setFocusFile] = useState<string | null>(null);
   const [focusStep, setFocusStep] = useState<string | null>(null);
@@ -86,7 +87,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
     return { sessionId: t, index: Math.max(0, Number(params.get("beat")) || 0), playing: false, speed: 1, detail, atStep: params.get("step") ?? undefined };
   });
   const [hiddenAgents, setHidden] = useState<Set<string>>(loadHidden);
-  const [lens, setLens] = useState<Lens>(() => (params.get("lens") === "track" ? "track" : "map"));
+  const [lens, setLens] = useState<Lens>(() => { const l = params.get("lens"); return l === "track" || l === "places" ? l : params.get("view") === "cowork" ? "places" : "map"; });
   const [showReads, setShowReadsState] = useState<boolean>(() => (mapPrefs.showReads = loadShowReads()));
   const setShowReads = useCallback((v: boolean) => {
     mapPrefs.showReads = v;
@@ -98,7 +99,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const u = new URL(location.href);
     u.searchParams.set("view", view);
-    if (lens === "track") u.searchParams.set("lens", "track"); else u.searchParams.delete("lens");
+    if (lens !== "map") u.searchParams.set("lens", lens); else u.searchParams.delete("lens");
     u.searchParams.delete("beat");
     if (replay) {
       u.searchParams.set("thread", replay.sessionId);

@@ -4,7 +4,7 @@ import { NavProvider, useNav, type View } from "./lib/nav";
 import { FollowView } from "./follow/FollowView";
 import { MapView } from "./map/MapView";
 import { FailuresView } from "./failures/FailuresView";
-import { CoworkView } from "./cowork/CoworkView";
+import { PlacesView } from "./cowork/CoworkView";
 import { TrackView } from "./tasks/TrackView";
 import { useThread } from "./lib/thread";
 import { Tour } from "./tour/Tour";
@@ -21,7 +21,7 @@ function Shell() {
   const tabs: { id: View; label: string }[] = state.replay && !state.preview
     ? [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }, { id: "failures", label: `Failures${state.failures.length ? ` ${state.failures.length}` : ""}` }]
     : state.replay ? [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }] // the post-deadline demo
-    : [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }, { id: "cowork", label: "Places" }];
+    : [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }];
   // Local app: pick a workspace first (and whenever "Change" is clicked). The hosted replay never shows setup.
   // In the post-deadline preview, the setup screen plays back a recorded run (see lib/preview.ts).
   if ((setupOpen && (!state.replay || state.preview)) || (!state.replay && state.setup && !state.setup.root)) {
@@ -62,7 +62,7 @@ function Shell() {
       )}
       {state.replay && <Tour openSignal={tourSignal} preview={state.preview} />}
       {!state.replay && <LiveReplay />}
-      <main className="view">{view === "follow" ? <FollowView /> : view === "map" ? (lens === "track" && !state.replay ? <TrackView /> : <MapView />) : view === "cowork" && !state.replay ? <CoworkView /> : state.replay ? <FailuresView /> : <FollowView />}</main>
+      <main className="view">{view === "follow" ? <FollowView /> : view === "map" ? (lens === "track" && !state.replay ? <TrackView /> : lens === "places" && !state.replay ? <PlacesView /> : <MapView />) : state.replay ? <FailuresView /> : <FollowView />}</main>
     </div>
   );
 }

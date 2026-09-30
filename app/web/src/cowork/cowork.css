@@ -78,3 +78,19 @@
 }
 .cw-day { font-size: 13px; font-weight: 700; color: var(--ink-2); padding: 18px 10px 4px; }
 .cw-day:first-child { padding-top: 8px; }
+
+/* Places as a lens of the Map tab: the threads sidebar floats on the left, Map | Track | Places at the top. */
+.cw-wrap { position: relative; height: 100%; overflow: hidden; background: var(--bg); }
+.cw-wrap .cw-root { padding-left: 380px; }
+.cw-wrap .cw-head { padding-top: 76px; }
+.cw-wrap:has(.sidebar-collapsed) .cw-root, .cw-wrap:has(.sidebar-collapsed) .cw-note { padding-left: 90px; }
+.cw-note { padding: 120px 40px 0 400px; color: var(--ink-3); }
+.cw-note h2 { font-size: 28px; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; margin: 0 0 8px; }
+.cw-note p { max-width: 480px; line-height: 1.5; margin: 0; }
+.cw-wrap .cw-root { grid-template-columns: minmax(0, 1fr) 380px; }
+/* Not enough room for sidebar + map + changes side by side: the changes go under the map. */
+@media (max-width: 1360px) {
+  .cw-wrap .cw-root { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(520px, 72vh) auto; overflow-y: auto; }
+  .cw-wrap .cw-side { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+}
+@media (max-width: 900px) { .cw-wrap .cw-root { padding-left: 0; } .cw-note { padding: 120px 16px 0; } }

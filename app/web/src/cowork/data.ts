@@ -1,17 +1,20 @@
-// Owner: cowork. Loads GET /api/cowork and shapes it for the view: change groups, verb names, area names.
+// Owner: cowork. Loads GET /api/cowork?sessionId= for one thread and shapes it for the view: change groups, verb names, area names.
 import { useEffect, useState } from "react";
 import type { CoworkArea, CoworkEvent, CoworkSummary, CoworkVerb } from "@contract";
 
-export function useCowork() {
+/** The places of one thread (its subagents included). Refreshes while the thread is running. */
+export function useCowork(sessionId: string | null, running: boolean) {
   const [data, setData] = useState<CoworkSummary | null>(null);
   const [error, setError] = useState(false);
   useEffect(() => {
+    setData(null);
+    if (!sessionId) return;
     let stop = false;
-    const load = () => fetch("/api/cowork").then((r) => r.json()).then((d: CoworkSummary) => { if (!stop) { setData(d); setError(false); } }).catch(() => !stop && setError(true));
+    const load = () => fetch(`/api/cowork?sessionId=${encodeURIComponent(sessionId)}`).then((r) => r.json()).then((d: CoworkSummary) => { if (!stop) { setData(d); setError(false); } }).catch(() => !stop && setError(true));
     load();
-    const t = setInterval(load, 15000);
-    return () => { stop = true; clearInterval(t); };
-  }, []);
+    const t = running ? setInterval(load, 8000) : undefined;
+    return () => { stop = true; if (t) clearInterval(t); };
+  }, [sessionId, running]);
   return { data, error };
 }
 

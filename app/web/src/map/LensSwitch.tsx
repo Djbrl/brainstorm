@@ -1,4 +1,4 @@
-// Owned by the lead. Map | Track: two views of the same thread, floating at the top of the Map tab.
+// Owned by the lead. Map | Track | Places: three views of the same thread, floating at the top of the Map tab.
 import { isReplay } from "../lib/live";
 import { useNav } from "../lib/nav";
 
@@ -9,6 +9,7 @@ export function LensSwitch() {
     <div className="lens-switch" role="tablist" aria-label="View">
       <button role="tab" aria-selected={lens === "map"} onClick={() => setLens("map")}>Map</button>
       <button role="tab" aria-selected={lens === "track"} onClick={() => setLens("track")}>Track</button>
+      <button role="tab" aria-selected={lens === "places"} onClick={() => setLens("places")}>Places</button>
     </div>
   );
 }

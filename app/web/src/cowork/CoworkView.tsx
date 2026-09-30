@@ -1,7 +1,11 @@
-// Owner: cowork. Agent work outside the code: where the agents went (map) and what they changed (list).
-import { Fragment, useMemo, useState } from "react";
+// Owner: cowork. Places: where the selected thread went outside the code (map) and what it changed there (list).
+// A lens of the Map tab (Map | Track | Places), driven by the same threads sidebar.
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { CoworkArea, CoworkEvent, CoworkSummary } from "@contract";
 import { useLive } from "../lib/live";
+import { MapSidebar } from "../map/sidebar/MapSidebar";
+import { MapStats } from "../map/MapStats";
+import { LensSwitch } from "../map/LensSwitch";
 import { useNav } from "../lib/nav";
 import { clockTime } from "../follow/format";
 import { AREAS, AREA_HINT, AREA_NAME, VERB_NAME, changeGroups, placeTitle, plural, useCowork, verbTotals, type ChangeGroup } from "./data";
@@ -29,12 +33,12 @@ function Headline({ data }: { data: CoworkSummary }) {
   const list = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : parts[0] ?? "haven't worked outside the code yet";
   return (
     <p className="cw-sub">
-      Your agents {list}. They changed <strong>{plural(changes, "thing")}</strong> outside this computer.
+      In this thread, the agents {list}. They changed <strong>{plural(changes, "thing")}</strong> outside this computer.
     </p>
   );
 }
 
-function ChangeRow({ g, sessions, onHover, onPick }: { g: ChangeGroup; sessions: Map<string, string>; onHover: (id: string | null) => void; onPick: (e: CoworkEvent) => void }) {
+function ChangeRow({ g, onHover, onPick }: { g: ChangeGroup; onHover: (id: string | null) => void; onPick: (e: CoworkEvent) => void }) {
   const { openStep } = useNav();
   const e = g.last;
   const c = e.change!;
@@ -46,7 +50,6 @@ function ChangeRow({ g, sessions, onHover, onPick }: { g: ChangeGroup; sessions:
         <span className="cw-where"><i style={{ background: AREA_COLOR[e.area] }} />{e.site}{placeTitle(e) !== e.site && <> · {placeTitle(e)}</>}</span>
         <span className="cw-meta">
           {clockTime(g.first.ts)}{g.count > 1 && `–${clockTime(e.ts)}`}
-          <span className="sep">·</span>{sessions.get(e.sessionId) ?? "Untitled session"}
           {c.confidence !== "sure" && <span className={`cw-conf ${c.confidence}`} title={c.confidence === "likely" ? "A click on a button like Send or Submit, or Enter after typing" : "A click or typing we couldn't read: it may not have changed anything"}>{c.confidence}</span>}
         </span>
       </button>
@@ -55,7 +58,7 @@ function ChangeRow({ g, sessions, onHover, onPick }: { g: ChangeGroup; sessions:
   );
 }
 
-function ChangesPanel({ data, sessions, onHover, onPick }: { data: CoworkSummary; sessions: Map<string, string>; onHover: (id: string | null) => void; onPick: (e: CoworkEvent) => void }) {
+function ChangesPanel({ data, onHover, onPick }: { data: CoworkSummary; onHover: (id: string | null) => void; onPick: (e: CoworkEvent) => void }) {
   const [maybe, setMaybe] = useState(false);
   const groups = useMemo(() => changeGroups(data.events, maybe), [data, maybe]);
   const totals = useMemo(() => verbTotals(data.events), [data]);
@@ -64,7 +67,7 @@ function ChangesPanel({ data, sessions, onHover, onPick }: { data: CoworkSummary
     <>
       <div className="cw-side-head">
         <h2>Changes</h2>
-        <p className="cw-side-sub">Things your agents did that reach outside this computer: deploys, pushes, sent forms, edited docs.</p>
+        <p className="cw-side-sub">What this thread did that reaches outside this computer: deploys, pushes, sent forms, edited docs.</p>
         {totals.length > 0 && (
           <div className="cw-totals">{totals.map(([v, n]) => <span key={v} className={`cw-total v-${v}`}>{VERB_NAME[v]} <b>{n}</b></span>)}</div>
         )}
@@ -76,13 +79,13 @@ function ChangesPanel({ data, sessions, onHover, onPick }: { data: CoworkSummary
         )}
       </div>
       {groups.length === 0
-        ? <p className="cw-empty">No changes outside this computer yet.</p>
+        ? <p className="cw-empty">No changes outside this computer in this thread.</p>
         : <ul className="cw-changes">{groups.map((g, i) => {
             const day = dayLabel(g.last.ts);
             return (
               <Fragment key={g.key}>
                 {(i === 0 || dayLabel(groups[i - 1].last.ts) !== day) && <li className="cw-day">{day}</li>}
-                <ChangeRow g={g} sessions={sessions} onHover={onHover} onPick={onPick} />
+                <ChangeRow g={g} onHover={onHover} onPick={onPick} />
               </Fragment>
             );
           })}</ul>}
@@ -90,7 +93,7 @@ function ChangesPanel({ data, sessions, onHover, onPick }: { data: CoworkSummary
   );
 }
 
-function PlacePanel({ data, id, sessions, onBack }: { data: CoworkSummary; id: string; sessions: Map<string, string>; onBack: () => void }) {
+function PlacePanel({ data, id, onBack }: { data: CoworkSummary; id: string; onBack: () => void }) {
   const { openStep } = useNav();
   const site = data.sites.find((s) => s.id === id);
   const page = data.pages.find((p) => p.id === id);
@@ -112,7 +115,6 @@ function PlacePanel({ data, id, sessions, onBack }: { data: CoworkSummary; id: s
           <p className="cw-side-sub">
             {plural(stats.events, "step")}{stats.changes > 0 && <> · <b className="hot">{plural(stats.changes, "change")}</b></>}
             {stats.failed > 0 && <> · <b className="risk">{stats.failed} failed</b></>}
-            {page && <> · {plural(page.sessions.length, "session")}</>}
             {site && site.pages > 1 && <> · {plural(site.pages, "page")}</>}
           </p>
         )}
@@ -124,8 +126,7 @@ function PlacePanel({ data, id, sessions, onBack }: { data: CoworkSummary; id: s
             <span className="cw-ev-main">
               <span className="cw-ev-what">{e.what}</span>
               <span className="cw-ev-meta">
-                {site && site.pages > 1 && <>{placeTitle(e)} · </>}
-                {sessions.get(e.sessionId) ?? "Untitled session"}
+                {site && site.pages > 1 && <>{placeTitle(e)}</>}
                 {e.change && <span className={`cw-conf ${e.change.confidence}`}>{VERB_NAME[e.change.verb].toLowerCase()}{e.change.confidence !== "sure" ? `, ${e.change.confidence}` : ""}</span>}
                 {e.failed && <span className="cw-conf failed">failed</span>}
               </span>
@@ -138,16 +139,23 @@ function PlacePanel({ data, id, sessions, onBack }: { data: CoworkSummary; id: s
   );
 }
 
-export function CoworkView() {
-  const { data, error } = useCowork();
+export function PlacesView() {
   const { state } = useLive();
+  const { replay, setLens } = useNav();
+  const session = state.sessions.find((s) => s.id === replay?.sessionId);
+  const { data, error } = useCowork(replay?.sessionId ?? null, session?.status === "running");
   const [areas, setAreas] = useState<ReadonlySet<CoworkArea>>(new Set(AREAS));
   const [selected, setSelected] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);
-  const sessions = useMemo(() => new Map(state.sessions.map((s) => [s.id, s.title || "Untitled session"])), [state.sessions]);
+  useEffect(() => { setSelected(null); setAreas(new Set(AREAS)); }, [replay?.sessionId]);
 
-  if (!data) {
-    return <div className="cw-root cw-loading"><p className="cw-empty">{error ? "Couldn't load the cowork data. Is the server running?" : "Reading your agents' sessions…"}</p></div>;
+  const sidebar = <MapSidebar agents={Object.values(state.agents)} accent="#5b5bd6" followId={null} onFollow={() => setLens("map")} onFocusFile={() => setLens("map")} map={state.map} />;
+  const frame = (body: ReactNode) => <div className="cw-wrap">{sidebar}<MapStats /><LensSwitch />{body}</div>;
+  if (!replay) return frame(<div className="cw-note"><h2>Pick a thread</h2><p>Choose a thread in the sidebar to see where it went outside the code: websites, your apps, services, and what it changed there.</p></div>);
+  if (!data) return frame(<div className="cw-note"><p>{error ? "Couldn't load this thread's places. Is the server running?" : "Reading the thread…"}</p></div>);
+  const outside = data.events.length;
+  if (!outside) {
+    return frame(<div className="cw-note"><h2>{session?.title || "This thread"}</h2><p>Everything in this thread happened in the code ({plural(data.codeSteps, "step")}). Places shows websites, apps and services an agent used; see Map or Track for this one.</p></div>);
   }
 
   const toggleArea = (a: CoworkArea) => setAreas((cur) => {
@@ -157,23 +165,23 @@ export function CoworkView() {
   });
   const pick = (e: CoworkEvent) => { setAreas((cur) => (cur.has(e.area) ? cur : new Set([...cur, e.area]))); setSelected(placeId(e)); };
 
-  return (
+  return frame(
     <div className="cw-root">
       <section className="cw-stage">
         <header className="cw-head">
-          <h1 className="cw-h1">Cowork</h1>
+          <h1 className="cw-h1">{session?.title || "Untitled thread"}</h1>
           <Headline data={data} />
-          <div className="cw-areas" role="group" aria-label="Kinds of work shown on the map">
+          <div className="cw-areas" role="group" aria-label="Kinds of places shown on the map">
             {AREAS.map((a) => (
               <button key={a} className={`cw-area${areas.has(a) ? " on" : ""}`} aria-pressed={areas.has(a)} title={AREA_HINT[a]}
                 disabled={data.areas[a] === 0} onClick={() => toggleArea(a)}>
                 <i style={{ background: AREA_COLOR[a] }} />{AREA_NAME[a]} <span>{data.areas[a].toLocaleString()}</span>
               </button>
             ))}
-            <span className="cw-code" title="Reads, edits and shell commands that stay in the code: see the Map">+ {data.codeSteps.toLocaleString()} steps in the code</span>
+            <span className="cw-code" title="Reads, edits and shell commands that stay in the code: see Map">+ {data.codeSteps.toLocaleString()} steps in the code</span>
           </div>
         </header>
-        <WorldMap data={data} areas={areas} selected={selected} highlight={highlight} onSelect={setSelected} />
+        <WorldMap key={replay.sessionId} data={data} areas={areas} selected={selected} highlight={highlight} onSelect={setSelected} />
         <div className="cw-legend">
           <span><i className="lg-size" />Bigger: more steps there</span>
           <span><i className="lg-hot" />Something changed there</span>
@@ -182,8 +190,8 @@ export function CoworkView() {
       </section>
       <aside className="cw-side">
         {selected
-          ? <PlacePanel data={data} id={selected} sessions={sessions} onBack={() => setSelected(null)} />
-          : <ChangesPanel data={data} sessions={sessions} onHover={setHighlight} onPick={pick} />}
+          ? <PlacePanel data={data} id={selected} onBack={() => setSelected(null)} />
+          : <ChangesPanel data={data} onHover={setHighlight} onPick={pick} />}
       </aside>
     </div>
   );

@@ -123,6 +123,14 @@ export function WorldMap({ data, areas, selected, highlight, onSelect }: {
     g.d3ReheatSimulation();
   }, [graph]);
 
+  // Frame the places once they've spread out. A running thread refreshes and reheats the layout, so the
+  // simulation may never stop: don't wait for onEngineStop alone.
+  useEffect(() => {
+    if (fitted.current || !graph.nodes.length) return;
+    const t = setTimeout(() => { if (!fitted.current) { fitted.current = true; fg.current?.zoomToFit(700, 80); } }, 1200);
+    return () => clearTimeout(t);
+  }, [graph]);
+
   // A page of a one-page site has no node of its own: it resolves to the site.
   const siteOfPage = useMemo(() => new Map(data.pages.map((p) => [p.id, p.site])), [data]);
   const byId = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n])), [graph]);

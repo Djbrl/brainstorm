@@ -1,5 +1,7 @@
 # Brainstorm Cowork
 
+> **30 Sep 2026:** Places is no longer its own tab tracking every session. It's the third view of the Map tab (**Map | Track | Places**) and shows only the thread picked in the sidebar, subagents included (`GET /api/cowork?sessionId=`). A running thread refreshes every 8 seconds. The rest of this doc describes the classifier, which is unchanged.
+
 Brainstorm only shows coding work today. Cowork extends it to the rest of what agents do: browsing and researching the web, testing your apps in a browser, using connected services (docs, calendar, email) and command-line tools that reach the outside world (GitHub, Vercel, cloud CLIs).
 
 The idea: the map shows *where the agents worked*, and the code is only one kind of place. The same verbs apply everywhere. A **read** is looking at something (opening a page, reading a doc). A **change** is doing something to the outside world (sending, submitting, publishing, deploying, deleting).

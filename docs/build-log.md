@@ -89,6 +89,9 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 15:30 (29 Sep) [lead] `feature/map-labels`: map folder labels without the pile-up. Labels are drawn by priority (pointer or selection, agents working there, recent edits, size) and skipped when they'd overlap; file names too. Subfolders gather around their parent on the map, fold into one parent label while the group is small on screen, and drop the parent's name when it has 4+ subfolders. Checked on the demo recording and on a 30-folder stress map.
 
+- 10:30 (30 Sep) [lead] Repo moved from ~/Documents/brainstorm to ~/brainstorm (symlink left at the old path): iCloud was offloading project files (node_modules, dist, the local db, .git objects) because the disk was 97% full. Worktrees repaired, dependencies reinstalled, git fsck clean.
+- 11:10 (30 Sep) [lead] `feature/map-labels`: Places reworked around threads. It's a lens of the Map tab (Map | Track | Places) with the same sidebar, showing only the selected thread's websites, local apps, services and changes; the Places tab is gone (old `view=cowork` links open the new lens). The places map now frames itself shortly after a thread opens.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

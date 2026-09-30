@@ -3,3 +3,13 @@
 .cw-note { position: absolute; left: 420px; top: 50%; margin: 0; color: var(--ink-3); font-size: 15px; }
 .pl-verbs { color: var(--ink-2); font-weight: 600; }
 @media (max-width: 900px) { .cw-note { left: 16px; top: auto; bottom: 90px; } }
+
+/* The step panel: the map's side panel with Follow's step view in it. */
+.pl-panel { overflow: hidden; display: flex; flex-direction: column; z-index: 4; }
+.pl-panel .sd { flex: 1; min-height: 0; border-left: 0; background: transparent; animation: none; }
+.pl-panel-nav { display: flex; align-items: center; gap: 8px; padding: 14px 20px 0 36px; font-size: 12.5px; color: var(--ink-3); flex: none; }
+.pl-panel-nav span:first-child { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--ink-2); }
+.pl-panel-count { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pl-panel-nav button { width: 26px; height: 26px; border-radius: 50%; border: 0; background: #f0f0f3; color: var(--ink-2); font-size: 16px; line-height: 1; }
+.pl-panel-nav button:hover:not(:disabled) { background: #e7e7ec; color: var(--ink); }
+.pl-panel-nav button:disabled { opacity: .35; }

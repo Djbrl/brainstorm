@@ -38,8 +38,9 @@ export const VERB_NAME: Record<CoworkVerb, string> = {
 };
 
 /** The open thread's places, shared by the places map (canvas) and the list in the sidebar. */
-type PlacesState = { data: CoworkSummary | null; selected: string | null; highlight: string | null };
-let places: PlacesState = { data: null, selected: null, highlight: null };
+/** `selected` is a place (or site) id on the map; `stepId` the step its panel shows. */
+type PlacesState = { data: CoworkSummary | null; selected: string | null; stepId: string | null; highlight: string | null };
+let places: PlacesState = { data: null, selected: null, stepId: null, highlight: null };
 const subs = new Set<() => void>();
 export const placesStore = {
   get: () => places,
@@ -48,15 +49,25 @@ export const placesStore = {
 };
 export const usePlaces = () => useSyncExternalStore(placesStore.subscribe, placesStore.get);
 
+/** The events at a place id: a page (`area|page`) or, for the map's site bubbles, a whole site (`area|site`). */
+export const eventsAt = (data: CoworkSummary, id: string) => data.events.filter((e) => `${e.area}|${e.page}` === id || `${e.area}|${e.site}` === id);
+/** Select a place and show its newest step (or a given one) in the panel. */
+export function selectPlace(id: string | null, stepId?: string) {
+  const d = places.data;
+  if (!id || !d) { placesStore.set({ selected: null, stepId: null }); return; }
+  const at = eventsAt(d, id);
+  placesStore.set({ selected: id, stepId: stepId ?? at[at.length - 1]?.stepId ?? null });
+}
+
 /** A stretch of steps in one place, in order (consecutive steps on the same page fold into one row). */
-export type PlaceRun = { key: string; place: string; first: CoworkEvent; last: CoworkEvent; count: number; verbs: Map<CoworkVerb, number>; failed: number };
+export type PlaceRun = { key: string; place: string; first: CoworkEvent; last: CoworkEvent; count: number; verbs: Map<CoworkVerb, number>; failed: number; stepIds: Set<string> };
 export function placeRuns(events: CoworkEvent[]): PlaceRun[] {
   const runs: PlaceRun[] = [];
   for (const e of events) {
     const place = `${e.area}|${e.page}`;
     let r = runs[runs.length - 1];
-    if (!r || r.place !== place) runs.push(r = { key: e.id, place, first: e, last: e, count: 0, verbs: new Map(), failed: 0 });
-    r.last = e; r.count++;
+    if (!r || r.place !== place) runs.push(r = { key: e.id, place, first: e, last: e, count: 0, verbs: new Map(), failed: 0, stepIds: new Set() });
+    r.last = e; r.count++; r.stepIds.add(e.stepId);
     if (e.failed) r.failed++;
     if (e.change && !e.failed && e.change.confidence !== "maybe") r.verbs.set(e.change.verb, (r.verbs.get(e.change.verb) ?? 0) + 1);
   }

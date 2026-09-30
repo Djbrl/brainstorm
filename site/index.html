@@ -46,7 +46,7 @@ h1, h2, h3 { text-wrap: balance; }
 .center { text-align: center; }
 .h2 { font-size: clamp(44px, 7vw, 96px); line-height: .98; }
 .sub { font-size: clamp(19px, 2vw, 24px); line-height: 1.4; color: var(--muted); font-weight: 500; max-width: 32ch; margin: 24px auto 0; }
-.block { padding: 180px 0; }
+.block { padding: 136px 0; }
 .alt { background: var(--alt); }
 
 /* ---------- nav ---------- */
@@ -76,28 +76,27 @@ nav .links a:hover { color: var(--text); }
 .stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; }
 
 /* hero */
-#hero { height: 580vh; }
+#hero { height: 250vh; }
 #hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero-type {
-  position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center;
-  text-align: center; will-change: transform, opacity; padding: 0 16px;
+  position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-start; align-items: center;
+  text-align: center; will-change: transform, opacity; padding: calc(92px + 7svh) 16px 0;
 }
-.hero-type h1 { font-size: clamp(64px, 15vw, 232px); line-height: .86; letter-spacing: -0.055em; }
+.hero-type h1 { font-size: clamp(56px, min(11.5vw, 18svh), 184px); line-height: .86; letter-spacing: -0.055em; }
+.hero-type .btns { margin-top: 36px; opacity: 0; animation: fade 1s .8s var(--ease) forwards; }
 .hero-type h1 .line { display: block; overflow: hidden; padding-bottom: .06em; }
 .hero-type h1 .line span { display: inline-block; transform: translateY(105%); animation: rise 1.2s var(--ease) forwards; }
 .hero-type h1 .line:nth-child(2) span { animation-delay: .12s; }
 .hero-type h1 .grad { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.hero-type p { font: 500 clamp(20px, 2.4vw, 28px)/1.3 var(--body); color: var(--muted); margin-top: 32px; opacity: 0; animation: fade 1s .6s var(--ease) forwards; }
+.hero-type p { font: 500 clamp(20px, 2.4vw, 28px)/1.3 var(--body); color: var(--muted); margin-top: 28px; opacity: 0; animation: fade 1s .6s var(--ease) forwards; }
 @keyframes rise { to { transform: none; } }
 @keyframes fade { to { opacity: 1; } }
-.cue { position: absolute; left: 50%; bottom: 36px; transform: translateX(-50%); width: 22px; height: 36px; border: 2px solid var(--faint); border-radius: 12px; opacity: 0; animation: fade 1s 1.2s forwards; }
-.cue::after { content: ""; position: absolute; left: 50%; top: 7px; width: 3px; height: 7px; margin-left: -1.5px; border-radius: 2px; background: var(--faint); animation: cue 1.8s infinite var(--ease); }
-@keyframes cue { 0% { transform: none; opacity: 1; } 70% { transform: translateY(10px); opacity: 0; } 100% { opacity: 0; } }
 .hero-end {
-  position: absolute; left: 0; right: 0; bottom: 0; padding: 120px 24px 56px; text-align: center; opacity: 0;
-  background: linear-gradient(to top, #fff 45%, rgba(255,255,255,0));
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 24px 44px; text-align: center; opacity: 0;
+  background: linear-gradient(to top, #fff 80%, rgba(255,255,255,0));
 }
 .hero-end h2 { font-size: clamp(34px, 5vw, 64px); line-height: 1; }
+.hero-end .said { font-size: clamp(17px, 1.7vw, 20px); color: var(--muted); font-weight: 500; margin-top: 14px; }
 .hcap {
   position: absolute; left: 0; right: 0; bottom: 13vh; padding: 0 24px; text-align: center; pointer-events: none; opacity: 0;
   font: 800 clamp(30px, 4.6vw, 60px)/1.05 var(--display); letter-spacing: -0.035em; text-wrap: balance;
@@ -106,62 +105,17 @@ nav .links a:hover { color: var(--text); }
 .legend { display: flex; justify-content: center; gap: 22px; margin-top: 22px; font-size: 14px; color: var(--muted); font-weight: 500; flex-wrap: wrap; }
 .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; vertical-align: 0; }
 
-/* problem */
-#problem { height: 300vh; background: var(--bg); }
-.wall {
-  position: absolute; left: 50%; top: 0; width: min(560px, 92vw); transform: translateX(-50%);
-  font: 14px/2.1 var(--mono); color: var(--faint); white-space: nowrap;
-}
-.wallbox { position: absolute; inset: 0; -webkit-mask-image: linear-gradient(transparent 8%, #000 30%, #000 70%, transparent 92%); mask-image: linear-gradient(transparent 8%, #000 30%, #000 70%, transparent 92%); }
-.wall b { color: #34c759; font-weight: 400; }
-.layer { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 24px; opacity: 0; will-change: opacity, transform; }
-.done { font: 800 clamp(40px, 7vw, 96px)/1 var(--display); letter-spacing: -0.04em; background: rgba(255,255,255,.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); padding: 14px 32px; border-radius: 28px; }
-.done .tick { color: #34c759; }
-.accept { display: inline-block; margin-top: 26px; font: 500 18px var(--body); padding: 10px 26px; border-radius: 999px; background: var(--text); color: #fff; }
-
-/* stats: pinned, one study at a time */
-#stats { height: 340vh; }
-#stats .stage { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 52px 24px 0; text-align: center; }
-.stats-head { font-size: clamp(36px, 5.4vw, 72px); line-height: 1; }
-.stats3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 9svh; max-width: 1080px; width: 100%; }
-.stat3 { opacity: 0; will-change: opacity, transform; }
+/* stats: a static row, the numbers count up once in view */
+#stats { padding: 88px 0 80px; text-align: center; }
+.stats-head { font-size: clamp(34px, 4.8vw, 64px); line-height: 1; }
+.stats3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 52px; }
 .stat3 .n { font: 800 clamp(56px, 6.4vw, 84px)/1 var(--display); letter-spacing: -0.045em; white-space: nowrap; }
 .stat3 .n.warm { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .stat3 p { color: var(--muted); font-size: 19px; font-weight: 500; margin: 14px auto 0; max-width: 22ch; }
 .stat3 p b { color: var(--text); font-weight: 500; }
-.study { display: block; margin: 22px auto 0; padding-top: 16px; border-top: 1px solid var(--line); max-width: 30ch; font-size: 14px; line-height: 1.4; color: var(--muted); font-weight: 500; }
+.study { display: block; margin: 20px auto 0; padding-top: 14px; border-top: 1px solid var(--line); max-width: 30ch; font-size: 13.5px; line-height: 1.4; color: var(--muted); font-weight: 500; }
 .study cite { display: block; font-style: normal; color: var(--text); font-weight: 700; margin-bottom: 4px; }
 .study:hover cite { text-decoration: underline; text-underline-offset: 3px; }
-
-/* product: one browser window, the camera moves over real screenshots as you scroll */
-#product { height: 520vh; }
-#product .stage { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 92px 24px 16px; --pw: min(1100px, 88vw, calc((100svh - 400px) * 1.6)); }
-.product-head { text-align: center; }
-.product-head .h2 { font-size: clamp(36px, 5vw, 64px); }
-.pv {
-  width: var(--pw); margin-top: 4svh; border-radius: 14px; background: #fff; overflow: hidden; position: relative;
-  box-shadow: 0 0 0 1px rgba(0,0,0,.07), 0 2px 6px rgba(0,0,0,.04), 0 40px 100px -40px rgba(0,0,0,.3);
-  will-change: transform; transform-origin: 50% 0;
-}
-.pv-bar { display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; background: #f3f3f6; border-bottom: 1px solid var(--line); }
-.pv-bar i { width: 11px; height: 11px; border-radius: 50%; background: #dcdce1; }
-.pv-screen { position: relative; aspect-ratio: 16 / 10; overflow: hidden; background: #fafafc; }
-.pv-shot { position: absolute; inset: 0; opacity: 0; }
-.pv-shot:first-child { opacity: 1; }
-.pv-img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 0 0; will-change: transform; }
-.pv-img img { display: block; width: 100%; height: 100%; }
-.pv-pulse { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; border: 2px solid #5b5bd6; opacity: 0; animation: pv-pulse 2s ease-out infinite; pointer-events: none; }
-.pv-pulse.hot { border-color: var(--hot); }
-@keyframes pv-pulse { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(2.6); opacity: 0; } }
-.pv-foot { width: var(--pw); display: flex; align-items: center; gap: 24px; margin-top: 26px; }
-.pv-caps { flex: 1; min-width: 0; display: grid; }
-.pv-cap { grid-area: 1 / 1; opacity: 0; transform: translateY(10px); transition: opacity .5s var(--ease), transform .6s var(--ease); }
-.pv-cap.on { opacity: 1; transform: none; }
-.pv-cap h3 { font-size: clamp(24px, 2.6vw, 34px); letter-spacing: -0.03em; }
-.pv-cap p { color: var(--muted); font-size: clamp(16px, 1.5vw, 18px); font-weight: 500; margin-top: 4px; }
-.dots { display: flex; justify-content: center; gap: 8px; flex: none; }
-.dots i { width: 8px; height: 8px; border-radius: 99px; background: #c7c7cc; transition: width .4s var(--ease), background .4s; }
-.dots i.on { width: 28px; background: var(--text); }
 
 /* ask */
 .ask-pill {
@@ -175,7 +129,7 @@ nav .links a:hover { color: var(--text); }
 @keyframes blink { 50% { opacity: 0; } }
 
 /* tasks: one agent's work outside code, as a track of stops with a window */
-#tasks { height: 460vh; background: var(--alt); }
+#tasks { height: 250vh; background: var(--alt); }
 #tasks .stage { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 64px 24px 24px; }
 .tasks-head { text-align: center; }
 .tasks-head .h2 { font-size: clamp(36px, 5vw, 64px); }
@@ -217,9 +171,6 @@ nav .links a:hover { color: var(--text); }
 .plain { list-style: none; margin: 0; padding: 14px 24px 18px; background: #fff; font-size: 14px; color: var(--muted); font-weight: 500; }
 .plain li { padding: 2px 0; }
 .plain code { font: 12.5px var(--mono); color: var(--text); background: #f0f0f3; border-radius: 5px; padding: 1px 6px; margin-right: 8px; }
-.srt { flex: 1; padding: 20px 26px; font: 13px/1.6 var(--mono); color: var(--faint); overflow: hidden; background: #fff; }
-.srt p { margin: 0 0 8px; }
-.srt .hl { color: var(--text); background: #eaf7f1; box-shadow: -8px 0 0 #eaf7f1, 8px 0 0 #eaf7f1; border-left: 3px solid #1f9d7a; }
 .film { flex: 1; position: relative; overflow: hidden; background: #08070c; display: flex; flex-direction: column; }
 .film .shot { position: relative; flex: 1; overflow: hidden; }
 .film .shot svg { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -284,36 +235,6 @@ nav .links a:hover { color: var(--text); }
 .needs { margin-top: 48px; font-weight: 500; }
 #install .more { color: #f0a58a; }
 
-/* brev: dark, in NVIDIA's colors */
-#brev { background: #000; color: #fff; position: relative; overflow: hidden; }
-#brev::before {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background-image: linear-gradient(rgba(118,185,0,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(118,185,0,.08) 1px, transparent 1px);
-  background-size: 56px 56px;
-  -webkit-mask-image: radial-gradient(ellipse 70% 55% at 50% 45%, #000, transparent); mask-image: radial-gradient(ellipse 70% 55% at 50% 45%, #000, transparent);
-}
-#brev .wrap { position: relative; }
-#brev .h2 .g { color: var(--nvidia); }
-#brev .sub { color: #a1a1a6; }
-.chip { display: block; width: min(560px, 100%); height: auto; margin: 90px auto 0; overflow: visible; }
-.chip .trace { fill: none; stroke: #1d2710; stroke-width: 2; }
-.chip .pulse { fill: none; stroke: var(--nvidia); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: .07 .93; animation: flow 2.6s linear infinite; filter: drop-shadow(0 0 3px #76b900); }
-@keyframes flow { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 1; } }
-.chip .pkg { fill: #080b04; stroke: #2c3a14; stroke-width: 1.5; }
-.chip .die { fill: #0d1307; stroke: rgba(118,185,0,.55); stroke-width: 1.2; }
-.chip .core { fill: #18220d; transition: fill .45s; }
-.chip .core.on { fill: var(--nvidia); }
-.why3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 90px; text-align: left; }
-.why3 > div { border-top: 3px solid var(--nvidia); padding-top: 22px; }
-.why3 h3 { font-size: 26px; letter-spacing: -0.025em; }
-.why3 p { color: #a1a1a6; margin-top: 10px; font-weight: 500; }
-.nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 64px 48px; margin-top: 110px; }
-.nums:empty { display: none; }
-.num .v { font: 800 clamp(48px, 5.5vw, 76px)/1 var(--display); letter-spacing: -0.045em; color: var(--nvidia); }
-.num .k { color: #a1a1a6; font-weight: 500; margin-top: 12px; }
-.brev-foot { margin-top: 80px; display: flex; justify-content: center; flex-wrap: wrap; gap: 10px 28px; font-size: 14px; color: #86868b; font-weight: 500; }
-.brev-foot a { color: var(--nvidia); }
-
 /* waitlist band, above the nav */
 html { scroll-padding-top: 96px; }
 .band { position: fixed; inset: 0 0 auto; z-index: 51; height: 40px; background: var(--alt); color: var(--text); font-size: 13.5px; font-weight: 500; border-bottom: 1px solid rgba(0,0,0,.05); }
@@ -336,7 +257,7 @@ nav { top: 40px; }
 .wl-done { font-weight: 700; }
 
 /* roadmap */
-.road { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 96px; text-align: left; }
+.road { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 72px; text-align: left; }
 .road::before { content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 2px; background: linear-gradient(90deg, var(--text) 0 20%, #2aa4ff 45%, #4f5bff 60%, var(--line) 85%); }
 .road > div { position: relative; }
 .road .dot { display: block; position: relative; z-index: 1; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid var(--line); box-sizing: border-box; }
@@ -349,6 +270,9 @@ nav { top: 40px; }
 .road ul { list-style: none; margin: 22px 0 0; padding: 0; }
 .road li { padding: 12px 0; border-top: 1px solid var(--line); font-weight: 500; line-height: 1.4; }
 .road .later li { color: var(--muted); }
+.road li small { display: block; margin-top: 4px; color: var(--muted); font-size: 14px; }
+.road li small a { color: var(--blue); white-space: nowrap; }
+.road li small a::after { content: " ›"; }
 .wl-big { display: flex; justify-content: center; gap: 10px; margin: 96px auto 0; max-width: 520px; }
 .wl-big input { flex: 1; min-width: 0; height: 52px; border: 1px solid var(--line); border-radius: 999px; padding: 0 22px; font: 500 17px var(--body); background: #fff; outline: none; transition: border-color .2s, box-shadow .2s; }
 .wl-big input:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(0,113,227,.15); }
@@ -356,22 +280,19 @@ nav { top: 40px; }
 .wl-note { margin-top: 16px; color: var(--muted); font-size: 14px; font-weight: 500; }
 .wl-big + .wl-note:empty { display: none; }
 
-/* privacy */
-#privacy .four { grid-template-columns: repeat(3, 1fr); max-width: 900px; margin-left: auto; margin-right: auto; }
-@media (max-width: 820px) { #privacy .four { grid-template-columns: 1fr; } }
-.four { display: grid; grid-template-columns: repeat(4, 1fr); gap: 48px; margin-top: 110px; }
-.four svg { width: 44px; height: 44px; stroke: var(--text); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.four h3 { font-size: 24px; margin-top: 22px; letter-spacing: -0.025em; }
-.four p { color: var(--muted); margin-top: 8px; font-weight: 500; font-size: 16px; }
+/* privacy: three lines */
+#privacy .sub { max-width: 46ch; }
 
 /* closing */
-.closing { padding: 220px 0 200px; }
+.closing { padding: 160px 0 150px; }
 .closing h2 { font-size: clamp(52px, 9vw, 140px); line-height: .92; letter-spacing: -0.05em; }
 .closing h2 span { display: block; }
 .closing h2 .grad { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .closing .btns { margin-top: 56px; }
 .btn.big { font-size: 20px; padding: 17px 36px; }
 .btn.pending { opacity: .5; pointer-events: none; }
+.award { display: inline-block; margin-top: 28px; color: var(--muted); font-size: 15px; font-weight: 500; }
+.award b { color: var(--text); font-weight: 600; }
 .team-line { margin-top: 64px; color: var(--muted); font-weight: 500; }
 .team-line:empty { display: none; }
 footer { border-top: 1px solid var(--line); padding: 22px 0 40px; font-size: 12px; color: var(--muted); }
@@ -387,8 +308,7 @@ footer a:hover { text-decoration: underline; }
   .block { padding: 120px 0; }
   nav .links { display: none; }
   nav .btn.small { margin-left: auto; }
-  .stats3 { grid-template-columns: 1fr; }
-  .stat3 { grid-area: 1 / 1; }                        /* one at a time on phones */
+  .stats3 { grid-template-columns: 1fr; gap: 44px; margin-top: 48px; }
   .cc { margin-top: 56px; }
   .band .wrap { gap: 10px; font-size: 12.5px; }
   .wl-mini, .has-waitlist .band .dim { display: none; }
@@ -398,7 +318,6 @@ footer a:hover { text-decoration: underline; }
   .road .dot { position: absolute; left: -36px; top: 8px; }
   .road h3 { margin-top: 0; }
   .wl-big { flex-direction: column; margin-top: 64px; }
-  .nums, .why3 { grid-template-columns: 1fr; gap: 48px; }
   #tasks .stage { justify-content: flex-start; padding-top: 116px; }  /* clears the band and the nav (92px) */
   .tasks-head .sub { display: none; }
   .tk { grid-template-columns: 1fr; gap: 16px; margin-top: 20px; }
@@ -407,38 +326,43 @@ footer a:hover { text-decoration: underline; }
   .tk-win header { padding: 10px 14px; font-size: 13px; }
   .term { padding: 14px 16px; font-size: 11.5px; }
   .plain { display: none; }
-  .srt { padding: 14px 16px; font-size: 11.5px; }
   .web .doc { padding: 12px 16px; } .web h4 { font-size: 20px; } .web p { display: none; }
   .tk-line li { padding: 5px 8px 5px 34px; }
   .tk-line li small { display: none; }
   .tk-ico { width: 26px; height: 26px; }
   .tk-body b { font-size: 14px; }
-  .four { grid-template-columns: 1fr 1fr; gap: 48px 24px; }
-  #product .stage { padding: 88px 16px 12px; --pw: calc(100vw - 32px); }
-  .pv { border-radius: 12px; margin-top: 20px; }
-  .pv-bar { height: 26px; gap: 5px; padding: 0 10px; }
-  .pv-bar i { width: 8px; height: 8px; }
-  .pv-screen { aspect-ratio: auto; height: min(112vw, calc(100svh - 390px)); }
-  .pv-foot { flex-direction: column; align-items: flex-start; gap: 14px; margin-top: 18px; }
-  .pv-cap h3 { font-size: 24px; }
-  .pv-cap p { font-size: 16px; }
-  .counts { gap: 40px; }
 }
 @media (max-width: 480px) {
   .wrap { padding: 0 16px; }
-  .four { grid-template-columns: 1fr; text-align: center; }
-  .four svg { margin: 0 auto; display: block; }
+}
+/* phones: no pinned scenes, each one shows its last frame as a still, with its text */
+.nav-demo { display: none; }
+@media (max-width: 699px) {
+  .nav-install { display: none; }
+  .nav-demo { display: inline-block; }
+  .block { padding: 88px 0; }
+  #stats { padding: 88px 0; }
+  .closing { padding: 112px 0 104px; }
+  .scene, #hero, #tasks { height: auto; }
+  .scene .stage { position: relative; height: auto; overflow: visible; }
+  #hero .stage { display: flex; flex-direction: column; }
+  .hero-type { position: relative; inset: auto; order: -1; padding: 124px 16px 0; }
+  .hero-type .btns { margin-top: 28px; }
+  #hero canvas { position: relative; display: block; height: min(128vw, 64svh); margin-top: 12px; }
+  .hcap { display: none; }
+  .hero-end { position: relative; opacity: 1; background: none; padding: 0 16px 16px; }
+  .hero-end .btns { display: none; }
+  #tasks .stage { padding: 88px 16px 80px; }
+  .tasks-head .sub { display: block; }
 }
 @media (prefers-reduced-motion: reduce) {
   .rv { opacity: 1; transform: none; transition: none; }
   .cc-body > * { opacity: 1; transform: none; transition: none; }
   .cc-note .spark { animation: none; }
-  .tk-line li, .tk-pane, .tk-agent, .pv-cap { transition: none; }
-  .pv-pulse { animation: none; }
+  .tk-line li, .tk-pane, .tk-agent { transition: none; }
   .sc-cone, .sc-hot, .sc-trail, .sc-speaker, .teaser .shot svg, .film .strip .ph { animation: none; }
   .sc-trail { stroke-dashoffset: 0; }
-  .chip .pulse { animation: none; opacity: 0; }
-  .hero-type h1 .line span, .hero-type p, .cue { animation: none; transform: none; opacity: 1; }
+  .hero-type h1 .line span, .hero-type p, .hero-type .btns { animation: none; transform: none; opacity: 1; }
 }
 </style>
 </head>
@@ -498,35 +422,40 @@ footer a:hover { text-decoration: underline; }
     </a>
     <div class="links">
       <a href="#tasks">Beyond code</a>
-      <a href="#brev">NVIDIA</a>
       <a href="#roadmap">Roadmap</a>
+      <a href="#install">Install</a>
       <a data-link="demo" href="#">Live demo</a>
     </div>
-    <a class="btn small" data-link="install" href="#">Install</a>
+    <a class="btn small nav-install" data-link="install" href="#">Install</a>
+    <a class="btn small nav-demo" data-link="demo" href="#">Try the demo</a>
   </div>
 </nav>
 
 <main>
-<!-- 1. Hero: big type dissolves, we follow one agent, then three, into the work, then zoom out -->
+<!-- 1. Hero: the first beats play on their own behind the title; scrolling follows the three agents into the work, then zooms out -->
 <section class="scene" id="hero">
   <div class="stage">
     <canvas id="map" aria-hidden="true"></canvas>
     <div class="hero-type" id="heroType">
       <h1><span class="line"><span>A live map</span></span><span class="line"><span class="grad">of your agents.</span></span></h1>
       <p>Where they go, what they touch, where they break.</p>
+      <div class="btns" id="heroBtns">
+        <a class="btn" data-link="demo" href="#">Try the live demo</a>
+        <a class="more" data-wl-link href="#waitlist">Join the waitlist</a>
+      </div>
     </div>
-    <div class="cue" id="cue" aria-hidden="true"></div>
     <p class="hcap" data-in=".1" data-out=".25">One agent, you can follow.</p>
     <p class="hcap" data-in=".29" data-out=".47">Three, you can't.</p>
     <p class="hcap" data-in=".5" data-out=".64">Each one is somewhere in your work.</p>
     <div class="hero-end" id="heroEnd">
       <h2>Brainstorm shows you where.</h2>
+      <p class="said">Nobody reads a list of 47 changed files. You look at a map.</p>
       <div class="legend">
         <span><i style="background:var(--cool)"></i>unchanged</span>
         <span><i style="background:var(--warm)"></i>changed recently</span>
         <span><i style="background:var(--hot)"></i>agent working now</span>
       </div>
-      <div class="btns" style="margin-top:28px">
+      <div class="btns" style="margin-top:24px">
         <a class="btn" data-link="demo" href="#">Try the live demo</a>
         <a class="more" data-link="install" href="#">Install for Claude Code</a>
       </div>
@@ -534,34 +463,22 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- 2. Problem: a wall of changes nobody reads -->
-<section class="scene" id="problem">
-  <div class="stage">
-    <div class="wallbox" aria-hidden="true"><div class="wall" id="wall"></div></div>
-    <div class="layer" id="pDone"><div class="done"><span class="tick">✓</span> Updated 47 files.</div><span class="accept">Accept all</span></div>
-    <div class="layer" id="pNobody">
-      <h2 class="h2">Nobody reads this.</h2>
-      <p class="sub" id="pCity" style="opacity:0">You don't learn a city from a list of streets. You look at a map.</p>
-    </div>
-  </div>
-</section>
-
-<!-- 3. Research: pinned, the three findings arrive one by one -->
-<section class="scene" id="stats">
-  <div class="stage">
-    <h2 class="stats-head">Agents write more.<br>We understand less.</h2>
+<!-- 2. Research: one row, the numbers count up once in view -->
+<section id="stats">
+  <div class="wrap">
+    <h2 class="stats-head rv">Agents write more.<br>We understand less.</h2>
     <div class="stats3">
-      <div class="stat3">
+      <div class="stat3 rv">
         <div class="n" data-count="240" data-suffix="%">240%</div>
         <p>more commits with autonomous coding agents. <b>Only 30% more releases.</b></p>
         <a class="study" href="https://www.nber.org/papers/w35275" target="_blank" rel="noopener"><cite>Writing Code vs. Shipping Code: Productivity Effects Across Generations of AI Coding Tools</cite>NBER, 2026 · 500,000+ developers</a>
       </div>
-      <div class="stat3">
+      <div class="stat3 rv d1">
         <div class="n" data-count="50" data-suffix="%">50%</div>
         <p>comprehension when learning with AI, <b>vs 67% without.</b></p>
         <a class="study" href="https://www.anthropic.com/research/AI-assistance-coding-skills" target="_blank" rel="noopener"><cite>How AI assistance impacts the formation of coding skills</cite>Anthropic, 2026 · 52 developers</a>
       </div>
-      <div class="stat3">
+      <div class="stat3 rv d2">
         <div class="n warm">65–86%</div>
         <p>for those who used AI <b>to ask questions.</b></p>
         <a class="study" href="https://www.anthropic.com/research/AI-assistance-coding-skills" target="_blank" rel="noopener"><cite>How AI assistance impacts the formation of coding skills</cite>Anthropic, 2026 · same study</a>
@@ -570,7 +487,7 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- 4. Beyond code: one agent editing a video, told as a track of stops (an illustration of the Track view) -->
+<!-- 3. Beyond code: one agent editing a video, told as a track of stops (an illustration of the Track view) -->
 <section class="scene" id="tasks">
   <div class="stage">
     <div class="tasks-head">
@@ -582,9 +499,7 @@ footer a:hover { text-decoration: underline; }
       <span class="tk-agent" id="tkAgent" aria-hidden="true"></span>
       <ol class="tk-line" id="tkLine">
         <li class="ask"><span class="tk-ico"><svg viewBox="0 0 16 16"><circle cx="8" cy="5.5" r="2.6"/><path d="M3 14c.6-2.6 2.6-4 5-4s4.4 1.4 5 4"/></svg></span><span class="tk-body"><b>Cut a 30-second teaser from talk.mp4</b><small>You asked · with captions</small></span></li>
-        <li class="c-cmd"><span class="tk-ico"><svg viewBox="0 0 16 16"><path d="M3 4.5 6.5 8 3 11.5M8.5 12H13"/></svg></span><span class="tk-body"><b>Checked the video</b><small>Ran ffprobe · talk.mp4</small></span></li>
-        <li class="c-file"><span class="tk-ico"><svg viewBox="0 0 16 16"><path d="M4 2h5l3 3v9H4z"/><path d="M9 2v3h3M6 8.5h4M6 11h4"/></svg></span><span class="tk-body"><b>Picked the best 30 seconds</b><small>Read transcript.srt</small></span></li>
-        <li class="c-cmd"><span class="tk-ico"><svg viewBox="0 0 16 16"><path d="M3 4.5 6.5 8 3 11.5M8.5 12H13"/></svg></span><span class="tk-body"><b>Cut 4:12 to 4:42</b><small>Ran ffmpeg · cut.mp4</small></span></li>
+        <li class="c-cmd"><span class="tk-ico"><svg viewBox="0 0 16 16"><path d="M3 4.5 6.5 8 3 11.5M8.5 12H13"/></svg></span><span class="tk-body"><b>Cut the best 30 seconds</b><small>Ran ffmpeg · 4:12 to 4:42 · cut.mp4</small></span></li>
         <li class="c-cmd fail"><span class="tk-ico"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M8 4.8v3.8M8 11.1v.1"/></svg></span><span class="tk-body"><b>Burn in the captions</b><small>Failed · no subtitles filter</small></span></li>
         <li class="c-web"><span class="tk-ico"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c1.8 1.7 2.6 3.7 2.6 6S9.8 12.3 8 14M8 2C6.2 3.7 5.4 5.7 5.4 8s.8 4.3 2.6 6"/></svg></span><span class="tk-body"><b>Looked up another way</b><small>ffmpeg.org · drawtext filter</small></span></li>
         <li class="c-cmd made"><span class="tk-ico"><svg viewBox="0 0 16 16"><rect x="2" y="3.5" width="12" height="9" rx="1.5"/><path d="m7 6.3 3 1.7-3 1.7z"/></svg></span><span class="tk-body"><b>Made teaser.mp4</b><small>Ran ffmpeg · captions with drawtext</small></span></li>
@@ -595,17 +510,6 @@ footer a:hover { text-decoration: underline; }
         <div class="tk-screen">
           <div class="tk-pane on"><div class="film"><div class="shot"><svg viewBox="0 0 560 350" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><span class="badge">talk.mp4 · 12:41</span></div>
             <div class="player"><svg viewBox="0 0 12 12"><path d="M2 1l9 5-9 5z"/></svg><div class="bar"><i></i><b></b></div><span>04:12 / 12:41</span></div></div></div>
-          <div class="tk-pane"><pre class="term"><span class="pr">$</span> ffprobe talk.mp4
-<span class="dim">Input #0, mov,mp4, from 'talk.mp4':</span>
-  Duration: <span class="ok">00:12:41</span>
-  Video: h264, <span class="ok">1920x1080</span>, 30 fps
-  Audio: aac, 48000 Hz, stereo</pre></div>
-          <div class="tk-pane"><div class="srt">
-            <p>141<br>00:04:05 --&gt; 00:04:11<br>so that's the setup, now the fun part</p>
-            <p class="hl">142<br>00:04:12 --&gt; 00:04:18<br>Agents should show their work.</p>
-            <p class="hl">143<br>00:04:18 --&gt; 00:04:25<br>Not a wall of diffs. A map you can follow.</p>
-            <p>144<br>00:04:43 --&gt; 00:04:50<br>okay, questions?</p>
-          </div></div>
           <div class="tk-pane"><pre class="term"><span class="pr">$</span> ffmpeg -ss 04:12 -t 30 -i talk.mp4 -c copy cut.mp4
 <span class="dim">Output #0, mp4, to 'cut.mp4'</span>
 <span class="ok">video:5.1MiB audio:470KiB</span></pre>
@@ -624,7 +528,7 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- 6. Ask why -->
+<!-- Ask why -->
 <section class="block alt">
   <div class="wrap center">
     <h2 class="h2 rv">Ask why.</h2>
@@ -633,39 +537,15 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- 7. NVIDIA: the first read of a codebase, on Nemotron -->
-<section class="block" id="brev">
-  <div class="wrap center">
-    <h2 class="h2 rv">Read everything.<br><span class="g">On NVIDIA Nemotron.</span></h2>
-    <p class="sub rv d1">Coming in the full release: Brainstorm reads your whole project once, so every file and every agent step gets a short summary.</p>
-    <svg class="chip rv d2" id="chip" viewBox="0 0 520 300" aria-hidden="true"></svg>
-    <div class="why3">
-      <div class="rv"><h3>Flat price.</h3><p>A GPU rented by the hour, not billed by the token. The thousandth file costs the same as the first.</p></div>
-      <div class="rv d1"><h3>Open weights.</h3><p>NVIDIA Nemotron 3 Nano, served with vLLM on NVIDIA Brev.</p></div>
-      <div class="rv d2"><h3>Your choice.</h3><p>Rather use your own Claude Code, or a local model? That will be a setting.</p></div>
-    </div>
-    <div class="nums">
-      <div class="num rv"><div class="v">81k</div><div class="k">lines of code read, 311 files</div></div>
-      <div class="num rv d1"><div class="v">73 s</div><div class="k">for the whole read</div></div>
-      <div class="num rv d2"><div class="v">$0.02</div><div class="k">of GPU time, about 35× less than Claude Haiku</div></div>
-    </div>
-    <div class="brev-foot rv"><span>Measured on the Hono web framework at the GOMYCODE × NVIDIA hackathon</span><a data-link="numbers" href="#">How we measured ›</a></div>
-  </div>
-</section>
-
-<!-- 8. Privacy -->
+<!-- Privacy, in three lines -->
 <section class="block" id="privacy">
   <div class="wrap center">
     <h2 class="h2 rv">Your code<br>stays yours.</h2>
-    <div class="four">
-      <div class="rv"><svg viewBox="0 0 44 44"><path d="M8 20 22 8l14 12v16a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2z"/><path d="M18 38V27h8v11"/></svg><h3>On your machine</h3><p>It reads your agents' logs where they are. No account, no cloud.</p></div>
-      <div class="rv d1"><svg viewBox="0 0 44 44"><rect x="6" y="14" width="32" height="16" rx="8"/><path d="M14 19v6M11.4 20.5l5.2 3M11.4 23.5l5.2-3M22 19v6M19.4 20.5l5.2 3M19.4 23.5l5.2-3M30 19v6M27.4 20.5l5.2 3M27.4 23.5l5.2-3"/></svg><h3>Secrets masked</h3><p>Keys and tokens are redacted before anything is stored or sent.</p></div>
-      <div class="rv d2"><svg viewBox="0 0 44 44"><path d="M22 6 37 14v16L22 38 7 30V14z"/><path d="M7 14l15 8 15-8M22 22v16"/></svg><h3>Your key, your call</h3><p>Questions go to Claude only when you ask, with only what's needed.</p></div>
-    </div>
+    <p class="sub rv d1">It runs on your machine and reads your agents' logs where they are. No account, no cloud. Secrets are masked before anything is stored, and nothing goes to Claude unless you ask.</p>
   </div>
 </section>
 
-<!-- 9. Install: in Claude's colors, one Claude Code window -->
+<!-- Install: in Claude's colors, one Claude Code window -->
 <section class="block" id="install">
   <div class="wrap center">
     <h2 class="h2 rv">Install it in<br><span class="o">Claude Code.</span></h2>
@@ -688,16 +568,16 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- 10. Roadmap and the waitlist -->
+<!-- Roadmap and the waitlist -->
 <section class="block" id="roadmap">
   <div class="wrap center">
     <h2 class="h2 rv">What's next.</h2>
     <p class="sub rv d1">Brainstorm is a prototype today. The full release lands in late October.</p>
     <div class="road">
       <div class="now rv"><span class="dot"></span><h3>Today</h3><p class="when">Prototype, version 0.3</p>
-        <ul><li>A live map of your agents, and a replay of every thread</li><li>The Track, for work beyond code</li><li>Places: the sites and apps your agents touch</li><li>A plugin for Claude Code</li></ul></div>
+        <ul><li>A live map of your agents, and a replay of every thread</li><li>The Track, for work beyond code</li><li>Places: the websites and apps each thread touched, on a map. Click one to see the step.</li><li>Share a thread as a web page or Markdown</li><li>Cleaner map labels</li><li>A plugin for Claude Code</li></ul></div>
       <div class="next rv d1"><span class="dot"></span><h3>Late October</h3><p class="when">Full release</p>
-        <ul><li>A short summary of every file and every step</li><li>Share a replay, with secrets and screenshots removed</li><li>A recap of what happened while you were away</li><li>Let your agents interact with Brainstorm through MCP and CLI</li></ul></div>
+        <ul><li>A first read on NVIDIA Nemotron: a short summary of every file and every step<small>81k lines read in 73 s for $0.02 at the hackathon. <a data-link="numbers" href="#">How we measured</a></small></li><li>A recap of what happened while you were away</li><li>Let your agents interact with Brainstorm through MCP and CLI</li></ul></div>
       <div class="later rv d2"><span class="dot"></span><h3>After</h3><p class="when">What we're building toward</p>
         <ul><li>Support for Codex, Cursor and Gemini CLI</li><li>Replays on pull requests</li><li>Pause and steer an agent from the map</li></ul></div>
     </div>
@@ -706,7 +586,7 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- 11. Closing -->
+<!-- Closing -->
 <section class="closing alt">
   <div class="wrap center">
     <h2 class="rv"><span>Let the agents work.</span><span class="grad">Keep your brain in the loop.</span></h2>
@@ -784,6 +664,8 @@ if (SITE.waitlist) {
   });
 }
 
+document.querySelectorAll("[data-wl-link]").forEach(a => a.hidden = !SITE.waitlist);
+
 /* copy buttons on the install commands */
 document.querySelectorAll("[data-copy]").forEach(btn => btn.addEventListener("click", async () => {
   const text = btn.previousElementSibling.textContent;
@@ -797,6 +679,8 @@ const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const win = (p, a, b) => clamp((p - a) / (b - a));
 const ease = t => 1 - Math.pow(1 - t, 3);
+const flatMQ = matchMedia("(max-width: 699px)");   // phones: no pinned scenes, each shows its last frame
+let flat = flatMQ.matches;
 const progress = el => window.__P?.[el.id] ?? clamp(-el.getBoundingClientRect().top / (el.offsetHeight - innerHeight));  // __P: preview hook, {sceneId: 0..1}
 
 /* reveal on scroll, plus count-ups and the typed question */
@@ -820,23 +704,13 @@ function typeQuestion() {
   let i = 0; setTimeout(function tick() { out.textContent = q.slice(0, ++i); if (i < q.length) setTimeout(tick, 45 + Math.random() * 60); }, 500);
 }
 
-/* ---------- problem: the wall of changes ---------- */
-(() => {
-  const files = ["src/auth/session.ts", "src/api/billing.ts", "src/lib/cache.ts", "tests/auth.test.ts", "src/db/schema.ts", "src/ui/Button.tsx", "src/ui/Modal.tsx",
-    "src/api/users.ts", "src/lib/retry.ts", "src/hooks/useAuth.ts", "src/config/env.ts", "src/pages/checkout.tsx", "src/workers/email.ts", "package.json",
-    "src/lib/logger.ts", "src/api/webhooks.ts", "src/ui/Table.tsx", "src/db/migrate.ts", "tests/billing.test.ts", "src/lib/format.ts"];
-  const verbs = ["Update", "Update", "Update", "Write", "Edit"];
-  let html = "";
-  for (let i = 0; i < 64; i++) html += `<div><b>●</b> ${verbs[i % 5]}(${files[(i * 7) % files.length]})</div>`;
-  $("#wall").innerHTML = html;
-})();
-
 /* ---------- hero story (an illustration, not product data) ----------
    Three agents doing three kinds of work: code, research on the web, a video edit. One agent's line
    draws on white while the camera follows it; two more join and the three tangle ("Three, you can't"),
    then they separate into the map and work: reads are dashed lines of sight, edits ripple, the video
    agent reads the docs between two edits. Then the camera pulls back to the whole map.
-   Everything is driven by p (0..1). */
+   Everything is driven by p (0..1). The opening (p up to AUTO) plays on its own behind the title,
+   low on the screen; scrolling the hero (s, 0..1) carries it the rest of the way. Phones show p = 1. */
 const hero = (() => {
   const cv = $("#map"), ctx = cv.getContext("2d");
   const COOL = [180, 194, 212], WARM = [255, 159, 10], HOT = [255, 55, 95];
@@ -962,11 +836,27 @@ const hero = (() => {
     ctx.globalAlpha = 1;
   }
 
-  let p = 0, visible = true;
+  const AUTO = .335, AUTO_MS = 7000, T0 = performance.now() + 600;
+  let p = 0, s = 0, visible = true, frame = { top: 104, bottom: 520, intro: 620 }, fit = { z: 1, x: 0, y: 0, sy: 300 };
+  /* the zoomed-out view: the whole map, fitted between the nav and the heading under it */
+  function fitMap() {
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    nodes.forEach(n => { x0 = Math.min(x0, n.x - n.rad * 1.5); x1 = Math.max(x1, n.x + n.rad * 1.5); y0 = Math.min(y0, n.y - n.rad * 1.3); y1 = Math.max(y1, n.y + n.rad * 1.3); });
+    const top = frame.top + 26, bottom = frame.bottom;                  // 26: room for the module names over the top row
+    const z = Math.min((W - 32) / (x1 - x0), (bottom - top) / (y1 - y0), 1.15);
+    fit = { z, x: (x0 + x1) / 2, y: (y0 + y1) / 2, sy: (top + bottom) / 2 };
+  }
+  function story(t) {
+    if (window.__P?.story != null) return window.__P.story;
+    if (flat) return 1;
+    const pa = still ? AUTO : AUTO * (k => k * k * (3 - 2 * k))(win(t, T0, T0 + AUTO_MS));
+    return pa + (1 - pa) * win(s, .04, .86);
+  }
   function draw(t) {
     if (!W || !H) return;
+    p = story(t); hook(p, s);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-    const pa = p;
+    const pa = p, lift = flat ? 0 : 1 - ease(win(s, 0, .12));            // lift: the title is still up, keep the agents low and small
     const heads = AG.map(a => { const L = lenAt(a, pa); return { a, L, ...at(a.path, L) }; });
     const live = heads.filter(h => h.L > 0);
 
@@ -975,9 +865,9 @@ const hero = (() => {
     const cen = { x: live.reduce((s, h) => s + h.x, 0) / (live.length || 1), y: live.reduce((s, h) => s + h.y, 0) / (live.length || 1) };
     const fk = ease(win(p, .23, .36));
     const fx = mixN(heads[0].x, cen.x, fk), fy = mixN(heads[0].y, cen.y, fk);
-    const zf = mixN(3, 2.1, fk) * (W < 700 ? .8 : 1);
-    const z = mixN(zf, 1, zo), camX = mixN(fx, 0, zo), camY = mixN(fy, H * .06, zo);
-    const ax = W / 2 + W * .06 * (1 - zo), ay = H * .46 + H * .04 * zo;
+    const zf = mixN(3, 2.1, fk) * (W < 700 ? .8 : 1) * mixN(1, .5, lift);
+    const z = mixN(zf, fit.z, zo), camX = mixN(fx, fit.x, zo), camY = mixN(fy, fit.y, zo);
+    const ax = W / 2 + W * .06 * (1 - zo) * (1 - lift), ay = mixN(mixN(H * .46, frame.intro, lift), fit.sy, zo);
     ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * (ax - camX * z), dpr * (ay - camY * z));
     const px = 1 / z;                                                    // one screen pixel in world units
 
@@ -1077,19 +967,20 @@ const hero = (() => {
       ctx.fillStyle = "#1d1d1f"; ctx.fillText(name, bx + 22, by + bh / 2 + .5);
     });
   }
+  let hook = () => {};
   function loop(t) { if (visible) draw(t); requestAnimationFrame(loop); }
-  build(); requestAnimationFrame(loop);
-  addEventListener("resize", build);
+  build(); fitMap(); requestAnimationFrame(loop);
+  addEventListener("resize", () => { build(); fitMap(); });
   document.fonts && document.fonts.ready.then(() => draw(performance.now()));
   new IntersectionObserver(([e]) => visible = e.isIntersecting).observe(cv);
-  return { set(v) { p = v; } };
+  return { set(v) { s = v; }, frame(f) { frame = f; fitMap(); }, onFrame(f) { hook = f; } };
 })();
 
 /* ---------- beyond code: the agent walks down the track, the window shows each stop ---------- */
 const tasks = (() => {
   const el = $("#tasks"), stops = [...document.querySelectorAll("#tkLine li")], panes = [...document.querySelectorAll(".tk-pane")];
   const agent = $("#tkAgent"), winEl = $("#tkWin"), title = $("#tkTitle"), time = $("#tkTime");
-  const META = [["talk.mp4", "10:02"], ["ffprobe", "10:02"], ["transcript.srt", "10:03"], ["ffmpeg", "10:04"], ["ffmpeg · failed", "10:05"], ["ffmpeg.org", "10:05"], ["teaser.mp4", "10:06"]];
+  const META = [["talk.mp4", "10:02"], ["ffmpeg", "10:04"], ["ffmpeg · failed", "10:05"], ["ffmpeg.org", "10:05"], ["teaser.mp4", "10:06"]];
   let cur = -1;
   function show(i) {
     if (i === cur) return; cur = i;
@@ -1103,60 +994,52 @@ const tasks = (() => {
   }
   show(0);
   addEventListener("resize", () => { const i = cur; cur = -1; show(i); });
-  return { set(p) { show(Math.min(stops.length - 1, Math.floor(win(p, .06, .9) * stops.length))); } };
+  return { set(p) { show(flat ? stops.length - 1 : Math.min(stops.length - 1, Math.floor(win(p, .04, .92) * stops.length))); } };
 })();
 
 /* ---------- scroll-driven scenes ---------- */
 const tasksEl = $("#tasks");
-const heroEl = $("#hero"), heroType = $("#heroType"), heroEnd = $("#heroEnd"), cue = $("#cue");
+const heroEl = $("#hero"), heroType = $("#heroType"), heroEnd = $("#heroEnd"), heroBtns = $("#heroBtns");
 const hcaps = [...document.querySelectorAll(".hcap")];
-const probEl = $("#problem"), wall = $("#wall"), pDone = $("#pDone"), pNobody = $("#pNobody"), pCity = $("#pCity");
-const statsEl = $("#stats"), statEls = [...document.querySelectorAll(".stat3")];
+const fade = [heroType, heroEnd, ...hcaps];
 
-function onScroll() {
-  /* hero: type zooms toward you and dissolves, the map assembles */
-  const hp = progress(heroEl);
-  hero.set(hp);
-  const tp = ease(win(hp, 0, .09));
+/* hero: where the map may sit. Low under the buttons while the title is up, and at the end between the nav and the heading */
+function measureHero() {
+  if (flat) { const c = $("#map"); hero.frame({ top: 0, bottom: c.clientHeight - 8, intro: 0 }); return; }
+  const H = heroEl.querySelector(".stage").clientHeight;
+  const btns = heroType.offsetTop + heroBtns.offsetTop + heroBtns.offsetHeight;
+  hero.frame({ top: 104, bottom: heroEnd.offsetTop + heroEnd.querySelector("h2").offsetTop - 16, intro: Math.min(H - 64, btns + (H - btns) * .5) });
+}
+/* hero overlay, every frame: the title zooms toward you and dissolves as you scroll, captions follow the story, then the end */
+let lastKey = "";
+hero.onFrame((p, s) => {
+  const key = flat ? "flat" : p.toFixed(4) + s.toFixed(4);
+  if (key === lastKey) return; lastKey = key;
+  if (flat) { fade.forEach(el => el.removeAttribute("style")); return; }
+  const tp = ease(win(s, 0, .12));
   heroType.style.transform = `scale(${1 + tp * .5})`;
   heroType.style.opacity = 1 - tp;
   heroType.style.filter = `blur(${tp * 12}px)`;
-  cue.style.visibility = hp > .02 ? "hidden" : "";
+  heroType.style.pointerEvents = tp > .5 ? "none" : "";
   hcaps.forEach(c => {
-    const k = win(hp, +c.dataset.in, +c.dataset.in + .03) - win(hp, +c.dataset.out - .03, +c.dataset.out);
+    const k = (win(p, +c.dataset.in, +c.dataset.in + .03) - win(p, +c.dataset.out - .03, +c.dataset.out)) * tp;
     c.style.opacity = k; c.style.transform = `translateY(${(1 - k) * 16}px)`;
   });
-  const ep = ease(win(hp, .8, .86));
+  const ep = ease(win(p, .8, .86));
   heroEnd.style.opacity = ep; heroEnd.style.transform = `translateY(${(1 - ep) * 40}px)`;
   heroEnd.style.pointerEvents = ep > .5 ? "" : "none";
+});
 
-  /* problem: files pour past, "Updated 47 files", then the punchline */
-  const pp = progress(probEl);
-  wall.style.transform = `translate(-50%, ${-pp * 70}%)`;
-  wall.style.opacity = 1 - win(pp, .5, .7) * .85;
-  wall.style.filter = `blur(${win(pp, .5, .7) * 6}px)`;
-  const d = win(pp, .12, .24) - win(pp, .44, .52);
-  pDone.style.opacity = d; pDone.style.transform = `scale(${.94 + .06 * d})`;
-  const nb = ease(win(pp, .52, .64));
-  pNobody.style.opacity = nb; pNobody.style.transform = `translateY(${(1 - nb) * 30}px)`;
-  pCity.style.opacity = ease(win(pp, .72, .84));
-
-  /* beyond code: one stop per slice of the scroll */
-  tasks.set(progress(tasksEl));
-
-  /* stats: each finding arrives in turn (one at a time on phones) */
-  const sp = progress(statsEl), narrow = innerWidth <= 820;
-  statEls.forEach((el, i) => {
-    const a = .06 + i * .27, k = ease(win(sp, a, a + .1));
-    const out = narrow && i < statEls.length - 1 ? win(sp, a + .22, a + .27) : 0;
-    el.style.opacity = k - out; el.style.transform = `translateY(${(1 - k) * 40 - out * 24}px)`;
-    if (k > .05 && !el.dataset.done) { el.dataset.done = 1; el.querySelectorAll("[data-count]").forEach(countUp); }
-  });
+function onScroll() {
+  hero.set(progress(heroEl));
+  tasks.set(progress(tasksEl));        /* beyond code: one stop per slice of the scroll */
 }
 let ticking = false;
 addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(() => { onScroll(); ticking = false; }); } }, { passive: true });
-addEventListener("resize", onScroll);
-onScroll();
+addEventListener("resize", () => { measureHero(); onScroll(); });
+flatMQ.addEventListener("change", e => { flat = e.matches; lastKey = ""; dispatchEvent(new Event("resize")); });
+measureHero(); onScroll();
+document.fonts && document.fonts.ready.then(measureHero);
 </script>
 </body>
 </html>

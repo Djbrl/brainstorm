@@ -83,6 +83,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 10:40 (29 Sep) [lead] Plugin 0.2.0: `feature/tasks` merged into `main` (one Map tab with Map | Track, threads play on click, errors in red everywhere, no Failures tab locally). brainstorm-next redeployed with the new interface and neutral copy (no "post-deadline" banner or Failures tab; the welcome and banner point to the plugin). The judged demo is unchanged. Landing page rewritten around "a live map of your agents", with install steps.
 
+- 05:40 (30 Sep) [lead] Plugin 0.3.0. **Share a thread:** Share on the replay player (or `/brainstorm:share`) saves one `.html` file that opens in any browser with no install (the whole app inline, the recording embedded, opens on the map), plus a Markdown report (requests, files changed by module, failures, step by step). Secrets masked again; home folder, account and computer names hidden; emails masked; screenshots never included. Smaller items from `next-steps.md`: exact call/result pairing (tool_use ids), deleted files leave the map live and import lines update live, Go/Rust/Java imports, first load 709 → 279 kB.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

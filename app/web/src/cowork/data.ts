@@ -1,5 +1,5 @@
 // Owner: cowork. Loads GET /api/cowork?sessionId= for one thread and shapes it for the view: change groups, verb names, area names.
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import type { CoworkArea, CoworkEvent, CoworkSummary, CoworkVerb } from "@contract";
 import { isReplay, replayCowork } from "../lib/live";
 
@@ -37,27 +37,30 @@ export const VERB_NAME: Record<CoworkVerb, string> = {
   created: "Created", updated: "Edited", deleted: "Deleted", typed: "Typed", clicked: "Clicked",
 };
 
-/** A run of the same change on the same place by the same session, e.g. 7 edits to one doc in a row. */
-export type ChangeGroup = { key: string; first: CoworkEvent; last: CoworkEvent; count: number; events: CoworkEvent[] };
+/** The open thread's places, shared by the places map (canvas) and the list in the sidebar. */
+type PlacesState = { data: CoworkSummary | null; selected: string | null; highlight: string | null };
+let places: PlacesState = { data: null, selected: null, highlight: null };
+const subs = new Set<() => void>();
+export const placesStore = {
+  get: () => places,
+  set(p: Partial<PlacesState>) { places = { ...places, ...p }; subs.forEach((f) => f()); },
+  subscribe(f: () => void) { subs.add(f); return () => { subs.delete(f); }; },
+};
+export const usePlaces = () => useSyncExternalStore(placesStore.subscribe, placesStore.get);
 
-const RUN_GAP_MS = 15 * 60 * 1000;
-
-export function changeGroups(events: CoworkEvent[], includeMaybe: boolean): ChangeGroup[] {
-  const changes = events.filter((e) => e.change && !e.failed && (includeMaybe || e.change.confidence !== "maybe"));
-  const groups: ChangeGroup[] = [];
-  for (const e of changes) {
-    const g = groups[groups.length - 1];
-    if (g && g.last.sessionId === e.sessionId && g.last.page === e.page && g.last.change!.verb === e.change!.verb && Date.parse(e.ts) - Date.parse(g.last.ts) < RUN_GAP_MS) {
-      g.last = e; g.count++; g.events.push(e);
-    } else groups.push({ key: e.id, first: e, last: e, count: 1, events: [e] });
+/** A stretch of steps in one place, in order (consecutive steps on the same page fold into one row). */
+export type PlaceRun = { key: string; place: string; first: CoworkEvent; last: CoworkEvent; count: number; verbs: Map<CoworkVerb, number>; failed: number };
+export function placeRuns(events: CoworkEvent[]): PlaceRun[] {
+  const runs: PlaceRun[] = [];
+  for (const e of events) {
+    const place = `${e.area}|${e.page}`;
+    let r = runs[runs.length - 1];
+    if (!r || r.place !== place) runs.push(r = { key: e.id, place, first: e, last: e, count: 0, verbs: new Map(), failed: 0 });
+    r.last = e; r.count++;
+    if (e.failed) r.failed++;
+    if (e.change && !e.failed && e.change.confidence !== "maybe") r.verbs.set(e.change.verb, (r.verbs.get(e.change.verb) ?? 0) + 1);
   }
-  return groups.reverse(); // newest first
-}
-
-export function verbTotals(events: CoworkEvent[]): [CoworkVerb, number][] {
-  const m = new Map<CoworkVerb, number>();
-  for (const e of events) if (e.change && !e.failed && e.change.confidence !== "maybe") m.set(e.change.verb, (m.get(e.change.verb) ?? 0) + 1);
-  return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  return runs;
 }
 
 export const placeTitle = (e: { title?: string; page: string; site: string }) =>

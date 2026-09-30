@@ -1,11 +1,14 @@
-// Owner: sidebar agent. Threads tab: every thread; clicking one plays it (a running one live) and opens its step list,
-// which fills the sidebar's height; clicking it again closes it. Agents: follow the camera, show/hide.
+// Owner: sidebar agent. Threads tab: every thread; clicking one plays it (a running one live) and opens its step list
+// (or its places, in the Places view), which fills the sidebar's height; clicking it again closes it.
+// Agents: follow the camera, show/hide. With a thread open, its agents fold into one row so the steps keep their room:
+// opening the agents folds the steps, and the other way round. The eye in the title row shows or hides all its agents.
 import { useEffect, useState } from "react";
 import type { AgentPresence, Session } from "@contract";
 import { clock, useLive } from "../../lib/live";
 import { useNav } from "../../lib/nav";
 import { agentColor, baseName, initial, shortName, verbIng } from "../agents";
 import { ReplaySteps } from "../replay/ReplaySteps";
+import { PlaceSteps } from "../../cowork/PlaceSteps";
 
 function useTick(ms: number) {
   const [, setTick] = useState(0);
@@ -54,9 +57,6 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }
     return <p className="sidebar-empty">No agent threads yet. Start Claude Code in this project.</p>;
   }
 
-  const allIds = agents.map((a) => a.id);
-  const allHidden = allIds.length > 0 && allIds.every((id) => hiddenAgents.has(id));
-
   // Clicking a thread plays it: a running thread follows its newest step, a finished one plays from the start.
   const select = (s: Session) => {
     if (replay?.sessionId === s.id) { stopReplay(); return; } // clicking the open thread closes it
@@ -66,11 +66,6 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }
 
   return (
     <div className={`sidebar-threads ${replay ? "has-open" : ""}`}>
-      {allIds.length > 0 && (
-        <div className="sidebar-threads-toolbar">
-          <button onClick={() => setHiddenAgents(allHidden ? [] : allIds)}>{allHidden ? "Show all" : "Hide all"}</button>
-        </div>
-      )}
       <ul className="sidebar-thread-list">
         {sessions.map((session) => {
           const selected = replay?.sessionId === session.id;
@@ -86,6 +81,7 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }
               onFocusFile={onFocusFile}
               hiddenAgents={hiddenAgents}
               toggleAgent={toggleAgent}
+              setHiddenAgents={setHiddenAgents}
               now={now}
               onSelect={() => select(session)}
             />
@@ -96,7 +92,7 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }
   );
 }
 
-function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFocusFile, hiddenAgents, toggleAgent, now, onSelect }: {
+function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFocusFile, hiddenAgents, toggleAgent, setHiddenAgents, now, onSelect }: {
   session: Session;
   selected: boolean;
   agents: AgentPresence[];
@@ -106,19 +102,43 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
   onFocusFile: (path: string) => void;
   hiddenAgents: ReadonlySet<string>;
   toggleAgent: (id: string) => void;
+  setHiddenAgents: (ids: Iterable<string>) => void;
   now: number;
   onSelect: () => void;
 }) {
   const sorted = [...agents].sort((a, b) => (a.isSubagent ? 1 : 0) - (b.isSubagent ? 1 : 0) || a.id.localeCompare(b.id));
   const running = session.status === "running";
+  const { lens } = useNav();
+  const [agentsOpen, setAgentsOpen] = useState(false);
+  useEffect(() => { if (!selected) setAgentsOpen(false); }, [selected]);
+  const ids = sorted.map((a) => a.id);
+  const allHidden = ids.length > 0 && ids.every((id) => hiddenAgents.has(id));
+  const toggleAll = () => setHiddenAgents(allHidden ? [...hiddenAgents].filter((id) => !ids.includes(id)) : [...hiddenAgents, ...ids]);
+  const working = sorted.filter((a) => a.active).length;
   return (
     <li className={`sidebar-thread ${selected ? "selected" : ""}`}>
-      <button className="sidebar-thread-head" onClick={onSelect} aria-pressed={selected} title={selected ? "Close this thread" : running ? "Watch this thread live" : "Replay this thread"}>
-        <span className={`sidebar-thread-status ${session.status}`} aria-hidden="true" />
-        <span className="sidebar-thread-title">{session.title || "Untitled thread"}</span>
-        <time>{running ? "live" : ago(session.lastEventAt, now)}</time>
-      </button>
-      {sorted.length > 0 && (
+      <div className="sidebar-thread-headrow">
+        <button className="sidebar-thread-head" onClick={onSelect} aria-pressed={selected} title={selected ? "Close this thread" : running ? "Watch this thread live" : "Replay this thread"}>
+          <span className={`sidebar-thread-status ${session.status}`} aria-hidden="true" />
+          <span className="sidebar-thread-title">{session.title || "Untitled thread"}</span>
+          <time>{running ? "live" : ago(session.lastEventAt, now)}</time>
+        </button>
+        {ids.length > 0 && (
+          <button className="sidebar-agent-eye" onClick={toggleAll} aria-label={allHidden ? "Show this thread's agents on the map" : "Hide this thread's agents from the map"} title={allHidden ? "Show its agents" : "Hide its agents"}>
+            <EyeIcon off={allHidden} />
+          </button>
+        )}
+      </div>
+      {selected && sorted.length > 0 && (
+        <button className="sidebar-fold" onClick={() => setAgentsOpen((o) => !o)} aria-expanded={agentsOpen}>
+          <span className="sidebar-fold-avatars" aria-hidden="true">
+            {sorted.slice(0, 5).map((a) => <i key={a.id} style={{ background: agentColor(a, accent) }}>{initial(a)}</i>)}
+          </span>
+          <span className="sidebar-fold-text">{sorted.length} agent{sorted.length > 1 ? "s" : ""}{working ? `, ${working} working` : ""}</span>
+          <i className={`sidebar-tree-caret ${agentsOpen ? "open" : ""}`} aria-hidden="true">›</i>
+        </button>
+      )}
+      {sorted.length > 0 && (!selected || agentsOpen) && (
         <ul className="sidebar-thread-agents">
           {sorted.map((a) => {
             const following = followId === a.id;
@@ -149,7 +169,9 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
           })}
         </ul>
       )}
-      {selected && <div className="sidebar-replay-steps sidebar-thread-steps"><ReplaySteps /></div>}
+      {selected && (agentsOpen
+        ? <button className="sidebar-fold" onClick={() => setAgentsOpen(false)}><span className="sidebar-fold-text">{lens === "places" ? "Places" : "Steps"}</span><i className="sidebar-tree-caret" aria-hidden="true">›</i></button>
+        : <div className="sidebar-replay-steps sidebar-thread-steps">{lens === "places" ? <PlaceSteps /> : <ReplaySteps />}</div>)}
     </li>
   );
 }

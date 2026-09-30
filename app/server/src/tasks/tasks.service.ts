@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { existsSync, statSync } from "node:fs";
 import { basename, relative } from "node:path";
 import { ListenerService } from "../listener/listener.service";
+import { CallPairer } from "../listener/pairing";
 import { CoworkTracker } from "../cowork/classify";
 import type { CoworkEvent, Step, TaskArtifact, TaskBeat, TaskDetail, TaskFileKind, TaskFrame, TaskKind, TaskListItem, TaskOutside, TaskSourceFile, TaskSourceSite, TaskStep } from "../types";
 import { ShotsService } from "./shots.service";
@@ -75,8 +76,7 @@ export class TasksService {
     const made = new Map<string, TaskArtifact>();
     const usedFiles = new Map<string, string>(); // path → via
     const prompts: string[] = [];
-    const pending = new Map<boolean, Step[]>();
-    const queue = (st: Step) => pending.get(!!st.isSubagent) ?? pending.set(!!st.isSubagent, []).get(!!st.isSubagent)!;
+    const pairer = new CallPairer();
     const src = (path: string) => `/api/tasks/${encodeURIComponent(sessionId)}/file?path=${encodeURIComponent(path)}`;
     const beat = () => beats[beats.length - 1] ?? (beats.push({ id: "start", ts: steps[0]?.ts ?? "", steps: [] }), beats[0]);
     const rel = (p: string) => (cwd && p.startsWith(cwd + "/") ? relative(cwd, p) : p.replace(/^\/Users\/[^/]+/, "~"));
@@ -100,7 +100,7 @@ export class TasksService {
         continue;
       }
       if (st.kind === "tool_call" || st.kind === "edit") {
-        queue(st).push(st);
+        pairer.call(st);
         const tool = st.tool ?? "";
         const input = (st.input ?? {}) as Record<string, any>;
         let detail: string | undefined;
@@ -126,7 +126,7 @@ export class TasksService {
         continue;
       }
       if (st.kind !== "tool_result") continue;
-      const call = queue(st).shift();
+      const call = pairer.result(st);
       if (!call) continue;
       const failed = !!(st.input as { isError?: boolean } | undefined)?.isError || FAILED.test((st.text ?? "").slice(0, 300));
       const ts = taskSteps.get(call.id);
@@ -159,7 +159,7 @@ export class TasksService {
         });
       }
     }
-    for (const q of pending.values()) for (const call of q) {
+    for (const call of pairer.pending()) {
       const events = tracker.handle(call, undefined);
       if (events.length) eventsByCall.set(call.id, events);
     }

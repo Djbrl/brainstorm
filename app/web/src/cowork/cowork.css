@@ -1,96 +1,15 @@
-/* Owner: cowork. Same language as the rest: light, big type, hairlines, no cards. */
-.cw-root { display: grid; grid-template-columns: minmax(0, 1fr) 440px; height: 100%; min-height: 0; }
-.cw-loading { display: flex; align-items: center; justify-content: center; grid-template-columns: 1fr; }
-.cw-stage { position: relative; min-width: 0; min-height: 0; overflow: clip; display: flex; flex-direction: column; }
-.cw-map { position: relative; flex: 1; min-height: 0; }
-.cw-head { padding: 28px 36px 0; }
-.cw-h1 { font-size: 40px; font-weight: 800; letter-spacing: -0.035em; line-height: 1.1; }
-.cw-sub { margin: 8px 0 0; max-width: 640px; font-size: 17px; line-height: 1.45; color: var(--ink-2); }
-.cw-sub strong { color: var(--hot); font-weight: 700; }
-.cw-areas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 16px; }
-.cw-area { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 12px; font-size: 13.5px; font-weight: 600; color: var(--ink-3); transition: color .15s, border-color .15s, background .15s; }
-.cw-area i { width: 8px; height: 8px; border-radius: 50%; opacity: .35; }
-.cw-area span { font-weight: 500; font-variant-numeric: tabular-nums; }
-.cw-area.on { color: var(--ink); border-color: #d2d2d8; }
-.cw-area.on i { opacity: 1; }
-.cw-area:disabled { opacity: .45; cursor: default; }
-.cw-area:focus-visible, .cw-open:focus-visible, .cw-change-main:focus-visible, .cw-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.cw-code { font-size: 13px; color: var(--ink-3); margin-left: 6px; }
-.cw-legend { position: absolute; left: 36px; bottom: 22px; display: flex; flex-wrap: wrap; gap: 18px; font-size: 12.5px; color: var(--ink-3); pointer-events: none; }
-.cw-legend span { display: inline-flex; align-items: center; gap: 7px; }
-.cw-legend i { display: inline-block; border-radius: 50%; }
-.lg-size { width: 12px; height: 12px; border: 1.4px solid var(--accent); background: rgba(91,91,214,.14); }
-.lg-hot { width: 10px; height: 10px; border: 2px solid var(--hot); }
-.lg-fail { width: 7px; height: 7px; background: var(--risk); }
+/* Owner: cowork. Places: the Map's screen with the places map in it. */
+.cw-wrap .cw-map { position: absolute; inset: 0; }
+.cw-note { position: absolute; left: 420px; top: 50%; margin: 0; color: var(--ink-3); font-size: 15px; }
+.pl-verbs { color: var(--ink-2); font-weight: 600; }
+@media (max-width: 900px) { .cw-note { left: 16px; top: auto; bottom: 90px; } }
 
-.cw-side { border-left: 1px solid var(--line); background: var(--surface); overflow-y: auto; min-height: 0; }
-.cw-side-head { padding: 28px 28px 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: rgba(255,255,255,.94); backdrop-filter: blur(12px); z-index: 1; }
-.cw-side-head h2 { font-size: 26px; font-weight: 800; letter-spacing: -0.025em; }
-.cw-side-sub { margin: 6px 0 0; font-size: 14.5px; color: var(--ink-2); line-height: 1.45; }
-.cw-side-sub .hot { color: var(--hot); } .cw-side-sub .risk { color: var(--risk); }
-.cw-totals { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
-.cw-total { font-size: 13px; color: var(--ink-2); background: #f2f2f6; border-radius: 999px; padding: 3px 11px; }
-.cw-total b { color: var(--ink); font-weight: 700; margin-left: 2px; font-variant-numeric: tabular-nums; }
-.cw-toggle { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13.5px; color: var(--ink-2); cursor: pointer; }
-.cw-toggle input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
-.cw-empty { color: var(--ink-3); font-size: 15px; padding: 28px; margin: 0; }
-
-.cw-changes, .cw-events { list-style: none; margin: 0; padding: 6px 12px 40px; }
-.cw-change { display: flex; align-items: flex-start; gap: 8px; border-bottom: 1px solid #f0f0f3; }
-.cw-change-main { flex: 1; min-width: 0; display: grid; gap: 2px; text-align: left; border: 0; background: transparent; padding: 14px 10px; border-radius: 12px; transition: background .15s; }
-.cw-change-main:hover { background: rgba(0,0,0,.025); }
-.cw-verb { font-size: 12px; font-weight: 700; letter-spacing: .01em; color: var(--hot); }
-.cw-times { color: var(--ink-3); font-weight: 600; }
-.cw-change.c-maybe .cw-verb { color: var(--ink-3); }
-.cw-what { font-size: 15.5px; font-weight: 600; color: var(--ink); line-height: 1.35; overflow-wrap: anywhere; }
-.cw-where { display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--ink-2); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.cw-where i { flex: none; width: 7px; height: 7px; border-radius: 50%; }
-.cw-meta, .cw-ev-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-3); }
-.cw-meta .sep { opacity: .5; }
-.cw-conf { font-size: 11.5px; font-weight: 600; border-radius: 999px; padding: 1px 8px; background: #f2f2f6; color: var(--ink-2); }
-.cw-conf.likely { background: #fff4e0; color: #b26a00; }
-.cw-conf.sure { background: #fff0ea; color: #c2410c; }
-.cw-conf.failed { background: #fdecea; color: var(--risk); }
-.cw-open { flex: none; margin-top: 14px; border: 0; background: transparent; color: var(--accent); font-size: 12.5px; font-weight: 600; padding: 4px 8px; border-radius: 8px; opacity: 0; transition: opacity .15s, background .15s; }
-.cw-change:hover .cw-open, .cw-event:hover .cw-open, .cw-open:focus-visible { opacity: 1; }
-.cw-open:hover { background: var(--accent-soft); }
-
-.cw-back { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; color: var(--accent); font-size: 13.5px; font-weight: 600; padding: 2px 0; margin-bottom: 10px; }
-.cw-place-title { overflow-wrap: anywhere; }
-.cw-url { display: block; margin-top: 4px; font-size: 13px; color: var(--ink-3); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cw-url:hover { color: var(--accent); }
-.cw-event { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 10px 10px; border-bottom: 1px solid #f0f0f3; }
-.cw-event .cw-open { margin-top: 0; }
-.cw-ev-time { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; padding-top: 2px; }
-.cw-ev-main { display: grid; gap: 2px; min-width: 0; }
-.cw-ev-what { font-size: 14.5px; color: var(--ink); overflow-wrap: anywhere; }
-.cw-event.has-change:not(.c-maybe) .cw-ev-what { font-weight: 600; }
-.cw-event.failed .cw-ev-what { color: var(--risk); }
-
-@media (max-width: 900px) {
-  .cw-root { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(520px, 70vh) auto; overflow-y: auto; }
-  .cw-side { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
-  .cw-head { padding: 18px 16px 0; }
-  .cw-h1 { font-size: 30px; }
-  .cw-sub { font-size: 15px; }
-  .cw-legend { left: 16px; bottom: 12px; gap: 10px; }
-  .cw-open { opacity: 1; }
-}
-.cw-day { font-size: 13px; font-weight: 700; color: var(--ink-2); padding: 18px 10px 4px; }
-.cw-day:first-child { padding-top: 8px; }
-
-/* Places as a lens of the Map tab: the threads sidebar floats on the left, Map | Track | Places at the top. */
-.cw-wrap { position: relative; height: 100%; overflow: hidden; background: var(--bg); }
-.cw-wrap .cw-root { padding-left: 380px; }
-.cw-wrap .cw-head { padding-top: 76px; }
-.cw-wrap:has(.sidebar-collapsed) .cw-root, .cw-wrap:has(.sidebar-collapsed) .cw-note { padding-left: 90px; }
-.cw-note { padding: 120px 40px 0 400px; color: var(--ink-3); }
-.cw-note h2 { font-size: 28px; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; margin: 0 0 8px; }
-.cw-note p { max-width: 480px; line-height: 1.5; margin: 0; }
-.cw-wrap .cw-root { grid-template-columns: minmax(0, 1fr) 380px; }
-/* Not enough room for sidebar + map + changes side by side: the changes go under the map. */
-@media (max-width: 1360px) {
-  .cw-wrap .cw-root { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(520px, 72vh) auto; overflow-y: auto; }
-  .cw-wrap .cw-side { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
-}
-@media (max-width: 900px) { .cw-wrap .cw-root { padding-left: 0; } .cw-note { padding: 120px 16px 0; } }
+/* The step panel: the map's side panel with Follow's step view in it. */
+.pl-panel { overflow: hidden; display: flex; flex-direction: column; z-index: 4; }
+.pl-panel .sd { flex: 1; min-height: 0; border-left: 0; background: transparent; animation: none; }
+.pl-panel-nav { display: flex; align-items: center; gap: 8px; padding: 14px 20px 0 36px; font-size: 12.5px; color: var(--ink-3); flex: none; }
+.pl-panel-nav span:first-child { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--ink-2); }
+.pl-panel-count { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pl-panel-nav button { width: 26px; height: 26px; border-radius: 50%; border: 0; background: #f0f0f3; color: var(--ink-2); font-size: 16px; line-height: 1; }
+.pl-panel-nav button:hover:not(:disabled) { background: #e7e7ec; color: var(--ink); }
+.pl-panel-nav button:disabled { opacity: .35; }

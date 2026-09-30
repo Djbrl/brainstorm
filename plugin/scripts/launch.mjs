@@ -8,6 +8,8 @@
 //   --switch       make the project the active workspace
 //   --project DIR  the project (default: CLAUDE_PROJECT_DIR, then the current folder)
 //   --stop         stop the running server
+//   --share        save a thread as a replay file (.html) and a summary (.md), in Downloads: the thread named by
+//                  --session ID, else the project's newest one
 // It always exits 0 and prints any problem on stdout, so a skill can run it as one plain command.
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -204,7 +206,7 @@ async function main() {
   const n = readNotices();
   if (!n.welcomed || n.lastVersion !== VERSION) writeNotices({ ...n, welcomed: true, lastVersion: VERSION });
 
-  if (flag("--switch")) {
+  if (flag("--switch") || flag("--share")) {
     const ws = await fetch(`http://127.0.0.1:${port}/api/workspace`).then((r) => r.json()).catch(() => null);
     if (ws?.root !== PROJECT) {
       const r = await fetch(`http://127.0.0.1:${port}/api/workspace`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ root: PROJECT }) });
@@ -212,9 +214,31 @@ async function main() {
     }
   }
 
+  if (flag("--share")) return share(port);
+
   const url = `http://localhost:${port}/?view=map`;
   if (flag("--open")) openBrowser(url);
   say(`Brainstorm ${VERSION} is running for ${PROJECT}: ${url}`);
+}
+
+/** Saves the thread as a replay file and a Markdown summary, and says where. */
+async function share(port) {
+  const sid = opt("--session");
+  const dir = existsSync(join(homedir(), "Downloads")) ? join(homedir(), "Downloads") : join(DATA, "shares");
+  mkdirSync(dir, { recursive: true });
+  const get = async (path, id) => fetch(`http://127.0.0.1:${port}${path}${id ? `?sessionId=${encodeURIComponent(id)}` : ""}`);
+  const saved = [];
+  for (const path of ["/api/share", "/api/export.md"]) {
+    // A session id the skill couldn't fill in (or one Brainstorm hasn't read yet) falls back to the newest thread.
+    let r = await get(path, sid && !sid.includes("$") ? sid : undefined);
+    if (r.status === 404 && sid) r = await get(path);
+    if (!r.ok) return say(`Couldn't save the replay: ${await r.text()}`);
+    const name = /filename="([^"]+)"/.exec(r.headers.get("content-disposition") ?? "")?.[1] ?? `brainstorm-replay${path.endsWith(".md") ? ".md" : ".html"}`;
+    writeFileSync(join(dir, name), Buffer.from(await r.arrayBuffer()));
+    saved.push(join(dir, name));
+  }
+  say(`Saved this thread:\n- Replay (opens in any browser, nothing to install): ${saved[0]}\n- Summary (Markdown): ${saved[1]}`);
+  say("Both include the thread's prompts, messages, commands and code changes. Secrets, emails, your home folder and computer name are masked; screenshots are never included.");
 }
 
 function tail(file, n = 15) {

@@ -102,15 +102,26 @@ function useGraph(data: CoworkSummary, areas: ReadonlySet<CoworkArea>) {
   }, [data, areas]);
 }
 
-export function WorldMap({ data, areas, selected, highlight, onSelect }: {
+export function WorldMap({ data, areas, selected, highlight, onSelect, leftInset = 0, rightInset = 0 }: {
   data: CoworkSummary; areas: ReadonlySet<CoworkArea>;
   selected: string | null; highlight: string | null; onSelect: (id: string | null) => void;
+  /** Width covered by the sidebar on the left: fitting and centering keep places out from under it. */
+  leftInset?: number;
+  /** Width covered by a side panel on the right, when one is open. */
+  rightInset?: number;
 }) {
   const [wrapRef, size] = useSize<HTMLDivElement>();
   const fg = useRef<ForceGraphMethods<GNode, GLink> | undefined>(undefined);
   const graph = useGraph(data, areas);
   const [hover, setHover] = useState<string | null>(null);
   const fitted = useRef(false);
+  const fit = () => {
+    if (fitted.current) return;
+    fitted.current = true;
+    fg.current?.zoomToFit(700, 80 + leftInset / 2);
+    // zoomToFit centers on the whole canvas: slide the view so the places sit in the part the sidebar leaves free.
+    setTimeout(() => { const g = fg.current; if (!g || !leftInset) return; const c = g.centerAt() as unknown as { x: number; y: number }; g.centerAt(c.x - leftInset / 2 / g.zoom(), c.y, 400); }, 750);
+  };
 
   useEffect(() => {
     const g = fg.current;
@@ -127,7 +138,7 @@ export function WorldMap({ data, areas, selected, highlight, onSelect }: {
   // simulation may never stop: don't wait for onEngineStop alone.
   useEffect(() => {
     if (fitted.current || !graph.nodes.length) return;
-    const t = setTimeout(() => { if (!fitted.current) { fitted.current = true; fg.current?.zoomToFit(700, 80); } }, 1200);
+    const t = setTimeout(fit, 1200);
     return () => clearTimeout(t);
   }, [graph]);
 
@@ -139,8 +150,8 @@ export function WorldMap({ data, areas, selected, highlight, onSelect }: {
   // Zoom to the selected place (from the list of changes, or a click).
   const sel = resolve(selected);
   useEffect(() => {
-    if (sel && sel.x !== undefined) { fg.current?.centerAt(sel.x, sel.y, 700); fg.current?.zoom(2.4, 700); }
-  }, [sel]);
+    if (sel && sel.x !== undefined) { fg.current?.centerAt(sel.x - (leftInset - rightInset) / 2 / 2.4, sel.y, 700); fg.current?.zoom(2.4, 700); }
+  }, [sel, rightInset]);
 
   const usedAreas = useMemo(() => [...new Set(graph.nodes.map((n) => n.area))], [graph]);
   // Lit: the focused place, its site and its pages. Everything else fades.
@@ -161,7 +172,7 @@ export function WorldMap({ data, areas, selected, highlight, onSelect }: {
         linkWidth={1}
         enableNodeDrag={false}
         cooldownTicks={300}
-        onEngineStop={() => { if (!fitted.current) { fitted.current = true; fg.current?.zoomToFit(700, 80); } }}
+        onEngineStop={fit}
         onNodeHover={(n) => setHover(n ? (n as GNode).id : null)}
         onNodeClick={(n) => onSelect((n as GNode).id)}
         onBackgroundClick={() => onSelect(null)}

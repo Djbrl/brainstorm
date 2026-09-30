@@ -75,7 +75,9 @@ function loadHidden(): Set<string> {
 export function NavProvider({ children }: { children: ReactNode }) {
   const params = new URLSearchParams(location.search);
   // "cowork" was the old all-sessions Places tab: it now opens the Map tab on the Places view of the selected thread.
-  const [view, setView] = useState<View>(() => { const v = (params.get("view") as View) || "follow"; return v === "cowork" ? "map" : v; });
+  // The hosted demos open on the Map; the local app on Follow.
+  const demo = !!(params.get("replay") ?? import.meta.env.VITE_REPLAY_URL);
+  const [view, setView] = useState<View>(() => { const v = (params.get("view") as View) || (demo ? "map" : "follow"); return v === "cowork" ? "map" : v; });
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [focusFile, setFocusFile] = useState<string | null>(null);
   const [focusStep, setFocusStep] = useState<string | null>(null);

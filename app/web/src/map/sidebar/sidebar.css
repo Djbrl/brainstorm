@@ -115,3 +115,26 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 
 /* The stats line sits just above the sidebar. */
 .map-stats { position: absolute; left: 40px; top: 84px; margin: 0; color: var(--ink-3); font-size: 14.5px; pointer-events: none; z-index: 3; white-space: nowrap; }
+
+/* The sidebar keeps one height and sits centered; the stats line rides just above it (Map, Track, Places). */
+.map-wrap, .trk-wrap, .cw-wrap { --sb-h: min(720px, calc(100% - 170px)); --sb-top: calc(50% - var(--sb-h) / 2 + 18px); }
+.map-sidebar { top: var(--sb-top); bottom: auto; height: var(--sb-h); }
+.sidebar-collapsed { top: var(--sb-top); }
+.map-stats { top: calc(var(--sb-top) - 34px); }
+
+/* Title row: the thread (a pill when open) and the eye that shows or hides all its agents. */
+.sidebar-thread-headrow { display: flex; align-items: center; gap: 2px; margin: -7px -8px; border-radius: 10px; }
+.sidebar-thread-headrow:hover { background: #f4f4f7; }
+.sidebar-thread.selected .sidebar-thread-headrow { background: var(--accent-soft); }
+.sidebar-thread-headrow button.sidebar-thread-head { flex: 1; min-width: 0; width: auto; margin: 0; background: transparent; }
+.sidebar-thread-headrow button.sidebar-thread-head:hover, .sidebar-thread.selected .sidebar-thread-headrow button.sidebar-thread-head { background: transparent; }
+.sidebar-thread-headrow .sidebar-agent-eye { margin-right: 4px; }
+
+/* Folded agents (or folded steps): one compact row. */
+.sidebar-fold { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 10px; padding: 6px 8px; border: 0; border-radius: 10px; background: transparent; text-align: left; color: var(--ink-2); font-size: 12.5px; font-weight: 500; }
+.sidebar-fold:hover { background: #f4f4f7; color: var(--ink); }
+.sidebar-fold-avatars { display: flex; }
+.sidebar-fold-avatars i { width: 18px; height: 18px; border-radius: 50%; display: grid; place-content: center; color: #fff; font-size: 9px; font-weight: 700; font-style: normal; box-shadow: 0 0 0 2px #fff; }
+.sidebar-fold-avatars i + i { margin-left: -5px; }
+.sidebar-fold-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-fold[aria-expanded="true"] { color: var(--ink); }

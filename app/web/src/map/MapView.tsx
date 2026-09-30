@@ -91,12 +91,13 @@ function useNow(ms = 20000) {
 // ---------- graph data (node objects are reused so positions survive live updates) ----------
 function useGraph(map: ProjectMap | null) {
   const nodesRef = useRef(new Map<string, GNode>());
-  const lastRef = useRef<{ key: string; graph: { nodes: GNode[]; links: GLink[]; anchors: Map<string, { x: number; y: number }> } } | null>(null);
+  const lastRef = useRef<{ key: string; edges: ProjectMap["edges"]; graph: { nodes: GNode[]; links: GLink[]; anchors: Map<string, { x: number; y: number }> } } | null>(null);
   return useMemo(() => {
     if (!map) return { nodes: [] as GNode[], links: [] as GLink[], anchors: new Map<string, { x: number; y: number }>() };
     // Same files, modules and edges: update node data in place so the simulation is not disturbed.
-    const key = map.files.map((f) => f.path + "|" + f.module).join(",") + "#" + map.edges.length;
-    if (lastRef.current && lastRef.current.key === key) {
+    // (The store only replaces the edges array when an import actually changed.)
+    const key = map.files.map((f) => f.path + "|" + f.module).join(",");
+    if (lastRef.current && lastRef.current.key === key && lastRef.current.edges === map.edges) {
       for (const f of map.files) { const n = nodesRef.current.get(f.path); if (n) { n.file = f; n.r = radius(f.lines); } }
       return lastRef.current.graph;
     }
@@ -131,7 +132,7 @@ function useGraph(map: ProjectMap | null) {
     nodesRef.current = next;
     const links: GLink[] = map.edges.filter((e) => next.has(e.from) && next.has(e.to) && e.from !== e.to).map((e) => ({ source: e.from, target: e.to }));
     const graph = { nodes, links, anchors };
-    lastRef.current = { key, graph };
+    lastRef.current = { key, edges: map.edges, graph };
     return graph;
   }, [map?.files, map?.edges]);
 }

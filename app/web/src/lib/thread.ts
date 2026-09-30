@@ -167,8 +167,10 @@ export function buildThread(sessionId: string, steps: Step[], resolve: FileResol
     beats.push(b);
     return b;
   };
+  const callBeat = new Map<string, Beat>(); // tool_use id → the beat holding the call
   const add = (b: Beat, s: Step) => {
     b.steps.push(s);
+    if (s.toolUseId && s.kind !== "tool_result") callBeat.set(s.toolUseId, b);
     stepBeat.set(s.id, b.index);
     if (isFailedResult(s)) { b.failed++; if (b.counts) b.counts.failed++; }
   };
@@ -204,7 +206,7 @@ export function buildThread(sessionId: string, steps: Step[], resolve: FileResol
 
     const k = streamOf(s);
     if (s.kind === "tool_result") {
-      const b = lastOf.get(k) ?? beats[beats.length - 1];
+      const b = (s.toolUseId ? callBeat.get(s.toolUseId) : undefined) ?? lastOf.get(k) ?? beats[beats.length - 1];
       if (b) { add(b, s); continue; } // results fold into what they answer
     }
     if (s.kind === "prompt" && !s.isSubagent) {

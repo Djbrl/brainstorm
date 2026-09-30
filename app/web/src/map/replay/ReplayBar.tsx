@@ -47,6 +47,39 @@ const FailTicks = memo(function FailTicks({ thread }: { thread: Thread }) {
   );
 });
 
+/** Local app: download this thread as a replay file anyone can open, or as a Markdown summary. */
+function ShareMenu({ sessionId }: { sessionId: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setOpen(false); } };
+    document.addEventListener("mousedown", away);
+    window.addEventListener("keydown", esc, true); // before the replay's own Esc (stop)
+    return () => { document.removeEventListener("mousedown", away); window.removeEventListener("keydown", esc, true); };
+  }, [open]);
+  const q = `sessionId=${encodeURIComponent(sessionId)}`;
+  return (
+    <div className="rp-share" ref={ref}>
+      <button className="rp-text" aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen((o) => !o)} title="Share this thread">Share</button>
+      {open && (
+        <div className="rp-share-menu" role="menu">
+          <a role="menuitem" href={`/api/share?${q}`} download onClick={() => setOpen(false)}>
+            <strong>Replay file</strong>
+            <span>One .html file that opens in any browser, with the map, every step and the code changes.</span>
+          </a>
+          <a role="menuitem" href={`/api/export.md?${q}`} download onClick={() => setOpen(false)}>
+            <strong>Summary</strong>
+            <span>A Markdown report: what was asked, the files changed by module, what failed.</span>
+          </a>
+          <p className="rp-share-note">Both include this thread's prompts, messages, commands and code changes. Secrets are masked and your home folder is hidden. Screenshots are never included.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ReplayBar() {
   const { replay: current, setReplayIndex, setReplayPlaying, setReplaySpeed, setReplayDetail, stopReplay, openStep, setSessionId, setView } = useNav();
   const { state } = useLive();
@@ -101,6 +134,7 @@ export function ReplayBar() {
         </button>
         <button className="rp-text" onClick={() => replayCamera.recenter()} title="Follow the tracer again">{Icon.target}<span>Recenter</span></button>
         <button className="rp-text" onClick={() => { const at = replayCursor.stepId; if (at) openStep(replay.sessionId, at); else { setSessionId(replay.sessionId); setView("follow"); } }} title="Open this step in Follow">Open in Follow</button>
+        {!isReplay() && <ShareMenu sessionId={replay.sessionId} />}
         {stop}
       </div>
       <div className="rp-controls">

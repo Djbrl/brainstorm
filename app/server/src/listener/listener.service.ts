@@ -525,13 +525,13 @@ export class ListenerService implements OnModuleInit {
  * (<command-name>, <local-command-caveat>, <local-command-stdout>...): keep the command, drop the rest.
  * Undefined when nothing readable is left, so a later prompt can title the thread.
  */
-export function promptTitle(text: string): string | undefined {
+export function promptTitle(text: string, max = 80): string | undefined {
   const command = /<command-name>([^<]*)/.exec(text)?.[1]?.trim();
   const args = /<command-args>([^<]*)<\/command-args>/.exec(text)?.[1]?.trim();
-  if (command) return `${command}${args ? " " + args : ""}`.slice(0, 80);
+  if (command) return `${command}${args ? " " + args : ""}`.slice(0, max);
   const plain = text
     .replace(/<(local-command-caveat|local-command-stdout|local-command-stderr|system-reminder|command-message|command-args)>[\s\S]*?(<\/\1>|$)/g, "")
     .replace(/<\/?[a-z-]+>/g, "")
     .trim();
-  return plain ? plain.slice(0, 80) : undefined;
+  return plain ? plain.slice(0, max) : undefined;
 }

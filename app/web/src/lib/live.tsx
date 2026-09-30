@@ -13,6 +13,7 @@ export type LiveState = {
   agents: Record<string, AgentPresence>; // live agents by id (main session thread or subagent)
   setup: SetupStatus | null;             // null until loaded (and always null in replay)
   preview: boolean;                      // replay built for the post-deadline preview (agent + setup playback)
+  shared: Replay["shared"] | null;       // a replay file someone shared from their Brainstorm
 };
 
 type Action =
@@ -27,7 +28,7 @@ type Action =
   | { type: "replay"; data: Replay }
   | WsMessage;
 
-const initial: LiveState = { connected: false, replay: false, sessions: [], steps: {}, map: null, failures: [], agents: {}, setup: null, preview: false };
+const initial: LiveState = { connected: false, replay: false, sessions: [], steps: {}, map: null, failures: [], agents: {}, setup: null, preview: false, shared: null };
 
 /** A changed file, and its outgoing imports when the server recomputed them. */
 function upsertFile(map: ProjectMap | null, file: FileNode, edges?: Edge[]): ProjectMap | null {
@@ -62,7 +63,7 @@ function reducer(s: LiveState, a: Action): LiveState {
       const steps: Record<string, Step[]> = {};
       for (const st of a.data.steps) (steps[st.sessionId] ??= []).push(st);
       Object.values(steps).forEach((l) => l.sort((x, y) => x.seq - y.seq));
-      return { ...s, replay: true, connected: true, sessions: sortSessions(a.data.sessions), steps, map: a.data.map, failures: a.data.failures ?? [], preview: !!(a.data.agentMoves?.length || a.data.setupPreview) };
+      return { ...s, replay: true, connected: true, sessions: sortSessions(a.data.sessions), steps, map: a.data.map, failures: a.data.failures ?? [], preview: !!(a.data.agentMoves?.length || a.data.setupPreview), shared: a.data.shared ?? null };
     }
     case "session": {
       const others = s.sessions.filter((x) => x.id !== a.session.id);
@@ -90,7 +91,17 @@ const sortSessions = (l: Session[]) => [...l].sort((a, b) => b.lastEventAt.local
 
 // Hosted demo: built with VITE_REPLAY_URL=/replay.json so it opens straight into the recording.
 const replayUrl = () => new URLSearchParams(location.search).get("replay") ?? (import.meta.env.VITE_REPLAY_URL as string | undefined) ?? null;
-export const isReplay = () => !!replayUrl();
+
+/** A shared replay file (GET /api/share) carries its recording inline, so it opens with no server. */
+let embedded: Replay | null | undefined;
+function embeddedReplay(): Replay | null {
+  if (embedded === undefined) {
+    const text = document.getElementById("brainstorm-replay")?.textContent;
+    try { embedded = text ? (JSON.parse(text) as Replay) : null; } catch { embedded = null; }
+  }
+  return embedded;
+}
+export const isReplay = () => !!embeddedReplay() || !!replayUrl();
 
 let replayData: Replay | null = null;
 
@@ -119,10 +130,10 @@ export function LiveProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initial);
 
   useEffect(() => {
-    const url = replayUrl();
-    if (url) {
+    const url = replayUrl(), inline = embeddedReplay();
+    if (inline || url) {
       let stopPlayback = () => {};
-      fetch(url).then((r) => r.json()).then((data: Replay) => {
+      (inline ? Promise.resolve(inline) : fetch(url!).then((r) => r.json() as Promise<Replay>)).then((data: Replay) => {
         replayData = data; clockOffset = Math.max(0, Date.now() - Date.parse(data.exportedAt));
         dispatch({ type: "replay", data });
         installSetupShim(data);

@@ -133,3 +133,14 @@
 .rp-top .rp-chip.fail { margin-left: -4px; }
 .rp-why { overflow: hidden; text-overflow: ellipsis; color: var(--ink-3); font-style: italic; }
 .rp-fail-ticks { color: #d93025; }
+
+/* ---------- share menu (local app) ---------- */
+.rp-share { position: relative; }
+.rp-share-menu { position: absolute; right: 0; bottom: calc(100% + 12px); width: 330px; padding: 8px; z-index: 6;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,.12); }
+.rp-share-menu a { display: block; padding: 10px 12px; border-radius: 10px; text-decoration: none; color: var(--ink); }
+.rp-share-menu a:hover, .rp-share-menu a:focus-visible { background: var(--accent-soft); outline: none; }
+.rp-share-menu strong { display: block; font-size: 14px; font-weight: 600; }
+.rp-share-menu span { display: block; font-size: 13px; color: var(--ink-2); line-height: 1.4; margin-top: 2px; }
+.rp-share-note { margin: 6px 12px 6px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-3); line-height: 1.45; }
+@media (max-width: 600px) { .rp-share-menu { width: min(330px, calc(100vw - 32px)); } }

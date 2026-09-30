@@ -1,7 +1,7 @@
 // Builds the Claude Code plugin in ../../plugin/build: the server bundled into one file (no npm install for users)
 // and the web app it serves. Run from app/: `node scripts/build-plugin.mjs`. Commit plugin/build with each release.
 import { execSync } from "node:child_process";
-import { mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
@@ -39,5 +39,9 @@ run(`npx vite build --outDir ${JSON.stringify(join(OUT, "web"))} --emptyOutDir`,
 // public/ holds the hosted demos' recordings: not part of the plugin.
 for (const f of readdirSync(join(OUT, "web"))) if (/^replay.*\.json$/.test(f)) rmSync(join(OUT, "web", f));
 
+// 3. The one-file app a shared replay is poured into (GET /api/share reads build/share.html).
+run("node scripts/build-share.mjs", join(APP, "web"));
+copyFileSync(join(APP, "web/dist-share/share.html"), join(OUT, "share.html"));
+
 const kb = (f) => Math.round(statSync(f).size / 1024);
-console.log(`plugin/build ready: server.js ${kb(join(OUT, "server.js"))} kB + web/`);
+console.log(`plugin/build ready: server.js ${kb(join(OUT, "server.js"))} kB + web/ + share.html ${kb(join(OUT, "share.html"))} kB`);

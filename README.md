@@ -53,6 +53,7 @@ Full guide, Brev setup and troubleshooting: [docs/run-locally.md](docs/run-local
 - **Places**: where a thread went outside the code: websites, the apps you run on this computer, services (GitHub, Vercel, connectors, cloud CLIs), and what it changed there, from deploys and pushes to sent forms. Same screen as the Map; click a place to read the step in a side panel.
 - **Track**: the same thread as a story, top to bottom. Each stop is a place the agent worked (a file, a website, a command-line tool, a service), with a window that shows the screenshot, the file it made, the code it wrote or the command explained in plain words. It works for work that isn't code, like cutting a video with FFmpeg.
 - **Errors**: a failed tool call turns the agent's marker red with one red ring, and shows red in Follow (with the first line of the error), on the replay bar and in the Track. (At the hackathon, a separate Failures view grouped and ranked them.)
+- **Share**: Share on the replay player (or `/brainstorm:share`) saves a thread as one `.html` file anyone can open in a browser, with nothing to install, and as a Markdown report for a review or a pull request. Secrets and emails are masked, your home folder and computer name hidden, and screenshots never included.
 - **Ask**: questions go to Claude with a small, grounded context (the step, its diff, the steps before it, the file and module summaries, at most 150 lines of the file). Every answer shows its model, tokens and cost.
 
 

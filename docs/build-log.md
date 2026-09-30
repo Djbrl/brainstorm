@@ -89,10 +89,13 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 15:30 (29 Sep) [lead] `feature/map-labels`: map folder labels without the pile-up. Labels are drawn by priority (pointer or selection, agents working there, recent edits, size) and skipped when they'd overlap; file names too. Subfolders gather around their parent on the map, fold into one parent label while the group is small on screen, and drop the parent's name when it has 4+ subfolders. Checked on the demo recording and on a 30-folder stress map.
 
+- 05:40 (30 Sep) [lead] Plugin 0.3.0. **Share a thread:** Share on the replay player (or `/brainstorm:share`) saves one `.html` file that opens in any browser with no install (the whole app inline, the recording embedded, opens on the map), plus a Markdown report (requests, files changed by module, failures, step by step). Secrets masked again; home folder, account and computer names hidden; emails masked; screenshots never included. Smaller items from `next-steps.md`: exact call/result pairing (tool_use ids), deleted files leave the map live and import lines update live, Go/Rust/Java imports, first load 709 → 279 kB.
 - 10:30 (30 Sep) [lead] Repo moved from ~/Documents/brainstorm to ~/brainstorm (symlink left at the old path): iCloud was offloading project files (node_modules, dist, the local db, .git objects) because the disk was 97% full. Worktrees repaired, dependencies reinstalled, git fsck clean.
 - 11:10 (30 Sep) [lead] `feature/map-labels`: Places reworked around threads. It's a lens of the Map tab (Map | Track | Places) with the same sidebar, showing only the selected thread's websites, local apps, services and changes; the Places tab is gone (old `view=cowork` links open the new lens). The places map now frames itself shortly after a thread opens.
 
 - 13:20 (30 Sep) [lead] Plugin 0.3.0: folder labels without the pile-up; Places as a lens of the Map tab per thread (same screen as the Map, places as step-like rows, a place opens its step in a side panel); sidebar folds agents vs steps, eye in the title row, centered. brainstorm-next shows Places from the recording. Merged `feature/map-labels` into `main`.
+
+- 14:10 (30 Sep) [lead] Plugin 0.3.1: the two parallel 0.3.0 lines merged (this session's labels, Places and sidebar on GitHub; the other session's sharing, smaller first load, exact call/result pairing, Go/Rust/Java imports, live file removals, local only). Places now pairs calls and results by tool_use id too; the export service adds each thread's places. The demo opens on the Map.
 
 ## Requests
 

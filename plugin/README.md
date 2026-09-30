@@ -9,6 +9,7 @@ Preview release (0.3). The full release is planned for late October 2026.
 - **Track:** the same thread as a story, top to bottom: each place the agent worked (a file, a website, a command-line tool), with a window showing the screenshot, the file it made, the code it wrote or the command explained. Works for non-code work too, like editing a video with FFmpeg.
 - **Follow:** every step of a session as a timeline. Click an edit to see its diff.
 - **Errors:** a failed step turns the agent's marker red, and shows red in Follow, on the replay bar and in the Track.
+- **Share:** save a thread as one `.html` file anyone can open in a browser (the map and every step, nothing to install), plus a Markdown summary.
 
 ## Install
 
@@ -32,6 +33,7 @@ To update automatically instead, turn on auto-update for the `brainstorm` market
 ## Use
 
 - **`/brainstorm:open`** opens the map in your browser, for the project you're in.
+- **`/brainstorm:share`** saves this thread to your Downloads folder as a replay file and a Markdown summary. The Share button on the map's replay player does the same for any thread.
 - **`/brainstorm:stop`** stops Brainstorm. It starts again with your next Claude Code session.
 
 Brainstorm starts in the background when a Claude Code session starts, and reads Claude Code's own session logs, so it also shows sessions that ran while it was closed. The first time, a message in Claude Code tells you where it's running.
@@ -47,11 +49,12 @@ Summaries of files and labels written by a model are off in this release. They'l
 - Data: `~/.claude/plugins/data/brainstorm-brainstorm/` (a SQLite database, the server log, `server.json`, `notices.json`). Uninstalling the plugin deletes it.
 - Once a day, Brainstorm fetches its own version number from GitHub to tell you about updates. That request carries nothing about you or your code.
 - The server listens on `127.0.0.1` only (port 4747, or the next free one). It refuses requests addressed to other host names, and WebSocket connections from other websites.
-- Nothing else is sent anywhere, except your questions to Claude if you set a key.
+- Nothing else is sent anywhere, except your questions to Claude if you set a key. Sharing only saves files on your computer; you decide where they go.
+- A shared file contains the thread's prompts, messages, commands and code changes, and the project's file list. Before it's saved, secrets are masked again, email addresses are masked, and your home folder, account name and computer name are replaced. Screenshots are never included. Read it before you send it anywhere.
 
 ## How it's built (for contributors)
 
-- `build/server.js` is the Brainstorm server (`app/server`) bundled into one file, and `build/web/` is the web app (`app/web`), which the server serves. Rebuild both from `app/` with `node scripts/build-plugin.mjs`, and commit `build/` with each release.
+- `build/server.js` is the Brainstorm server (`app/server`) bundled into one file, and `build/web/` is the web app (`app/web`), which the server serves, and `build/share.html` is the same app in one file, which shared replays are poured into. Rebuild both from `app/` with `node scripts/build-plugin.mjs`, and commit `build/` with each release.
 - `scripts/launch.mjs` starts the server or reuses the running one, restarts it when the plugin version changed, and opens the browser. The `SessionStart` hook runs it through `scripts/hook.sh` (which checks for Node) with `--background`, where it prints at most one JSON `systemMessage` for the user: welcome, updated, update available, or Node too old.
 - Releasing: bump `version` in `.claude-plugin/plugin.json`, rebuild, commit, push. Users on a pinned version don't get new commits until the version changes.
 

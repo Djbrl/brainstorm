@@ -1,6 +1,7 @@
 // Owner: C. Display helpers for steps and sessions.
 import { clock } from "../lib/live";
 import type { Step } from "@contract";
+import { CallPairer } from "../lib/pairing";
 
 export const basename = (p?: string) => (p ? p.split(/[\\/]/).filter(Boolean).pop() ?? p : "");
 
@@ -103,14 +104,14 @@ export function resultText(s: Step): string {
   return typeof s.input === "string" ? s.input : JSON.stringify(s.input, null, 2);
 }
 
-/** Pair tool_call/edit steps with their tool_result (results arrive in call order). */
+/** Pair tool_call/edit steps with their tool_result: call id → result. */
 export function pairResults(steps: Step[]): Map<string, Step> {
   const out = new Map<string, Step>();
-  const pending: string[] = [];
+  const pairer = new CallPairer();
   for (const s of steps) {
-    if (s.kind === "tool_call" || s.kind === "edit") pending.push(s.id);
-    else if (s.kind === "tool_result") { const id = pending.shift(); if (id) out.set(id, s); }
-    else if (s.kind === "prompt") pending.length = 0;
+    if (s.kind === "tool_call" || s.kind === "edit") pairer.call(s);
+    else if (s.kind === "tool_result") { const call = pairer.result(s); if (call) out.set(call.id, s); }
+    else if (s.kind === "prompt" && !s.isSubagent) pairer.clear();
   }
   return out;
 }

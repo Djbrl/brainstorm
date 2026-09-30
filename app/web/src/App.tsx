@@ -2,14 +2,17 @@
 import { isReplay, useLive } from "./lib/live";
 import { NavProvider, useNav, type View } from "./lib/nav";
 import { FollowView } from "./follow/FollowView";
-import { MapView } from "./map/MapView";
-import { FailuresView } from "./failures/FailuresView";
-import { PlacesView } from "./cowork/CoworkView";
-import { TrackView } from "./tasks/TrackView";
+
 import { useThread } from "./lib/thread";
 import { Tour } from "./tour/Tour";
 import { SetupView } from "./setup/SetupView";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+
+// Follow opens first; the other views (and the graph library the Map needs) load when they're opened.
+const MapView = lazy(() => import("./map/MapView").then((m) => ({ default: m.MapView })));
+const TrackView = lazy(() => import("./tasks/TrackView").then((m) => ({ default: m.TrackView })));
+const PlacesView = lazy(() => import("./cowork/CoworkView").then((m) => ({ default: m.PlacesView })));
+const FailuresView = lazy(() => import("./failures/FailuresView").then((m) => ({ default: m.FailuresView })));
 
 function Shell() {
   const { state, reload } = useLive();
@@ -18,7 +21,8 @@ function Shell() {
   const [tourSignal, setTourSignal] = useState(0);
   // Local app: Follow, Map (with its Map | Track views) and Places. Failures was a hackathon view: errors now show on the map,
   // in Follow and in the Track. The judged hackathon demo keeps it, its tour points at it.
-  const tabs: { id: View; label: string }[] = state.replay && !state.preview
+  const tabs: { id: View; label: string }[] = state.shared ? [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }]
+    : state.replay && !state.preview
     ? [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }, { id: "failures", label: `Failures${state.failures.length ? ` ${state.failures.length}` : ""}` }]
     : state.replay ? [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }] // the post-deadline demo
     : [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }];
@@ -29,7 +33,7 @@ function Shell() {
   }
 
   return (
-    <div className={`shell ${state.preview ? "has-banner" : ""}`}>
+    <div className={`shell ${state.preview || state.shared ? "has-banner" : ""}`}>
       <header className="topbar">
         {isReplay()
           ? <a className="wordmark" href="https://brainstorm-landing.vercel.app" aria-label="Brainstorm home">Brainstorm</a>
@@ -46,12 +50,12 @@ function Shell() {
           {!state.replay && state.setup?.root && (
             <button className="ws-chip" title={state.setup.root} onClick={() => setSetupOpen(true)}>{state.setup.name} <span>Change</span></button>
           )}
-          {state.replay && !state.preview && (
+          {state.replay && !state.preview && !state.shared && (
             <a className="next-cta" href="https://brainstorm-next.vercel.app" title="Post-deadline preview: setup, live agents on the map, thread replay">Try Brainstorm Next</a>
           )}
           <span className={`dot ${state.connected ? "live" : ""}`} />
-          {state.replay ? "Recorded demo" : state.connected ? "Live" : "Connecting…"}
-          {state.replay && <button className="tour-help" aria-label="Show the tour" title="Show the tour" onClick={() => setTourSignal((n) => n + 1)}>?</button>}
+          {state.shared ? "Shared replay" : state.replay ? "Recorded demo" : state.connected ? "Live" : "Connecting…"}
+          {state.replay && !state.shared && <button className="tour-help" aria-label="Show the tour" title="Show the tour" onClick={() => setTourSignal((n) => n + 1)}>?</button>}
         </div>
       </header>
       {state.preview && (
@@ -60,11 +64,36 @@ function Shell() {
           <a href="https://github.com/Djbrl/brainstorm#install-claude-code-plugin-preview" target="_blank" rel="noopener">install the plugin</a>.
         </div>
       )}
-      {state.replay && <Tour openSignal={tourSignal} preview={state.preview} />}
+      {state.shared && (
+        <div className="preview-banner">
+          A Claude Code session, shared from Brainstorm on {new Date(state.shared.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}.
+          {" "}Press play to watch it on the map. To follow your own agents,{" "}
+          <a href="https://github.com/Djbrl/brainstorm#install-claude-code-plugin-preview" target="_blank" rel="noopener">install Brainstorm</a>.
+        </div>
+      )}
+      {state.replay && !state.shared && <Tour openSignal={tourSignal} preview={state.preview} />}
+      {state.shared && <OpenShared />}
       {!state.replay && <LiveReplay />}
-      <main className="view">{view === "follow" ? <FollowView /> : view === "map" ? (lens === "track" && !state.replay ? <TrackView /> : lens === "places" ? <PlacesView /> : <MapView />) : state.replay ? <FailuresView /> : <FollowView />}</main>
+      <main className="view"><Suspense fallback={null}>{view === "follow" ? <FollowView /> : view === "map" ? (lens === "track" && !state.replay ? <TrackView /> : lens === "places" ? <PlacesView /> : <MapView />) : state.replay ? <FailuresView /> : <FollowView />}</Suspense></main>
     </div>
   );
+}
+
+// Read before the app writes the current view into the URL.
+const linkedView = new URLSearchParams(location.search).get("view");
+
+/** A shared replay opens on the map with its thread loaded, paused at the first step (unless its link names a view). */
+function OpenShared() {
+  const { state } = useLive();
+  const { startReplay } = useNav();
+  const first = state.sessions[0]?.id;
+  const done = useRef(false);
+  useEffect(() => {
+    if (!first || done.current) return;
+    done.current = true;
+    if (!linkedView) startReplay(first, 0);
+  }, [first, startReplay]);
+  return null;
 }
 
 /**

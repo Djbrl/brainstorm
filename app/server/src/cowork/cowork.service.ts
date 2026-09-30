@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { ListenerService } from "../listener/listener.service";
+import { CallPairer } from "../listener/pairing";
 import type { CoworkArea, CoworkEvent, CoworkPage, CoworkSite, CoworkSummary, Step } from "../types";
 import { CODE_TOOLS, CoworkTracker } from "./classify";
 
@@ -32,23 +33,21 @@ export function summarizePlaces(sessions: string[], stepsOf: (sessionId: string)
 
   for (const sid of sessions) {
     const tracker = new CoworkTracker(sid);
-    // Results come back in call order, so pair them first-in-first-out per thread (as in failures).
-    const pending = new Map<boolean, Step[]>();
-    const queue = (st: Step) => pending.get(!!st.isSubagent) ?? pending.set(!!st.isSubagent, []).get(!!st.isSubagent)!;
+    const pairer = new CallPairer();                   // results pair with their call by tool_use id (order as the fallback)
     for (const st of stepsOf(sid)) {
       if (st.kind === "tool_call" || st.kind === "edit") {
         if (CODE_TOOLS.has(st.tool ?? "") && st.tool !== "Bash") codeSteps++;
-        queue(st).push(st);
+        pairer.call(st);
         continue;
       }
       if (st.kind !== "tool_result") continue;
-      const call = queue(st).shift();
+      const call = pairer.result(st);
       if (!call) continue;
       const found = tracker.handle(call, st);
       if (call.tool === "Bash" && !found.length) codeSteps++;
       events.push(...found);
     }
-    for (const q of pending.values()) for (const call of q) events.push(...tracker.handle(call, undefined)); // still running
+    for (const call of pairer.pending()) events.push(...tracker.handle(call, undefined)); // still running
   }
   events.sort((a, b) => a.ts.localeCompare(b.ts));
 

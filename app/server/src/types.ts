@@ -10,6 +10,7 @@ export type Step = {
   risk?: string[];      // e.g. ["deleted test", "touches auth"], filled by the reader (B)
   isSubagent?: boolean;
   agentId?: string;     // subagent id (from its log); absent for the main session thread. Live only, not persisted.
+  toolUseId?: string;   // tool_call/edit: the call's tool_use id; tool_result: the id it answers. Absent on steps stored before 30 Sep 2026.
 };
 export type FileNode = { path: string; module: string; lines: number; lastChangedAt?: string; activeSessionId?: string; summary?: string };
 export type Edge = { from: string; to: string };
@@ -21,7 +22,8 @@ export type WsMessage =
   | { type: "session"; session: Session }
   | { type: "step"; step: Step }
   | { type: "step-update"; id: string; label?: string; risk?: string[] }
-  | { type: "file"; file: FileNode }
+  | { type: "file"; file: FileNode; edges?: Edge[] } // edges: the file's outgoing imports, when they were recomputed
+  | { type: "file-removed"; path: string }
   | { type: "map"; map: ProjectMap }
   | { type: "agent"; agent: AgentPresence }
   | { type: "setup"; status: SetupStatus };
@@ -95,6 +97,8 @@ export type Replay = {
   agentMoves?: { id: string; name: string; isSubagent: boolean; sessionId: string; file: string; action: string; ts: string }[];
   /** Post-deadline preview: a recorded setup run, played back by the setup screen. */
   setupPreview?: { status: SetupStatus; suggestions: WorkspaceSuggestion[] };
+  /** A replay someone shared from their local Brainstorm (GET /api/share): one self-contained file, secrets masked. */
+  shared?: { title: string; createdAt: string; version: string };
 };
 
 /**

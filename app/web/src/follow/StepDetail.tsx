@@ -1,6 +1,6 @@
 // Owner: C. Right pane: full detail of one step + AskBox.
 import { useEffect, useMemo, useState } from "react";
-import DiffViewer from "react-diff-viewer-continued";
+import { Diff } from "../lib/Diff";
 import type { Step } from "@contract";
 import { AskBox } from "../ask/AskBox";
 import { Markdown } from "../ask/Markdown";
@@ -66,7 +66,7 @@ function EditBody({ step }: { step: Step }) {
     <div className="sd-diff">
       <div className="sd-diffstat"><span className="add">+{added}</span><span className="del">−{removed}</span></div>
       {open ? (
-        <div className="sd-diff-scroll"><DiffViewer oldValue={pair.before} newValue={pair.after} splitView={false} showDiffOnly extraLinesSurroundingDiff={2} hideSummary styles={diffStyles} /></div>
+        <div className="sd-diff-scroll"><Diff oldValue={pair.before} newValue={pair.after} splitView={false} showDiffOnly extraLinesSurroundingDiff={2} hideSummary styles={diffStyles} /></div>
       ) : (
         <button className="sd-expand" onClick={() => setOpen(true)}>Large change, {lines} lines. Show the diff</button>
       )}

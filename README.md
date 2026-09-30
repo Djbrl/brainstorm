@@ -6,7 +6,7 @@
 
 AI agents make it easy to stop understanding your own work. Brainstorm runs next to Claude Code and shows what the agents did, where, and why, so a human stays in the loop. Every session becomes a replay you can watch live or catch up on later, for code and for work that isn't code.
 
-Brainstorm is a prototype (0.2). The full release is planned for late October 2026.
+Brainstorm is a prototype (0.3). The full release is planned for late October 2026.
 
 ## Install (Claude Code plugin, preview)
 
@@ -50,6 +50,7 @@ Full guide, Brev setup and troubleshooting: [docs/run-locally.md](docs/run-local
 
 - **Follow**: a live timeline of a Claude Code session: prompts, messages, tool calls and edits, each with a short label. Click a step to see its diff and ask "why?".
 - **Map**: the project's modules and files as a graph. Files glow by how recently they changed. Each agent is a marker that moves to the file it writes, with a trail, and reads show as short lines of sight. Replay any thread on the map, step by step. Hover or select a file to see what it imports and what uses it; click it for its summary, the steps that touched it, and a question box.
+- **Places**: where a thread went outside the code: websites, the apps you run on this computer, services (GitHub, Vercel, connectors, cloud CLIs), and what it changed there, from deploys and pushes to sent forms. Same screen as the Map; click a place to read the step in a side panel.
 - **Track**: the same thread as a story, top to bottom. Each stop is a place the agent worked (a file, a website, a command-line tool, a service), with a window that shows the screenshot, the file it made, the code it wrote or the command explained in plain words. It works for work that isn't code, like cutting a video with FFmpeg.
 - **Errors**: a failed tool call turns the agent's marker red with one red ring, and shows red in Follow (with the first line of the error), on the replay bar and in the Track. (At the hackathon, a separate Failures view grouped and ranked them.)
 - **Ask**: questions go to Claude with a small, grounded context (the step, its diff, the steps before it, the file and module summaries, at most 150 lines of the file). Every answer shows its model, tokens and cost.

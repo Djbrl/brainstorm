@@ -92,6 +92,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 - 10:30 (30 Sep) [lead] Repo moved from ~/Documents/brainstorm to ~/brainstorm (symlink left at the old path): iCloud was offloading project files (node_modules, dist, the local db, .git objects) because the disk was 97% full. Worktrees repaired, dependencies reinstalled, git fsck clean.
 - 11:10 (30 Sep) [lead] `feature/map-labels`: Places reworked around threads. It's a lens of the Map tab (Map | Track | Places) with the same sidebar, showing only the selected thread's websites, local apps, services and changes; the Places tab is gone (old `view=cowork` links open the new lens). The places map now frames itself shortly after a thread opens.
 
+- 13:20 (30 Sep) [lead] Plugin 0.3.0: folder labels without the pile-up; Places as a lens of the Map tab per thread (same screen as the Map, places as step-like rows, a place opens its step in a side panel); sidebar folds agents vs steps, eye in the title row, centered. brainstorm-next shows Places from the recording. Merged `feature/map-labels` into `main`.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

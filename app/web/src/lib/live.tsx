@@ -1,7 +1,7 @@
 // Owned by the lead. One store for the whole app: REST bootstrap + websocket updates, or a static replay file.
 import { installSetupShim, startAgentPlayback } from "./preview";
 import { createContext, useCallback, useContext, useEffect, useReducer, type ReactNode } from "react";
-import type { AgentPresence, AskRequest, AskResponse, FailureGroup, FileNode, SetupStatus, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
+import type { AgentPresence, AskRequest, AskResponse, Edge, FailureGroup, FileNode, SetupStatus, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
 
 export type LiveState = {
   connected: boolean;
@@ -29,11 +29,21 @@ type Action =
 
 const initial: LiveState = { connected: false, replay: false, sessions: [], steps: {}, map: null, failures: [], agents: {}, setup: null, preview: false };
 
-function upsertFile(map: ProjectMap | null, file: FileNode): ProjectMap | null {
+/** A changed file, and its outgoing imports when the server recomputed them. */
+function upsertFile(map: ProjectMap | null, file: FileNode, edges?: Edge[]): ProjectMap | null {
   if (!map) return map;
   const i = map.files.findIndex((f) => f.path === file.path);
   const files = i === -1 ? [...map.files, file] : map.files.map((f, j) => (j === i ? { ...f, ...file } : f));
-  return { ...map, files };
+  if (!edges) return { ...map, files };
+  const same = (a: Edge[], b: Edge[]) => a.length === b.length && a.every((e, k) => e.to === b[k].to);
+  const old = map.edges.filter((e) => e.from === file.path);
+  if (same(old, edges)) return { ...map, files };
+  return { ...map, files, edges: [...map.edges.filter((e) => e.from !== file.path), ...edges] };
+}
+
+function removeFile(map: ProjectMap | null, path: string): ProjectMap | null {
+  if (!map || !map.files.some((f) => f.path === path)) return map;
+  return { ...map, files: map.files.filter((f) => f.path !== path), edges: map.edges.filter((e) => e.from !== path && e.to !== path) };
 }
 
 function reducer(s: LiveState, a: Action): LiveState {
@@ -70,7 +80,8 @@ function reducer(s: LiveState, a: Action): LiveState {
         steps[k] = list.map((x) => (x.id === a.id ? { ...x, ...(a.label !== undefined && { label: a.label }), ...(a.risk !== undefined && { risk: a.risk }) } : x));
       return { ...s, steps };
     }
-    case "file": return { ...s, map: upsertFile(s.map, a.file) };
+    case "file": return { ...s, map: upsertFile(s.map, a.file, a.edges) };
+    case "file-removed": return { ...s, map: removeFile(s.map, a.path) };
     default: return s;
   }
 }

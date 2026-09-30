@@ -357,6 +357,8 @@ nav { top: 40px; }
 .wl-big + .wl-note:empty { display: none; }
 
 /* privacy */
+#privacy .four { grid-template-columns: repeat(3, 1fr); max-width: 900px; margin-left: auto; margin-right: auto; }
+@media (max-width: 820px) { #privacy .four { grid-template-columns: 1fr; } }
 .four { display: grid; grid-template-columns: repeat(4, 1fr); gap: 48px; margin-top: 110px; }
 .four svg { width: 44px; height: 44px; stroke: var(--text); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .four h3 { font-size: 24px; margin-top: 22px; letter-spacing: -0.025em; }
@@ -659,7 +661,6 @@ footer a:hover { text-decoration: underline; }
       <div class="rv"><svg viewBox="0 0 44 44"><path d="M8 20 22 8l14 12v16a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2z"/><path d="M18 38V27h8v11"/></svg><h3>On your machine</h3><p>It reads your agents' logs where they are. No account, no cloud.</p></div>
       <div class="rv d1"><svg viewBox="0 0 44 44"><rect x="6" y="14" width="32" height="16" rx="8"/><path d="M14 19v6M11.4 20.5l5.2 3M11.4 23.5l5.2-3M22 19v6M19.4 20.5l5.2 3M19.4 23.5l5.2-3M30 19v6M27.4 20.5l5.2 3M27.4 23.5l5.2-3"/></svg><h3>Secrets masked</h3><p>Keys and tokens are redacted before anything is stored or sent.</p></div>
       <div class="rv d2"><svg viewBox="0 0 44 44"><path d="M22 6 37 14v16L22 38 7 30V14z"/><path d="M7 14l15 8 15-8M22 22v16"/></svg><h3>Your key, your call</h3><p>Questions go to Claude only when you ask, with only what's needed.</p></div>
-      <div class="rv d3"><svg viewBox="0 0 44 44"><path d="M22 6 8 11v10c0 8.5 6 14.5 14 17 8-2.5 14-8.5 14-17V11z"/><path d="m16 22 4.5 4.5L29 18"/></svg><h3>Locked to you</h3><p>It listens on your computer only. Other websites can't reach it.</p></div>
     </div>
   </div>
 </section>

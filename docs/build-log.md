@@ -91,6 +91,7 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 10:30 (30 Sep) [lead] Repo moved from ~/Documents/brainstorm to ~/brainstorm (symlink left at the old path): iCloud was offloading project files (node_modules, dist, the local db, .git objects) because the disk was 97% full. Worktrees repaired, dependencies reinstalled, git fsck clean.
 - 11:10 (30 Sep) [lead] `feature/map-labels`: Places reworked around threads. It's a lens of the Map tab (Map | Track | Places) with the same sidebar, showing only the selected thread's websites, local apps, services and changes; the Places tab is gone (old `view=cowork` links open the new lens). The places map now frames itself shortly after a thread opens.
+- 30 Sep 09:49 [site] Landing (branch landing/jury-update, from feature/map-labels): NBER study replaces METR, roadmap copy (Places, MCP and CLI, no git bisect), product scene removed, install as one Claude Code window in Claude orange.
 
 ## Requests
 

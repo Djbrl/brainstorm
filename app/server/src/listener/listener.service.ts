@@ -78,6 +78,8 @@ export class ListenerService implements OnModuleInit {
       text TEXT, tool TEXT, input TEXT, file_path TEXT, diff TEXT, label TEXT, risk TEXT,
       is_subagent INTEGER NOT NULL DEFAULT 0
     )`);
+    // Added 30 Sep 2026: pairs a tool result with its call exactly (older rows are paired by order).
+    if (!(db.prepare(`PRAGMA table_info(steps)`).all() as { name: string }[]).some((c) => c.name === "tool_use_id")) db.exec(`ALTER TABLE steps ADD COLUMN tool_use_id TEXT`);
     db.exec(`CREATE INDEX IF NOT EXISTS steps_session_seq ON steps(session_id, seq)`);
     db.exec(`CREATE INDEX IF NOT EXISTS steps_label ON steps(kind, label)`);
 
@@ -274,6 +276,7 @@ export class ListenerService implements OnModuleInit {
       else if (Array.isArray(b.content)) text = b.content.filter((c: any) => c?.type === "text").map((c: any) => c.text).join("\n\n");
       else text = JSON.stringify(b.content ?? "");
       const step = this.makeStep(o, sessionId, i, ts, "tool_result", sanitizeText(text, TOOL_RESULT_LIMIT), isSubagent);
+      if (typeof b.tool_use_id === "string") step.toolUseId = b.tool_use_id;
       if (b.is_error) step.input = { isError: true, toolUseId: b.tool_use_id }; // read by the failures module
       this.storeStep(step, { cwd: o.cwd });
     });
@@ -294,12 +297,12 @@ export class ListenerService implements OnModuleInit {
       } else if (b.type === "thinking" && typeof b.thinking === "string" && b.thinking.trim()) {
         this.storeStep(this.makeStep(o, sessionId, i, ts, "thinking", b.thinking, isSubagent), { cwd: o.cwd });
       } else if (b.type === "tool_use") {
-        this.ingestToolUse(o, sessionId, i, ts, isSubagent, b.name, b.input);
+        this.ingestToolUse(o, sessionId, i, ts, isSubagent, b.name, b.input, typeof b.id === "string" ? b.id : undefined);
       }
     });
   }
 
-  private ingestToolUse(o: RawLine, sessionId: string, i: number, ts: string, isSubagent: boolean, name: string, input: any) {
+  private ingestToolUse(o: RawLine, sessionId: string, i: number, ts: string, isSubagent: boolean, name: string, input: any, toolUseId?: string) {
     const isEdit = name === "Edit" || name === "MultiEdit" || name === "Write";
     const id = `${o.uuid ?? ""}:${i}`;
     let filePath: string | undefined = typeof input?.file_path === "string" ? input.file_path : typeof input?.path === "string" ? input.path : undefined;
@@ -322,6 +325,7 @@ export class ListenerService implements OnModuleInit {
         tool: name, input: sanitizeDeep(input) as unknown, filePath,
         diff: { before: sanitizeText(before, TEXT_LIMIT), after: sanitizeText(after, TEXT_LIMIT) },
         isSubagent, ...(isSubagent && (o as { agentId?: string }).agentId ? { agentId: (o as { agentId?: string }).agentId } : {}),
+        ...(toolUseId ? { toolUseId } : {}),
       };
       this.storeStep(step, { cwd: o.cwd });
     } else {
@@ -329,6 +333,7 @@ export class ListenerService implements OnModuleInit {
         id, sessionId, seq: this.allocSeq(sessionId), ts, kind: "tool_call",
         tool: name, input: sanitizeDeep(input) as unknown, filePath, isSubagent,
         ...(isSubagent && (o as { agentId?: string }).agentId ? { agentId: (o as { agentId?: string }).agentId } : {}),
+        ...(toolUseId ? { toolUseId } : {}),
       };
       this.storeStep(step, { cwd: o.cwd });
     }
@@ -355,8 +360,8 @@ export class ListenerService implements OnModuleInit {
   private storeStep(step: Step, opts?: { cwd?: string; promptTitle?: string }) {
     this.dbs.db
       .prepare(
-        `INSERT OR REPLACE INTO steps (id, session_id, seq, ts, kind, text, tool, input, file_path, diff, label, risk, is_subagent)
-         VALUES (@id, @session_id, @seq, @ts, @kind, @text, @tool, @input, @file_path, @diff, @label, @risk, @is_subagent)`,
+        `INSERT OR REPLACE INTO steps (id, session_id, seq, ts, kind, text, tool, input, file_path, diff, label, risk, is_subagent, tool_use_id)
+         VALUES (@id, @session_id, @seq, @ts, @kind, @text, @tool, @input, @file_path, @diff, @label, @risk, @is_subagent, @tool_use_id)`,
       )
       .run({
         id: step.id,
@@ -372,6 +377,7 @@ export class ListenerService implements OnModuleInit {
         label: step.label ?? null,
         risk: step.risk ? JSON.stringify(step.risk) : null,
         is_subagent: step.isSubagent ? 1 : 0,
+        tool_use_id: step.toolUseId ?? null,
       });
 
     this.upsertSession(step.sessionId, opts?.cwd ?? "", step.ts, opts?.promptTitle);
@@ -471,6 +477,7 @@ export class ListenerService implements OnModuleInit {
       label: row.label ?? undefined,
       risk: row.risk ? JSON.parse(row.risk) : undefined,
       isSubagent: !!row.is_subagent,
+      ...(row.tool_use_id ? { toolUseId: row.tool_use_id } : {}),
     };
   }
 

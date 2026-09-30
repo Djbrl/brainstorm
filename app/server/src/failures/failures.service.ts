@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { DbService } from "../core/db.service";
 import { ListenerService } from "../listener/listener.service";
+import { CallPairer } from "../listener/pairing";
 import { NemotronService, looksLikeEchoedInstructions } from "../llm/nemotron.service";
 import type { FailureEvidence, FailureGroup, Step } from "../types";
 
@@ -79,14 +80,12 @@ export class FailuresService implements OnModuleInit {
     const sessions = sessionId ? sessionId.split(",") : this.listener.listSessions().map((s) => s.id);
     const rows: Row[] = [];
     for (const sid of sessions) {
-      // Results come back in call order (also for parallel calls), so pair them first-in-first-out per thread.
-      const pending = new Map<boolean, Step[]>();
+      const pairer = new CallPairer();
       for (const st of this.listener.listSteps(sid)) {
         if (until && st.ts > until) continue;
-        const q = pending.get(!!st.isSubagent) ?? pending.set(!!st.isSubagent, []).get(!!st.isSubagent)!;
-        if (st.kind === "tool_call" || st.kind === "edit") { q.push(st); continue; }
+        if (st.kind === "tool_call" || st.kind === "edit") { pairer.call(st); continue; }
         if (st.kind !== "tool_result") continue;
-        const call = q.shift();
+        const call = pairer.result(st);
         if (!isErrorResult(st)) continue;
         const tool = call?.tool ?? (call?.kind === "edit" ? "Edit" : "unknown");
         rows.push({

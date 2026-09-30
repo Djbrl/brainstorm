@@ -11,7 +11,7 @@ type Step = { target?: string; view?: View; title: string; body: string };
 const PREVIEW_STEPS: Step[] = [
   { target: '[data-tour="tab-map"]', view: "map", title: "Live agents", body: "Each agent is a marker on the file it is working on. It glides to the next file and leaves a trail. A failed step flashes red. These are real moves, recorded while agents built Brainstorm." },
   { target: ".map-sidebar", view: "map", title: "Threads", body: "Click a thread to replay it on the map, step by step. Its steps fill the sidebar; click one to jump there." },
-  { target: ".lens-switch", view: "map", title: "Places", body: "Switch to Places to see where the thread went outside the code: its dev app, GitHub, Vercel, the GPU, and what it changed there (pushes, deploys)." },
+  { target: ".lens-switch", view: "map", title: "Places", body: "Switch to Places to see where the thread went outside the code: its dev app, GitHub, Vercel, the GPU, and what it changed there (pushes, deploys). Track, for work beyond code, is off in this demo for privacy: it shows screenshots of the agent's screen, so it only runs on your computer." },
   { target: '[data-tour="tab-follow"]', view: "follow", title: "Follow", body: "Every step of a session as a timeline. Click an edit to see its diff." },
   { title: "Watch your own agents", body: "Brainstorm is a Claude Code plugin. Install it from github.com/Djbrl/brainstorm and run /brainstorm:open." },
 ];

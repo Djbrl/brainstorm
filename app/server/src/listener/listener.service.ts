@@ -556,6 +556,8 @@ export function promptTitle(text: string, max = 80): string | undefined {
   const args = /<command-args>([^<]*)<\/command-args>/.exec(text)?.[1]?.trim();
   if (command) return `${command}${args ? " " + args : ""}`.slice(0, max);
   const plain = withoutPastes(text)
+    .replace(/<bash-input>([\s\S]*?)(<\/bash-input>|$)/g, "$ $1") // a command run with ! in Claude Code
+    .replace(/<(bash-stdout|bash-stderr)>[\s\S]*?(<\/\1>|$)/g, "")
     .replace(/<(local-command-caveat|local-command-stdout|local-command-stderr|system-reminder|command-message|command-args)>[\s\S]*?(<\/\1>|$)/g, "")
     .replace(/<\/?[a-z_-]+(\s[^>]*)?>/g, "")
     .trim();

@@ -24,6 +24,8 @@ function cleanPrompt(text: string): string {
   const args = /<command-args>([^<]*)/.exec(text)?.[1]?.trim();
   if (command) return `${command}${args ? " " + args : ""}`;
   return withoutPastes(text)
+    .replace(/<bash-input>([\s\S]*?)(<\/bash-input>|$)/g, "$ $1") // a command run with ! in Claude Code
+    .replace(/<(bash-stdout|bash-stderr)>[\s\S]*?(<\/\1>|$)/g, "")
     .replace(/<(local-command-caveat|local-command-stdout|local-command-stderr|system-reminder|command-message|task-notification|bash-notification|user-prompt-submit-hook)>[\s\S]*?(<\/\1>|$)/g, "")
     .replace(/<\/?[a-z_-]+(\s[^>]*)?>/g, "")
     .replace(/^\[Image[:#][^\]]*\]\s*$/gm, "") // Claude Code's note on an image a tool returned, not a request

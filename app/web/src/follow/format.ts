@@ -38,7 +38,9 @@ export const unwrapPastes = (t = "") => t.replace(PASTE, "\n$1\n");
 
 /** Drop blocks Claude Code injects into the log (e.g. `<system-reminder>…</system-reminder>`); they aren't what the person or agent wrote. */
 export const stripInjected = (t = "") =>
-  withoutPastes(t).replace(/<(system-reminder|command-[a-z-]+|local-command-[a-z-]+|task-notification)>[\s\S]*?(<\/\1>|$)/g, " ")
+  withoutPastes(t).replace(/<bash-input>([\s\S]*?)(<\/bash-input>|$)/g, "$ $1") // a command you ran with ! in Claude Code
+    .replace(/<(bash-stdout|bash-stderr)>[\s\S]*?(<\/\1>|$)/g, " ")
+    .replace(/<(system-reminder|command-[a-z-]+|local-command-[a-z-]+|task-notification)>[\s\S]*?(<\/\1>|$)/g, " ")
     .replace(/^\[Image[:#][^\]]*\]\s*$/gm, "") // Claude Code's note on an image a tool returned
     .trim();
 

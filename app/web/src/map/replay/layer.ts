@@ -1,6 +1,6 @@
 // Owner: replay agent. Map-canvas side of the thread replay: tracer, stops, read flashes, dimming,
 // camera follow, playback, keyboard and wheel-to-scrub.
-import { useCallback, useEffect, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react";
 import type { ForceGraphMethods } from "react-force-graph-2d";
 import { mapPrefs, replayCursor, useNav } from "../../lib/nav";
 import { useThread, type Thread } from "../../lib/thread";
@@ -22,7 +22,10 @@ const FLASH_MS = 600;       // read flash
 const PULSE_MS = 700;       // edit pulse on the marker
 const RED = "#d93025";      // a beat with a failed tool call
 const ERR_PULSE_MS = 1100;
-const DIM = 0.18;           // files the thread never touches
+const DIM = 0.18;           // files the thread never touches (or hasn't reached yet, in a replay)
+const PAST = 0.42;          // files it touched earlier than the window below
+/** Fog of war: in a replay, only the last few moments are drawn in full (path, numbers, files); older ones fade back. */
+const WINDOW = 25;
 const BEAT_PX = 60;         // trackpad pixels per beat
 const OTHER_MS = 120;       // playback pace for single "other" steps (every-step detail)
 const SUMMARY_MS = 380;     // playback pace for summary beats (light detail)
@@ -198,10 +201,24 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     return () => cancelAnimationFrame(raf);
   }, [active, mode, fg]);
 
+  // For the fog: the moments at which each file was touched (edited or read), in order.
+  const touchedAt = useMemo(() => {
+    const m = new Map<string, number[]>();
+    for (const b of thread?.beats ?? []) for (const f of new Set([...b.files, ...(b.file ? [b.file] : [])])) m.set(f, [...(m.get(f) ?? []), b.index]);
+    return m;
+  }, [thread]);
+  const touchedRef = useRef(touchedAt); touchedRef.current = touchedAt;
+
   const nodeAlpha = useCallback((id: string) => {
     const s = st.current;
     if (!s.active || !s.thread || !s.thread.touched.size) return 1; // a thread with no files leaves the map as it is (see TalkCard)
-    return s.thread.touched.has(id) ? 1 : DIM;
+    if (s.mode === "footprint") return s.thread.touched.has(id) ? 1 : DIM; // the whole footprint at once
+    // Steps and replay: files light up as the thread reaches them, and fade back once they're out of the last few moments.
+    const at = touchedRef.current.get(id);
+    if (!at) return DIM;
+    let last = -1;
+    for (const i of at) { if (i > s.index) break; last = i; }
+    return last < 0 ? DIM : s.index - last <= WINDOW ? 1 : PAST;
   }, []);
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
@@ -244,15 +261,17 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     const readPos = beat.action === "read" && beat.file ? pos(beat.file) : undefined; // the last file of a read group
     a.cam = target && readPos ? { x: (a.x + readPos.x) / 2, y: (a.y + readPos.y) / 2 } : target ? { x: a.x, y: a.y } : readPos ? { x: readPos.x, y: readPos.y } : null;
 
-    // Tracer path through moves[0..mi], newest segments strongest.
+    // Tracer path through moves[0..mi], newest segments strongest; segments older than the window are a faint thread.
+    const fogBefore = s.index - WINDOW;
     for (let k = 1; k <= mi; k++) {
       const p0 = pos(moves[k - 1].file);
       const p1 = k === mi && target ? { x: a.x, y: a.y } : pos(moves[k].file);
       if (!p0 || !p1) continue;
-      const w = Math.pow(0.84, mi - k);
-      ctx.globalAlpha = 0.1 + 0.65 * w;
+      const old = moves[k].beatIndex < fogBefore;
+      const w = old ? 0 : Math.pow(0.9, mi - k);
+      ctx.globalAlpha = old ? 0.07 : 0.12 + 0.63 * w;
       ctx.strokeStyle = accent;
-      ctx.lineWidth = (1.1 + 2 * w) / scale;
+      ctx.lineWidth = (old ? 1 : 1.1 + 2 * w) / scale;
       const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2, dx = p1.x - p0.x, dy = p1.y - p0.y;
       ctx.beginPath();
       ctx.moveTo(p0.x, p0.y);
@@ -260,9 +279,10 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
       ctx.stroke();
     }
 
-    // Numbered stops: each visited file shows its latest stop number (top-left of the file).
+    // Numbered stops: each file visited within the window shows its latest stop number (top-left of the file).
     const lastVisit = new Map<string, number>();
     for (let k = 0; k <= mi; k++) lastVisit.set(moves[k].file, k);
+    for (const [file, k] of lastVisit) if (moves[k].beatIndex < fogBefore) lastVisit.delete(file);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = `700 ${9.5 / scale}px ${font}`;
@@ -274,7 +294,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
       const d = n.r + 8 / scale, ang = (-3 * Math.PI) / 4;
       const bx = n.x + Math.cos(ang) * d, by = n.y + Math.sin(ang) * d;
       const h = 15 / scale, wdt = Math.max(h, ctx.measureText(label).width + 8 / scale);
-      ctx.globalAlpha = 0.5 + 0.5 * Math.pow(0.84, mi - k);
+      ctx.globalAlpha = 0.5 + 0.5 * Math.pow(0.9, mi - k);
       ctx.beginPath();
       ctx.roundRect(bx - wdt / 2, by - h / 2, wdt, h, h / 2);
       ctx.fillStyle = "#fff";

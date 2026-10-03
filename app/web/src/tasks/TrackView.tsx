@@ -214,7 +214,7 @@ function ThreadAsk({ sessionId }: { sessionId: string }) {
 // ---- the view ----
 export function TrackView() {
   const { state } = useLive();
-  const { replay, setLens, startReplay, setReplayLive } = useNav();
+  const { replay, setLens, startReplay, setReplayLive, step: openStepId, showStep } = useNav();
   const session = state.sessions.find((s) => s.id === replay?.sessionId);
   const running = session?.status === "running";
   const task = useTask(replay?.sessionId ?? null, session?.status === "running");
@@ -271,6 +271,12 @@ export function TrackView() {
 
   const current = stops[Math.min(cur, stops.length - 1)]?.stop;
   useEffect(() => { if (current) replayCursor.stepId = current.steps[0].id; }, [current]);
+  // An open step follows the track as you scroll it: it shows the stop you're on.
+  const openRef = useRef(openStepId); openRef.current = openStepId;
+  useEffect(() => {
+    const id = openRef.current;
+    if (current && id && !current.steps.some((s) => s.id === id)) showStep(current.steps[0].id);
+  }, [current, showStep]);
 
   const sidebar = <MapSidebar agents={Object.values(state.agents)} accent="#5b5bd6" followId={null} onFollow={() => setLens("map")} onFocusFile={() => setLens("map")} map={state.map} />;
   if (!replay) {

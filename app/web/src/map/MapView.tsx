@@ -289,8 +289,8 @@ export function MapView() {
     if (n.x === undefined) setTimeout(go, 800); else go();
   }, [focusFile, graph.nodes, setFocusFile]);
 
-  // Import links show only around the file you hover (or, failing that, the selected one).
-  const linkFocus = hover ?? selected;
+  // Import links show only around the selected file.
+  const linkFocus = selected; // on click, not hover: moving the mouse across the map shouldn't flash lines everywhere
   const activePaths = useMemo(() => new Set((map?.files ?? []).filter((f) => f.activeSessionId).map((f) => f.path)), [map?.files]);
 
   // One-shot ripples: start one when a file receives a new agent edit (not on first load).
@@ -447,7 +447,7 @@ export function MapView() {
         <span><i style={{ background: "var(--warm)" }} />{isReplay() ? "This hour" : lastSeen ? "Since you last looked" : "In the last day"}</span>
         <span><i style={{ background: "var(--cool)" }} />Earlier</span>
         <span><i className="ring" />Agent editing</span>
-        <span title="Hover or select a file to see what it imports and what uses it"><i className="line" style={{ background: IMPORTS_COLOR }} />Imports</span>
+        <span title="Click a file to see what it imports and what uses it"><i className="line" style={{ background: IMPORTS_COLOR }} />Imports</span>
         <div className="map-seg" role="radiogroup" aria-label="Agent activity shown">
           <button role="radio" aria-checked={!showReads} onClick={() => setShowReads(false)}>Writes</button>
           <button role="radio" aria-checked={showReads} onClick={() => setShowReads(true)}>Reads + writes</button>

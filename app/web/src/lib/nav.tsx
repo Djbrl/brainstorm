@@ -64,6 +64,8 @@ type Nav = {
   step: string | null;
   /** Open a step of a thread in the side panel (opening the thread first if needed). */
   openStep: (sessionId: string, stepId: string) => void;
+  /** Show another step of the open thread in the panel as the cursor moves (scrolling, scrubbing): no new history entry. */
+  showStep: (stepId: string) => void;
   closeStep: () => void;
   /** Up one level: step → thread → project. */
   back: () => void;
@@ -139,14 +141,16 @@ export function NavProvider({ children }: { children: ReactNode }) {
 
   // The URL follows the place (thread, lens, step): a new history entry per move, except when the move came from the URL.
   const fromUrl = useRef(true); // the first render matches the URL already (an old ?view= link is rewritten in place)
+  const replaceNext = useRef(false); // a move that shouldn't add a history entry (the panel following the cursor)
   const thread = replay?.sessionId ?? null;
   useEffect(() => {
     const href = hrefFor({ thread, step: thread ? step : null, lens: thread ? lens : "map" });
     if (href !== hereHref()) {
-      if (fromUrl.current) history.replaceState(null, "", href);
+      if (fromUrl.current || replaceNext.current) history.replaceState(null, "", href);
       else history.pushState(null, "", href);
     }
     fromUrl.current = false;
+    replaceNext.current = false;
   }, [thread, step, lens]);
 
   // Back and Forward: go where the URL says.
@@ -198,6 +202,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
       : { sessionId: sid, index: 0, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: "steps", atStep: stepId }));
     setStep(stepId);
   }, []);
+  const showStep = useCallback((stepId: string) => { replaceNext.current = true; setStep(stepId); }, []);
   const closeStep = useCallback(() => setStep(null), []);
   const back = useCallback(() => {
     if (step) { setStep(null); return; }
@@ -212,7 +217,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider value={{
       focusFile, setFocusFile, openFile,
       replay, startReplay, setThreadMode, setReplayIndex, setReplayPlaying, setReplaySpeed, setReplayDetail, landReplay, stopReplay, followLive, setReplayLive, lens, setLens,
-      step, openStep, closeStep, back,
+      step, openStep, showStep, closeStep, back,
       hiddenAgents, toggleAgent, setHiddenAgents, showReads, setShowReads,
     }}>{children}</Ctx.Provider>
   );

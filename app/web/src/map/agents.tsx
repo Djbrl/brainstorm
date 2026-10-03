@@ -127,8 +127,10 @@ export function drawAgents(opts: {
   ctx: CanvasRenderingContext2D; scale: number; agents: AgentPresence[]; anim: Map<string, AgentAnim>;
   resolve: (file: string) => Pt | undefined; accent: string; font: string; hoverFile: string | null; followId: string | null;
   resolveId: (file: string) => string | undefined; showReads: boolean;
+  /** The project overview: markers only (no trails, no lines of sight), until a thread or an agent is picked. */
+  quiet?: boolean;
 }) {
-  const { ctx, scale, agents, anim, resolve, accent, font, hoverFile, followId, resolveId, showReads } = opts;
+  const { ctx, scale, agents, anim, resolve, accent, font, hoverFile, followId, resolveId, showReads, quiet } = opts;
   const t = performance.now();
   const now = clock();
 
@@ -190,7 +192,7 @@ export function drawAgents(opts: {
       }
       const pts = files.slice(-7).map((f) => resolve(f)).filter((x): x is Pt => !!x);
       if (pts.length) pts[pts.length - 1] = { x: st.x, y: st.y, r: 0 }; // end at the marker
-      if (pts.length > 1) {
+      if (pts.length > 1 && (!quiet || followId === a.id)) {
         ctx.lineCap = "round";
         for (let k = 0; k < pts.length - 1; k++) {
           const a0 = pts[k], a1 = pts[k + 1];
@@ -213,7 +215,7 @@ export function drawAgents(opts: {
 
       // Reads: a thin line from the marker to the file read and a small ring on it, fading out.
       st.flashes = st.flashes.filter((f) => t - f.t0 < READ_MS);
-      if (showReads) for (const f of st.flashes) {
+      if (showReads && (!quiet || followId === a.id)) for (const f of st.flashes) {
         const id = resolveId(f.file);
         const n = id ? resolve(id) : undefined;
         if (!n) continue;

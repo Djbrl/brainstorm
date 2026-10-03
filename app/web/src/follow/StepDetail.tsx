@@ -104,12 +104,6 @@ export function StepDetail({ step, result, onClose }: { step: Step; result?: Ste
   const file = stepFile(step);
   const label = displayLabel(step);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !(e.target instanceof HTMLInputElement)) onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
   return (
     <aside className="sd" key={step.id}>
       <div className="sd-scroll">

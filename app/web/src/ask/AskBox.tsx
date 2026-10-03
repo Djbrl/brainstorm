@@ -1,4 +1,4 @@
-// Owner: C. Reused by Follow (stepId) and Map (filePath). Shows answer, model and cost.
+// Owner: C. Ask about a step (the step panel), a file (the map) or a whole thread (the Track). Shows answer, model and cost.
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { AskRequest, AskResponse } from "@contract";
 import { ask } from "../lib/api";
@@ -20,13 +20,13 @@ export function formatCost(usd: number): string {
 
 const fmtTokens = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
-export function AskBox({ context, placeholder }: { context: Omit<AskRequest, "question">; placeholder?: string }) {
+export function AskBox({ context, placeholder, suggestions = SUGGESTIONS }: { context: Omit<AskRequest, "question">; placeholder?: string; suggestions?: string[] }) {
   const [items, setItems] = useState<QA[]>([]);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
-  const key = `${context.stepId ?? ""}|${context.filePath ?? ""}|${context.root ?? ""}`;
+  const key = `${context.stepId ?? ""}|${context.filePath ?? ""}|${context.root ?? ""}|${context.sessionId ?? ""}`;
 
   const keyRef = useRef(key);
   keyRef.current = key;
@@ -92,7 +92,7 @@ export function AskBox({ context, placeholder }: { context: Omit<AskRequest, "qu
       )}
 
       <div className="ask-chips">
-        {SUGGESTIONS.map((s) => (
+        {suggestions.map((s) => (
           <button key={s} type="button" className="ask-chip" disabled={busy} onClick={() => submit(s)}>{s}</button>
         ))}
       </div>

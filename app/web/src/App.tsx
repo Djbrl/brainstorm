@@ -1,36 +1,61 @@
-// Owned by the lead.
+// Owned by the lead. The shell: the header with where you are (project › thread › step), and the view for that place.
 import { isReplay, useLive } from "./lib/live";
-import { NavProvider, followCursor, useNav, type View } from "./lib/nav";
-import { FollowView } from "./follow/FollowView";
-
+import { NavProvider, useNav } from "./lib/nav";
 import { useThread } from "./lib/thread";
-import { Tour } from "./tour/Tour";
+import { displayLabel } from "./follow/format";
 import { SetupView } from "./setup/SetupView";
+import { Welcome } from "./map/Welcome";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
-// Follow opens first; the other views (and the graph library the Map needs) load when they're opened.
+// The views (and the graph library the Map needs) load when they're opened.
 const MapView = lazy(() => import("./map/MapView").then((m) => ({ default: m.MapView })));
 const TrackView = lazy(() => import("./tasks/TrackView").then((m) => ({ default: m.TrackView })));
 const PlacesView = lazy(() => import("./cowork/CoworkView").then((m) => ({ default: m.PlacesView })));
-const FailuresView = lazy(() => import("./failures/FailuresView").then((m) => ({ default: m.FailuresView })));
+
+/** Project › Thread › Step: each part takes you back up to it. */
+function Crumbs({ project }: { project: string }) {
+  const { state } = useLive();
+  const { replay, step, stopReplay, closeStep, setThreadMode } = useNav();
+  const session = replay ? state.sessions.find((s) => s.id === replay.sessionId) : undefined;
+  const st = replay && step ? state.steps[replay.sessionId]?.find((s) => s.id === step) : undefined;
+  return (
+    <nav className="crumbs" aria-label="Where you are">
+      {replay ? <button onClick={stopReplay}>{project}</button> : <span aria-current="page">{project}</span>}
+      {replay && <>
+        <span className="sep" aria-hidden="true">›</span>
+        {step ? <button onClick={closeStep}>{session?.title || "Thread"}</button>
+          : <button className="here" aria-current="page" onClick={() => setThreadMode("footprint")}>{session?.title || "Thread"}</button>}
+      </>}
+      {replay && step && <>
+        <span className="sep" aria-hidden="true">›</span>
+        <span className="here" aria-current="page">{st ? displayLabel(st) : "Step"}</span>
+      </>}
+    </nav>
+  );
+}
 
 function Shell() {
   const { state, reload } = useLive();
   const [setupOpen, setSetupOpen] = useState(false);
-  const { view, setView, lens } = useNav();
-  const [tourSignal, setTourSignal] = useState(0);
-  // Local app: Follow, Map (with its Map | Track views) and Places. Failures was a hackathon view: errors now show on the map,
-  // in Follow and in the Track. The judged hackathon demo keeps it, its tour points at it.
-  const tabs: { id: View; label: string }[] = state.shared ? [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }]
-    : state.replay && !state.preview
-    ? [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }, { id: "failures", label: `Failures${state.failures.length ? ` ${state.failures.length}` : ""}` }]
-    : state.replay ? [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }] // the post-deadline demo
-    : [{ id: "follow", label: "Follow" }, { id: "map", label: "Map" }];
-  // Local app: pick a workspace first (and whenever "Change" is clicked). The hosted replay never shows setup.
-  // In the post-deadline preview, the setup screen plays back a recorded run (see lib/preview.ts).
+  const { lens, replay, back } = useNav();
+
+  // Esc goes up one level: step → thread → project (not while typing).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.key !== "Escape" || e.defaultPrevented || (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable))) return;
+      back();
+    };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, [back]);
+
+  // Local app: pick a workspace first (and whenever "Change" is clicked). The hosted demo never shows setup,
+  // except the post-deadline preview, which plays back a recorded setup run (see lib/preview.ts).
   if ((setupOpen && (!state.replay || state.preview)) || (!state.replay && state.setup && !state.setup.root)) {
     return <SetupView onDone={() => { setSetupOpen(false); reload(); }} onCancel={state.setup?.root || state.preview ? () => setSetupOpen(false) : undefined} />;
   }
+  const project = state.setup?.name || "brainstorm";
 
   return (
     <div className={`shell ${state.preview || state.shared ? "has-banner" : ""}`}>
@@ -38,24 +63,16 @@ function Shell() {
         {isReplay()
           ? <a className="wordmark" href="https://brainstorm-landing.vercel.app" aria-label="Brainstorm home">Brainstorm</a>
           : <div className="wordmark">Brainstorm</div>}
-        <nav className="tabs" role="tablist">
-          {tabs.map((t) => (
-            <button key={t.id} role="tab" data-tour={`tab-${t.id}`} aria-selected={view === t.id} onClick={() => setView(t.id)}>{t.label}</button>
-          ))}
-        </nav>
+        <Crumbs project={project} />
         <div className="status">
           {state.preview && (
-            <button className="ws-chip" title="Play back a recorded setup run" onClick={() => setSetupOpen(true)}>brainstorm <span>Setup preview</span></button>
+            <button className="ws-chip" title="Play back a recorded setup run" onClick={() => setSetupOpen(true)}>Setup preview</button>
           )}
           {!state.replay && state.setup?.root && (
-            <button className="ws-chip" title={state.setup.root} onClick={() => setSetupOpen(true)}>{state.setup.name} <span>Change</span></button>
-          )}
-          {state.replay && !state.preview && !state.shared && (
-            <a className="next-cta" href="https://brainstorm-next.vercel.app" title="Post-deadline preview: setup, live agents on the map, thread replay">Try Brainstorm Next</a>
+            <button className="ws-chip" title={state.setup.root} onClick={() => setSetupOpen(true)}>Change project</button>
           )}
           <span className={`dot ${state.connected ? "live" : ""}`} />
           {state.shared ? "Shared replay" : state.replay ? "Recorded demo" : state.connected ? "Live" : "Connecting…"}
-          {state.replay && !state.shared && <button className="tour-help" aria-label="Show the tour" title="Show the tour" onClick={() => setTourSignal((n) => n + 1)}>?</button>}
         </div>
       </header>
       {state.preview && (
@@ -67,83 +84,51 @@ function Shell() {
       {state.shared && (
         <div className="preview-banner">
           A Claude Code session, shared from Brainstorm on {new Date(state.shared.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}.
-          {" "}Press play to watch it on the map. To follow your own agents,{" "}
+          {" "}Press Play to watch it on the map. To follow your own agents,{" "}
           <a href="https://github.com/Djbrl/brainstorm#install-claude-code-plugin-preview" target="_blank" rel="noopener">install Brainstorm</a>.
         </div>
       )}
-      {state.replay && !state.shared && <Tour openSignal={tourSignal} preview={state.preview} />}
       {state.shared && <OpenShared />}
-      {!state.replay && <LiveReplay />}
-      <FromFollow />
-      <main className="view"><Suspense fallback={null}>{view === "follow" ? <FollowView /> : view === "map" ? (lens === "track" && !state.replay ? <TrackView /> : lens === "places" ? <PlacesView /> : <MapView />) : state.replay ? <FailuresView /> : <FollowView />}</Suspense></main>
+      <LiveFollow />
+      {!replay && !state.shared && <Welcome />}
+      <main className="view"><Suspense fallback={null}>{
+        replay && lens === "track" && !state.replay ? <TrackView />
+          : replay && lens === "places" ? <PlacesView />
+          : <MapView />
+      }</Suspense></main>
     </div>
   );
 }
 
-// Read before the app writes the current view into the URL.
-const linkedView = new URLSearchParams(location.search).get("view");
-
-/** A shared replay opens on the map with its thread loaded, paused at the first step (unless its link names a view). */
+/** A shared replay holds one thread: it opens on that thread's footprint (unless its link names a place). */
 function OpenShared() {
   const { state } = useLive();
-  const { startReplay } = useNav();
+  const { replay, startReplay } = useNav();
   const first = state.sessions[0]?.id;
   const done = useRef(false);
   useEffect(() => {
     if (!first || done.current) return;
     done.current = true;
-    if (!linkedView) startReplay(first, 0);
-  }, [first, startReplay]);
+    if (!replay) startReplay(first, 0);
+  }, [first, replay, startReplay]);
   return null;
 }
 
 /**
- * The Map never opens still: with no thread selected, the newest running thread is picked and followed live; with none
- * running, the newest thread plays from its start at 4× (once per visit, and not after the user closes a replay).
- * A live replay stays on the thread's newest beat.
+ * A thread you chose to follow live stays on its newest step; a replay that reaches the end of a running thread
+ * starts following it. Nothing opens or plays by itself: running threads show as moving dots until you click one.
  */
-function LiveReplay() {
+function LiveFollow() {
   const { state } = useLive();
-  const { replay, view, startReplay, followLive, setReplayLive, setReplayPlaying, setReplaySpeed } = useNav();
+  const { replay, followLive, setReplayLive } = useNav();
   const thread = useThread(replay?.live ? replay.sessionId : null, replay?.detail ?? "light");
   const beats = thread?.beats.length ?? 0;
   useEffect(() => { if (replay?.live && beats) followLive(beats - 1); }, [replay?.live, beats, followLive]);
   const running = state.sessions.find((s) => s.id === replay?.sessionId)?.status === "running";
-  const all = useThread(replay && !replay.live && running ? replay.sessionId : null, replay?.detail ?? "light");
+  const all = useThread(replay && replay.mode === "play" && !replay.live && running ? replay.sessionId : null, replay?.detail ?? "light");
   useEffect(() => {
-    if (replay && !replay.live && running && all && replay.index >= all.beats.length - 1 && !replay.playing) setReplayLive(true);
+    if (replay && replay.mode === "play" && !replay.live && running && all && replay.index >= all.beats.length - 1 && !replay.playing) setReplayLive(true);
   }, [replay, running, all, setReplayLive]);
-
-  const closed = useRef(false), had = useRef(false);
-  useEffect(() => { if (had.current && !replay) closed.current = true; had.current = !!replay; }, [replay]);
-  const autoplayed = useRef(false);
-  useEffect(() => {
-    if (replay || closed.current || view !== "map" || !state.sessions.length) return;
-    const newest = [...state.sessions].sort((a, b) => b.lastEventAt.localeCompare(a.lastEventAt));
-    const running = newest.find((s) => s.status === "running");
-    if (running) { startReplay(running.id, 0, { live: true }); return; }
-    if (autoplayed.current) return;
-    autoplayed.current = true;
-    startReplay(newest[0].id, 0);
-    setReplaySpeed(4);
-    setReplayPlaying(true);
-  }, [state.sessions, replay, view, startReplay, setReplaySpeed, setReplayPlaying]);
-  return null;
-}
-
-/** Back from Follow, the Map shows the thread you were reading, at the step you had open. */
-function FromFollow() {
-  const { view, replay, startReplay } = useNav();
-  const prev = useRef(view);
-  useEffect(() => {
-    const was = prev.current;
-    prev.current = view;
-    if (was !== "follow" || view !== "map") return;
-    const { sessionId, stepId } = followCursor;
-    if (!sessionId || (replay?.sessionId === sessionId && !stepId)) return;
-    startReplay(sessionId, stepId ?? 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view]);
   return null;
 }
 

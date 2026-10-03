@@ -25,7 +25,9 @@ async function bootstrap() {
   if (web && existsSync(join(web, "index.html"))) {
     app.useStaticAssets(web);
     app.use((req: Request, res: Response, next: NextFunction) =>
-      req.method === "GET" && !req.path.startsWith("/api") && !req.path.startsWith("/ws") ? res.sendFile(join(web, "index.html")) : next());
+      // Any other page (/thread/<id>/…) is the app: index.html. `root` matters: the plugin lives under ~/.claude, and
+      // sendFile refuses a full path through a dot folder.
+      req.method === "GET" && !req.path.startsWith("/api") && !req.path.startsWith("/ws") ? res.sendFile("index.html", { root: web }) : next());
   }
 
   const version = process.env.BRAINSTORM_VERSION ?? "dev";

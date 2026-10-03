@@ -50,9 +50,12 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
   accent: string;
   font: string;
 }): ReplayLayerApi {
-  const { replay, setReplayIndex, setReplayPlaying, stopReplay, landReplay } = useNav();
+  const { replay, setReplayIndex, setReplayPlaying, landReplay } = useNav();
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
   const active = !!replay && !!thread && thread.sessionId === replay.sessionId && thread.detail === replay.detail;
+  // A thread opens on its footprint: its files lit, the camera on them, no tracer. The keys and the wheel drive the replay only once it plays.
+  const mode = replay?.mode ?? "footprint";
+  const playable = active && mode === "play";
   const len = active ? thread!.beats.length : 0;
   const last = Math.max(0, len - 1);
   const index = replay ? Math.min(replay.index, last) : 0;
@@ -67,8 +70,8 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
 
   replayCamera.fg = fg;
 
-  const st = useRef<{ active: boolean; thread: Thread | null; index: number; len: number }>({ active, thread, index, len });
-  st.current = { active, thread, index, len };
+  const st = useRef<{ active: boolean; thread: Thread | null; index: number; len: number; mode: string }>({ active, thread, index, len, mode });
+  st.current = { active, thread, index, len, mode };
   const anim = useRef<Anim>({ x: 0, y: 0, fromX: 0, fromY: 0, t0: -1e9, file: null, lastIndex: -1, beatAt: -1e9, cam: null });
 
   // Bounds: clamp the cursor whenever the thread (or its length) changes.
@@ -93,11 +96,21 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     return () => clearTimeout(t);
   }, [active, replay?.playing, replay?.speed, index, last, thread, setReplayIndex, setReplayPlaying]);
 
+  // ---- footprint: frame the files the thread touched ----
+  useEffect(() => {
+    const g = fg.current;
+    if (!active || mode !== "footprint" || !g || !thread!.touched.size) return;
+    const touched = thread!.touched;
+    const t = setTimeout(() => (g as unknown as { zoomToFit: (ms: number, pad: number, f: (n: { id?: string | number }) => boolean) => void })
+      .zoomToFit(700, 140, (n) => touched.has(String(n.id))), 60);
+    return () => clearTimeout(t);
+  }, [active, mode, replay?.sessionId, thread, fg]);
+
   // ---- keyboard ----
   const replayPlayingRef = useRef(false);
   replayPlayingRef.current = !!replay?.playing;
   useEffect(() => {
-    if (!active) return;
+    if (!playable) return;
     const step = (d: number) => { setReplayPlaying(false); setReplayIndex((i) => Math.max(0, Math.min(st.current.len - 1, i + d))); };
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return;
@@ -106,7 +119,6 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
         case "ArrowLeft": step(e.shiftKey ? -10 : -1); break;
         case "Home": setReplayPlaying(false); setReplayIndex(0); break;
         case "End": setReplayPlaying(false); setReplayIndex(st.current.len - 1); break;
-        case "Escape": stopReplay(); break;
         case " ": {
           if ((e.target as HTMLElement | null)?.tagName === "BUTTON") return; // let the focused button click
           togglePlay(st.current.index, st.current.len, replayPlayingRef.current, setReplayIndex, setReplayPlaying);
@@ -118,11 +130,11 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, setReplayIndex, setReplayPlaying, stopReplay]);
+  }, [playable, setReplayIndex, setReplayPlaying]);
   // ---- wheel scrubs, pinch / ⌘-wheel zooms; user camera moves pause the follow ----
   useEffect(() => {
     const el = wrapRef.current;
-    if (!el || !active) return;
+    if (!el || !playable) return;
     let acc = 0, lastWheel = 0;
     const onWheel = (e: WheelEvent) => {
       const t = e.target as HTMLElement;
@@ -163,11 +175,11 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
       window.removeEventListener("pointerup", onUp, true);
       window.removeEventListener("pointercancel", onUp, true);
     };
-  }, [active, wrapRef, setReplayIndex, setReplayPlaying]);
+  }, [playable, wrapRef, setReplayIndex, setReplayPlaying]);
 
   // ---- camera: ease toward the marker unless the user moved the camera recently ----
   useEffect(() => {
-    if (!active) return;
+    if (!active || mode === "footprint") return;
     let raf = 0;
     const tick = () => {
       const g = fg.current;
@@ -184,7 +196,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [active, fg]);
+  }, [active, mode, fg]);
 
   const nodeAlpha = useCallback((id: string) => {
     const s = st.current;
@@ -194,7 +206,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
     const s = st.current;
-    if (!s.active || !s.thread || s.len === 0) return;
+    if (!s.active || !s.thread || s.len === 0 || s.mode === "footprint") return;
     const { beats, moves } = s.thread;
     const beat = beats[s.index];
     if (!beat) return;

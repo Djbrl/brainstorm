@@ -1,0 +1,15 @@
+/* The first-visit card, over the map (Welcome.tsx). */
+.welcome {
+  position: fixed; z-index: 40; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100% - 32px));
+  background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 26px 28px 22px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .12); animation: welcome-in 320ms ease;
+}
+.welcome h2 { margin: 0 0 10px; font-size: 21px; letter-spacing: -.01em; color: var(--ink); }
+.welcome p { margin: 0; font-size: 14.5px; line-height: 1.55; color: var(--ink-2); }
+.welcome .welcome-sub { margin-top: 10px; color: var(--ink-3); font-size: 13.5px; }
+.welcome-actions { display: flex; gap: 12px; align-items: center; margin-top: 20px; }
+.welcome-primary { border: 0; background: var(--accent); color: #fff; font: inherit; font-weight: 600; font-size: 14px; padding: 9px 18px; border-radius: 999px; cursor: pointer; }
+.welcome-quiet { border: 0; background: none; color: var(--accent); font: inherit; font-size: 14px; cursor: pointer; padding: 9px 6px; }
+.welcome-primary:focus-visible, .welcome-quiet:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@keyframes welcome-in { from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); } to { opacity: 1; transform: translate(-50%, -50%); } }
+@media (prefers-reduced-motion: reduce) { .welcome { animation: none; } }

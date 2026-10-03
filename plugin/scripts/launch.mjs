@@ -216,7 +216,7 @@ async function main() {
 
   if (flag("--share")) return share(port);
 
-  const url = `http://localhost:${port}/?view=map`;
+  const url = `http://localhost:${port}/`;
   if (flag("--open")) openBrowser(url);
   say(`Brainstorm ${VERSION} is running for ${PROJECT}: ${url}`);
 }

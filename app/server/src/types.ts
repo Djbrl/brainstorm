@@ -17,7 +17,8 @@ export type Edge = { from: string; to: string };
 /** `formerRoots`: where the repo lived before it moved, so paths in older threads still land on today's files. */
 export type ProjectMap = { root: string; files: FileNode[]; edges: Edge[]; modules: { id: string; summary?: string }[]; formerRoots?: string[] };
 export type Snapshot = { ts: string; map: ProjectMap };
-export type AskRequest = { question: string; stepId?: string; filePath?: string; root?: string };
+/** What a question is about: a step, a file, or a whole thread (`sessionId`, asked from the Track). */
+export type AskRequest = { question: string; stepId?: string; filePath?: string; root?: string; sessionId?: string };
 export type AskResponse = { answer: string; model: string; tokensIn: number; tokensOut: number; costUsd: number; fallback: boolean };
 export type WsMessage =
   | { type: "session"; session: Session }

@@ -113,6 +113,7 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .sidebar-threads.has-open .sidebar-thread-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; margin: 0 -8px; padding: 0 8px; } /* room for the pill's rounded edges */
 .sidebar-threads.has-open .sidebar-thread { flex: none; }
 .sidebar-threads.has-open .sidebar-thread.selected { flex: 1 0 58%; min-height: 0; display: flex; flex-direction: column; }
+.sidebar-threads.has-open .sidebar-thread.selected.footprint { flex: none; } /* a footprint card is short: the other threads stay right under it */
 .sidebar-thread-steps { flex: 1; min-height: 0; margin: 10px -2px 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
 
 /* The stats line sits just above the sidebar. */
@@ -140,3 +141,21 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .sidebar-fold-avatars i + i { margin-left: -5px; }
 .sidebar-fold-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-fold[aria-expanded="true"] { color: var(--ink); }
+
+/* "Show all 12 threads" under the short list (ThreadsPanel). */
+.sidebar-more { display: block; width: 100%; margin-top: 6px; padding: 8px; border: 0; background: none; color: var(--accent); font-size: 13px; font-weight: 500; text-align: left; border-radius: 10px; }
+.sidebar-more:hover { background: #f4f4f7; }
+
+/* An open thread's footprint (ThreadCard): what you asked, what it changed, and two ways in. */
+.thread-card { margin: 10px 2px 4px; display: flex; flex-direction: column; gap: 10px; }
+.thread-card-prompt { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--ink); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.thread-card-facts { margin: 0; font-size: 12.5px; color: var(--ink-3); }
+.thread-card-files { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.thread-card-files button { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 3px 8px; font-size: 12px; font-family: var(--font-mono); color: var(--ink-2); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-card-files button:hover { border-color: var(--accent); color: var(--accent); }
+.thread-card-files .more { font-size: 12px; color: var(--ink-3); align-self: center; }
+.thread-card-actions { display: flex; gap: 8px; margin-top: 2px; }
+.thread-card-play, .thread-card-steps { display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; padding: 7px 16px; font-size: 13px; font-weight: 600; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.thread-card-play { background: var(--accent); border-color: var(--accent); color: #fff; }
+.thread-card-play:disabled, .thread-card-steps:disabled { opacity: .45; cursor: default; }
+.thread-card-steps:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }

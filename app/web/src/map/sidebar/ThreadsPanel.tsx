@@ -7,6 +7,7 @@ import type { AgentPresence, Session } from "@contract";
 import { clock, useLive } from "../../lib/live";
 import { useNav } from "../../lib/nav";
 import { agentColor, baseName, initial, shortName, verbIng } from "../agents";
+import { ThreadCard } from "./ThreadCard";
 import { ReplaySteps } from "../replay/ReplaySteps";
 import { PlaceSteps } from "../../cowork/PlaceSteps";
 
@@ -46,7 +47,8 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }
   useTick(5000);
   const now = clock();
   const { state } = useLive();
-  const { replay, hiddenAgents, toggleAgent, setHiddenAgents, startReplay, setReplayPlaying, stopReplay } = useNav();
+  const { replay, hiddenAgents, toggleAgent, setHiddenAgents, startReplay, stopReplay } = useNav();
+  const [all, setAll] = useState(false);
 
   const sessions = [...state.sessions].sort((a, b) => {
     const running = (a.status === "running" ? 0 : 1) - (b.status === "running" ? 0 : 1);
@@ -57,17 +59,19 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }
     return <p className="sidebar-empty">No agent threads yet. Start Claude Code in this project.</p>;
   }
 
-  // Clicking a thread plays it: a running thread follows its newest step, a finished one plays from the start.
+  // Clicking a thread opens its footprint (what it touched); its steps and its replay are one click further.
   const select = (s: Session) => {
     if (replay?.sessionId === s.id) { stopReplay(); return; } // clicking the open thread closes it
     startReplay(s.id, 0, { live: s.status === "running" });
-    if (s.status !== "running") setReplayPlaying(true);
   };
+  // The most recent few; the rest behind "Show all" (the open thread always shows).
+  const SHORT = 5;
+  const shown = all || sessions.length <= SHORT + 1 ? sessions : sessions.filter((x, i) => i < SHORT || x.id === replay?.sessionId);
 
   return (
     <div className={`sidebar-threads ${replay ? "has-open" : ""}`}>
       <ul className="sidebar-thread-list">
-        {sessions.map((session) => {
+        {shown.map((session) => {
           const selected = replay?.sessionId === session.id;
           return (
             <ThreadRow
@@ -88,6 +92,8 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }
           );
         })}
       </ul>
+      {sessions.length > shown.length && <button className="sidebar-more" onClick={() => setAll(true)}>Show all {sessions.length} threads</button>}
+      {all && sessions.length > SHORT + 1 && <button className="sidebar-more" onClick={() => setAll(false)}>Show fewer</button>}
     </div>
   );
 }
@@ -110,7 +116,8 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
   const running = session.status === "running";
   // Which git worktree the thread ran in ("hackathon-landing-page", without Claude Code's random suffix).
   const tree = /\/\.claude\/worktrees\/([^/]+)/.exec(session.cwd ?? "")?.[1]?.replace(/-[0-9a-f]{6}$/, "");
-  const { lens } = useNav();
+  const { lens, replay } = useNav();
+  const mode = selected ? replay?.mode ?? "footprint" : "footprint";
   const [agentsOpen, setAgentsOpen] = useState(false);
   useEffect(() => { if (!selected) setAgentsOpen(false); }, [selected]);
   const ids = sorted.map((a) => a.id);
@@ -118,9 +125,9 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
   const toggleAll = () => setHiddenAgents(allHidden ? [...hiddenAgents].filter((id) => !ids.includes(id)) : [...hiddenAgents, ...ids]);
   const working = sorted.filter((a) => a.active).length;
   return (
-    <li className={`sidebar-thread ${selected ? "selected" : ""}`}>
+    <li className={`sidebar-thread ${selected ? "selected" : ""} ${selected && mode === "footprint" && lens !== "places" ? "footprint" : ""}`}>
       <div className="sidebar-thread-headrow">
-        <button className="sidebar-thread-head" onClick={onSelect} aria-pressed={selected} title={selected ? "Close this thread" : running ? "Watch this thread live" : "Replay this thread"}>
+        <button className="sidebar-thread-head" onClick={onSelect} aria-pressed={selected} title={selected ? "Close this thread" : "Open this thread: what it touched"}>
           <span className={`sidebar-thread-status ${session.status}`} aria-hidden="true" />
           <span className="sidebar-thread-title">{session.title || "Untitled thread"}</span>
           {tree && <span className="sidebar-thread-tree" title={session.cwd}>{tree}</span>}
@@ -141,7 +148,7 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
           <i className={`sidebar-tree-caret ${agentsOpen ? "open" : ""}`} aria-hidden="true">›</i>
         </button>
       )}
-      {sorted.length > 0 && (!selected || agentsOpen) && (
+      {sorted.length > 0 && selected && agentsOpen && (
         <ul className="sidebar-thread-agents">
           {sorted.map((a) => {
             const following = followId === a.id;
@@ -172,9 +179,10 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
           })}
         </ul>
       )}
+      {selected && !agentsOpen && lens !== "places" && mode === "footprint" && <ThreadCard session={session} />}
       {selected && (agentsOpen
-        ? <button className="sidebar-fold" onClick={() => setAgentsOpen(false)}><span className="sidebar-fold-text">{lens === "places" ? "Places" : "Steps"}</span><i className="sidebar-tree-caret" aria-hidden="true">›</i></button>
-        : <div className="sidebar-replay-steps sidebar-thread-steps">{lens === "places" ? <PlaceSteps /> : <ReplaySteps />}</div>)}
+        ? <button className="sidebar-fold" onClick={() => setAgentsOpen(false)}><span className="sidebar-fold-text">{lens === "places" ? "Places" : mode === "footprint" ? "Summary" : "Steps"}</span><i className="sidebar-tree-caret" aria-hidden="true">›</i></button>
+        : (lens === "places" || mode !== "footprint") && <div className="sidebar-replay-steps sidebar-thread-steps">{lens === "places" ? <PlaceSteps /> : <ReplaySteps />}</div>)}
     </li>
   );
 }

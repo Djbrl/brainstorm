@@ -10,6 +10,8 @@ import { clockTime, stripInjected } from "../follow/format";
 import { MapSidebar } from "../map/sidebar/MapSidebar";
 import { LensSwitch } from "../map/LensSwitch";
 import { MapStats } from "../map/MapStats";
+import { StepPanel } from "../map/StepPanel";
+import { AskBox } from "../ask/AskBox";
 import "./track.css";
 
 type Area = "files" | "web" | "commands" | "services";
@@ -180,7 +182,7 @@ function Window({ task, stop, onMap }: { task: TaskDetail; stop: Stop; onMap: ()
       {stop.say && <p className="trk-say">“{stop.say}”</p>}
       <ul className="trk-steps">{stop.steps.slice(0, 6).map((s) => <li key={s.id} className={s.failed ? "failed" : ""}><span>{s.tool}</span>{s.label}</li>)}{stop.steps.length > 6 && <li className="more">and {stop.steps.length - 6} more</li>}</ul>
       <footer>
-        <button onClick={() => openStep(task.sessionId, stop.steps[0].id)}>Open in Follow</button>
+        <button onClick={() => openStep(task.sessionId, stop.steps[0].id)} title="Its diff or output, and Ask about it">Open step</button>
         <button onClick={onMap}>Show on map</button>
       </footer>
     </div>
@@ -194,6 +196,18 @@ function ReturnRow({ r, cur, goTo }: { r: StopRow; cur: number; goTo: (i: number
       <i className="trk-dot" /><Icon k={r.stop.failed.length ? "error" : "return"} /><span>Back to <b>{r.stop.name}</b>{r.stop.failed.length ? " · failed" : ""}</span>
       {r.stop.firstIndex !== undefined && <button onClick={(e) => { e.stopPropagation(); goTo(r.stop.firstIndex!); }} title="Go to the first visit">first visit</button>}
     </li>
+  );
+}
+
+/** Ask about the whole thread, from its Track. Folded until you want it. */
+function ThreadAsk({ sessionId }: { sessionId: string }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => setOpen(false), [sessionId]);
+  if (!open) return <button className="trk-ask-open" onClick={() => setOpen(true)}>Ask about this thread</button>;
+  return (
+    <div className="trk-ask">
+      <AskBox context={{ sessionId }} placeholder="What did this thread do, and why?" suggestions={["What did it change, and why?", "What's left to do?", "What went wrong?"]} />
+    </div>
   );
 }
 
@@ -268,6 +282,7 @@ export function TrackView() {
       {sidebar}
       <MapStats />
       <LensSwitch />
+      <StepPanel />
       <div className="trk-scroll" ref={scroller}>
         {!task ? <p className="trk-loading">Loading the thread…</p> : (
           <div className="trk-cols">
@@ -275,6 +290,7 @@ export function TrackView() {
               <header className="trk-head">
                 <h1>{task.goal || session?.title || "Untitled thread"}</h1>
                 <p>{stops.length} stops · {task.counts.made} made{errors ? <> · <span className="err">{errors} failed</span></> : null}{task.counts.frames ? ` · ${task.counts.frames} screenshots` : ""}</p>
+                <ThreadAsk sessionId={task.sessionId} />
               </header>
               <ol className="trk-line">
                 {rows.map((r) => r.type === "chapter" ? (

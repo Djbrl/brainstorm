@@ -81,7 +81,10 @@ function ShareMenu({ sessionId }: { sessionId: string }) {
 }
 
 export function ReplayBar() {
-  const { replay: current, setReplayIndex, setReplayPlaying, setReplaySpeed, setReplayDetail, stopReplay, openStep, setSessionId, setView } = useNav();
+  const { replay: open, setReplayIndex, setReplayPlaying, setReplaySpeed, setReplayDetail, setThreadMode, openStep } = useNav();
+  // The player only shows once you ask for the replay (Play on the thread's card), not when a thread opens.
+  const current = open?.mode === "play" ? open : null;
+  const stopReplay = () => setThreadMode("footprint"); // same as Esc: back to the thread's footprint
   const { state } = useLive();
   // After the replay closes, keep showing its last state while the bar slides out.
   const last = useRef(current);
@@ -99,7 +102,7 @@ export function ReplayBar() {
   if (!replay) return null;
   const cls = leaving ? " leaving" : "";
 
-  const stop = <button className="rp-icon" onClick={stopReplay} aria-label="Stop replay" title="Stop replay (Esc)">{Icon.close}</button>;
+  const stop = <button className="rp-icon" onClick={stopReplay} aria-label="Close the player" title="Close the player (Esc)">{Icon.close}</button>;
   const session = state.sessions.find((s) => s.id === replay.sessionId);
   const title = session?.title || "Untitled thread";
 
@@ -133,7 +136,7 @@ export function ReplayBar() {
           All steps
         </button>
         <button className="rp-text" onClick={() => replayCamera.recenter()} title="Follow the tracer again">{Icon.target}<span>Recenter</span></button>
-        <button className="rp-text" onClick={() => { const at = replayCursor.stepId; if (at) openStep(replay.sessionId, at); else { setSessionId(replay.sessionId); setView("follow"); } }} title="Open this step in Follow">Open in Follow</button>
+        <button className="rp-text" onClick={() => { const at = replayCursor.stepId; if (at) openStep(replay.sessionId, at); }} title="Open this step: its diff, its output, and Ask">Open step</button>
         {!isReplay() && <ShareMenu sessionId={replay.sessionId} />}
         {stop}
       </div>

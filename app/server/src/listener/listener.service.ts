@@ -41,6 +41,8 @@ type RawLine = {
   cwd?: string;
   timestamp?: string;
   isSidechain?: boolean;
+  /** Claude Code's recap of a conversation it compacted: the agent's context, not something the person wrote. */
+  isCompactSummary?: boolean;
   customTitle?: string;
   message?: { role?: string; content?: unknown };
 };
@@ -86,6 +88,8 @@ export class ListenerService implements OnModuleInit {
     if (!(db.prepare(`PRAGMA table_info(steps)`).all() as { name: string }[]).some((c) => c.name === "tool_use_id")) db.exec(`ALTER TABLE steps ADD COLUMN tool_use_id TEXT`);
     db.exec(`CREATE INDEX IF NOT EXISTS steps_session_seq ON steps(session_id, seq)`);
     db.exec(`CREATE INDEX IF NOT EXISTS steps_label ON steps(kind, label)`);
+    // Added 3 Oct 2026: compacted-conversation recaps were stored as prompts; they read as the agent's text.
+    db.exec(`UPDATE steps SET kind = 'text' WHERE kind = 'prompt' AND text LIKE 'This session is being continued from a previous conversation%'`);
 
     for (const row of db.prepare(`SELECT file, offset FROM listener_offsets`).all() as { file: string; offset: number }[]) {
       this.offsets.set(row.file, row.offset);
@@ -253,6 +257,12 @@ export class ListenerService implements OnModuleInit {
     const content = o.message?.content;
     const ts = o.timestamp ?? new Date().toISOString();
     const isSubagent = o.isSidechain === true;
+
+    if (o.isCompactSummary) { // the recap Claude Code writes when it compacts a long conversation
+      const text = typeof content === "string" ? content : Array.isArray(content) ? content.filter((b: any) => b?.type === "text").map((b: any) => b.text).join("\n\n") : "";
+      if (text.trim()) this.storeStep(this.makeStep(o, sessionId, 0, ts, "text", text, isSubagent), { cwd: o.cwd });
+      return;
+    }
 
     if (typeof content === "string") {
       const step = this.makeStep(o, sessionId, 0, ts, "prompt", content, isSubagent);

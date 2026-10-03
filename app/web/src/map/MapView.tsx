@@ -2,7 +2,8 @@
 import { LensSwitch } from "./LensSwitch";
 import { MapStats } from "./MapStats";
 import "../tasks/track.css";
-import { clock } from "../lib/live";
+import { clock, isReplay } from "../lib/live";
+import { lastSeen, sinceMs } from "../lib/visit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const RIPPLE_MS = 700; // one ripple per edit
@@ -16,6 +17,7 @@ import { drawAgents, visibleAgents, type AgentAnim } from "./agents";
 import { MapSidebar } from "./sidebar/MapSidebar";
 import { ReplayBar } from "./replay/ReplayBar";
 import { TalkCard } from "./replay/TalkCard";
+import { StepPanel } from "./StepPanel";
 import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
 import { makeFileResolver } from "../lib/paths";
 import { drawModuleLabels, LabelSpace } from "./labels";
@@ -48,13 +50,17 @@ function readTokens() {
 }
 type Tokens = ReturnType<typeof readTokens>;
 
+/**
+ * A file's color: hot for a few minutes after an edit, warm if it changed since you last looked (see lib/visit.ts),
+ * quiet otherwise. A recording (the hosted demo) has no "last visit": there, warm fades out over an hour as before.
+ */
 function recencyColor(t: Tokens, iso: string | undefined, now: number): string {
   if (!iso) return mix(t.cool, t.cool, 0);
-  const age = now - Date.parse(iso);
+  const at = Date.parse(iso), age = now - at;
   if (!(age >= 0)) return mix(t.hot, t.hot, 0);
   if (age < 5 * MIN) return mix(t.hot, t.warm, (age / (5 * MIN)) ** 1.5);
-  if (age < HOUR) return mix(t.warm, t.cool, (age - 5 * MIN) / (HOUR - 5 * MIN));
-  return mix(t.cool, t.cool, 0);
+  if (isReplay()) return age < HOUR ? mix(t.warm, t.cool, (age - 5 * MIN) / (HOUR - 5 * MIN)) : mix(t.cool, t.cool, 0);
+  return at > sinceMs ? mix(t.warm, t.warm, 0) : mix(t.cool, t.cool, 0);
 }
 
 export function relTime(iso: string | undefined, now = clock()): string {
@@ -165,7 +171,7 @@ function linkRole(l: GLink, focus: string | null): "imports" | "usedBy" | null {
 // ---------- view ----------
 export function MapView() {
   const { state } = useLive();
-  const { focusFile, setFocusFile, hiddenAgents, replay, showReads, setShowReads } = useNav();
+  const { focusFile, setFocusFile, hiddenAgents, replay, step, showReads, setShowReads } = useNav();
   const mock = useMemo(() => new URLSearchParams(location.search).has("mockmap"), []);
   const map = useMemo(() => (mock ? mockMap() : state.map), [mock, state.map]);
   const graph = useGraph(map);
@@ -213,11 +219,12 @@ export function MapView() {
   }, []);
   const replayLayer = useReplayLayer({ fg: fg as never, wrapRef, nodeIndexRef, accent: tokens.accent, font: tokens.body });
   const replayRef = useRef<ReplayLayerApi>(replayLayer); replayRef.current = replayLayer;
+  const openRef = useRef(!!replay); openRef.current = !!replay;
   const drawAgentLayer = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
     replayRef.current.draw(ctx, scale);
     drawAgents({
       ctx, scale, agents: agentsRef.current, anim: anim.current, accent: tokens.accent, font: tokens.body,
-      hoverFile: hoverRef.current, followId: followRef.current, resolveId, showReads: mapPrefs.showReads,
+      hoverFile: hoverRef.current, followId: followRef.current, resolveId, showReads: mapPrefs.showReads, quiet: !openRef.current,
       resolve: (id) => { const n = nodeIndexRef.current.get(id); return n && n.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y, r: n.r } : undefined; },
     });
   }, [tokens, resolveId]);
@@ -349,7 +356,8 @@ export function MapView() {
     }
 
     const forced = isSel || isHover || active;
-    let showLabel = forced || r * scale > 9 || scale > 3.2;
+    // With a thread open, only the files it touched are named: the rest of the project stays in the background.
+    let showLabel = forced || (alpha >= 1 && (r * scale > 9 || scale > 3.2));
     const fs = Math.max(11, Math.min(14, 11 + r * scale * 0.08)) / scale;
     const label = baseName(n.id);
     const ty = y + r + 3 / scale;
@@ -436,7 +444,7 @@ export function MapView() {
 
       <div className="map-legend" aria-label="Legend">
         <span><i style={{ background: "var(--hot)" }} />Just now</span>
-        <span><i style={{ background: "var(--warm)" }} />This hour</span>
+        <span><i style={{ background: "var(--warm)" }} />{isReplay() ? "This hour" : lastSeen ? "Since you last looked" : "In the last day"}</span>
         <span><i style={{ background: "var(--cool)" }} />Earlier</span>
         <span><i className="ring" />Agent editing</span>
         <span title="Hover or select a file to see what it imports and what uses it"><i className="line" style={{ background: IMPORTS_COLOR }} />Imports</span>
@@ -446,7 +454,8 @@ export function MapView() {
         </div>
       </div>
 
-      <FilePanel file={sel} root={root} steps={state.steps} edges={map?.edges ?? []} onFocus={focusOnFile} onClose={() => setSelected(null)} />
+      <StepPanel />
+      <FilePanel file={step ? undefined : sel} root={root} steps={state.steps} edges={map?.edges ?? []} onFocus={focusOnFile} onClose={() => setSelected(null)} />
     </div>
   );
 }

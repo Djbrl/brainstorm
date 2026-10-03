@@ -1,6 +1,6 @@
 // Owner: cowork. Places: where the open thread went outside the code. The same screen as the Map (full-screen map,
 // threads sidebar, legend at the bottom); the open thread's panel in the sidebar lists its places (PlaceSteps).
-// Clicking a place opens its step in the side panel, the same step view as in Follow.
+// Clicking a place opens its step in the side panel, the same step view as on the Map and the Track (and the same link: …/places/step/<id>).
 import { useEffect, useMemo } from "react";
 import type { CoworkArea } from "@contract";
 import { useLive } from "../lib/live";
@@ -20,13 +20,20 @@ const ALL = new Set<CoworkArea>(AREAS);
 
 export function PlacesView() {
   const { state } = useLive();
-  const { replay, setLens } = useNav();
+  const { replay, setLens, step: navStep, openStep, closeStep } = useNav();
   const session = state.sessions.find((s) => s.id === replay?.sessionId);
   const { data } = useCowork(replay?.sessionId ?? null, session?.status === "running", state.connected); // a recording is "connected" once loaded
   const { selected, stepId, highlight } = usePlaces();
   useEffect(() => { placesStore.set({ data, selected: null, stepId: null, highlight: null }); }, [replay?.sessionId, !!data]);
   useEffect(() => { if (data) placesStore.set({ data }); }, [data]);
   useEffect(() => () => placesStore.set({ data: null, selected: null, stepId: null, highlight: null }), []);
+  // The step in the panel is the app's open step, so its link, Back and Esc work as everywhere else.
+  useEffect(() => {
+    if (!replay || stepId === navStep) return;
+    if (stepId) openStep(replay.sessionId, stepId); else closeStep();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepId]);
+  useEffect(() => { if (navStep !== placesStore.get().stepId) placesStore.set({ stepId: navStep }); }, [navStep, !!data]);
 
   // The step in the panel, its result, and the other steps in the same place (to step through them).
   const steps = replay ? state.steps[replay.sessionId] : undefined;

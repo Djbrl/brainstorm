@@ -8,9 +8,9 @@ const MAX = 420;
 const cut = (t: string) => (t.length > MAX ? `${t.slice(0, MAX - 1).trimEnd()}…` : t);
 
 export function TalkCard() {
-  const { replay, setLens } = useNav();
+  const { replay, setLens, step } = useNav();
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
-  if (!replay || !thread || thread.sessionId !== replay.sessionId || !thread.beats.length) return null;
+  if (!replay || replay.mode !== "play" || step || !thread || thread.sessionId !== replay.sessionId || !thread.beats.length) return null;
   const beat = thread.beats[Math.min(replay.index, thread.beats.length - 1)];
   const noFiles = thread.touched.size === 0;
   if (!noFiles && beat.moveIndex >= 0) return null; // the tracer is on the map: it tells the story

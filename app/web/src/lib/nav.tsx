@@ -1,17 +1,28 @@
-// Owned by the lead. Cross-view navigation: which view, which session, which file is focused.
-// Thread replay (map) state and hidden agents added by the thread-replay foundation.
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+// Owned by the lead. Where you are in the app, and the links for it.
+//
+// Three levels, one at a time:
+//   /                                   the project: the map at rest, live agents as dots, what changed since you last looked
+//   /thread/<id>                        one thread: its footprint first (the files and places it touched), then its steps or its replay
+//   /thread/<id>/step/<stepId>          one step, in a side panel (its diff, its output, Ask)
+// A thread can be seen three ways, the lens: /thread/<id> (the map), /thread/<id>/track, /thread/<id>/places.
+// Opening or closing a thread, a step or a lens adds a browser history entry, so Back and Esc go up one level. Moving
+// through a replay doesn't. A file opened from disk (a shared replay) keeps the same paths after a `#`.
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { ReplayDetail } from "./thread";
 
-export type View = "follow" | "map" | "failures" | "cowork";
-/** How the Map tab shows the selected thread: where it happened in the code, the story as a vertical track, or the places it went outside the code. */
+/** How a thread is shown: where it happened in the code, the story as a vertical track, or the places it went outside the code. */
 export type Lens = "map" | "track" | "places";
 export type ReplaySpeed = 1 | 2 | 4;
 /**
- * A thread being replayed on the map. `index` is the current beat (see lib/thread.ts) in `detail` mode.
- * `atStep` is a step id to land on once the thread is built (links, Follow, switching detail); the replay layer resolves and clears it.
+ * How much of an open thread is out: its footprint (a summary card and the files it touched), its steps as a list,
+ * or the replay with its player. Each is one click deeper than the last.
  */
-export type ThreadReplay = { sessionId: string; index: number; playing: boolean; speed: ReplaySpeed; detail: ReplayDetail; atStep?: string; live?: boolean };
+export type ThreadMode = "footprint" | "steps" | "play";
+/**
+ * An open thread. `index` is the current beat (see lib/thread.ts) in `detail` mode.
+ * `atStep` is a step id to land on once the thread is built (links, switching detail); the replay layer resolves and clears it.
+ */
+export type ThreadReplay = { sessionId: string; index: number; playing: boolean; speed: ReplaySpeed; detail: ReplayDetail; mode: ThreadMode; atStep?: string; live?: boolean };
 
 /**
  * Map display prefs read by the canvas layers (live agents, thread replay) on every frame.
@@ -19,26 +30,20 @@ export type ThreadReplay = { sessionId: string; index: number; playing: boolean;
  */
 export const mapPrefs: { showReads: boolean } = { showReads: true };
 
-/** The step id at the replay cursor, published by the replay layer while rendering, so the URL can point at a step (stable across detail modes). */
+/** The step id at the replay cursor, published by the replay layer while rendering. */
 export const replayCursor: { stepId: string | null } = { stepId: null };
-/** The thread and step open in Follow, for the Map to pick up when you switch back to it. */
-export const followCursor: { sessionId: string | null; stepId: string | null } = { sessionId: null, stepId: null };
 
 type Nav = {
-  view: View; setView: (v: View) => void;
-  sessionId: string | null; setSessionId: (id: string | null) => void;
   focusFile: string | null; setFocusFile: (p: string | null) => void;
-  /** Jump to the map with a file selected (e.g. from an edit step). */
+  /** Select a file on the map. */
   openFile: (path: string) => void;
-  /** Step to reveal in Follow (set by openStep; Follow selects + scrolls to it, then clears it). */
-  focusStep: string | null; setFocusStep: (id: string | null) => void;
-  /** Jump to Follow with a session selected and a step revealed (e.g. from Failures evidence). */
-  openStep: (sessionId: string, stepId: string) => void;
 
-  /** Thread replay on the map, or null. */
+  /** The open thread, or null on the project overview. */
   replay: ThreadReplay | null;
-  /** Open the map and replay a thread, paused: from a beat index, or from the beat holding a step id. `live` follows its newest step. */
-  startReplay: (sessionId: string, at?: number | string, opts?: { live?: boolean }) => void;
+  /** Open a thread: its footprint unless `mode` says otherwise, landing on a beat index or on the beat holding a step id. `live` follows its newest step. */
+  startReplay: (sessionId: string, at?: number | string, opts?: { live?: boolean; mode?: ThreadMode }) => void;
+  /** Show more or less of the open thread (footprint → steps → play). */
+  setThreadMode: (mode: ThreadMode) => void;
   /** Keep a live replay on the newest beat (called as the thread grows). */
   followLive: (index: number) => void;
   /** Go back to following a running thread live, or stop following. */
@@ -52,7 +57,16 @@ type Nav = {
   setReplayDetail: (detail: ReplayDetail, atStep?: string) => void;
   /** Clear `atStep` after landing on it, at `index`. */
   landReplay: (index: number) => void;
+  /** Close the thread: back to the project. */
   stopReplay: () => void;
+
+  /** The step open in the side panel, or null. */
+  step: string | null;
+  /** Open a step of a thread in the side panel (opening the thread first if needed). */
+  openStep: (sessionId: string, stepId: string) => void;
+  closeStep: () => void;
+  /** Up one level: step → thread → project. */
+  back: () => void;
 
   /** Agents hidden from the map (agent ids: sessionId for main threads, agentId for subagents). */
   hiddenAgents: ReadonlySet<string>;
@@ -74,23 +88,48 @@ function loadHidden(): Set<string> {
   try { return new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? "[]") as string[]); } catch { return new Set(); }
 }
 
+// ---- links ----
+
+type Place = { thread: string | null; step: string | null; lens: Lens };
+const hashMode = typeof location !== "undefined" && location.protocol === "file:"; // a shared .html opened from disk
+
+/** The query a hosted demo needs on every link (?replay=…), kept as is. */
+function keptQuery(): string {
+  const replay = new URLSearchParams(location.search).get("replay");
+  return replay ? `?${new URLSearchParams({ replay })}` : "";
+}
+
+export function pathFor(p: Place): string {
+  if (!p.thread) return "/";
+  let path = `/thread/${encodeURIComponent(p.thread)}${p.lens === "map" ? "" : `/${p.lens}`}`;
+  if (p.step) path += `/step/${encodeURIComponent(p.step)}`;
+  return path;
+}
+
+function readPlace(): Place {
+  const raw = hashMode ? location.hash.replace(/^#/, "") || "/" : location.pathname;
+  const m = /^\/thread\/([^/]+)(?:\/(track|places))?(?:\/step\/([^/]+))?\/?$/.exec(raw);
+  if (m) return { thread: decodeURIComponent(m[1]), lens: (m[2] as Lens) ?? "map", step: m[3] ? decodeURIComponent(m[3]) : null };
+  // Links from before the paths: ?view=map&lens=places&thread=<id>&step=<id> (and ?view=cowork for Places).
+  const q = new URLSearchParams(location.search), thread = q.get("thread");
+  const lens: Lens = q.get("lens") === "track" || q.get("lens") === "places" ? (q.get("lens") as Lens) : q.get("view") === "cowork" ? "places" : "map";
+  return { thread, step: thread ? q.get("step") : null, lens: thread ? lens : "map" };
+}
+
+const hrefFor = (p: Place) => (hashMode ? `${location.pathname}${keptQuery()}#${pathFor(p)}` : `${pathFor(p)}${keptQuery()}`);
+const hereHref = () => (hashMode ? `${location.pathname}${location.search}${location.hash || "#/"}` : `${location.pathname}${location.search}`);
+
 export function NavProvider({ children }: { children: ReactNode }) {
-  const params = new URLSearchParams(location.search);
-  // "cowork" was the old all-sessions Places tab: it now opens the Map tab on the Places view of the selected thread.
-  // Everything opens on the Map, where agents move: Follow is where a click on a step takes you.
-  const [view, setView] = useState<View>(() => { const v = (params.get("view") as View) || "map"; return v === "cowork" ? "map" : v; });
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const first = useRef<Place | null>(null);
+  if (!first.current) first.current = readPlace();
   const [focusFile, setFocusFile] = useState<string | null>(null);
-  const [focusStep, setFocusStep] = useState<string | null>(null);
-  // Deep link: ?view=map&thread=<sessionId>&step=<stepId>[&detail=full]  (older links: &beat=<n>)
   const [replay, setReplay] = useState<ThreadReplay | null>(() => {
-    const t = params.get("thread");
-    if (!t) return null;
-    const detail: ReplayDetail = params.get("detail") === "full" ? "full" : "light";
-    return { sessionId: t, index: Math.max(0, Number(params.get("beat")) || 0), playing: false, speed: 1, detail, atStep: params.get("step") ?? undefined };
+    const f = first.current!;
+    return f.thread ? { sessionId: f.thread, index: 0, playing: false, speed: 1, detail: "light", mode: f.step ? "steps" : "footprint", atStep: f.step ?? undefined } : null;
   });
+  const [step, setStep] = useState<string | null>(first.current.step);
+  const [lens, setLensState] = useState<Lens>(first.current.lens);
   const [hiddenAgents, setHidden] = useState<Set<string>>(loadHidden);
-  const [lens, setLens] = useState<Lens>(() => { const l = params.get("lens"); return l === "track" || l === "places" ? l : params.get("view") === "cowork" ? "places" : "map"; });
   const [showReads, setShowReadsState] = useState<boolean>(() => (mapPrefs.showReads = loadShowReads()));
   const setShowReads = useCallback((v: boolean) => {
     mapPrefs.showReads = v;
@@ -98,54 +137,82 @@ export function NavProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem(READS_KEY, v ? "1" : "0"); } catch { /* storage blocked: resets on reload */ }
   }, []);
 
-  // Keep the view (and a replay) in the URL so a reload (e.g. the dev server reacting to agents editing this very repo) stays put.
+  // The URL follows the place (thread, lens, step): a new history entry per move, except when the move came from the URL.
+  const fromUrl = useRef(true); // the first render matches the URL already (an old ?view= link is rewritten in place)
+  const thread = replay?.sessionId ?? null;
   useEffect(() => {
-    const u = new URL(location.href);
-    u.searchParams.set("view", view);
-    if (lens !== "map") u.searchParams.set("lens", lens); else u.searchParams.delete("lens");
-    u.searchParams.delete("beat");
-    if (replay) {
-      u.searchParams.set("thread", replay.sessionId);
-      const at = replay.atStep ?? replayCursor.stepId;
-      if (at) u.searchParams.set("step", at); else u.searchParams.delete("step");
-      if (replay.detail === "full") u.searchParams.set("detail", "full"); else u.searchParams.delete("detail");
-    } else { u.searchParams.delete("thread"); u.searchParams.delete("step"); u.searchParams.delete("detail"); }
-    if (u.href !== location.href) history.replaceState(null, "", u);
-  }, [view, lens, replay?.sessionId, replay?.index, replay?.detail, replay?.atStep]);
+    const href = hrefFor({ thread, step: thread ? step : null, lens: thread ? lens : "map" });
+    if (href !== hereHref()) {
+      if (fromUrl.current) history.replaceState(null, "", href);
+      else history.pushState(null, "", href);
+    }
+    fromUrl.current = false;
+  }, [thread, step, lens]);
+
+  // Back and Forward: go where the URL says.
+  useEffect(() => {
+    const onPop = () => {
+      const p = readPlace();
+      fromUrl.current = true;
+      setLensState(p.lens);
+      setStep(p.step);
+      setReplay((r) => {
+        if (!p.thread) { replayCursor.stepId = null; return null; }
+        if (r && r.sessionId === p.thread) return p.step ? { ...r, atStep: p.step, playing: false, mode: r.mode === "footprint" ? "steps" : r.mode } : r;
+        return { sessionId: p.thread, index: 0, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: p.step ? "steps" : "footprint", atStep: p.step ?? undefined };
+      });
+    };
+    addEventListener(hashMode ? "hashchange" : "popstate", onPop);
+    return () => removeEventListener(hashMode ? "hashchange" : "popstate", onPop);
+  }, []);
 
   useEffect(() => {
     try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hiddenAgents])); } catch { /* storage blocked: hidden agents reset on reload */ }
   }, [hiddenAgents]);
 
-  const openFile = (p: string) => { setFocusFile(p); setView("map"); };
-  const openStep = (sid: string, stepId: string) => { setSessionId(sid); setFocusStep(stepId); setView("follow"); };
-
-  const startReplay = useCallback((sid: string, at: number | string = 0, opts?: { live?: boolean }) => {
+  const startReplay = useCallback((sid: string, at: number | string = 0, opts?: { live?: boolean; mode?: ThreadMode }) => {
     setReplay((r) => ({
-      sessionId: sid, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light",
+      sessionId: sid, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: opts?.mode ?? "footprint",
       index: typeof at === "number" ? Math.max(0, at) : 0, atStep: typeof at === "string" ? at : undefined, live: !!opts?.live,
     }));
-    setView("map");
+    setStep(null);
   }, []);
+  const stopReplay = useCallback(() => { replayCursor.stepId = null; setReplay(null); setStep(null); }, []);
+  const setThreadMode = useCallback((mode: ThreadMode) => setReplay((r) => (r ? { ...r, mode, playing: mode === "play" ? r.playing : false } : r)), []);
+  const openFile = useCallback((p: string) => { setFocusFile(p); setLensState("map"); }, []);
+  const setLens = useCallback((l: Lens) => { setLensState(l); setStep(null); }, []);
   // Moving the cursor by hand stops following live; followLive is the only setter that keeps it.
   const setReplayIndex = useCallback((i: number | ((prev: number) => number)) =>
     setReplay((r) => (r ? { ...r, live: false, index: Math.max(0, typeof i === "function" ? i(r.index) : i) } : r)), []);
   const followLive = useCallback((i: number) => setReplay((r) => (r && r.live && r.index !== i ? { ...r, index: Math.max(0, i), atStep: undefined } : r)), []);
-  const setReplayLive = useCallback((live: boolean) => setReplay((r) => (r ? { ...r, live, playing: false } : r)), []);
-  const setReplayPlaying = useCallback((playing: boolean) => setReplay((r) => (r ? { ...r, playing, live: playing ? false : r.live } : r)), []);
+  const setReplayLive = useCallback((live: boolean) => setReplay((r) => (r ? { ...r, live, playing: false, mode: live ? "play" : r.mode } : r)), []);
+  const setReplayPlaying = useCallback((playing: boolean) => setReplay((r) => (r ? { ...r, playing, live: playing ? false : r.live, mode: playing ? "play" : r.mode } : r)), []);
   const setReplaySpeed = useCallback((speed: ReplaySpeed) => setReplay((r) => (r ? { ...r, speed } : r)), []);
   const setReplayDetail = useCallback((detail: ReplayDetail, atStep?: string) =>
     setReplay((r) => (r ? { ...r, detail, playing: false, atStep: atStep ?? replayCursor.stepId ?? undefined } : r)), []);
   const landReplay = useCallback((index: number) => setReplay((r) => (r ? { ...r, index: Math.max(0, index), atStep: undefined } : r)), []);
-  const stopReplay = useCallback(() => { replayCursor.stepId = null; setReplay(null); }, []);
+
+  const openStep = useCallback((sid: string, stepId: string) => {
+    setReplay((r) => (r && r.sessionId === sid
+      ? { ...r, atStep: stepId, playing: false, live: false, mode: r.mode === "footprint" ? "steps" : r.mode }
+      : { sessionId: sid, index: 0, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: "steps", atStep: stepId }));
+    setStep(stepId);
+  }, []);
+  const closeStep = useCallback(() => setStep(null), []);
+  const back = useCallback(() => {
+    if (step) { setStep(null); return; }
+    if (replay && replay.mode !== "footprint") { setThreadMode("footprint"); return; }
+    if (replay) stopReplay();
+  }, [step, replay, setThreadMode, stopReplay]);
 
   const toggleAgent = useCallback((id: string) => setHidden((h) => { const n = new Set(h); if (n.has(id)) n.delete(id); else n.add(id); return n; }), []);
   const setHiddenAgents = useCallback((ids: Iterable<string>) => setHidden(new Set(ids)), []);
 
   return (
     <Ctx.Provider value={{
-      view, setView, sessionId, setSessionId, focusFile, setFocusFile, openFile, focusStep, setFocusStep, openStep,
-      replay, startReplay, setReplayIndex, setReplayPlaying, setReplaySpeed, setReplayDetail, landReplay, stopReplay, followLive, setReplayLive, lens, setLens,
+      focusFile, setFocusFile, openFile,
+      replay, startReplay, setThreadMode, setReplayIndex, setReplayPlaying, setReplaySpeed, setReplayDetail, landReplay, stopReplay, followLive, setReplayLive, lens, setLens,
+      step, openStep, closeStep, back,
       hiddenAgents, toggleAgent, setHiddenAgents, showReads, setShowReads,
     }}>{children}</Ctx.Provider>
   );

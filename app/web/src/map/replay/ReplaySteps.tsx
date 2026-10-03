@@ -1,13 +1,12 @@
 // Owner: replay agent. Scrollable step list shown in the sidebar's Threads tab during a replay.
 // The list follows the replay cursor, and scrolling the list moves the cursor (beat nearest the center line).
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Diff } from "../../lib/Diff";
 import type { Step } from "@contract";
 import { isReplay, useLive } from "../../lib/live";
 import { useNav } from "../../lib/nav";
 import { beatLabel, countParts, isFailedResult, useThread, type Beat } from "../../lib/thread";
 import { Glyph } from "../../follow/Glyph";
-import { basename, clockTime, displayLabel, resultText, stepFile, stripInjected } from "../../follow/format";
+import { basename, clockTime, displayLabel, stepFile } from "../../follow/format";
 import "./replay.css";
 
 const ROW_H = 52;          // collapsed row height, keep in sync with replay.css
@@ -15,44 +14,12 @@ const USER_MS = 400;       // the list stops following the cursor this long afte
 
 type RowState = "done" | "current" | "todo";
 
-const diffStyles = {
-  variables: {
-    light: {
-      diffViewerBackground: "#ffffff", diffViewerColor: "#1d1d1f",
-      addedBackground: "#eaf7ef", addedColor: "#1d1d1f", removedBackground: "#fdeeee", removedColor: "#1d1d1f",
-      wordAddedBackground: "#c6ecd4", wordRemovedBackground: "#f8cfcf",
-      addedGutterBackground: "#dff3e6", removedGutterBackground: "#fbe3e3",
-      gutterBackground: "#fbfbfd", gutterColor: "#a1a1a6", emptyLineBackground: "#ffffff",
-      codeFoldGutterBackground: "#f4f4f8", codeFoldBackground: "#f7f7fa", codeFoldContentColor: "#86868b",
-    },
-  },
-  contentText: { fontFamily: "var(--font-mono)", fontSize: "11.5px", lineHeight: "1.5 !important" },
-  lineNumber: { fontSize: "10.5px" },
-  gutter: { minWidth: "28px", padding: "0 4px" },
-};
 
-function editPair(s: Step): { before: string; after: string } | null {
-  if (s.diff) return s.diff;
-  const i = s.input && typeof s.input === "object" ? (s.input as Record<string, unknown>) : {};
-  if (typeof i.old_string === "string" || typeof i.new_string === "string") return { before: String(i.old_string ?? ""), after: String(i.new_string ?? "") };
-  if (typeof i.content === "string") return { before: "", after: i.content };
-  if (Array.isArray(i.edits)) {
-    const edits = i.edits as { old_string?: string; new_string?: string }[];
-    return { before: edits.map((e) => e.old_string ?? "").join("\n\n"), after: edits.map((e) => e.new_string ?? "").join("\n\n") };
-  }
-  return null;
-}
 
-function preview(s: Step): string {
-  const i = s.input && typeof s.input === "object" ? (s.input as Record<string, unknown>) : {};
-  const t = typeof i.command === "string" ? `$ ${i.command}` : s.kind === "tool_result" ? resultText(s) : stripInjected(s.text ?? "");
-  const clean = t.trim();
-  return clean.length > 600 ? `${clean.slice(0, 599)}…` : clean;
-}
 
 const SUMMARY_ROWS = 8;
 
-/** A summary or read group, expanded: its notable steps, each opening Follow at that step. */
+/** A summary or read group, expanded: its notable steps, each opening in the side panel. */
 function GroupDetail({ beat, sessionId }: { beat: Beat; sessionId: string }) {
   const { openStep } = useNav();
   const failedCalls = useMemo(() => {
@@ -78,7 +45,7 @@ function GroupDetail({ beat, sessionId }: { beat: Beat; sessionId: string }) {
       <ul className="rp-sub">
         {shown.map(({ st, label, n, failed }) => (
           <li key={st.id}>
-            <button className={failed ? "fail" : ""} onClick={() => openStep(sessionId, st.id)} title="Open in Follow">
+            <button className={failed ? "fail" : ""} onClick={() => openStep(sessionId, st.id)} title="Open this step">
               <span className="rp-glyph sm" aria-hidden="true"><Glyph kind={st.kind} tool={st.tool} size={12} /></span>
               <span className="rp-sub-label">{label}</span>
               {n > 1 && <span className="rp-sub-count">×{n}</span>}
@@ -87,35 +54,13 @@ function GroupDetail({ beat, sessionId }: { beat: Beat; sessionId: string }) {
           </li>
         ))}
       </ul>
-      <button className="rp-link" onClick={() => openStep(sessionId, beat.step.id)}>
-        {more > 0 ? `${more} more ${more === 1 ? "step" : "steps"}: open in Follow` : "Open in Follow"}
-      </button>
+      {more > 0 && <button className="rp-link" onClick={() => openStep(sessionId, shown[shown.length - 1].st.id)}>{more} more {more === 1 ? "step" : "steps"}: walk through them with ‹ ›</button>}
     </div>
   );
 }
 
-function BeatDetail({ beat, sessionId }: { beat: Beat; sessionId: string }) {
-  const { openStep } = useNav();
-  const s = beat.step;
-  if (beat.kind === "summary" || (beat.kind === "reads" && beat.steps.filter((x) => x.kind === "tool_call").length > 1)) return <GroupDetail beat={beat} sessionId={sessionId} />;
-  const pair = useMemo(() => (s.kind === "edit" ? editPair(s) : null), [s]);
-  const lines = pair ? pair.before.split("\n").length + pair.after.split("\n").length : 0;
-  const text = s.kind === "edit" ? "" : preview(s);
-  return (
-    <div className="rp-detail">
-      {s.kind === "edit" ? (
-        pair ? (
-          <div className="rp-diff">
-            {lines > 600 ? <p className="rp-quiet">Large change, {lines} lines. Open it in Follow to read it.</p>
-              : <Diff oldValue={pair.before} newValue={pair.after} splitView={false} showDiffOnly extraLinesSurroundingDiff={1} hideSummary styles={diffStyles} />}
-          </div>
-        ) : <p className="rp-quiet">No diff recorded for this edit.</p>
-      ) : text ? <pre className="rp-pre">{text}</pre> : null}
-      {s.filePath && <p className="rp-path" title={s.filePath}>{s.filePath}</p>}
-      <button className="rp-link" onClick={() => openStep(sessionId, s.id)}>Open in Follow at this step</button>
-    </div>
-  );
-}
+/** A moment that holds several steps (a summary, a run of reads): it unfolds in the list. A single step opens in the side panel. */
+const isGroup = (beat: Beat) => beat.kind === "summary" || (beat.kind === "reads" && beat.steps.filter((x) => x.kind === "tool_call").length > 1);
 
 const Row = memo(function Row({ beat, state, expanded, sessionId, onPick }: {
   beat: Beat; state: RowState; expanded: boolean; sessionId: string; onPick: (i: number) => void;
@@ -146,7 +91,7 @@ const Row = memo(function Row({ beat, state, expanded, sessionId, onPick }: {
           </span>
         </span>
       </button>
-      {expanded && <BeatDetail beat={beat} sessionId={sessionId} />}
+      {expanded && isGroup(beat) && <GroupDetail beat={beat} sessionId={sessionId} />}
     </div>
   );
 });
@@ -156,9 +101,10 @@ function SummaryGlyph() {
 }
 
 export function ReplaySteps() {
-  const { replay, setReplayIndex, setReplayPlaying } = useNav();
+  const { replay, setReplayIndex, setReplayPlaying, openStep } = useNav();
   const { state } = useLive();
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
+  const threadRef = useRef(thread); threadRef.current = thread;
   const listRef = useRef<HTMLDivElement>(null);
   const userAt = useRef(0);
   const dragging = useRef(false);
@@ -172,7 +118,11 @@ export function ReplaySteps() {
   const playingRef = useRef(playing); playingRef.current = playing;
   const indexRef = useRef(index); indexRef.current = index;
 
-  const onPick = useCallback((i: number) => { setReplayPlaying(false); setReplayIndex(i); userAt.current = 0; }, [setReplayIndex, setReplayPlaying]);
+  const onPick = useCallback((i: number) => {
+    setReplayPlaying(false); setReplayIndex(i); userAt.current = 0;
+    const beat = threadRef.current?.beats[i];
+    if (beat && !isGroup(beat) && replay) openStep(replay.sessionId, beat.step.id); // one step: open it beside the list
+  }, [setReplayIndex, setReplayPlaying, openStep, replay?.sessionId]);
 
   // Any real scroll input from the user (wheel, touch, scrollbar drag, keys).
   const markUser = useCallback(() => {

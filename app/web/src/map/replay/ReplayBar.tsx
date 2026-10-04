@@ -1,9 +1,11 @@
 // Owner: replay agent. The map's floating footer: Replay and the legend in one pill, and the player above it when you
 // ask for it. The player is only what playing needs: back, play, forward, a timeline cut by chapter (red where one
 // failed), speed and hide. The rest moved: the step panel follows the cursor (no "Open step"), the camera recenters
-// itself, "Every step" is under the step list, and Share is on the thread's card.
+// itself, "Every step" is under the step list. With a thread open the pill leads with what you can do with it:
+// Replay (or Live, for a running thread) and Share.
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNav, type ReplaySpeed } from "../../lib/nav";
+import { isReplay, useLive } from "../../lib/live";
 import { useThread, type Thread } from "../../lib/thread";
 import { chaptersOf } from "../../lib/chapters";
 import { togglePlay } from "./layer";
@@ -102,25 +104,34 @@ function Player() {
   );
 }
 
-/** The footer pill: Replay (with a thread open) and the legend, which the view passes in. The player rises above it. */
+/**
+ * The footer pill: with a thread open, Replay (Live for a running thread) and Share, then the legend, which the view
+ * passes in. The player rises above it while replaying.
+ */
 export function Dock({ children }: { children: ReactNode }) {
-  const { replay, setReplayIndex, setReplayPlaying, setThreadMode } = useNav();
+  const { state } = useLive();
+  const { replay, setReplayIndex, setReplayPlaying, setThreadMode, setReplayLive } = useNav();
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
+  const running = !!replay && state.sessions.find((s) => s.id === replay.sessionId)?.status === "running";
   const on = replay?.mode === "play";
   const toggle = () => {
     if (on) { setThreadMode("steps"); return; }
     const len = thread?.beats.length ?? 0;
-    togglePlay(Math.min(replay?.index ?? 0, Math.max(0, len - 1)), len, false, setReplayIndex, setReplayPlaying);
+    togglePlay(Math.min(replay?.index ?? 0, Math.max(0, len - 1)), len, false, setReplayIndex, setReplayPlaying); // from the start at the end
   };
   return (
     <div className="dock">
       {on && <Player />}
       <div className="dock-pill">
-        {replay && (
-          <button className={`dock-replay${on ? " on" : ""}`} onClick={toggle} disabled={!thread?.beats.length} aria-pressed={on}>
-            {Icon.small}{on ? "Hide replay" : "Replay"}
-          </button>
-        )}
+        {replay && (running && !on
+          ? <button className={`dock-replay live${replay.live ? " on" : ""}`} onClick={() => setReplayLive(!replay.live)} aria-pressed={!!replay.live}
+              title={replay.live ? "Following its newest step. Click to stop" : "Jump to its newest step and follow it"}>
+              <i className="dock-live-dot" aria-hidden="true" />{replay.live ? "Live" : "Follow live"}
+            </button>
+          : <button className={`dock-replay${on ? " on" : ""}`} onClick={toggle} disabled={!thread?.beats.length} aria-pressed={on}>
+              {Icon.small}{on ? "Hide replay" : "Replay"}
+            </button>)}
+        {replay && !isReplay() && <ShareMenu sessionId={replay.sessionId} className="dock-share" />}
         {children}
       </div>
     </div>

@@ -2,7 +2,7 @@
 //
 // Three levels, one at a time:
 //   /                                   the project: the map at rest, live agents as dots, what changed since you last looked
-//   /thread/<id>                        one thread: its footprint first (the files and places it touched), then its steps or its replay
+//   /thread/<id>                        one thread: its steps, at the end (a running one follows live); its replay from the footer
 //   /thread/<id>/step/<stepId>          one step, in a side panel (its diff, its output, Ask)
 // A thread can be seen three ways, the lens: /thread/<id> (the map), /thread/<id>/track, /thread/<id>/places.
 // Opening or closing a thread, a step or a lens adds a browser history entry, so Back and Esc go up one level. Moving
@@ -14,10 +14,12 @@ import type { ReplayDetail } from "./thread";
 export type Lens = "map" | "track" | "places";
 export type ReplaySpeed = 1 | 2 | 4;
 /**
- * How much of an open thread is out: its footprint (a summary card and the files it touched), its steps as a list,
- * or the replay with its player. Each is one click deeper than the last.
+ * How much of an open thread is out: its steps as a list (what opening a thread shows), or the replay with its player
+ * (from the footer). "footprint", the files it touched all lit at once with no tracer, is no longer opened by the UI.
  */
 export type ThreadMode = "footprint" | "steps" | "play";
+/** Open a thread at its end: the index is clamped to its last moment once it loads (a running one then follows live). */
+export const END = Number.MAX_SAFE_INTEGER;
 /**
  * An open thread. `index` is the current beat (see lib/thread.ts) in `detail` mode.
  * `atStep` is a step id to land on once the thread is built (links, switching detail); the replay layer resolves and clears it.
@@ -127,7 +129,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
   const [focusFile, setFocusFile] = useState<string | null>(null);
   const [replay, setReplay] = useState<ThreadReplay | null>(() => {
     const f = first.current!;
-    return f.thread ? { sessionId: f.thread, index: 0, playing: false, speed: 1, detail: "light", mode: f.step ? "steps" : "footprint", atStep: f.step ?? undefined } : null;
+    return f.thread ? { sessionId: f.thread, index: END, playing: false, speed: 1, detail: "light", mode: "steps", atStep: f.step ?? undefined } : null;
   });
   const [step, setStep] = useState<string | null>(first.current.step);
   const [lens, setLensState] = useState<Lens>(first.current.lens);
@@ -163,7 +165,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
       setReplay((r) => {
         if (!p.thread) { replayCursor.stepId = null; return null; }
         if (r && r.sessionId === p.thread) return p.step ? { ...r, atStep: p.step, playing: false, mode: r.mode === "footprint" ? "steps" : r.mode } : r;
-        return { sessionId: p.thread, index: 0, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: p.step ? "steps" : "footprint", atStep: p.step ?? undefined };
+        return { sessionId: p.thread, index: END, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: "steps", atStep: p.step ?? undefined };
       });
     };
     addEventListener(hashMode ? "hashchange" : "popstate", onPop);
@@ -176,7 +178,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
 
   const startReplay = useCallback((sid: string, at: number | string = 0, opts?: { live?: boolean; mode?: ThreadMode }) => {
     setReplay((r) => ({
-      sessionId: sid, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: opts?.mode ?? "footprint",
+      sessionId: sid, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: opts?.mode ?? "steps",
       index: typeof at === "number" ? Math.max(0, at) : 0, atStep: typeof at === "string" ? at : undefined, live: !!opts?.live,
     }));
     setStep(null);
@@ -189,7 +191,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
   const setReplayIndex = useCallback((i: number | ((prev: number) => number)) =>
     setReplay((r) => (r ? { ...r, live: false, index: Math.max(0, typeof i === "function" ? i(r.index) : i) } : r)), []);
   const followLive = useCallback((i: number) => setReplay((r) => (r && r.live && r.index !== i ? { ...r, index: Math.max(0, i), atStep: undefined } : r)), []);
-  const setReplayLive = useCallback((live: boolean) => setReplay((r) => (r ? { ...r, live, playing: false, mode: live ? "play" : r.mode } : r)), []);
+  const setReplayLive = useCallback((live: boolean) => setReplay((r) => (r ? { ...r, live, playing: false, mode: r.mode === "footprint" ? "steps" : r.mode } : r)), []);
   const setReplayPlaying = useCallback((playing: boolean) => setReplay((r) => (r ? { ...r, playing, live: playing ? false : r.live, mode: playing ? "play" : r.mode } : r)), []);
   const setReplaySpeed = useCallback((speed: ReplaySpeed) => setReplay((r) => (r ? { ...r, speed } : r)), []);
   const setReplayDetail = useCallback((detail: ReplayDetail, atStep?: string) =>
@@ -206,7 +208,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
   const closeStep = useCallback(() => setStep(null), []);
   const back = useCallback(() => {
     if (step) { setStep(null); return; }
-    if (replay && replay.mode !== "footprint") { setThreadMode("footprint"); return; }
+    if (replay?.mode === "play") { setThreadMode("steps"); return; }
     if (replay) stopReplay();
   }, [step, replay, setThreadMode, stopReplay]);
 

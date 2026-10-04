@@ -25,7 +25,7 @@ function Crumbs({ project }: { project: string }) {
       {replay && <>
         <span className="sep" aria-hidden="true">›</span>
         {step ? <button onClick={closeStep}>{session?.title || "Thread"}</button>
-          : <button className="here" aria-current="page" onClick={() => setThreadMode("footprint")}>{session?.title || "Thread"}</button>}
+          : <button className="here" aria-current="page" onClick={() => setThreadMode("steps")}>{session?.title || "Thread"}</button>}
       </>}
       {replay && step && <>
         <span className="sep" aria-hidden="true">›</span>

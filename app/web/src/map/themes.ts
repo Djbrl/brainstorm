@@ -18,6 +18,8 @@ export type MapStyle = {
   markerStroke: string; markerText: string; glow: boolean;
   /** Agent trails: soft curves, or right angles like a locator line. */
   trail: "curve" | "elbow";
+  /** How an agent travels between files: a straight glide, or along metro track (straight, 45°, straight). The trail follows the same route. */
+  route: "glide" | "metro";
   /** Subagent colours (main threads take the theme's accent). */
   palette: string[];
 };
@@ -28,14 +30,14 @@ const BASE: MapStyle = {
   moduleInk: "rgba(29,29,31,0.2)", moduleInkLively: "rgba(29,29,31,0.34)",
   linkIdle: "rgba(29,29,31,0.08)", linkDim: "rgba(29,29,31,0.04)",
   imports: "rgba(91,91,214,0.7)", usedBy: "rgba(15,157,138,0.7)",
-  markerStroke: "#fff", markerText: "#fff", glow: false, trail: "curve",
+  markerStroke: "#fff", markerText: "#fff", glow: false, trail: "curve", route: "glide",
   palette: ["#2f7ae5", "#0f9d8a", "#c2409a", "#7c4dde", "#2e9e4f", "#0b8fb3", "#b5487a", "#4a6fa5"],
 };
 
 const STYLES: Record<ThemeId, MapStyle> = {
   default: BASE,
   metro: {
-    ...BASE, node: "station", link: "metro", moduleColored: true,
+    ...BASE, node: "station", link: "metro", moduleColored: true, route: "metro",
     halo: "rgba(255,255,255,0.95)", moduleInk: "rgba(29,29,31,0.55)", moduleInkLively: "rgba(29,29,31,0.8)",
   },
   ps2: {
@@ -121,11 +123,33 @@ export function drawStation(ctx: CanvasRenderingContext2D, x: number, y: number,
   ctx.strokeStyle = ring; ctx.stroke();
 }
 
-/** The path a metro line takes between two stations: straight, then 45°, then straight. */
-export function metroPath(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
+/** The corners of a metro track between two points: straight, then 45°, then straight. */
+export function metroPoints(x1: number, y1: number, x2: number, y2: number): Pt2[] {
   const dx = x2 - x1, dy = y2 - y1, ax = Math.abs(dx), ay = Math.abs(dy);
-  ctx.beginPath(); ctx.moveTo(x1, y1);
-  if (ax >= ay) { const h = ((ax - ay) / 2) * Math.sign(dx); ctx.lineTo(x1 + h, y1); ctx.lineTo(x2 - h, y2); }
-  else { const v = ((ay - ax) / 2) * Math.sign(dy); ctx.lineTo(x1, y1 + v); ctx.lineTo(x2, y2 - v); }
-  ctx.lineTo(x2, y2);
+  if (ax >= ay) { const h = ((ax - ay) / 2) * Math.sign(dx); return [[x1, y1], [x1 + h, y1], [x2 - h, y2], [x2, y2]]; }
+  const v = ((ay - ax) / 2) * Math.sign(dy); return [[x1, y1], [x1, y1 + v], [x2, y2 - v], [x2, y2]];
 }
+export type Pt2 = [number, number];
+
+/** Starts a path along a metro track (the caller strokes it). */
+export function metroPath(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
+  const pts = metroPoints(x1, y1, x2, y2);
+  ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+}
+
+/** The point a fraction k (0..1) of the way along a polyline, by length: an agent riding the track. */
+export function along(pts: Pt2[], k: number): { x: number; y: number } {
+  const seg: number[] = []; let total = 0;
+  for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg.push(d); total += d; }
+  let left = Math.max(0, Math.min(1, k)) * total;
+  for (let i = 1; i < pts.length; i++) {
+    const d = seg[i - 1];
+    if (left <= d || i === pts.length - 1) { const f = d ? Math.min(1, left / d) : 1; return { x: pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * f, y: pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * f }; }
+    left -= d;
+  }
+  return { x: pts[pts.length - 1][0], y: pts[pts.length - 1][1] };
+}
+
+/** How long a trip takes: a bent metro route is longer than a glide, so it gets a little more time, capped so a fast replay keeps up. */
+export const tripMs = (route: MapStyle["route"], glideMs: number) => (route === "metro" ? Math.round(glideMs * 1.45) : glideMs);

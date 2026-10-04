@@ -5,6 +5,7 @@ import type { ForceGraphMethods } from "react-force-graph-2d";
 import { mapPrefs, replayCursor, useNav } from "../../lib/nav";
 import { useThread, type Thread } from "../../lib/thread";
 import { replayCamera, USER_CAMERA_MS } from "./store";
+import { along, mapStyle, metroPath, metroPoints, tripMs } from "../themes";
 
 export type NodePos = { x?: number; y?: number; r: number };
 
@@ -265,9 +266,9 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     if (target) {
       if (a.file === null) { a.x = a.fromX = target.x; a.y = a.fromY = target.y; a.t0 = -1e9; a.file = curFile; }
       else if (a.file !== curFile) { a.fromX = a.x; a.fromY = a.y; a.t0 = t; a.file = curFile; }
-      const e = ease(Math.min(1, (t - a.t0) / GLIDE_MS));
-      a.x = a.fromX + (target.x - a.fromX) * e;
-      a.y = a.fromY + (target.y - a.fromY) * e;
+      const route = mapStyle().route, p = Math.min(1, (t - a.t0) / tripMs(route, GLIDE_MS)), e = ease(p);
+      if (route === "metro" && p < 1) { const q = along(metroPoints(a.fromX, a.fromY, target.x, target.y), e); a.x = q.x; a.y = q.y; }  // ride the track
+      else { a.x = a.fromX + (target.x - a.fromX) * e; a.y = a.fromY + (target.y - a.fromY) * e; }
     } else if (!curFile) {
       a.file = null;
     }
@@ -288,9 +289,8 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
       ctx.strokeStyle = accent;
       ctx.lineWidth = (old ? 1 : 1.1 + 2 * w) / scale;
       const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2, dx = p1.x - p0.x, dy = p1.y - p0.y;
-      ctx.beginPath();
-      ctx.moveTo(p0.x, p0.y);
-      ctx.quadraticCurveTo(mx - dy * 0.15, my + dx * 0.15, p1.x, p1.y);
+      if (mapStyle().route === "metro") metroPath(ctx, p0.x, p0.y, p1.x, p1.y);              // the track it rode
+      else { ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.quadraticCurveTo(mx - dy * 0.15, my + dx * 0.15, p1.x, p1.y); }
       ctx.stroke();
     }
 

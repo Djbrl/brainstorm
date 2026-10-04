@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import type { AgentPresence } from "@contract";
 import { clock } from "../lib/live";
-import { mapStyle } from "./themes";
+import { along, mapStyle, metroPath, metroPoints, tripMs } from "./themes";
 
 // Colors that do not clash with the recency scale (orange/amber/grey). Main threads get the accent.
 const PALETTE = ["#2f7ae5", "#0f9d8a", "#c2409a", "#7c4dde", "#2e9e4f", "#0b8fb3", "#b5487a", "#4a6fa5"];
@@ -161,10 +161,10 @@ export function drawAgents(opts: {
         anim.set(a.id, st);
       }
       if (st.file !== key) { st.fromX = st.x; st.fromY = st.y; st.t0 = t; st.file = key; }
-      const p = Math.min(1, (t - st.t0) / GLIDE_MS);
+      const p = Math.min(1, (t - st.t0) / tripMs(style.route, GLIDE_MS));
       const e = ease(p);
-      st.x = st.fromX + (tx - st.fromX) * e;
-      st.y = st.fromY + (ty - st.fromY) * e;
+      if (style.route === "metro" && p < 1) { const q = along(metroPoints(st.fromX, st.fromY, tx, ty), e); st.x = q.x; st.y = q.y; }  // ride the track
+      else { st.x = st.fromX + (tx - st.fromX) * e; st.y = st.fromY + (ty - st.fromY) * e; }
       const idle = now - Date.parse(a.ts);
       const target = a.active ? 1 : Math.max(0, 0.35 * (1 - (idle - 2 * 60_000) / (8 * 60_000)));
       st.alpha += (target - st.alpha) * 0.08;
@@ -205,10 +205,13 @@ export function drawAgents(opts: {
           ctx.lineWidth = (1.2 + 1.6 * w) / scale;
           const mx = (a0.x + a1.x) / 2, my = (a0.y + a1.y) / 2;
           const dx = a1.x - a0.x, dy = a1.y - a0.y;
-          ctx.beginPath();
-          ctx.moveTo(a0.x, a0.y);
-          if (style.trail === "elbow") { ctx.lineTo(a1.x, a0.y); ctx.lineTo(a1.x, a1.y); }   // a locator line: right angles
-          else ctx.quadraticCurveTo(mx - dy * 0.15, my + dx * 0.15, a1.x, a1.y);
+          if (style.route === "metro") metroPath(ctx, a0.x, a0.y, a1.x, a1.y);                 // the track it rode
+          else {
+            ctx.beginPath();
+            ctx.moveTo(a0.x, a0.y);
+            if (style.trail === "elbow") { ctx.lineTo(a1.x, a0.y); ctx.lineTo(a1.x, a1.y); }   // a locator line: right angles
+            else ctx.quadraticCurveTo(mx - dy * 0.15, my + dx * 0.15, a1.x, a1.y);
+          }
           if (style.glow) { ctx.shadowColor = color; ctx.shadowBlur = 8; }
           ctx.stroke();
           ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;

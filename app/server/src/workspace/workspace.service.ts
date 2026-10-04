@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { closeSync, existsSync, openSync, readdirSync, readSync, statSync } from "node:fs";
+import { closeSync, existsSync, openSync, readdirSync, readSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { homedir } from "node:os";
 import type { SetupStatus, SetupStep, WorkspaceSuggestion } from "../types";
@@ -15,6 +15,7 @@ import { ReaderService } from "../reader/reader.service";
 
 const execFileP = promisify(execFile);
 const encodeRoot = (root: string) => root.replace(/[^A-Za-z0-9-]/g, "-");
+const real = (p: string) => { try { return realpathSync(p); } catch { return p; } };
 
 /** Turn a Claude Code project folder name back into a real path by walking the filesystem ("-Users-me-my-app" → /Users/me/my-app). */
 function decodeProjectDir(name: string): string | null {
@@ -45,7 +46,6 @@ function claudeCandidates(): string[] {
   return list;
 }
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-const MAX_SUGGESTIONS = 12;
 const CWD_READ_BYTES = 64 * 1024;
 const POLL_MS = 300;
 const POLL_TIMEOUT_MS = 5 * 60_000;
@@ -103,7 +103,11 @@ export class WorkspaceService implements OnModuleInit {
     return { root: this.root, name: basename(this.root), ready, steps };
   }
 
-  /** Recent Claude Code projects, most recently active first (owner: S). Must stay fast (<300ms). */
+  /**
+   * Every Claude Code project on this machine, most recently active first (owner: S). Must stay fast (<300ms).
+   * One entry per repo: its worktrees count towards it (even when every thread ran in a worktree), and so do the
+   * folders it lived in before it moved (a symlink left behind, or a folder of the same name that's gone).
+   */
   suggestions(): WorkspaceSuggestion[] {
     let dirs: string[];
     try {
@@ -114,7 +118,17 @@ export class WorkspaceService implements OnModuleInit {
     }
 
     const byRoot = new Map<string, WorkspaceSuggestion>();
-    const worktrees: { root: string; parentRoot: string; sessions: number; lastActiveAt: string }[] = [];
+    const ids = new Map<string, Set<string>>(); // thread ids per repo: a move can leave a copy of a thread in the old folder
+    const add = (root: string, threads: Iterable<string>, lastActiveAt: string) => {
+      const seen = ids.get(root) ?? ids.set(root, new Set()).get(root)!;
+      for (const t of threads) seen.add(t);
+      const existing = byRoot.get(root);
+      if (!existing) byRoot.set(root, { root, name: basename(root), lastActiveAt, sessions: seen.size, exists: existsSync(root) });
+      else {
+        existing.sessions = seen.size;
+        if (lastActiveAt > (existing.lastActiveAt ?? "")) existing.lastActiveAt = lastActiveAt;
+      }
+    };
 
     for (const d of dirs) {
       const dirPath = join(this.cfg.claudeProjectsDir, d);
@@ -134,7 +148,6 @@ export class WorkspaceService implements OnModuleInit {
       if (!jsonlFiles.length) continue;
 
       jsonlFiles.sort((a, b) => b.mtimeMs - a.mtimeMs);
-      const newest = jsonlFiles[0];
       // The folder name is the project root with every non [A-Za-z0-9-] char replaced by "-". A session's cwd can
       // drift into a subfolder, so try the cwds of the newest few sessions and their ancestors for an exact match.
       const decoded = decodeProjectDir(d);
@@ -147,37 +160,19 @@ export class WorkspaceService implements OnModuleInit {
         }
       }
       if (/\/Library\/Application Support\//.test(root)) continue; // Claude Desktop's own scratch folders
-      const lastActiveAt = new Date(newest.mtimeMs).toISOString();
-      const sessions = jsonlFiles.length;
-      const exists = existsSync(root);
-
-      // Git worktrees belong to their parent repo, not to their own suggestion.
-      const wtMatch = root.match(/^(.*)[/\\]\.claude[/\\]worktrees[/\\][^/\\]+$/);
-      if (wtMatch) {
-        worktrees.push({ root, parentRoot: resolve(wtMatch[1]), sessions, lastActiveAt });
-        continue;
-      }
-
-      const existing = byRoot.get(root);
-      if (existing) {
-        existing.sessions += sessions;
-        if (lastActiveAt > (existing.lastActiveAt ?? "")) existing.lastActiveAt = lastActiveAt;
-        existing.exists = existing.exists || exists;
-      } else {
-        byRoot.set(root, { root, name: basename(root), lastActiveAt, sessions, exists });
-      }
+      // A worktree (or a folder inside one) belongs to its repo; a folder reached through a symlink, to the real one.
+      add(real(real(root).replace(/\/\.claude\/worktrees\/[^/]+(?:\/.*)?$/, "")), jsonlFiles.map((f) => basename(f.path, ".jsonl")), new Date(jsonlFiles[0].mtimeMs).toISOString());
     }
 
-    for (const wt of worktrees) {
-      const parent = byRoot.get(wt.parentRoot);
-      if (!parent) continue; // no listed parent: skip per spec, worktrees aren't their own suggestion
-      parent.sessions += wt.sessions;
-      if (wt.lastActiveAt > (parent.lastActiveAt ?? "")) parent.lastActiveAt = wt.lastActiveAt;
+    // A repo that moved: its old folder is gone, and one of the same name has threads. Count them together.
+    for (const old of [...byRoot.values()].filter((s) => !s.exists)) {
+      const home = [...byRoot.values()].filter((s) => s.exists && s.name === old.name);
+      if (home.length !== 1) continue;
+      byRoot.delete(old.root);
+      add(home[0].root, ids.get(old.root) ?? [], old.lastActiveAt ?? "");
     }
 
-    return [...byRoot.values()]
-      .sort((a, b) => (b.lastActiveAt ?? "").localeCompare(a.lastActiveAt ?? ""))
-      .slice(0, MAX_SUGGESTIONS);
+    return [...byRoot.values()].sort((a, b) => Number(b.exists) - Number(a.exists) || (b.lastActiveAt ?? "").localeCompare(a.lastActiveAt ?? ""));
   }
 
   // ---- writes ----

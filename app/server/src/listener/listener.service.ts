@@ -8,12 +8,12 @@ import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";
 import { ConfigService } from "../core/config.service";
 import { maskSecrets } from "../privacy/mask";
-import { encodeRoot, formerRoots, underPrefix } from "./moved";
+import { encodeRoot, formerRoots, repoBase, underPrefix } from "./moved";
 
 // Owner: A. Tail ~/.claude/projects/**/*.jsonl, parse into Steps, store, emit on bus, broadcast over ws.
 
-// Threads touched in the last two weeks: enough to find yesterday's and last week's work, not the whole history.
-const HISTORY_MS = 14 * 24 * 60 * 60 * 1000;
+// All of a project's history is loaded: the last two weeks first (the first screen), then older threads a file at a time.
+const RECENT_MS = 14 * 24 * 60 * 60 * 1000;
 const IDLE_AFTER_MS = 2 * 60 * 1000;
 const TEXT_LIMIT = 20_000;
 const TOOL_RESULT_LIMIT = 2_000;
@@ -113,6 +113,7 @@ export class ListenerService implements OnModuleInit {
     this.watcher.on("error", (e) => this.log.warn(`watcher error: ${(e as Error).message}`));
     this.watcher.on("ready", () => {
       this.ready = true;
+      if (!this.sessionFilterOverride) this.backfillForNewFilter(); // the older threads skipped at boot
       this.log.log(`backfill complete, watching ${this.cfg.claudeProjectsDir} live (filter="${this.sessionFilterOverride ?? this.projectFilterPrefixes.join(", ")}")`);
     });
   }
@@ -121,7 +122,9 @@ export class ListenerService implements OnModuleInit {
 
   private setRoot(root: string) {
     this.activeRoot = resolve(root);
-    this.roots = [this.activeRoot, ...formerRoots(this.cfg.claudeProjectsDir, this.activeRoot)];
+    // Opened from a worktree: the whole repo's threads (its main checkout and every worktree), not just this one's.
+    const base = repoBase(this.activeRoot);
+    this.roots = [...new Set([this.activeRoot, base, ...formerRoots(this.cfg.claudeProjectsDir, this.activeRoot)])];
     this.projectFilterPrefixes = this.sessionFilterOverride ? [] : this.roots.map(encodeRoot);
   }
 
@@ -138,42 +141,51 @@ export class ListenerService implements OnModuleInit {
     this.backfillForNewFilter();
   }
 
-  /** Scan (not watch) every project folder now matching the filter for jsonl files from the last
-   * two weeks that we haven't tailed yet. Reuses handleFile's offset bookkeeping, so nothing duplicates. */
+  /** Read every thread of the project folders now matching the filter that we haven't tailed yet, newest first:
+   * the last two weeks right away, older ones a file at a time so the server stays responsive. Quietly: history
+   * isn't live activity (no step broadcasts, map touches, agent markers or labels), only new threads are announced.
+   * Reuses handleFile's offset bookkeeping, so nothing duplicates. */
   private backfillForNewFilter() {
     let dirs: string[];
     try { dirs = readdirSync(this.cfg.claudeProjectsDir); } catch (e) {
       this.log.warn(`backfill: cannot read ${this.cfg.claudeProjectsDir}: ${(e as Error).message}`);
       return;
     }
-    let scanned = 0;
-    for (const d of dirs) {
-      if (!this.matchesFilter(d)) continue;
-      scanned += this.scanDirForJsonl(join(this.cfg.claudeProjectsDir, d));
-    }
-    this.log.log(`backfill: scanned ${scanned} jsonl file(s) for the new workspace`);
+    const files: { path: string; mtimeMs: number }[] = [];
+    for (const d of dirs) if (this.matchesFilter(d)) this.collectJsonl(join(this.cfg.claudeProjectsDir, d), files);
+    files.sort((a, b) => b.mtimeMs - a.mtimeMs);
+    const gen = ++this.backfillGen;
+    const recent = files.filter((f) => Date.now() - f.mtimeMs <= RECENT_MS);
+    const older = files.slice(recent.length);
+    for (const f of recent) this.handleFile(f.path, true);
+    this.log.log(`backfill: read ${recent.length} recent jsonl file(s) for the new workspace, ${older.length} older ones to follow`);
+    const next = (i: number) => {
+      if (gen !== this.backfillGen) return;                     // the workspace changed again: that backfill takes over
+      if (i >= older.length) { if (older.length) this.log.log(`backfill: read ${older.length} older jsonl file(s)`); return; }
+      this.handleFile(older[i].path, true);
+      setTimeout(() => next(i + 1), 0);
+    };
+    setTimeout(() => next(0), 0);
   }
+  private backfillGen = 0;
+  /** True while reading history: steps are stored, not broadcast as live activity. */
+  private quiet = false;
 
-  private scanDirForJsonl(dir: string): number {
+  private collectJsonl(dir: string, out: { path: string; mtimeMs: number }[]) {
     let entries: string[];
-    try { entries = readdirSync(dir); } catch { return 0; }
-    let count = 0;
+    try { entries = readdirSync(dir); } catch { return; }
     for (const name of entries) {
       const p = join(dir, name);
       let st;
       try { st = statSync(p); } catch { continue; }
-      if (st.isDirectory()) { count += this.scanDirForJsonl(p); continue; } // e.g. <session>/subagents/
-      if (!name.endsWith(".jsonl")) continue;
-      if (Date.now() - st.mtimeMs > HISTORY_MS) continue;
-      this.handleFile(p);
-      count++;
+      if (st.isDirectory()) { this.collectJsonl(p, out); continue; } // e.g. <session>/subagents/
+      if (name.endsWith(".jsonl")) out.push({ path: p, mtimeMs: st.mtimeMs });
     }
-    return count;
   }
 
   // ---- file tailing ----
 
-  private handleFile(file: string) {
+  private handleFile(file: string, history = false) {
     try {
       // Session files live at <projectsDir>/<project>/<sessionId>.jsonl, and subagent
       // transcripts one level deeper at <projectsDir>/<project>/<sessionId>/subagents/agent-*.jsonl.
@@ -182,7 +194,8 @@ export class ListenerService implements OnModuleInit {
       const projectDir = rel.split(sep)[0] ?? "";
       if (!this.matchesFilter(projectDir)) return;
       const stat = statSync(file);
-      if (Date.now() - stat.mtimeMs > HISTORY_MS) return;
+      // At boot only the last two weeks are read before the server is up; older threads follow once it is (see "ready").
+      if (!this.ready && !history && Date.now() - stat.mtimeMs > RECENT_MS) return;
 
       const prevOffset = this.offsets.get(file) ?? 0;
       const { text, newOffset } = this.readAppended(file, prevOffset, stat.size);
@@ -191,14 +204,17 @@ export class ListenerService implements OnModuleInit {
         return;
       }
       const lines = text.split("\n").filter((l) => l.length > 0);
-      for (const line of lines) {
-        try {
-          const obj = JSON.parse(line) as RawLine;
-          this.ingestLine(obj);
-        } catch (e) {
-          this.log.warn(`bad jsonl line in ${file}: ${(e as Error).message}`);
+      this.quiet = history;
+      try {
+        for (const line of lines) {
+          try {
+            const obj = JSON.parse(line) as RawLine;
+            this.ingestLine(obj);
+          } catch (e) {
+            this.log.warn(`bad jsonl line in ${file}: ${(e as Error).message}`);
+          }
         }
-      }
+      } finally { this.quiet = false; }
       this.saveOffset(file, newOffset);
     } catch (e) {
       this.log.warn(`handleFile(${file}) failed: ${(e as Error).message}`);
@@ -395,7 +411,7 @@ export class ListenerService implements OnModuleInit {
 
     this.upsertSession(step.sessionId, opts?.cwd ?? "", step.ts, opts?.promptTitle);
 
-    if (this.ready) {
+    if (this.ready && !this.quiet) {
       this.bus.emit("step", step);
       this.gateway.broadcast({ type: "step", step });
       if (step.kind === "edit" && step.filePath) {

@@ -67,6 +67,7 @@ function recencyRGB(t: Tokens, iso: string | undefined, now: number): RGB {
 const css = (c: RGB) => `rgb(${c.join(",")})`;
 const same = (a: RGB, b: RGB) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 /** A stable starting angle per file, so cubes don't all turn in step. */
+const STILL = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 const spin = (id: string) => { let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0; return (h % 628) / 100; };
 
 export function relTime(iso: string | undefined, now = clock()): string {
@@ -355,7 +356,7 @@ export function MapView() {
 
     const st = mapStyle();
     const rgb = recencyRGB(tokens, n.file.lastChangedAt, now), lit = active || !same(rgb, tokens.cool);
-    if (st.node === "cube") drawCube(ctx, x, y, r * 0.78 * (active ? 1.3 : 1), performance.now() / (active ? 700 : 2600) + spin(n.id), rgb, lit, scale);
+    if (st.node === "cube") drawCube(ctx, x, y, r * 0.78 * (active ? 1.3 : 1), (STILL ? 0 : performance.now() / (active ? 700 : 2600)) + spin(n.id), rgb, lit, scale);
     else if (st.node === "plate") drawPlate(ctx, x, y, r * 0.9, rgb, lit, scale);
     else if (st.node === "station") drawStation(ctx, x, y, r, css(rgb), active || isSel, scale);
     else { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = css(rgb); ctx.fill(); }

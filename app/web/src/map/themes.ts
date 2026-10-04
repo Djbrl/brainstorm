@@ -7,15 +7,13 @@ export type RGB = [number, number, number];
 
 export type MapStyle = {
   /** How a file is drawn: a dot, a turning glass cube, a hologram floor plate or a metro station. */
-  node: "dot" | "cube" | "plate" | "station" | "mark";
+  node: "dot" | "cube" | "plate" | "station";
   /** Imports: plain lines, or metro lines (horizontal, vertical and 45°, coloured by folder). */
   link: "line" | "metro";
   halo: string; fileInk: string; fileInkQuiet: string;
   moduleInk: string; moduleInkLively: string; moduleFont?: string; labelFont?: string;
   /** Metro: folder names in their line's colour. */
   moduleColored?: boolean;
-  /** Folder names in capitals, spaced out (technical callouts). */
-  moduleUpper?: boolean;
   linkIdle: string; linkDim: string; imports: string; usedBy: string;
   markerStroke: string; markerText: string; glow: boolean;
   /** Agent trails: soft curves, or right angles like a locator line. */
@@ -49,16 +47,6 @@ const STYLES: Record<ThemeId, MapStyle> = {
     imports: "rgba(242,227,106,0.9)", usedBy: "rgba(140,200,255,0.9)",
     markerStroke: "rgba(255,255,255,0.95)", markerText: "#1b1b40", glow: true,
     palette: ["#8fb4ff", "#7ee0ff", "#ff9ff3", "#c7a6ff", "#9dffb0", "#ffe08a", "#ffb38a", "#a6f0ff"],
-  },
-  marathon: {
-    ...BASE, node: "mark", moduleUpper: true,
-    halo: "rgba(232,234,238,0.94)", fileInk: "#111", fileInkQuiet: "rgba(17,17,17,0.55)",
-    moduleInk: "rgba(17,17,17,0.38)", moduleInkLively: "#111",
-    moduleFont: `ui-monospace, "SF Mono", Menlo, monospace`, labelFont: `ui-monospace, "SF Mono", Menlo, monospace`,
-    linkIdle: "rgba(17,17,17,0.1)", linkDim: "rgba(17,17,17,0.04)",
-    imports: "rgba(123,108,255,0.9)", usedBy: "rgba(0,184,138,0.9)",
-    markerStroke: "#e8eaee", markerText: "#fff",
-    palette: ["#7b6cff", "#00b88a", "#ff5a36", "#2f7ae5", "#b04fd6", "#0aa2c0", "#e0a400", "#5b6170"],
   },
   deadspace: {
     ...BASE, node: "plate", trail: "elbow",
@@ -121,26 +109,6 @@ export function drawPlate(ctx: CanvasRenderingContext2D, x: number, y: number, r
     const g = ctx.createRadialGradient(x, y, 0, x, y, rx * 2.2);
     g.addColorStop(0, rgba(c, 0.28)); g.addColorStop(1, rgba(c, 0));
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rx * 2.2, 0, TAU); ctx.fill();
-  }
-}
-
-// ---------- Marathon: a crisp square mark with crosshair ticks ----------
-export function drawMark(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: RGB, lit: boolean, hot: boolean, scale: number) {
-  const s = Math.max(2.4, r * 0.62), px = 1 / scale;
-  ctx.fillStyle = `rgb(${c.join(",")})`;
-  ctx.fillRect(x - s, y - s, s * 2, s * 2);
-  ctx.lineWidth = 1.1 * px; ctx.strokeStyle = "#111";
-  ctx.strokeRect(x - s, y - s, s * 2, s * 2);
-  if (lit) {                                   // crosshair ticks out of each side
-    const a = s + 2.5 * px, b = s + 6.5 * px;
-    ctx.beginPath();
-    ctx.moveTo(x - b, y); ctx.lineTo(x - a, y); ctx.moveTo(x + a, y); ctx.lineTo(x + b, y);
-    ctx.moveTo(x, y - b); ctx.lineTo(x, y - a); ctx.moveTo(x, y + a); ctx.lineTo(x, y + b);
-    ctx.stroke();
-  }
-  if (hot) {                                   // a small "+" glyph, top right
-    const gx = x + s + 5 * px, gy = y - s - 5 * px, g = 3 * px;
-    ctx.lineWidth = 1.6 * px; ctx.beginPath(); ctx.moveTo(gx - g, gy); ctx.lineTo(gx + g, gy); ctx.moveTo(gx, gy - g); ctx.lineTo(gx, gy + g); ctx.stroke();
   }
 }
 

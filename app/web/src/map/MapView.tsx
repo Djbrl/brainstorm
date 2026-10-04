@@ -22,7 +22,7 @@ import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
 import { makeFileResolver } from "../lib/paths";
 import { drawModuleLabels, LabelSpace } from "./labels";
 import { useTheme } from "../lib/theme";
-import { drawCube, drawMark, drawPlate, drawStation, mapStyle, metroPath, moduleColor, type RGB } from "./themes";
+import { drawCube, drawPlate, drawStation, mapStyle, metroPath, moduleColor, type RGB } from "./themes";
 import "./map.css";
 
 type GNode = NodeObject & { id: string; file: FileNode; r: number; ax: number; ay: number };
@@ -359,7 +359,6 @@ export function MapView() {
     if (st.node === "cube") drawCube(ctx, x, y, r * 0.78 * (active ? 1.3 : 1), (STILL ? 0 : performance.now() / (active ? 700 : 2600)) + spin(n.id), rgb, lit, scale);
     else if (st.node === "plate") drawPlate(ctx, x, y, r * 0.9, rgb, lit, scale);
     else if (st.node === "station") drawStation(ctx, x, y, r, css(rgb), active || isSel, scale);
-    else if (st.node === "mark") drawMark(ctx, x, y, r, rgb, lit, active || same(rgb, tokens.hot), scale);
     else { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = css(rgb); ctx.fill(); }
     if (isSel || isHover || active) {
       ctx.beginPath();

@@ -95,8 +95,7 @@ export function drawModuleLabels(ctx: CanvasRenderingContext2D, scale: number, n
   ctx.textBaseline = "bottom";
   for (const c of cands) {
     const px = c.px / scale, y = c.y - 10 / scale;
-    ctx.font = `${style.moduleUpper ? 600 : 700} ${style.moduleUpper ? px * 0.62 : px}px ${font}`;
-    if (style.moduleUpper) { c.text = c.text.toUpperCase(); (ctx as unknown as { letterSpacing: string }).letterSpacing = `${(px * 0.62 * 0.14).toFixed(3)}px`; }
+    ctx.font = `700 ${px}px ${font}`;
     const w = ctx.measureText(c.text).width, pad = 8 / scale;
     const box = { x0: c.x - w / 2 - pad, x1: c.x + w / 2 + pad, y0: y - px - pad / 2, y1: y + pad / 2 };
     const focused = c.mods.some((m) => opts.focus.has(m));
@@ -107,5 +106,4 @@ export function drawModuleLabels(ctx: CanvasRenderingContext2D, scale: number, n
     ctx.fillText(c.text, c.x, y);
     ctx.globalAlpha = 1;
   }
-  (ctx as unknown as { letterSpacing: string }).letterSpacing = "0px";
 }

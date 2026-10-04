@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import type { AgentPresence } from "@contract";
 import { clock } from "../lib/live";
+import { mapStyle } from "./themes";
 
 // Colors that do not clash with the recency scale (orange/amber/grey). Main threads get the accent.
 const PALETTE = ["#2f7ae5", "#0f9d8a", "#c2409a", "#7c4dde", "#2e9e4f", "#0b8fb3", "#b5487a", "#4a6fa5"];
@@ -9,7 +10,8 @@ export function agentColor(a: Pick<AgentPresence, "id" | "isSubagent">, accent: 
   if (!a.isSubagent) return accent;
   let h = 0;
   for (let i = 0; i < a.id.length; i++) h = (h * 31 + a.id.charCodeAt(i)) >>> 0;
-  return PALETTE[h % PALETTE.length];
+  const palette = mapStyle().palette ?? PALETTE;   // each map theme has its own subagent colours
+  return palette[h % palette.length];
 }
 
 export const shortName = (a: AgentPresence, max = 34) => {
@@ -133,6 +135,7 @@ export function drawAgents(opts: {
   const { ctx, scale, agents, anim, resolve, accent, font, hoverFile, followId, resolveId, showReads, quiet } = opts;
   const t = performance.now();
   const now = clock();
+  const style = mapStyle();
 
   // Fan out agents standing on the same file.
   const groups = new Map<string, AgentPresence[]>();
@@ -204,8 +207,11 @@ export function drawAgents(opts: {
           const dx = a1.x - a0.x, dy = a1.y - a0.y;
           ctx.beginPath();
           ctx.moveTo(a0.x, a0.y);
-          ctx.quadraticCurveTo(mx - dy * 0.15, my + dx * 0.15, a1.x, a1.y);
+          if (style.trail === "elbow") { ctx.lineTo(a1.x, a0.y); ctx.lineTo(a1.x, a1.y); }   // a locator line: right angles
+          else ctx.quadraticCurveTo(mx - dy * 0.15, my + dx * 0.15, a1.x, a1.y);
+          if (style.glow) { ctx.shadowColor = color; ctx.shadowBlur = 8; }
           ctx.stroke();
+          ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
           ctx.beginPath();
           ctx.arc(a0.x, a0.y, 2.8 / scale, 0, Math.PI * 2);
           ctx.fillStyle = color;
@@ -246,12 +252,13 @@ export function drawAgents(opts: {
 
       // Marker
       ctx.globalAlpha = st.alpha;
-      ctx.shadowColor = "rgba(0,0,0,0.18)"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 1;
+      if (style.glow) { ctx.shadowColor = color; ctx.shadowBlur = 16; }
+      else { ctx.shadowColor = "rgba(0,0,0,0.18)"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 1; }
       ctx.beginPath(); ctx.arc(st.x, st.y, 9 / scale, 0, Math.PI * 2);
       ctx.fillStyle = color; ctx.fill();
       ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-      ctx.lineWidth = 2 / scale; ctx.strokeStyle = "#fff"; ctx.stroke();
-      ctx.fillStyle = "#fff";
+      ctx.lineWidth = 2 / scale; ctx.strokeStyle = style.markerStroke; ctx.stroke();
+      ctx.fillStyle = style.markerText;
       ctx.font = `700 ${10 / scale}px ${font}`;
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText(initial(a), st.x, st.y + 0.5 / scale);
@@ -261,7 +268,7 @@ export function drawAgents(opts: {
         ctx.font = `600 ${12 / scale}px ${font}`;
         ctx.textAlign = "left";
         const lx = st.x + 13 / scale, ly = st.y;
-        ctx.lineWidth = 3.5 / scale; ctx.strokeStyle = "rgba(251,251,253,0.95)";
+        ctx.lineWidth = 3.5 / scale; ctx.strokeStyle = style.halo;
         ctx.strokeText(label, lx, ly);
         ctx.fillStyle = color;
         ctx.fillText(label, lx, ly);

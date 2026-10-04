@@ -5,6 +5,7 @@ import { useThread } from "./lib/thread";
 import { displayLabel } from "./follow/format";
 import { SetupView } from "./setup/SetupView";
 import { Welcome } from "./map/Welcome";
+import { SettingsButton } from "./settings/Settings";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
 // The views (and the graph library the Map needs) load when they're opened.
@@ -71,6 +72,7 @@ function Shell() {
           {!state.replay && state.setup?.root && (
             <button className="ws-chip" title={state.setup.root} onClick={() => setSetupOpen(true)}>Change project</button>
           )}
+          <SettingsButton />
           <span className={`dot ${state.connected ? "live" : ""}`} />
           {state.shared ? "Shared replay" : state.replay ? "Recorded demo" : state.connected ? "Live" : "Connecting…"}
         </div>

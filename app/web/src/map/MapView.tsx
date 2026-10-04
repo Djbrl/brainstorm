@@ -21,6 +21,8 @@ import { StepPanel } from "./StepPanel";
 import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
 import { makeFileResolver } from "../lib/paths";
 import { drawModuleLabels, LabelSpace } from "./labels";
+import { useTheme } from "../lib/theme";
+import { drawCube, drawPlate, drawStation, mapStyle, metroPath, moduleColor, type RGB } from "./themes";
 import "./map.css";
 
 type GNode = NodeObject & { id: string; file: FileNode; r: number; ax: number; ay: number };
@@ -35,9 +37,9 @@ function hex(c: string): [number, number, number] {
   const n = parseInt(h.length === 3 ? h.split("").map((x) => x + x).join("") : h, 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
-const mix = (a: [number, number, number], b: [number, number, number], t: number) => {
+const mixRGB = (a: RGB, b: RGB, t: number): RGB => {
   const k = Math.max(0, Math.min(1, t));
-  return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * k)).join(",")})`;
+  return a.map((v, i) => Math.round(v + (b[i] - v) * k)) as RGB;
 };
 function readTokens() {
   const cs = getComputedStyle(document.documentElement);
@@ -54,14 +56,18 @@ type Tokens = ReturnType<typeof readTokens>;
  * A file's color: hot for a few minutes after an edit, warm if it changed since you last looked (see lib/visit.ts),
  * quiet otherwise. A recording (the hosted demo) has no "last visit": there, warm fades out over an hour as before.
  */
-function recencyColor(t: Tokens, iso: string | undefined, now: number): string {
-  if (!iso) return mix(t.cool, t.cool, 0);
+function recencyRGB(t: Tokens, iso: string | undefined, now: number): RGB {
+  if (!iso) return t.cool;
   const at = Date.parse(iso), age = now - at;
-  if (!(age >= 0)) return mix(t.hot, t.hot, 0);
-  if (age < 5 * MIN) return mix(t.hot, t.warm, (age / (5 * MIN)) ** 1.5);
-  if (isReplay()) return age < HOUR ? mix(t.warm, t.cool, (age - 5 * MIN) / (HOUR - 5 * MIN)) : mix(t.cool, t.cool, 0);
-  return at > sinceMs ? mix(t.warm, t.warm, 0) : mix(t.cool, t.cool, 0);
+  if (!(age >= 0)) return t.hot;
+  if (age < 5 * MIN) return mixRGB(t.hot, t.warm, (age / (5 * MIN)) ** 1.5);
+  if (isReplay()) return age < HOUR ? mixRGB(t.warm, t.cool, (age - 5 * MIN) / (HOUR - 5 * MIN)) : t.cool;
+  return at > sinceMs ? t.warm : t.cool;
 }
+const css = (c: RGB) => `rgb(${c.join(",")})`;
+const same = (a: RGB, b: RGB) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+/** A stable starting angle per file, so cubes don't all turn in step. */
+const spin = (id: string) => { let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0; return (h % 628) / 100; };
 
 export function relTime(iso: string | undefined, now = clock()): string {
   if (!iso) return "not changed recently";
@@ -158,8 +164,7 @@ function moduleForce(strength: number) {
 }
 
 // ---------- import links ----------
-const IMPORTS_COLOR = "rgba(91,91,214,0.7)";   // this file → what it imports
-const USED_BY_COLOR = "rgba(15,157,138,0.7)";  // files that import this one → this file
+// Their colours (imports, used by) belong to the map theme: see themes.ts.
 const endId = (e: unknown) => (typeof e === "object" && e ? (e as GNode).id : (e as string));
 function linkRole(l: GLink, focus: string | null): "imports" | "usedBy" | null {
   if (!focus) return null;
@@ -177,7 +182,9 @@ export function MapView() {
   const graph = useGraph(map);
   const [wrapRef, size] = useSize<HTMLDivElement>();
   const fg = useRef<ForceGraphMethods<GNode, GLink> | undefined>(undefined);
-  const tokens = useMemo(readTokens, []);
+  const theme = useTheme();
+  const tokens = useMemo(readTokens, [theme]);   // each theme sets its own colours (themes.css)
+  const style = mapStyle();
   const [selected, setSelected] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const fitted = useRef(false);
@@ -291,6 +298,7 @@ export function MapView() {
 
   // Import links show only around the selected file.
   const linkFocus = selected; // on click, not hover: moving the mouse across the map shouldn't flash lines everywhere
+  const linkFocusRef = useRef(linkFocus); linkFocusRef.current = linkFocus;
   const activePaths = useMemo(() => new Set((map?.files ?? []).filter((f) => f.activeSessionId).map((f) => f.path)), [map?.files]);
 
   // One-shot ripples: start one when a file receives a new agent edit (not on first load).
@@ -345,11 +353,15 @@ export function MapView() {
       ctx.globalAlpha = alpha;
     }
 
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fillStyle = recencyColor(tokens, n.file.lastChangedAt, now);
-    ctx.fill();
+    const st = mapStyle();
+    const rgb = recencyRGB(tokens, n.file.lastChangedAt, now), lit = active || !same(rgb, tokens.cool);
+    if (st.node === "cube") drawCube(ctx, x, y, r * 0.78 * (active ? 1.3 : 1), performance.now() / (active ? 700 : 2600) + spin(n.id), rgb, lit, scale);
+    else if (st.node === "plate") drawPlate(ctx, x, y, r * 0.9, rgb, lit, scale);
+    else if (st.node === "station") drawStation(ctx, x, y, r, css(rgb), active || isSel, scale);
+    else { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = css(rgb); ctx.fill(); }
     if (isSel || isHover || active) {
+      ctx.beginPath();
+      ctx.arc(x, y, st.node === "dot" ? r : r * 1.35 + 2 / scale, 0, Math.PI * 2);
       ctx.lineWidth = (isSel ? 2.4 : 1.4) / scale;
       ctx.strokeStyle = active ? tokens.accent : tokens.ink;
       ctx.stroke();
@@ -363,7 +375,7 @@ export function MapView() {
     const ty = y + r + 3 / scale;
     if (showLabel) {
       // Skip a file name that would print over one already drawn this frame (the ones you point at always win).
-      ctx.font = `${isSel || active ? 600 : 500} ${fs}px ${tokens.body}`;
+      ctx.font = `${isSel || active ? 600 : 500} ${fs}px ${st.labelFont ?? tokens.body}`;
       const w = ctx.measureText(label).width, pad = 3 / scale;
       showLabel = fileSpace.current.claim({ x0: x - w / 2 - pad, x1: x + w / 2 + pad, y0: ty - pad, y1: ty + fs + pad }, forced);
     }
@@ -371,13 +383,29 @@ export function MapView() {
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
       ctx.lineWidth = 3 / scale;
-      ctx.strokeStyle = "rgba(251,251,253,0.9)";
+      ctx.strokeStyle = st.halo;
       ctx.strokeText(label, x, ty);
-      ctx.fillStyle = isSel || active || isHover ? tokens.ink : "rgba(29,29,31,0.62)";
+      ctx.fillStyle = isSel || active || isHover ? st.fileInk : st.fileInkQuiet;
       ctx.fillText(label, x, ty);
     }
     ctx.restore();
   }, [tokens, selected, hover]);
+
+  // Metro: imports as transit lines (horizontal, vertical and 45°), coloured by the importing file's folder.
+  const drawMetroLink = useCallback((link: LinkObject, ctx: CanvasRenderingContext2D, scale: number) => {
+    const l = link as GLink, s = l.source as GNode, t = l.target as GNode;
+    if (s.x === undefined || t.x === undefined) return;
+    const role = linkRole(l, linkFocusRef.current);
+    const alpha = Math.min(replayRef.current.nodeAlpha(s.id), replayRef.current.nodeAlpha(t.id));
+    ctx.save();
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.lineWidth = role ? Math.max(3 / scale, 3.2) : Math.max(1.6 / scale, 2.2);
+    ctx.strokeStyle = role === "imports" ? style.imports : role === "usedBy" ? style.usedBy : moduleColor(s.file.module);
+    ctx.globalAlpha = (role ? 1 : linkFocusRef.current ? 0.12 : 0.55) * alpha;
+    metroPath(ctx, s.x, s.y ?? 0, t.x, t.y ?? 0);
+    ctx.stroke();
+    ctx.restore();
+  }, [style]);
 
   const drawModules = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
     moduleSpace.current.reset(); fileSpace.current.reset();
@@ -420,7 +448,9 @@ export function MapView() {
           nodePointerAreaPaint={(n, color, ctx) => { const g = n as GNode; ctx.fillStyle = color; ctx.beginPath(); ctx.arc(g.x ?? 0, g.y ?? 0, g.r + 3, 0, Math.PI * 2); ctx.fill(); }}
           onRenderFramePre={drawModules}
           onRenderFramePost={drawAgentLayer}
-          linkColor={(l) => linkRole(l as GLink, linkFocus) === "imports" ? IMPORTS_COLOR : linkRole(l as GLink, linkFocus) === "usedBy" ? USED_BY_COLOR : linkFocus ? "rgba(29,29,31,0.04)" : "rgba(29,29,31,0.08)"}
+          linkColor={(l) => linkRole(l as GLink, linkFocus) === "imports" ? style.imports : linkRole(l as GLink, linkFocus) === "usedBy" ? style.usedBy : linkFocus ? style.linkDim : style.linkIdle}
+          linkCanvasObjectMode={style.link === "metro" ? () => "replace" : undefined}
+          linkCanvasObject={style.link === "metro" ? drawMetroLink : undefined}
           linkWidth={(l) => (linkRole(l as GLink, linkFocus) ? 1.6 : 0.6)}
           linkDirectionalArrowLength={(l) => (linkRole(l as GLink, linkFocus) ? 3.5 : 0)}
           linkDirectionalArrowRelPos={0.92}
@@ -446,7 +476,7 @@ export function MapView() {
           <span><i style={{ background: "var(--hot)" }} />Just now</span>
           <span><i style={{ background: "var(--warm)" }} />{isReplay() ? "This hour" : lastSeen ? "Since you last looked" : "In the last day"}</span>
           <span><i style={{ background: "var(--cool)" }} />Earlier</span>
-          {sel && <span title="What the selected file imports"><i className="line" style={{ background: IMPORTS_COLOR }} />Imports</span>}
+          {sel && <span title="What the selected file imports"><i className="line" style={{ background: style.imports }} />Imports</span>}
         </div>
         <div className="map-seg" role="radiogroup" aria-label="Agent activity shown">
           <button role="radio" aria-checked={!showReads} onClick={() => setShowReads(false)}>Writes</button>
@@ -494,11 +524,11 @@ function FilePanel({ file, root, steps, edges, onFocus, onClose }: {
           {(imports.length > 0 || usedBy.length > 0) && (
             <section className="map-deps">
               {imports.length > 0 && (<>
-                <h3><i style={{ background: IMPORTS_COLOR }} />Imports</h3>
+                <h3><i style={{ background: mapStyle().imports }} />Imports</h3>
                 <ul>{imports.map((p) => <li key={p}><button onClick={() => onFocus(p)} title={relPath(p, root)}>{baseName(p)}</button></li>)}</ul>
               </>)}
               {usedBy.length > 0 && (<>
-                <h3><i style={{ background: USED_BY_COLOR }} />Used by</h3>
+                <h3><i style={{ background: mapStyle().usedBy }} />Used by</h3>
                 <ul>{usedBy.map((p) => <li key={p}><button onClick={() => onFocus(p)} title={relPath(p, root)}>{baseName(p)}</button></li>)}</ul>
               </>)}
             </section>

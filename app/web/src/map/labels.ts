@@ -3,7 +3,10 @@
 //    then size), and a label that would overlap one already drawn is skipped, like town names on a map.
 // 2. Subfolders fold into one label for their parent folder while the group is small on screen; zoomed in, each
 //    subfolder shows its own name, without the parent's when the parent has many ("alpha", not "projects/alpha").
+// Colours and fonts follow the map theme (map/themes.ts).
 // File names use the same idea: a LabelSpace per frame, so two file labels never print on top of each other.
+
+import { mapStyle, moduleColor } from "./themes";
 
 export type LabelNode = { x?: number; y?: number; r: number; module: string; lastChangedAt?: string; active: boolean };
 
@@ -87,17 +90,20 @@ export function drawModuleLabels(ctx: CanvasRenderingContext2D, scale: number, n
   for (const c of cands) if ((seen.get(c.text) ?? 0) > 1 && c.mods.length === 1) c.text = display(c.mods[0]);
 
   cands.sort((a, b) => b.prio - a.prio);
+  const style = mapStyle(), font = style.moduleFont ?? opts.font;
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
   for (const c of cands) {
     const px = c.px / scale, y = c.y - 10 / scale;
-    ctx.font = `700 ${px}px ${opts.font}`;
+    ctx.font = `700 ${px}px ${font}`;
     const w = ctx.measureText(c.text).width, pad = 8 / scale;
     const box = { x0: c.x - w / 2 - pad, x1: c.x + w / 2 + pad, y0: y - px - pad / 2, y1: y + pad / 2 };
     const focused = c.mods.some((m) => opts.focus.has(m));
     if (!opts.space.claim(box, focused)) continue;
     const lively = focused || c.prio >= 1e5;
-    ctx.fillStyle = lively ? "rgba(29,29,31,0.34)" : "rgba(29,29,31,0.2)";
+    if (style.moduleColored) { ctx.globalAlpha = lively ? 0.95 : 0.7; ctx.fillStyle = moduleColor(c.mods[0]); }
+    else ctx.fillStyle = lively ? style.moduleInkLively : style.moduleInk;
     ctx.fillText(c.text, c.x, y);
+    ctx.globalAlpha = 1;
   }
 }

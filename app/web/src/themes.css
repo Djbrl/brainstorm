@@ -1,0 +1,121 @@
+/* Owned by the lead. Map themes (lib/theme.ts sets <html data-theme>). Each theme sets the design tokens, the map's
+   backdrop, and, for the dark ones, the frosted surfaces that are hard-coded light elsewhere. The canvas side is
+   in map/themes.ts. */
+
+/* ---------- Metro: light paper, imports as transit lines ---------- */
+:root[data-theme="metro"] {
+  --bg: #fbfaf6;
+  --cool: #2c2c30;          /* station rings */
+  --warm: #ff9f0a;
+  --hot: #ff375f;
+}
+:root[data-theme="metro"] .map-wrap {
+  background:
+    linear-gradient(rgba(29,29,31,.035) 1px, transparent 1px) 0 0 / 28px 28px,
+    linear-gradient(90deg, rgba(29,29,31,.035) 1px, transparent 1px) 0 0 / 28px 28px,
+    var(--bg);
+}
+
+/* ---------- Dark themes: shared surfaces ---------- */
+:root[data-theme="ps2"], :root[data-theme="deadspace"] { color-scheme: dark; }
+:root[data-theme="ps2"] .topbar, :root[data-theme="deadspace"] .topbar { background: var(--chrome); }
+:root[data-theme="ps2"] .crumbs > button:hover, :root[data-theme="deadspace"] .crumbs > button:hover { background: var(--hover); }
+:root[data-theme="ps2"] :is(.map-sidebar, .sidebar-collapsed, .map-panel, .map-agents, .rp-bar, .dock-pill, .map-legend, .welcome),
+:root[data-theme="deadspace"] :is(.map-sidebar, .sidebar-collapsed, .map-panel, .map-agents, .rp-bar, .dock-pill, .map-legend, .welcome) {
+  background: var(--sheet); box-shadow: 0 18px 50px rgba(0,0,0,.35);
+}
+:root[data-theme="ps2"] :is(.map-close, .map-seg, .sidebar-tabs, .rp-speed, .pl-panel-nav button),
+:root[data-theme="deadspace"] :is(.map-close, .map-seg, .sidebar-tabs, .rp-speed, .pl-panel-nav button) { background: var(--hover); }
+:root[data-theme="ps2"] :is(.map-close:hover, .sidebar-collapse:hover, .sidebar-agent-eye:hover, .sidebar-agent-main:hover, .sidebar-tree-dir:hover, .sidebar-tree-file:hover, .rp-icon:hover:not(:disabled), .rp-text:hover),
+:root[data-theme="deadspace"] :is(.map-close:hover, .sidebar-collapse:hover, .sidebar-agent-eye:hover, .sidebar-agent-main:hover, .sidebar-tree-dir:hover, .sidebar-tree-file:hover, .rp-icon:hover:not(:disabled), .rp-text:hover) { background: var(--hover-2); }
+:root[data-theme="ps2"] :is(.rp-diff, .rp-speed button.on), :root[data-theme="deadspace"] :is(.rp-diff, .rp-speed button.on) { background: var(--surface); }
+:root[data-theme="ps2"] .map-agent-head i, :root[data-theme="deadspace"] .map-agent-head i { box-shadow: 0 0 0 3px var(--surface); }
+/* light hovers, pills and code blocks hard-coded elsewhere */
+:root:is([data-theme="ps2"], [data-theme="deadspace"]) .lens-switch { background: var(--sheet); }
+:root:is([data-theme="ps2"], [data-theme="deadspace"]) :is(button.sidebar-thread-head:hover, .sidebar-thread-headrow:hover, .sidebar-fold:hover, .sidebar-more:hover,
+  .rp-ch-head:hover, .rp-m:hover, .trk-stop:hover, .trk-return:hover, .fl-session:hover, .sd-close:hover) { background: var(--hover-2); }
+:root:is([data-theme="ps2"], [data-theme="deadspace"]) :is(.md code, .md-pre, .sd-code, .sd-expand, .trk-screen, .trk-screen img, .trk-screen video, .trk-steps li span, .trk-bounce em, .sd-glyph, .tl-skel .dotph) { background: var(--hover); }
+:root:is([data-theme="ps2"], [data-theme="deadspace"]) .rp-slider input::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--accent) var(--rp-pct), var(--hover-2) var(--rp-pct)); }
+:root:is([data-theme="ps2"], [data-theme="deadspace"]) .rp-slider input::-moz-range-track { background: var(--hover-2); }
+:root:is([data-theme="ps2"], [data-theme="deadspace"]) .rp-slider input::-webkit-slider-thumb { background: var(--surface); }
+
+:root:is([data-theme="ps2"], [data-theme="deadspace"]) .force-graph-container { position: relative; }
+
+/* ---------- PS2: violet haze, light pillars, glass cubes ---------- */
+:root[data-theme="ps2"] {
+  --bg: #15153a;
+  --surface: #1f1f4a;
+  --ink: #eef0ff;
+  --ink-2: #c3c8ee;
+  --ink-3: #8d93c4;
+  --line: rgba(160,170,255,.18);
+  --accent: #9fd0ff;
+  --accent-soft: rgba(120,160,255,.18);
+  --cool: #5a78e6;          /* a quiet cube */
+  --warm: #ffd66e;          /* changed recently: gold */
+  --hot: #ffffff;           /* just now: white light */
+  --chrome: rgba(16,16,44,.82);
+  --sheet: rgba(26,26,66,.82);
+  --hover: rgba(160,170,255,.12);
+  --hover-2: rgba(160,170,255,.2);
+  --font-display: "Arial Rounded MT Bold", "Nunito", system-ui, sans-serif;
+}
+:root[data-theme="ps2"] .map-wrap {
+  isolation: isolate;
+  background:
+    radial-gradient(40% 35% at 30% 30%, rgba(140,140,220,.14), transparent 70%),
+    radial-gradient(35% 30% at 72% 68%, rgba(140,140,220,.12), transparent 70%),
+    radial-gradient(75% 75% at 50% 45%, #4a4a86 0%, #24244e 55%, #08081a 100%);
+}
+:root[data-theme="ps2"] .map-wrap::before {
+  content: ""; position: absolute; inset: -40%; z-index: -1; pointer-events: none;
+  background: repeating-conic-gradient(from 0deg at 50% 50%, rgba(70,120,255,.22) 0deg 5deg, transparent 5deg 25.7deg);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 9%, #000 16%, transparent 46%);
+  mask-image: radial-gradient(circle at 50% 50%, transparent 9%, #000 16%, transparent 46%);
+  animation: ps2-pillars 120s linear infinite;
+}
+@keyframes ps2-pillars { to { transform: rotate(360deg); } }
+:root[data-theme="ps2"] .force-graph-container::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    repeating-linear-gradient(transparent 0 2px, rgba(0,0,0,.07) 2px 3px),
+    radial-gradient(80% 80% at 50% 50%, transparent 55%, rgba(0,0,0,.5) 100%);
+}
+
+/* ---------- Dead Space: a hologram in a dark room ---------- */
+:root[data-theme="deadspace"] {
+  --bg: #0c1012;
+  --surface: #121a1c;
+  --ink: #dcf6f8;
+  --ink-2: #a9cdd3;
+  --ink-3: #6f9399;
+  --line: rgba(143,233,240,.16);
+  --accent: #39e75f;        /* the locator: agents */
+  --accent-soft: rgba(57,231,95,.14);
+  --cool: #5c6c70;
+  --warm: #5fe3e0;          /* changed recently: cyan */
+  --hot: #c9fbff;           /* just now */
+  --chrome: rgba(10,16,18,.85);
+  --sheet: rgba(14,22,24,.84);
+  --hover: rgba(143,233,240,.08);
+  --hover-2: rgba(143,233,240,.15);
+  --font-display: "Arial Narrow", "Helvetica Neue", sans-serif;
+}
+:root[data-theme="deadspace"] .map-wrap {
+  background:
+    linear-gradient(rgba(143,233,240,.035) 1px, transparent 1px) 0 0 / 32px 32px,
+    linear-gradient(90deg, rgba(143,233,240,.035) 1px, transparent 1px) 0 0 / 32px 32px,
+    radial-gradient(70% 70% at 45% 50%, #1c2427 0%, #0e1315 55%, #050707 100%);
+}
+:root[data-theme="deadspace"] .force-graph-container::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    repeating-linear-gradient(transparent 0 2px, rgba(143,233,240,.025) 2px 3px),
+    radial-gradient(85% 85% at 50% 50%, transparent 55%, rgba(0,0,0,.55) 100%);
+  animation: ds-flicker 7s steps(1) infinite;
+}
+@keyframes ds-flicker { 0%, 100% { opacity: 1; } 91% { opacity: .82; } 92% { opacity: 1; } 96% { opacity: .9; } 97% { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme="ps2"] .map-wrap::before, :root[data-theme="deadspace"] .force-graph-container::after { animation: none; }
+}

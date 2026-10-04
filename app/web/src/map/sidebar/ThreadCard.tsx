@@ -1,29 +1,27 @@
 // Owned by the lead. A thread's footprint, the first thing you see when you open it: what you asked, what it changed,
 // and two ways in, its steps or its replay. The map meanwhile lights the files it touched.
 import type { Session } from "@contract";
-import { useLive } from "../../lib/live";
+import { isReplay, useLive } from "../../lib/live";
+import { activeMs, duration, isPersonPrompt } from "../../lib/chapters";
+import { ShareMenu } from "../replay/ReplayBar";
 import { useNav } from "../../lib/nav";
 import { useThread } from "../../lib/thread";
 import { basename, stripInjected } from "../../follow/format";
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
-function duration(from: string, to: string): string {
-  const min = Math.round((Date.parse(to) - Date.parse(from)) / 60_000);
-  if (!Number.isFinite(min) || min < 1) return "";
-  return min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ""}`;
-}
 
 export function ThreadCard({ session }: { session: Session }) {
   const { state } = useLive();
   const { setThreadMode, setReplayPlaying, setReplayIndex, setReplayLive, openFile } = useNav();
   const thread = useThread(session.id, "light");
   const running = session.status === "running";
-  const prompt = state.steps[session.id]?.find((s) => s.kind === "prompt" && !s.isSubagent && stripInjected(s.text).trim());
+  const prompt = state.steps[session.id]?.find(isPersonPrompt);
   const touched = thread ? [...thread.touched.entries()] : [];
   const changed = touched.filter(([, t]) => t.edits > 0).sort((a, b) => b[1].edits - a[1].edits);
   const read = touched.filter(([, t]) => t.edits === 0 && t.reads > 0).length;
-  const took = duration(session.startedAt, session.lastEventAt);
+  const steps = state.steps[session.id];
+  const took = steps && steps.length > 1 ? duration(activeMs(steps)) : "";
 
   const play = () => {
     if (running) { setReplayLive(true); return; }
@@ -56,6 +54,7 @@ export function ThreadCard({ session }: { session: Session }) {
           {running ? "Follow live" : "Play"}
         </button>
         <button className="thread-card-steps" onClick={() => setThreadMode("steps")} disabled={!thread?.beats.length}>Steps</button>
+        {!isReplay() && <ShareMenu sessionId={session.id} className="thread-card-steps" />}
       </div>
     </div>
   );

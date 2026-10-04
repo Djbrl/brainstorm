@@ -159,3 +159,10 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .thread-card-play { background: var(--accent); border-color: var(--accent); color: #fff; }
 .thread-card-play:disabled, .thread-card-steps:disabled { opacity: .45; cursor: default; }
 .thread-card-steps:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+/* Share on the thread card opens down and to the right, inside the sidebar. */
+.thread-card .rp-share { position: relative; }
+.thread-card .rp-share-menu { left: 0; right: auto; top: calc(100% + 8px); bottom: auto; }
+/* In the card, the share menu opens inline under the buttons (the sidebar would clip a popover). */
+.thread-card-actions { flex-wrap: wrap; }
+.thread-card .rp-share { display: contents; }
+.thread-card .rp-share-menu { position: static; order: 9; width: 100%; box-shadow: none; margin-top: 2px; }

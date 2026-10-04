@@ -15,7 +15,7 @@ import { AskBox } from "../ask/AskBox";
 import { mockAgents, mockMap } from "./mock";
 import { drawAgents, visibleAgents, type AgentAnim } from "./agents";
 import { MapSidebar } from "./sidebar/MapSidebar";
-import { ReplayBar } from "./replay/ReplayBar";
+import { Dock } from "./replay/ReplayBar";
 import { TalkCard } from "./replay/TalkCard";
 import { StepPanel } from "./StepPanel";
 import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
@@ -427,7 +427,7 @@ export function MapView() {
           autoPauseRedraw={false}
           cooldownTicks={400}
           d3VelocityDecay={0.35}
-          onEngineStop={() => { if (!settledFit.current && !selected) { settledFit.current = true; fg.current?.zoomToFit(900, 130); } }}
+          onEngineStop={() => { if (!settledFit.current && !selected && !openRef.current) { settledFit.current = true; fg.current?.zoomToFit(900, 130); } }}
           onNodeHover={(n) => setHover(n ? (n as GNode).id : null)}
           onNodeClick={(n) => setSelected((n as GNode).id)}
           onBackgroundClick={() => setSelected(null)}
@@ -438,21 +438,21 @@ export function MapView() {
       <MapSidebar agents={agents} accent={tokens.accent} followId={followId}
         onFollow={(id) => setFollowId(id)} onFocusFile={focusOnFile} map={map} />
       <MapStats />
-      <ReplayBar />
       <TalkCard />
       <LensSwitch />
 
-      <div className="map-legend" aria-label="Legend">
-        <span><i style={{ background: "var(--hot)" }} />Just now</span>
-        <span><i style={{ background: "var(--warm)" }} />{isReplay() ? "This hour" : lastSeen ? "Since you last looked" : "In the last day"}</span>
-        <span><i style={{ background: "var(--cool)" }} />Earlier</span>
-        <span><i className="ring" />Agent editing</span>
-        <span title="Click a file to see what it imports and what uses it"><i className="line" style={{ background: IMPORTS_COLOR }} />Imports</span>
+      <Dock>
+        <div className="dock-legend" aria-label="Legend">
+          <span><i style={{ background: "var(--hot)" }} />Just now</span>
+          <span><i style={{ background: "var(--warm)" }} />{isReplay() ? "This hour" : lastSeen ? "Since you last looked" : "In the last day"}</span>
+          <span><i style={{ background: "var(--cool)" }} />Earlier</span>
+          {sel && <span title="What the selected file imports"><i className="line" style={{ background: IMPORTS_COLOR }} />Imports</span>}
+        </div>
         <div className="map-seg" role="radiogroup" aria-label="Agent activity shown">
           <button role="radio" aria-checked={!showReads} onClick={() => setShowReads(false)}>Writes</button>
-          <button role="radio" aria-checked={showReads} onClick={() => setShowReads(true)}>Reads + writes</button>
+          <button role="radio" aria-checked={showReads} onClick={() => setShowReads(true)}>Reads too</button>
         </div>
-      </div>
+      </Dock>
 
       <StepPanel />
       <FilePanel file={step ? undefined : sel} root={root} steps={state.steps} edges={map?.edges ?? []} onFocus={focusOnFile} onClose={() => setSelected(null)} />

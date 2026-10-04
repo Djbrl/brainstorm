@@ -26,6 +26,7 @@ const DIM = 0.18;           // files the thread never touches (or hasn't reached
 const PAST = 0.42;          // files it touched earlier than the window below
 /** Fog of war: in a replay, only the last few moments are drawn in full (path, numbers, files); older ones fade back. */
 const WINDOW = 25;
+const MAX_FIT = 2.4;        // a footprint of one or two files doesn't fill the screen
 const BEAT_PX = 60;         // trackpad pixels per beat
 const OTHER_MS = 120;       // playback pace for single "other" steps (every-step detail)
 const SUMMARY_MS = 380;     // playback pace for summary beats (light detail)
@@ -99,15 +100,29 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     return () => clearTimeout(t);
   }, [active, replay?.playing, replay?.speed, index, last, thread, setReplayIndex, setReplayPlaying]);
 
-  // ---- footprint: frame the files the thread touched ----
+  // ---- footprint: frame the files the thread touched, in the space right of the sidebar, never closer than MAX_FIT ----
   useEffect(() => {
-    const g = fg.current;
-    if (!active || mode !== "footprint" || !g || !thread!.touched.size) return;
-    const touched = thread!.touched;
-    const t = setTimeout(() => (g as unknown as { zoomToFit: (ms: number, pad: number, f: (n: { id?: string | number }) => boolean) => void })
-      .zoomToFit(700, 140, (n) => touched.has(String(n.id))), 60);
-    return () => clearTimeout(t);
-  }, [active, mode, replay?.sessionId, thread, fg]);
+    const g = fg.current, el = wrapRef.current;
+    if (!active || mode !== "footprint" || !g || !el || !thread!.touched.size) return;
+    const touched = [...thread!.touched.keys()];
+    const frame = () => {
+      const pts = touched.map((id) => nodeIndexRef.current.get(id)).filter((n): n is NodePos & { x: number; y: number } => n?.x !== undefined && n?.y !== undefined);
+      if (!pts.length) return false;
+      const x0 = Math.min(...pts.map((p) => p.x - p.r)), x1 = Math.max(...pts.map((p) => p.x + p.r));
+      const y0 = Math.min(...pts.map((p) => p.y - p.r)), y1 = Math.max(...pts.map((p) => p.y + p.r));
+      const LEFT = 380, PAD = 120;                              // the sidebar, and room around the files
+      const w = Math.max(1, el.clientWidth - LEFT - 2 * PAD), h = Math.max(1, el.clientHeight - 2 * PAD);
+      const z = Math.min(MAX_FIT, w / Math.max(1, x1 - x0), h / Math.max(1, y1 - y0));
+      g.centerAt((x0 + x1) / 2 - LEFT / 2 / z, (y0 + y1) / 2, 700);
+      g.zoom(z, 700);
+      return true;
+    };
+    // Now, and again as the layout settles (a link opened straight onto a thread loads the map at the same time).
+    frame();
+    const ts = [600, 1800].map((ms) => setTimeout(frame, ms));
+    return () => ts.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, mode, replay?.sessionId, thread?.touched.size, fg, wrapRef, nodeIndexRef]);
 
   // ---- keyboard ----
   const replayPlayingRef = useRef(false);

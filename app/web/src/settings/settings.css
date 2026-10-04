@@ -43,3 +43,8 @@
   linear-gradient(90deg, rgba(143,233,240,.08) 1px, transparent 1px) 0 0 / 8px 8px, #0c1012; }
 .sw-deadspace::before { content: ""; position: absolute; left: 14%; top: 30%; width: 44%; height: 32%; border-left: 2px solid #5fe3e0; border-bottom: 2px solid #5fe3e0; box-shadow: -2px 2px 8px rgba(95,227,224,.5); }
 .sw-deadspace::after { content: ""; position: absolute; left: 58%; top: 56%; width: 8px; height: 8px; transform: rotate(45deg); background: #39e75f; box-shadow: 0 0 8px #39e75f; }
+.sw-marathon { background:
+  linear-gradient(rgba(17,17,17,.08) 1px, transparent 1px) 0 0 / 8px 8px,
+  linear-gradient(90deg, rgba(17,17,17,.08) 1px, transparent 1px) 0 0 / 8px 8px, #e8eaee; }
+.sw-marathon::before { content: ""; position: absolute; left: 16px; top: 8px; width: 28px; height: 28px; border-radius: 50%; border: 1px solid rgba(123,108,255,.55); box-shadow: inset 7px 0 0 -6px rgba(123,108,255,.55), inset -7px 0 0 -6px rgba(123,108,255,.55); }
+.sw-marathon::after { content: ""; position: absolute; left: 40px; top: 15px; width: 9px; height: 9px; background: #c6ff1a; border: 1px solid #111; }

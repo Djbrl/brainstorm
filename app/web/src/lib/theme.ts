@@ -4,11 +4,12 @@
 // frame by the canvas layers through getTheme() (see map/themes.ts), like mapPrefs.
 import { useSyncExternalStore } from "react";
 
-export type ThemeId = "default" | "ps2" | "deadspace" | "metro";
+export type ThemeId = "default" | "ps2" | "deadspace" | "metro" | "marathon";
 
 export const THEMES: { id: ThemeId; name: string; note: string; dark: boolean }[] = [
   { id: "default", name: "Brainstorm", note: "Light and quiet. Colour shows what changed.", dark: false },
   { id: "metro", name: "Metro", note: "Imports as transit lines, files as stations.", dark: false },
+  { id: "marathon", name: "Marathon", note: "Clinical white, wireframe and acid marks. Neo-industrial.", dark: false },
   { id: "ps2", name: "PS2", note: "Glass cubes in a violet haze.", dark: true },
   { id: "deadspace", name: "Dead Space", note: "A hologram: floor plates and a cyan locator line.", dark: true },
 ];

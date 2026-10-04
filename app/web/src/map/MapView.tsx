@@ -327,10 +327,13 @@ export function MapView() {
     const alpha = replayRef.current.nodeAlpha(n.id);
     ctx.save();
     ctx.globalAlpha = alpha;
+    const st = mapStyle();
+    const station = st.node === "station"; // Metro keeps stations plain: no ripple or outlines, one ring where an agent is
 
     // An edit lands: one ripple, once. While the file stays active: a steady outline, no motion.
     const rippleStart = ripples.current.get(n.id);
-    if (rippleStart !== undefined) {
+    if (station) ripples.current.delete(n.id);
+    else if (rippleStart !== undefined) {
       const t = (performance.now() - rippleStart) / RIPPLE_MS;
       if (t >= 1) ripples.current.delete(n.id);
       else {
@@ -344,7 +347,7 @@ export function MapView() {
         ctx.globalAlpha = alpha;
       }
     }
-    if (active) {
+    if (active && !station) {
       ctx.beginPath();
       ctx.arc(x, y, r + 3.5 / scale, 0, Math.PI * 2);
       ctx.strokeStyle = tokens.accent;
@@ -354,13 +357,12 @@ export function MapView() {
       ctx.globalAlpha = alpha;
     }
 
-    const st = mapStyle();
     const rgb = recencyRGB(tokens, n.file.lastChangedAt, now), lit = active || !same(rgb, tokens.cool);
     if (st.node === "cube") drawCube(ctx, x, y, r * 0.78 * (active ? 1.3 : 1), (STILL ? 0 : performance.now() / (active ? 700 : 2600)) + spin(n.id), rgb, lit, scale);
     else if (st.node === "plate") drawPlate(ctx, x, y, r * 0.9, rgb, lit, scale);
-    else if (st.node === "station") drawStation(ctx, x, y, r, css(rgb), active || isSel, scale);
+    else if (station) drawStation(ctx, x, y, r, same(rgb, tokens.cool) ? "#fff" : css(rgb), css(tokens.cool), active ? css(tokens.hot) : null, isSel, scale);
     else { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = css(rgb); ctx.fill(); }
-    if (isSel || isHover || active) {
+    if (isSel || isHover || (active && !station)) {
       ctx.beginPath();
       ctx.arc(x, y, st.node === "dot" ? r : r * 1.35 + 2 / scale, 0, Math.PI * 2);
       ctx.lineWidth = (isSel ? 2.4 : 1.4) / scale;
@@ -402,7 +404,8 @@ export function MapView() {
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     ctx.lineWidth = role ? Math.max(3 / scale, 3.2) : Math.max(1.6 / scale, 2.2);
     ctx.strokeStyle = role === "imports" ? style.imports : role === "usedBy" ? style.usedBy : moduleColor(s.file.module);
-    ctx.globalAlpha = (role ? 1 : linkFocusRef.current ? 0.12 : 0.55) * alpha;
+    // While a thread plays, the import lines step back so the thread's own line reads over them.
+    ctx.globalAlpha = (role ? 1 : linkFocusRef.current ? 0.12 : replayRef.current.tracing ? 0.18 : 0.55) * alpha;
     metroPath(ctx, s.x, s.y ?? 0, t.x, t.y ?? 0);
     ctx.stroke();
     ctx.restore();

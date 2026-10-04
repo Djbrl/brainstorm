@@ -5,7 +5,7 @@ import type { ForceGraphMethods } from "react-force-graph-2d";
 import { mapPrefs, replayCursor, useNav } from "../../lib/nav";
 import { useThread, type Thread } from "../../lib/thread";
 import { replayCamera, USER_CAMERA_MS } from "./store";
-import { along, mapStyle, metroPath, metroPoints, tripMs } from "../themes";
+import { along, casing, mapStyle, metroPath, metroPoints, platform, tripMs } from "../themes";
 
 export type NodePos = { x?: number; y?: number; r: number };
 
@@ -14,6 +14,8 @@ export type ReplayLayerApi = {
   active: boolean;
   /** Alpha for a node during replay: 1 = normal, lower = dimmed (not touched by the thread). */
   nodeAlpha: (id: string) => number;
+  /** True while the tracer is drawn (a replay or steps, not the footprint): Metro quiets the import lines then. */
+  tracing: boolean;
   /** Draw the tracer, numbered stops, the current marker and read flashes. Called every frame after the agent layer. */
   draw: (ctx: CanvasRenderingContext2D, scale: number) => void;
 };
@@ -75,8 +77,9 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
 
   replayCamera.fg = fg;
 
-  const st = useRef<{ active: boolean; thread: Thread | null; index: number; len: number; mode: string }>({ active, thread, index, len, mode });
-  st.current = { active, thread, index, len, mode };
+  const speed = replay?.speed ?? 1;
+  const st = useRef<{ active: boolean; thread: Thread | null; index: number; len: number; mode: string; speed: number }>({ active, thread, index, len, mode, speed });
+  st.current = { active, thread, index, len, mode, speed };
   const anim = useRef<Anim>({ x: 0, y: 0, fromX: 0, fromY: 0, t0: -1e9, file: null, lastIndex: -1, beatAt: -1e9, cam: null });
 
   // Bounds: clamp the cursor whenever the thread (or its length) changes.
@@ -253,21 +256,18 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     ctx.save();
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+    const style = mapStyle(), metro = style.route === "metro";
+    const line = style.track ?? accent;   // Metro: the thread is its own ink line, apart from the folder lines
 
     // Marker target: just off the file's top-right, like the live agents.
-    const markerAt = (id: string) => {
-      const n = pos(id);
-      if (!n) return undefined;
-      const d = n.r + 11 / scale, ang = -Math.PI / 4;
-      return { x: n.x + Math.cos(ang) * d, y: n.y + Math.sin(ang) * d };
-    };
+    const markerAt = (id: string) => { const n = pos(id); return n ? platform(n.x, n.y, n.r, scale) : undefined; };
     const curFile = mi >= 0 ? moves[mi].file : null;
     const target = curFile ? markerAt(curFile) : undefined;
     if (target) {
       if (a.file === null) { a.x = a.fromX = target.x; a.y = a.fromY = target.y; a.t0 = -1e9; a.file = curFile; }
       else if (a.file !== curFile) { a.fromX = a.x; a.fromY = a.y; a.t0 = t; a.file = curFile; }
-      const route = mapStyle().route, p = Math.min(1, (t - a.t0) / tripMs(route, GLIDE_MS)), e = ease(p);
-      if (route === "metro" && p < 1) { const q = along(metroPoints(a.fromX, a.fromY, target.x, target.y), e); a.x = q.x; a.y = q.y; }  // ride the track
+      const p = Math.min(1, (t - a.t0) / tripMs(style.route, GLIDE_MS, s.speed)), e = ease(p);
+      if (metro && p < 1) { const q = along(metroPoints(a.fromX, a.fromY, target.x, target.y), e); a.x = q.x; a.y = q.y; }  // ride the track
       else { a.x = a.fromX + (target.x - a.fromX) * e; a.y = a.fromY + (target.y - a.fromY) * e; }
     } else if (!curFile) {
       a.file = null;
@@ -278,18 +278,20 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     a.cam = target && readPos ? { x: (a.x + readPos.x) / 2, y: (a.y + readPos.y) / 2 } : target ? { x: a.x, y: a.y } : readPos ? { x: readPos.x, y: readPos.y } : null;
 
     // Tracer path through moves[0..mi], newest segments strongest; segments older than the window are a faint thread.
+    // Metro: the track runs between the marker's stops, not the files' centres, so a trip back retraces the same track.
     const fogBefore = s.index - WINDOW;
+    const stop = metro ? markerAt : pos;
     for (let k = 1; k <= mi; k++) {
-      const p0 = pos(moves[k - 1].file);
-      const p1 = k === mi && target ? { x: a.x, y: a.y } : pos(moves[k].file);
+      const p0 = stop(moves[k - 1].file);
+      const p1 = k === mi && target ? { x: a.x, y: a.y } : stop(moves[k].file);
       if (!p0 || !p1) continue;
       const old = moves[k].beatIndex < fogBefore;
       const w = old ? 0 : Math.pow(0.9, mi - k);
       ctx.globalAlpha = old ? 0.07 : 0.12 + 0.63 * w;
-      ctx.strokeStyle = accent;
+      ctx.strokeStyle = line;
       ctx.lineWidth = (old ? 1 : 1.1 + 2 * w) / scale;
       const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2, dx = p1.x - p0.x, dy = p1.y - p0.y;
-      if (mapStyle().route === "metro") metroPath(ctx, p0.x, p0.y, p1.x, p1.y);              // the track it rode
+      if (metro) { metroPath(ctx, p0.x, p0.y, p1.x, p1.y); if (!old) casing(ctx, scale); }  // the track it rode
       else { ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.quadraticCurveTo(mx - dy * 0.15, my + dx * 0.15, p1.x, p1.y); }
       ctx.stroke();
     }
@@ -315,9 +317,9 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
       ctx.fillStyle = "#fff";
       ctx.fill();
       ctx.lineWidth = 1.4 / scale;
-      ctx.strokeStyle = accent;
+      ctx.strokeStyle = line;
       ctx.stroke();
-      ctx.fillStyle = accent;
+      ctx.fillStyle = line;
       ctx.fillText(label, bx, by + 0.5 / scale);
     }
 
@@ -327,7 +329,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
       if (n) {
         const p = Math.min(1, (t - a.beatAt) / FLASH_MS);
         ctx.lineWidth = 2 / scale;
-        ctx.strokeStyle = accent;
+        ctx.strokeStyle = line;
         if (p < 1) {
           ctx.globalAlpha = 0.9 * (1 - p);
           ctx.beginPath(); ctx.arc(n.x, n.y, n.r + (3 + p * 16) / scale, 0, Math.PI * 2); ctx.stroke();
@@ -344,13 +346,13 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
         const ly = n.y - n.r - 8 / scale;
         ctx.globalAlpha = 1;
         ctx.lineWidth = 3.5 / scale; ctx.strokeStyle = HALO; ctx.strokeText(label, n.x, ly);
-        ctx.fillStyle = accent; ctx.fillText(label, n.x, ly);
+        ctx.fillStyle = line; ctx.fillText(label, n.x, ly);
       }
     }
 
     // Current marker with a soft halo. Red, with one red ring, when this beat has a failed tool call.
     const failed = beat.failed > 0;
-    const mark = failed ? RED : accent;
+    const mark = failed ? RED : line;
     if (target && curFile) {
       const halo = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, 26 / scale);
       halo.addColorStop(0, hexA(mark, 0.28));
@@ -371,7 +373,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
         if (p < 1) {
           ctx.globalAlpha = 0.6 * (1 - p);
           ctx.beginPath(); ctx.arc(a.x, a.y, (10 + p * 16) / scale, 0, Math.PI * 2);
-          ctx.strokeStyle = accent; ctx.lineWidth = 2 / scale; ctx.stroke();
+          ctx.strokeStyle = line; ctx.lineWidth = 2 / scale; ctx.stroke();
         }
       }
 
@@ -403,7 +405,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     ctx.restore();
   }, [accent, font, nodeIndexRef]);
 
-  return { active, nodeAlpha, draw };
+  return { active, tracing: active && mode !== "footprint", nodeAlpha, draw };
 }
 
 /** Play/pause; pressing play at the last beat starts over. Shared by the keyboard and the ReplayBar. */

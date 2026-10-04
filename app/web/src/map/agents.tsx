@@ -2,12 +2,12 @@
 import { useEffect, useState } from "react";
 import type { AgentPresence } from "@contract";
 import { clock } from "../lib/live";
-import { along, mapStyle, metroPath, metroPoints, tripMs } from "./themes";
+import { along, casing, mapStyle, metroPath, metroPoints, platform, tripMs } from "./themes";
 
-// Colors that do not clash with the recency scale (orange/amber/grey). Main threads get the accent.
+// Colors that do not clash with the recency scale (orange/amber/grey). Main threads get the accent (Metro: their own ink line).
 const PALETTE = ["#2f7ae5", "#0f9d8a", "#c2409a", "#7c4dde", "#2e9e4f", "#0b8fb3", "#b5487a", "#4a6fa5"];
 export function agentColor(a: Pick<AgentPresence, "id" | "isSubagent">, accent: string): string {
-  if (!a.isSubagent) return accent;
+  if (!a.isSubagent) return mapStyle().track ?? accent;
   let h = 0;
   for (let i = 0; i < a.id.length; i++) h = (h * 31 + a.id.charCodeAt(i)) >>> 0;
   const palette = mapStyle().palette ?? PALETTE;   // each map theme has its own subagent colours
@@ -193,7 +193,9 @@ export function drawAgents(opts: {
         const id = resolveId(m.file);
         if (id && files[files.length - 1] !== id) files.push(id);
       }
-      const pts = files.slice(-7).map((f) => resolve(f)).filter((x): x is Pt => !!x);
+      // Metro: through the marker's stops by each file, so the track it rode is the one it leaves.
+      const pts = files.slice(-7).map((f) => resolve(f)).filter((x): x is Pt => !!x)
+        .map((n) => (style.route === "metro" ? { ...platform(n.x, n.y, n.r, scale, angle), r: 0 } : n));
       if (pts.length) pts[pts.length - 1] = { x: st.x, y: st.y, r: 0 }; // end at the marker
       if (pts.length > 1 && (!quiet || followId === a.id)) {
         ctx.lineCap = "round";
@@ -205,7 +207,7 @@ export function drawAgents(opts: {
           ctx.lineWidth = (1.2 + 1.6 * w) / scale;
           const mx = (a0.x + a1.x) / 2, my = (a0.y + a1.y) / 2;
           const dx = a1.x - a0.x, dy = a1.y - a0.y;
-          if (style.route === "metro") metroPath(ctx, a0.x, a0.y, a1.x, a1.y);                 // the track it rode
+          if (style.route === "metro") { metroPath(ctx, a0.x, a0.y, a1.x, a1.y); casing(ctx, scale); } // the track it rode
           else {
             ctx.beginPath();
             ctx.moveTo(a0.x, a0.y);

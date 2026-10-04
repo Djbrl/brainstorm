@@ -20,6 +20,8 @@ export type MapStyle = {
   trail: "curve" | "elbow";
   /** How an agent travels between files: a straight glide, or along metro track (straight, 45°, straight). The trail follows the same route. */
   route: "glide" | "metro";
+  /** Metro: the agent's own line (the main thread and a replay), in a colour no folder line can take. Others use the accent. */
+  track?: string;
   /** Subagent colours (main threads take the theme's accent). */
   palette: string[];
 };
@@ -37,7 +39,7 @@ const BASE: MapStyle = {
 const STYLES: Record<ThemeId, MapStyle> = {
   default: BASE,
   metro: {
-    ...BASE, node: "station", link: "metro", moduleColored: true, route: "metro",
+    ...BASE, node: "station", link: "metro", moduleColored: true, route: "metro", track: "#1d1d1f",
     halo: "rgba(255,255,255,0.95)", moduleInk: "rgba(29,29,31,0.55)", moduleInkLively: "rgba(29,29,31,0.8)",
   },
   ps2: {
@@ -115,12 +117,30 @@ export function drawPlate(ctx: CanvasRenderingContext2D, x: number, y: number, r
 }
 
 // ---------- Metro: a station, and imports as transit lines ----------
-export function drawStation(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, ring: string, bold: boolean, scale: number) {
+/** A station: an ink ring, filled with the recency colour once the file changed (white while quiet).
+ *  Where an agent is: one more ring, in the "just now" colour. Nothing else is drawn around a station. */
+export function drawStation(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, fill: string, ring: string, here: string | null, bold: boolean, scale: number) {
   const rr = Math.max(2.6, r * 0.6);
   ctx.beginPath(); ctx.arc(x, y, rr, 0, TAU);
-  ctx.fillStyle = "#fff"; ctx.fill();
-  ctx.lineWidth = (bold ? 2.6 : 1.7) / scale + rr * 0.18;
+  ctx.fillStyle = fill; ctx.fill();
+  ctx.lineWidth = (bold ? 2.4 : 1.6) / scale + rr * 0.18;
   ctx.strokeStyle = ring; ctx.stroke();
+  if (here) {
+    ctx.beginPath(); ctx.arc(x, y, rr + 4.5 / scale + rr * 0.18, 0, TAU);
+    ctx.lineWidth = 2.2 / scale; ctx.strokeStyle = here; ctx.stroke();
+  }
+}
+
+/** Where a marker stands by its file: just off the top-right (or around it, when several agents share it). Metro tracks run between these points. */
+export const platform = (x: number, y: number, r: number, scale: number, angle = -Math.PI / 4) =>
+  ({ x: x + Math.cos(angle) * (r + 11 / scale), y: y + Math.sin(angle) * (r + 11 / scale) });
+
+/** Metro: a white casing under an agent's track, so it reads over the import lines it crosses (the caller strokes the track after). */
+export function casing(ctx: CanvasRenderingContext2D, scale: number) {
+  const { strokeStyle, lineWidth, globalAlpha } = ctx;
+  ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = lineWidth + 3 / scale; ctx.globalAlpha = Math.min(1, globalAlpha * 1.4);
+  ctx.stroke();
+  ctx.strokeStyle = strokeStyle; ctx.lineWidth = lineWidth; ctx.globalAlpha = globalAlpha;
 }
 
 /** The corners of a metro track between two points: straight, then 45°, then straight. */
@@ -151,5 +171,5 @@ export function along(pts: Pt2[], k: number): { x: number; y: number } {
   return { x: pts[pts.length - 1][0], y: pts[pts.length - 1][1] };
 }
 
-/** How long a trip takes: a bent metro route is longer than a glide, so it gets a little more time, capped so a fast replay keeps up. */
-export const tripMs = (route: MapStyle["route"], glideMs: number) => (route === "metro" ? Math.round(glideMs * 1.45) : glideMs);
+/** How long a trip takes: a bent metro route is longer than a glide, so it gets a little more time; a fast replay shortens it so the marker arrives before the next step. */
+export const tripMs = (route: MapStyle["route"], glideMs: number, speed = 1) => (route === "metro" ? glideMs * 1.45 : glideMs) / Math.max(1, speed);

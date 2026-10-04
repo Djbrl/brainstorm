@@ -8,6 +8,25 @@
 .su-name { overflow-wrap: anywhere; }
 .su-lede.su-path-shown { font-family: var(--font-mono); font-size: 14px; color: var(--ink-3); margin-top: 10px; overflow-wrap: anywhere; }
 
+/* Pick: one viewport. The heading and the field stay put; the projects scroll in their own area. */
+.su-col.su-pick { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: max(64px, 9vh) 32px 20px; }
+.su-pick .su-title { font-size: clamp(36px, 5.2vh, 52px); }
+.su-pick .su-lede { font-size: 17px; margin-top: 10px; }
+.su-pick .su-back { align-self: flex-start; margin-bottom: 12px; }
+.su-find { position: relative; display: flex; gap: 10px; margin-top: 28px; flex: none; }
+.su-find .su-input { font-family: inherit; font-size: 16px; padding: 13px 16px 13px 42px; }
+.su-find-icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
+.su-pick .su-list { margin-top: 18px; flex: 0 1 auto; min-height: 120px; overflow-y: auto; overscroll-behavior: contain; padding: 0 14px; margin-left: -14px; margin-right: -14px;
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 20px), transparent); mask-image: linear-gradient(#000 calc(100% - 20px), transparent); padding-bottom: 20px; }
+.su-pick .su-ws { padding: 11px 14px; gap: 16px; border-radius: 12px; animation: none; }
+.su-pick .su-list.intro .su-ws { animation: su-in .4s cubic-bezier(.2,.7,.2,1) both; }
+.su-pick .su-ws-name { font-size: 18px; }
+.su-pick .su-ws-path { font-size: 12px; margin-top: 1px; }
+.su-pick .su-ws-meta { font-size: 13px; text-align: right; line-height: 1.35; }
+.su-pick .su-none { margin-top: 24px; }
+.su-count { flex: none; margin: 8px 0 0; font-size: 13px; color: var(--ink-3); }
+@media (max-width: 600px) { .su-col.su-pick { padding: 56px 16px 16px; } .su-pick .su-ws-path { display: none; } }
+
 /* Suggestions */
 .su-list { margin-top: 44px; border-top: 1px solid var(--line); }
 .su-ws { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto 20px; align-items: center; gap: 20px; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: transparent; padding: 20px 14px; margin: 0 -14px; width: calc(100% + 28px); border-radius: 14px; outline: none; transition: background .15s; animation: su-in .4s cubic-bezier(.2,.7,.2,1) both; }

@@ -22,7 +22,7 @@ import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
 import { makeFileResolver } from "../lib/paths";
 import { drawModuleLabels, LabelSpace } from "./labels";
 import { useTheme } from "../lib/theme";
-import { drawCube, drawPlate, drawStation, mapStyle, metroPath, moduleColor, type RGB } from "./themes";
+import { drawCube, drawPlate, drawStation, LAND_MS, landings, mapStyle, metroPath, moduleColor, type RGB } from "./themes";
 import "./map.css";
 
 type GNode = NodeObject & { id: string; file: FileNode; r: number; ax: number; ay: number };
@@ -328,11 +328,11 @@ export function MapView() {
     ctx.save();
     ctx.globalAlpha = alpha;
     const st = mapStyle();
-    const station = st.node === "station"; // Metro keeps stations plain: no ripple or outlines, one ring where an agent is
+    const plain = st.node !== "dot"; // themed files stay plain: no ripple or outlines, one mark where an agent is
 
     // An edit lands: one ripple, once. While the file stays active: a steady outline, no motion.
     const rippleStart = ripples.current.get(n.id);
-    if (station) ripples.current.delete(n.id);
+    if (plain) ripples.current.delete(n.id);
     else if (rippleStart !== undefined) {
       const t = (performance.now() - rippleStart) / RIPPLE_MS;
       if (t >= 1) ripples.current.delete(n.id);
@@ -347,7 +347,7 @@ export function MapView() {
         ctx.globalAlpha = alpha;
       }
     }
-    if (active && !station) {
+    if (active && !plain) {
       ctx.beginPath();
       ctx.arc(x, y, r + 3.5 / scale, 0, Math.PI * 2);
       ctx.strokeStyle = tokens.accent;
@@ -358,11 +358,18 @@ export function MapView() {
     }
 
     const rgb = recencyRGB(tokens, n.file.lastChangedAt, now), lit = active || !same(rgb, tokens.cool);
-    if (st.node === "cube") drawCube(ctx, x, y, r * 0.78 * (active ? 1.3 : 1), (STILL ? 0 : performance.now() / (active ? 700 : 2600)) + spin(n.id), rgb, lit, scale);
-    else if (st.node === "plate") drawPlate(ctx, x, y, r * 0.9, rgb, lit, scale);
-    else if (station) drawStation(ctx, x, y, r, same(rgb, tokens.cool) ? "#fff" : css(rgb), css(tokens.cool), active ? css(tokens.hot) : null, isSel, scale);
+    if (st.node === "cube") {
+      // An agent lands: the cube spins up and flashes gold for a moment.
+      const landed = landings.get(n.id), k = landed === undefined ? 1 : (performance.now() - landed) / LAND_MS;
+      if (k >= 1 && landed !== undefined) landings.delete(n.id);
+      const kick = k < 1 ? 1 - (1 - k) ** 3 : 0, flash = k < 1 ? 1 - k : 0; // a half turn: the cube looks the same after it, so it never snaps back
+      drawCube(ctx, x, y, r * 0.78 * (active ? 1.3 : 1) * (1 + flash * 0.25), (STILL ? 0 : performance.now() / (active ? 700 : 2600) + kick * Math.PI) + spin(n.id),
+        flash ? mixRGB(rgb, tokens.warm, flash) : rgb, lit || flash > 0, scale, active ? tokens.accent : null);
+    }
+    else if (st.node === "plate") drawPlate(ctx, x, y, r * 0.9, rgb, lit, scale, active ? tokens.accent : null);
+    else if (st.node === "station") drawStation(ctx, x, y, r, same(rgb, tokens.cool) ? "#fff" : css(rgb), css(tokens.cool), active ? css(tokens.hot) : null, isSel, scale);
     else { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = css(rgb); ctx.fill(); }
-    if (isSel || isHover || (active && !station)) {
+    if (isSel || isHover || (active && !plain)) {
       ctx.beginPath();
       ctx.arc(x, y, st.node === "dot" ? r : r * 1.35 + 2 / scale, 0, Math.PI * 2);
       ctx.lineWidth = (isSel ? 2.4 : 1.4) / scale;
@@ -452,7 +459,7 @@ export function MapView() {
           nodePointerAreaPaint={(n, color, ctx) => { const g = n as GNode; ctx.fillStyle = color; ctx.beginPath(); ctx.arc(g.x ?? 0, g.y ?? 0, g.r + 3, 0, Math.PI * 2); ctx.fill(); }}
           onRenderFramePre={drawModules}
           onRenderFramePost={drawAgentLayer}
-          linkColor={(l) => linkRole(l as GLink, linkFocus) === "imports" ? style.imports : linkRole(l as GLink, linkFocus) === "usedBy" ? style.usedBy : linkFocus ? style.linkDim : style.linkIdle}
+          linkColor={(l) => linkRole(l as GLink, linkFocus) === "imports" ? style.imports : linkRole(l as GLink, linkFocus) === "usedBy" ? style.usedBy : linkFocus || replayLayer.tracing ? style.linkDim : style.linkIdle}
           linkCanvasObjectMode={style.link === "metro" ? () => "replace" : undefined}
           linkCanvasObject={style.link === "metro" ? drawMetroLink : undefined}
           linkWidth={(l) => (linkRole(l as GLink, linkFocus) ? 1.6 : 0.6)}

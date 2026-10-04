@@ -16,10 +16,9 @@ export type MapStyle = {
   moduleColored?: boolean;
   linkIdle: string; linkDim: string; imports: string; usedBy: string;
   markerStroke: string; markerText: string; glow: boolean;
-  /** Agent trails: soft curves, or right angles like a locator line. */
-  trail: "curve" | "elbow";
-  /** How an agent travels between files: a straight glide, or along metro track (straight, 45°, straight). The trail follows the same route. */
-  route: "glide" | "metro";
+  /** How an agent travels between files, and the shape of the trail it leaves (see routePoints):
+   *  a straight glide (trails curve softly), metro track, a locator line with one right angle, or a hop in an arc. */
+  route: "glide" | "metro" | "elbow" | "hop";
   /** Metro: the agent's own line (the main thread and a replay), in a colour no folder line can take. Others use the accent. */
   track?: string;
   /** Subagent colours (main threads take the theme's accent). */
@@ -32,7 +31,7 @@ const BASE: MapStyle = {
   moduleInk: "rgba(29,29,31,0.2)", moduleInkLively: "rgba(29,29,31,0.34)",
   linkIdle: "rgba(29,29,31,0.08)", linkDim: "rgba(29,29,31,0.04)",
   imports: "rgba(91,91,214,0.7)", usedBy: "rgba(15,157,138,0.7)",
-  markerStroke: "#fff", markerText: "#fff", glow: false, trail: "curve", route: "glide",
+  markerStroke: "#fff", markerText: "#fff", glow: false, route: "glide",
   palette: ["#2f7ae5", "#0f9d8a", "#c2409a", "#7c4dde", "#2e9e4f", "#0b8fb3", "#b5487a", "#4a6fa5"],
 };
 
@@ -43,7 +42,7 @@ const STYLES: Record<ThemeId, MapStyle> = {
     halo: "rgba(255,255,255,0.95)", moduleInk: "rgba(29,29,31,0.55)", moduleInkLively: "rgba(29,29,31,0.8)",
   },
   ps2: {
-    ...BASE, node: "cube",
+    ...BASE, node: "cube", route: "hop",
     halo: "rgba(22,22,52,0.85)", fileInk: "#f0f2ff", fileInkQuiet: "rgba(215,222,255,0.62)",
     moduleInk: "rgba(205,210,255,0.26)", moduleInkLively: "rgba(242,227,106,0.75)",
     moduleFont: `"Arial Rounded MT Bold", "Nunito", system-ui, sans-serif`, labelFont: `"Arial Rounded MT Bold", "Nunito", system-ui, sans-serif`,
@@ -53,7 +52,7 @@ const STYLES: Record<ThemeId, MapStyle> = {
     palette: ["#8fb4ff", "#7ee0ff", "#ff9ff3", "#c7a6ff", "#9dffb0", "#ffe08a", "#ffb38a", "#a6f0ff"],
   },
   deadspace: {
-    ...BASE, node: "plate", trail: "elbow",
+    ...BASE, node: "plate", route: "elbow",
     halo: "rgba(8,14,16,0.9)", fileInk: "#dcf6f8", fileInkQuiet: "rgba(160,205,215,0.6)",
     moduleInk: "rgba(143,233,240,0.28)", moduleInkLively: "rgba(143,233,240,0.7)",
     moduleFont: `"Arial Narrow", "Helvetica Neue", sans-serif`, labelFont: `"Arial Narrow", "Helvetica Neue", sans-serif`,
@@ -79,7 +78,13 @@ const rgba = ([r, g, b]: RGB, a: number) => `rgba(${r},${g},${b},${a})`;
 // ---------- PS2: a glass cube, turning slowly ----------
 const CUBE_V: RGB[] = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]];
 const CUBE_F = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [2, 3, 7, 6], [1, 2, 6, 5], [0, 3, 7, 4]];
-export function drawCube(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, angle: number, c: RGB, glow: boolean, scale: number) {
+export function drawCube(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, angle: number, c: RGB, glow: boolean, scale: number, here: string | null = null) {
+  if (here) { // where an agent is: one glowing ring on the floor under the cube
+    ctx.save();
+    ctx.beginPath(); ctx.ellipse(x, y + s * 1.35, s * 1.9, s * 0.62, 0, 0, TAU);
+    ctx.strokeStyle = here; ctx.lineWidth = 1.8 / scale; ctx.shadowColor = here; ctx.shadowBlur = 12; ctx.stroke();
+    ctx.restore();
+  }
   if (glow) {
     const g = ctx.createRadialGradient(x, y, 0, x, y, s * 3.6);
     g.addColorStop(0, rgba(c, 0.45)); g.addColorStop(1, rgba(c, 0));
@@ -101,8 +106,15 @@ export function drawCube(ctx: CanvasRenderingContext2D, x: number, y: number, s:
 }
 
 // ---------- Dead Space: a floor plate, seen from above at an angle ----------
-export function drawPlate(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: RGB, lit: boolean, scale: number) {
+export function drawPlate(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: RGB, lit: boolean, scale: number, here: string | null = null) {
   const rx = r * 1.3, ry = r * 0.72, depth = Math.max(r * 0.35, 2.5 / scale);
+  if (here) { // where an agent is: one holographic square projected on the floor around the plate
+    const qx = rx * 1.75 + 5 / scale, qy = ry * 1.75 + 3 / scale;
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(x - qx, y); ctx.lineTo(x, y - qy); ctx.lineTo(x + qx, y); ctx.lineTo(x, y + qy); ctx.closePath();
+    ctx.strokeStyle = here; ctx.lineWidth = 1.5 / scale; ctx.shadowColor = here; ctx.shadowBlur = 10; ctx.stroke();
+    ctx.restore();
+  }
   ctx.fillStyle = "rgba(16,24,26,0.95)";
   ctx.beginPath(); ctx.ellipse(x, y + depth, rx, ry, 0, 0, TAU); ctx.fill();
   ctx.fillRect(x - rx, y, rx * 2, depth);
@@ -153,9 +165,7 @@ export type Pt2 = [number, number];
 
 /** Starts a path along a metro track (the caller strokes it). */
 export function metroPath(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
-  const pts = metroPoints(x1, y1, x2, y2);
-  ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
-  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  polyPath(ctx, metroPoints(x1, y1, x2, y2));
 }
 
 /** The point a fraction k (0..1) of the way along a polyline, by length: an agent riding the track. */
@@ -171,5 +181,72 @@ export function along(pts: Pt2[], k: number): { x: number; y: number } {
   return { x: pts[pts.length - 1][0], y: pts[pts.length - 1][1] };
 }
 
-/** How long a trip takes: a bent metro route is longer than a glide, so it gets a little more time; a fast replay shortens it so the marker arrives before the next step. */
-export const tripMs = (route: MapStyle["route"], glideMs: number, speed = 1) => (route === "metro" ? glideMs * 1.45 : glideMs) / Math.max(1, speed);
+/** The way between two points for a route, as a polyline: the marker rides it and the trail draws it.
+ *  metro: straight, 45°, straight. elbow: along the longer axis, one right angle, like a corridor on a deck plan.
+ *  hop: an arc that rises on screen and lands. glide: a straight line. */
+export function routePoints(route: MapStyle["route"], x1: number, y1: number, x2: number, y2: number): Pt2[] {
+  if (route === "metro") return metroPoints(x1, y1, x2, y2);
+  if (route === "elbow") return Math.abs(x2 - x1) >= Math.abs(y2 - y1) ? [[x1, y1], [x2, y1], [x2, y2]] : [[x1, y1], [x1, y2], [x2, y2]];
+  if (route === "hop") {
+    const h = Math.hypot(x2 - x1, y2 - y1) * 0.32, cx = (x1 + x2) / 2, cy = (y1 + y2) / 2 - h, pts: Pt2[] = [];
+    for (let i = 0; i <= 16; i++) { const k = i / 16, m = 1 - k; pts.push([m * m * x1 + 2 * m * k * cx + k * k * x2, m * m * y1 + 2 * m * k * cy + k * k * y2]); }
+    return pts;
+  }
+  return [[x1, y1], [x2, y2]];
+}
+
+/** Starts a path along a polyline (the caller strokes it). */
+export function polyPath(ctx: CanvasRenderingContext2D, pts: Pt2[]) {
+  ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+}
+
+/** The polyline from its start to a fraction k of its length. */
+function upTo(pts: Pt2[], k: number): Pt2[] {
+  if (k >= 1) return pts;
+  const end = along(pts, k), out: Pt2[] = [pts[0]];
+  let total = 0; const seg: number[] = [];
+  for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg.push(d); total += d; }
+  let left = k * total;
+  for (let i = 1; i < pts.length && left > seg[i - 1]; i++) { out.push(pts[i]); left -= seg[i - 1]; }
+  out.push([end.x, end.y]);
+  return out;
+}
+
+/** Files a marker just landed on (PS2: the cube spins up and flashes). Set by the agent and replay layers, read by the map. */
+export const landings = new Map<string, number>();
+export const LAND_MS = 520;
+
+/**
+ * The trip itself, drawn under the marker while it travels (p: 0..1 of the trip, e: the eased position on it).
+ * Dead Space: a dashed locator line projects ahead to the destination, then the marker follows it.
+ * PS2: fading afterimages of the marker along the arc behind it.
+ */
+export function drawTrip(ctx: CanvasRenderingContext2D, route: MapStyle["route"], pts: Pt2[], p: number, e: number, color: string, r: number, alpha: number, scale: number) {
+  if (p >= 1) return;
+  ctx.save();
+  if (route === "elbow") {
+    ctx.setLineDash([6 / scale, 4 / scale]);
+    ctx.lineDashOffset = -performance.now() / 40 / scale;          // dashes running toward the destination
+    ctx.strokeStyle = color; ctx.lineWidth = 1.8 / scale; ctx.lineCap = "butt"; ctx.lineJoin = "miter";
+    ctx.shadowColor = color; ctx.shadowBlur = 8;
+    ctx.globalAlpha = alpha * 0.9 * Math.min(1, (1 - p) * 3);
+    polyPath(ctx, upTo(pts, Math.min(1, p / 0.3))); ctx.stroke();  // reaches the destination in the first third of the trip
+    const end = pts[pts.length - 1];
+    if (p >= 0.3) { ctx.setLineDash([]); ctx.beginPath(); ctx.arc(end[0], end[1], 3 / scale, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); }
+  } else if (route === "hop") {
+    ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 10;
+    for (let i = 1; i <= 3; i++) {
+      const k = e - i * 0.07;
+      if (k <= 0) break;
+      const q = along(pts, k);
+      ctx.globalAlpha = alpha * (0.32 - i * 0.08);
+      ctx.beginPath(); ctx.arc(q.x, q.y, r * (1 - i * 0.12), 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+/** How long a trip takes: a bent route is longer than a glide, so it gets a little more time; a fast replay shortens it so the marker arrives before the next step. */
+const TRIP: Record<MapStyle["route"], number> = { glide: 1, metro: 1.45, elbow: 1.35, hop: 1.2 };
+export const tripMs = (route: MapStyle["route"], glideMs: number, speed = 1) => (glideMs * TRIP[route]) / Math.max(1, speed);

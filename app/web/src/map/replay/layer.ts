@@ -5,7 +5,7 @@ import type { ForceGraphMethods } from "react-force-graph-2d";
 import { mapPrefs, replayCursor, useNav } from "../../lib/nav";
 import { useThread, type Thread } from "../../lib/thread";
 import { replayCamera, USER_CAMERA_MS } from "./store";
-import { along, casing, mapStyle, metroPath, metroPoints, platform, tripMs } from "../themes";
+import { along, casing, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs } from "../themes";
 
 export type NodePos = { x?: number; y?: number; r: number };
 
@@ -42,7 +42,7 @@ const INK = "#1d1d1f";
 const HALO = "rgba(251,251,253,0.95)";
 
 type Anim = { x: number; y: number; fromX: number; fromY: number; t0: number; file: string | null; lastIndex: number; beatAt: number;
-  cam: { x: number; y: number } | null };
+  cam: { x: number; y: number } | null; landedT0?: number };
 
 function isTyping(t: EventTarget | null) {
   const el = t as HTMLElement | null;
@@ -256,19 +256,21 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     ctx.save();
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    const style = mapStyle(), metro = style.route === "metro";
+    const style = mapStyle(), metro = style.route === "metro", routed = style.route !== "glide";
     const line = style.track ?? accent;   // Metro: the thread is its own ink line, apart from the folder lines
 
     // Marker target: just off the file's top-right, like the live agents.
     const markerAt = (id: string) => { const n = pos(id); return n ? platform(n.x, n.y, n.r, scale) : undefined; };
     const curFile = mi >= 0 ? moves[mi].file : null;
     const target = curFile ? markerAt(curFile) : undefined;
+    let trip: ReturnType<typeof routePoints> | null = null, tp = 1, te = 1;
     if (target) {
       if (a.file === null) { a.x = a.fromX = target.x; a.y = a.fromY = target.y; a.t0 = -1e9; a.file = curFile; }
       else if (a.file !== curFile) { a.fromX = a.x; a.fromY = a.y; a.t0 = t; a.file = curFile; }
       const p = Math.min(1, (t - a.t0) / tripMs(style.route, GLIDE_MS, s.speed)), e = ease(p);
-      if (metro && p < 1) { const q = along(metroPoints(a.fromX, a.fromY, target.x, target.y), e); a.x = q.x; a.y = q.y; }  // ride the track
+      if (routed && p < 1) { trip = routePoints(style.route, a.fromX, a.fromY, target.x, target.y); tp = p; te = e; const q = along(trip, e); a.x = q.x; a.y = q.y; }  // ride the route
       else { a.x = a.fromX + (target.x - a.fromX) * e; a.y = a.fromY + (target.y - a.fromY) * e; }
+      if (style.route === "hop" && p >= 1 && a.t0 > 0 && a.landedT0 !== a.t0 && curFile) { a.landedT0 = a.t0; landings.set(curFile, t); }
     } else if (!curFile) {
       a.file = null;
     }
@@ -278,9 +280,9 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     a.cam = target && readPos ? { x: (a.x + readPos.x) / 2, y: (a.y + readPos.y) / 2 } : target ? { x: a.x, y: a.y } : readPos ? { x: readPos.x, y: readPos.y } : null;
 
     // Tracer path through moves[0..mi], newest segments strongest; segments older than the window are a faint thread.
-    // Metro: the track runs between the marker's stops, not the files' centres, so a trip back retraces the same track.
+    // Routed themes: the track runs between the marker's stops, not the files' centres, so a trip back retraces the same track.
     const fogBefore = s.index - WINDOW;
-    const stop = metro ? markerAt : pos;
+    const stop = routed ? markerAt : pos;
     for (let k = 1; k <= mi; k++) {
       const p0 = stop(moves[k - 1].file);
       const p1 = k === mi && target ? { x: a.x, y: a.y } : stop(moves[k].file);
@@ -291,7 +293,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
       ctx.strokeStyle = line;
       ctx.lineWidth = (old ? 1 : 1.1 + 2 * w) / scale;
       const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2, dx = p1.x - p0.x, dy = p1.y - p0.y;
-      if (metro) { metroPath(ctx, p0.x, p0.y, p1.x, p1.y); if (!old) casing(ctx, scale); }  // the track it rode
+      if (routed) { polyPath(ctx, routePoints(style.route, p0.x, p0.y, p1.x, p1.y)); if (metro && !old) casing(ctx, scale); }  // the way it went
       else { ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.quadraticCurveTo(mx - dy * 0.15, my + dx * 0.15, p1.x, p1.y); }
       ctx.stroke();
     }
@@ -354,6 +356,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     const failed = beat.failed > 0;
     const mark = failed ? RED : line;
     if (target && curFile) {
+      if (trip) drawTrip(ctx, style.route, trip, tp, te, mark, 10 / scale, 1, scale);
       const halo = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, 26 / scale);
       halo.addColorStop(0, hexA(mark, 0.28));
       halo.addColorStop(1, hexA(mark, 0));

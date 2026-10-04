@@ -16,22 +16,22 @@ export const repoBase = (root: string) => resolve(root).replace(/\/\.claude\/wor
  * sibling that merely starts the same ("brainstorm2"). */
 export const underPrefix = (projectDir: string, prefix: string) => projectDir === prefix || projectDir.startsWith(prefix + "-");
 
-/** Where a few of the folder's threads ran (a folder can hold a thread that ran elsewhere, e.g. a scratch space). */
+/** Where a few of the folder's threads ran: every folder each one moved through, since a thread can start
+ * elsewhere (a scratch space) and only later work in the repo. */
 function cwdsOf(dir: string): string[] {
   let files: string[];
   try { files = readdirSync(dir).filter((f) => f.endsWith(".jsonl")).slice(0, 5); } catch { return []; }
-  const out: string[] = [];
+  const out = new Set<string>();
   for (const f of files) {
     let fd: number | undefined;
     try {
       fd = openSync(join(dir, f), "r");
-      const buf = Buffer.alloc(256 * 1024);
+      const buf = Buffer.alloc(4 * 1024 * 1024);
       const n = readSync(fd, buf, 0, buf.length, 0);
-      const m = /"cwd":"((?:[^"\\]|\\.)*)"/.exec(buf.toString("utf8", 0, n));
-      if (m) out.push(JSON.parse(`"${m[1]}"`) as string);
+      for (const m of buf.toString("utf8", 0, n).matchAll(/"cwd":"((?:[^"\\]|\\.)*)"/g)) out.add(JSON.parse(`"${m[1]}"`) as string);
     } catch { /* unreadable, try the next */ } finally { if (fd !== undefined) closeSync(fd); }
   }
-  return out;
+  return [...out];
 }
 
 const real = (p: string) => { try { return realpathSync(p); } catch { return p; } };

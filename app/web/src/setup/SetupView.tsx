@@ -33,7 +33,7 @@ async function getStatus(): Promise<SetupStatus | null> {
 
 function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string) => void; onCancel?: () => void }) {
   const [list, setList] = useState<WorkspaceSuggestion[] | null>(null);
-  const [path, setPath] = useState("");
+  const [query, setQuery] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -41,12 +41,17 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
   const now = clock();
 
   useEffect(() => { getSuggestions().then(setList).catch(() => setList([])); }, []);
-  // Focus the first usable suggestion, or the field when there are none.
-  useEffect(() => {
-    if (!list) return;
-    const first = listRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)");
-    (first ?? inputRef.current)?.focus();
-  }, [list]);
+  useEffect(() => { inputRef.current?.focus(); }, []);
+  // The rows come in once, when the list first loads, not again on every keystroke of a filter.
+  const [intro, setIntro] = useState(true);
+  useEffect(() => { if (!list) return; const t = setTimeout(() => setIntro(false), 900); return () => clearTimeout(t); }, [list]);
+
+  // One field: type to filter the projects, or paste a folder path to open any folder.
+  const q = query.trim();
+  const isPath = /^(\/|~|[A-Za-z]:\\)/.test(q);
+  const shown = !list ? null : !q ? list
+    : isPath ? list.filter((s) => s.root.toLowerCase().startsWith(q.toLowerCase()))   // projects under the path typed so far
+    : list.filter((s) => `${s.name} ${s.root}`.toLowerCase().includes(q.toLowerCase()));
 
   const open = async (root: string) => {
     const r = root.trim();
@@ -55,54 +60,58 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
     try { onOpened(await openWorkspace(r), r); }
     catch (e) { setError(e instanceof Error ? e.message : "Couldn't open that folder."); setBusy(null); }
   };
+  const submit = () => {
+    if (isPath) return open(q);
+    const first = shown?.find((s) => s.exists);
+    if (first) open(first.root);
+  };
 
+  const items = () => [...(listRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [])];
   const onListKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
     e.preventDefault();
-    const items = [...(listRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [])];
-    const i = items.indexOf(document.activeElement as HTMLButtonElement);
+    const all = items(), i = all.indexOf(document.activeElement as HTMLButtonElement);
     const next = e.key === "ArrowDown" ? i + 1 : i - 1;
-    if (next >= items.length) inputRef.current?.focus();
-    else items[Math.max(0, next)]?.focus();
+    if (next < 0) inputRef.current?.focus();
+    else all[Math.min(all.length - 1, next)]?.focus();
   };
 
   return (
-    <div className="su-col">
+    <div className="su-col su-pick">
       {onCancel && <button className="su-back" onClick={onCancel}><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 3.5L5.5 8l4.5 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>Back</button>}
       <h1 className="su-title">Pick a workspace</h1>
-      <p className="su-lede">Brainstorm maps the code in this folder and follows the Claude Code agents working in it, live.</p>
+      <p className="su-lede">Brainstorm maps the code in a folder and follows the Claude Code agents working in it, live.</p>
 
-      {list === null ? (
-        <div className="su-list">{[0, 1, 2].map((i) => <div key={i} className="su-skel" style={{ animationDelay: `${i * 90}ms` }}><span /><span /></div>)}</div>
-      ) : list.length > 0 ? (
-        <div className="su-list" ref={listRef} onKeyDown={onListKey} role="listbox" aria-label="Recent workspaces">
-          {list.map((s, i) => (
-            <button key={s.root} className={`su-ws ${s.exists ? "" : "gone"} ${busy === s.root ? "busy" : ""}`} disabled={!s.exists || !!busy} onClick={() => open(s.root)} style={{ animationDelay: `${i * 60}ms` }} role="option" aria-selected={false}>
+      <form className="su-find" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+        <svg className="su-find-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.8" stroke="currentColor" strokeWidth="1.6" /><path d="M10.6 10.6L14 14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+        <input ref={inputRef} className="su-input" value={query} placeholder="Find a project, or paste a folder path" spellCheck={false} autoComplete="off" aria-label="Find a project, or paste a folder path"
+          onChange={(e) => { setQuery(e.target.value); setError(null); }}
+          onKeyDown={(e) => { if (e.key === "ArrowDown") { e.preventDefault(); items()[0]?.focus(); } }} />
+        {isPath && <button className="su-btn" type="submit" disabled={!!busy}>{busy === q ? <span className="su-spin light" /> : "Open"}</button>}
+      </form>
+      {error && <p className="su-error" role="alert">{error}</p>}
+
+      {shown === null ? (
+        <div className="su-list">{[0, 1, 2, 3].map((i) => <div key={i} className="su-skel" style={{ animationDelay: `${i * 90}ms` }}><span /><span /></div>)}</div>
+      ) : shown.length > 0 ? (
+        <div className={`su-list ${intro ? "intro" : ""}`} ref={listRef} onKeyDown={onListKey} role="listbox" aria-label="Claude Code projects on this computer">
+          {shown.map((s, i) => (
+            <button key={s.root} className={`su-ws ${s.exists ? "" : "gone"} ${busy === s.root ? "busy" : ""}`} disabled={!s.exists || !!busy} onClick={() => open(s.root)} style={{ animationDelay: `${Math.min(i, 10) * 35}ms` }} role="option" aria-selected={false}>
               <span className="su-ws-main">
                 <span className="su-ws-name">{s.name || nameOf(s.root)}</span>
                 <span className="su-ws-path">{s.root}</span>
               </span>
               <span className="su-ws-meta">
-                {!s.exists ? "folder not found" : [s.lastActiveAt && `last active ${relTime(s.lastActiveAt, now)}`, plural(s.sessions, "session")].filter(Boolean).join(" · ")}
+                {!s.exists ? "folder not found" : <>{plural(s.sessions, "thread")}{s.lastActiveAt && <><br />{relTime(s.lastActiveAt, now)}</>}</>}
               </span>
               <span className="su-ws-go">{busy === s.root ? <span className="su-spin" /> : <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3.5L10.5 8 6 12.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}</span>
             </button>
           ))}
         </div>
       ) : (
-        <p className="su-none">No Claude Code projects found on this machine yet. Paste a folder path below.</p>
+        <p className="su-none">{isPath ? "Press Enter to open this folder." : list?.length ? `No project matches “${q}”. Paste its folder path to open it.` : "No Claude Code projects found on this computer yet. Paste a folder path above."}</p>
       )}
-
-      <form className="su-path" onSubmit={(e) => { e.preventDefault(); open(path); }}>
-        <label className="su-path-label" htmlFor="su-path-input">Or paste a folder path</label>
-        <div className="su-path-row">
-          <input id="su-path-input" ref={inputRef} className="su-input" value={path} placeholder="/Users/you/code/project" spellCheck={false} autoComplete="off"
-            onChange={(e) => { setPath(e.target.value); setError(null); }}
-            onKeyDown={(e) => { if (e.key === "ArrowUp") { e.preventDefault(); const b = [...(listRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [])]; b[b.length - 1]?.focus(); } }} />
-          <button className="su-btn" type="submit" disabled={!path.trim() || !!busy}>{busy && busy === path.trim() ? <span className="su-spin light" /> : "Open"}</button>
-        </div>
-        {error && <p className="su-error" role="alert">{error}</p>}
-      </form>
+      {shown && shown.length > 0 && <p className="su-count">{q ? `${shown.length} of ${list!.length} projects` : plural(list!.length, "project")} with Claude Code threads</p>}
     </div>
   );
 }

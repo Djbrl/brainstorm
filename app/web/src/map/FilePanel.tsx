@@ -64,6 +64,10 @@ export function FilePanel({ file, root, steps, edges, onFocus, onClose }: {
   const shown = useLastShown(file); // while it slides out, it keeps showing the file it had
   return (
     <aside className={`map-panel ${file ? "open" : ""}`} aria-hidden={!file} inert={!file}>
+      {/* A phone's panel fills the width, leaving no map to tap away on: it gets a close button (hidden when wider). */}
+      <button className="map-panel-close" onClick={onClose} aria-label="Close the file" title="Close (Esc)">
+        <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+      </button>
       {shown && <FileDetail file={shown} root={root} steps={steps} edges={edges} onFocus={onFocus} />}
     </aside>
   );

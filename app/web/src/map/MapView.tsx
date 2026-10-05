@@ -7,8 +7,8 @@ import { lastSeen, sinceMs } from "../lib/visit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const RIPPLE_MS = 700; // one ripple per edit
-import ForceGraph2D, { type ForceGraphMethods, type LinkObject, type NodeObject } from "react-force-graph-2d";
-import type { AgentPresence, Edge, FileNode, ProjectMap, Step } from "@contract";
+import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-force-graph-2d";
+import type { AgentPresence, FileNode, ProjectMap } from "@contract";
 import { useLive } from "../lib/live";
 import { attentionText, needsYou } from "../lib/attention";
 import { mapPrefs, useNav } from "../lib/nav";
@@ -16,25 +16,37 @@ import { mockAgents, mockMap } from "./mock";
 import { drawAgents, visibleAgents, type AgentAnim } from "./agents";
 import { MapSidebar } from "./sidebar/MapSidebar";
 import { Dock, LockToggle, ReadsToggle } from "./replay/ReplayBar";
-import { getCameraLock } from "./prefs";
+import { getCameraLock, useStepWindow } from "./prefs";
 import { TalkCard } from "./replay/TalkCard";
 import { StepPanel } from "./StepPanel";
 import { FilePanel, useSelectedFile } from "./FilePanel";
-import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
+import { useReplayLayer, type Look, type ReplayLayerApi } from "./replay/layer";
 import { makeFileResolver } from "../lib/paths";
-import { drawModuleLabels, drawQueuedLabels, LabelSpace, type QueuedLabel } from "./labels";
+import { aggregateFolders, clearTextWidths, drawModuleLabels, drawQueuedLabels, LabelSpace, type Folders, type QueuedLabel } from "./labels";
 import { boxOf, isFitKey, useCamera, type Camera, type View } from "./camera";
 import { FitButton } from "./FitButton";
 import { replayCamera } from "./replay/store";
 import { useTheme } from "../lib/theme";
-import { drawCube, drawPlate, drawStation, LAND_MS, landings, mapStyle, metroPath, moduleColor, reachOf, type RGB } from "./themes";
+import {
+  CUBE_STILL_PX, drawCube, drawPlate, drawStation, LAND_MS, landings, mapStyle, metroPath, metroSegment, moduleColor, reachOf,
+  settleLandings, stampCube, stampPlate, stampStation, tripMs, type MapStyle, type RGB,
+} from "./themes";
+import { clearSprites, spriteFrame, type StampMemo } from "./sprites";
+import { createRedraw, Motion } from "./redraw";
 import "./map.css";
 
-type GNode = NodeObject & { id: string; file: FileNode; r: number; ax: number; ay: number };
-type GLink = LinkObject & { source: string | GNode; target: string | GNode };
+type GNode = NodeObject & {
+  id: string; file: FileNode; r: number; ax: number; ay: number;
+  // Kept per file between frames (perf-canvas): its colour, its focus look this frame, its cube's turn.
+  cAt?: string; cEp?: number; c?: RGB; css?: string;
+  lf?: number; lk?: Look | null;
+  sp?: number; bn?: string; stamp?: StampMemo;
+};
+type GLink = { source: GNode; target: GNode };
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
+const TAU = Math.PI * 2;
 
 // ---------- helpers ----------
 function hex(c: string): [number, number, number] {
@@ -57,6 +69,10 @@ function readTokens() {
 }
 type Tokens = ReturnType<typeof readTokens>;
 
+/** A recording (the hosted demo) or a shared replay: fixed for the page's life, read once (it parses the URL). */
+let replayed: boolean | undefined;
+const recorded = () => (replayed ??= isReplay());
+
 /**
  * A file's color: hot for a few minutes after an edit, warm if it changed since you last looked (see lib/visit.ts),
  * quiet otherwise. A recording (the hosted demo) has no "last visit": there, warm fades out over an hour as before.
@@ -65,10 +81,12 @@ function recencyRGB(t: Tokens, iso: string | undefined, now: number): RGB {
   if (!iso) return t.cool;
   const at = Date.parse(iso), age = now - at;
   if (!(age >= 0)) return t.hot;
-  if (age < 5 * MIN) return mixRGB(t.hot, t.warm, (age / (5 * MIN)) ** 1.5);
-  if (isReplay()) return age < HOUR ? mixRGB(t.warm, t.cool, (age - 5 * MIN) / (HOUR - 5 * MIN)) : t.cool;
+  // In 1/32 steps (a few seconds each): the same few colours for every file, so their drawings can be reused (sprites.ts).
+  if (age < 5 * MIN) return mixRGB(t.hot, t.warm, steps((age / (5 * MIN)) ** 1.5));
+  if (recorded()) return age < HOUR ? mixRGB(t.warm, t.cool, steps((age - 5 * MIN) / (HOUR - 5 * MIN))) : t.cool;
   return at > sinceMs ? t.warm : t.cool;
 }
+const steps = (k: number, n = 32) => Math.round(k * n) / n;
 const css = (c: RGB) => `rgb(${c.join(",")})`;
 const same = (a: RGB, b: RGB) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 /** A stable starting angle per file, so cubes don't all turn in step. */
@@ -135,12 +153,21 @@ function pack(shapes: Disc[][], gap: number) {
 }
 
 // ---------- graph data (node objects are reused so positions survive live updates) ----------
+type Graph = {
+  nodes: GNode[]; links: GLink[]; anchors: Map<string, { x: number; y: number }>;
+  /** What force-graph gets: the files only. Import lines are drawn by the map and pulled by its own link force. */
+  data: { nodes: GNode[]; links: never[] };
+  /** Bumped per rebuild: what the label caches key on. */
+  id: number;
+};
+let graphIds = 0;
+const NO_LINKS: never[] = [];
 function useGraph(map: ProjectMap | null) {
   const theme = useTheme();   // a theme's files take more or less room (themes.ts reach): the folders re-pack, the nodes stay
   const nodesRef = useRef(new Map<string, GNode>());
-  const lastRef = useRef<{ key: string; edges: ProjectMap["edges"]; graph: { nodes: GNode[]; links: GLink[]; anchors: Map<string, { x: number; y: number }> } } | null>(null);
-  return useMemo(() => {
-    if (!map) return { nodes: [] as GNode[], links: [] as GLink[], anchors: new Map<string, { x: number; y: number }>() };
+  const lastRef = useRef<{ key: string; edges: ProjectMap["edges"]; graph: Graph } | null>(null);
+  return useMemo((): Graph => {
+    if (!map) return { nodes: [], links: [], anchors: new Map(), data: { nodes: [], links: NO_LINKS }, id: 0 };
     // Same files, modules and edges: update node data in place so the simulation is not disturbed.
     // (The store only replaces the edges array when an import actually changed.)
     const key = theme + ":" + map.files.map((f) => f.path + "|" + f.module).join(",");
@@ -173,11 +200,53 @@ function useGraph(map: ProjectMap | null) {
       return n;
     });
     nodesRef.current = next;
-    const links: GLink[] = map.edges.filter((e) => next.has(e.from) && next.has(e.to) && e.from !== e.to).map((e) => ({ source: e.from, target: e.to }));
-    const graph = { nodes, links, anchors };
+    const links: GLink[] = [];
+    for (const e of map.edges) { const s = next.get(e.from), t = next.get(e.to); if (s && t && s !== t) links.push({ source: s, target: t }); }
+    const graph: Graph = { nodes, links, anchors, data: { nodes, links: NO_LINKS }, id: ++graphIds };
     lastRef.current = { key, edges: map.edges, graph };
     return graph;
   }, [map?.files, map?.edges, theme]);
+}
+
+// ---------- forces ----------
+type Force = ((alpha: number) => void) & { initialize?: (nodes: GNode[], ...rest: unknown[]) => void };
+/**
+ * Import lines pull their two files together (d3's forceLink, one iteration): a file and its imports in one folder sit
+ * close, across folders the pull is weak. The map's own link force, so force-graph needn't hold (or scan) the lines.
+ */
+function linkForce(links: { current: GLink[] }) {
+  let ls: GLink[] = [], dist = new Float64Array(0), str = dist, bias = dist;
+  const f = ((alpha: number) => {
+    const a = alpha;
+    for (let i = 0; i < ls.length; i++) {
+      const s = ls[i].source, t = ls[i].target;
+      let x = (t.x ?? 0) + (t.vx ?? 0) - (s.x ?? 0) - (s.vx ?? 0) || (Math.random() - 0.5) * 1e-6;
+      let y = (t.y ?? 0) + (t.vy ?? 0) - (s.y ?? 0) - (s.vy ?? 0) || (Math.random() - 0.5) * 1e-6;
+      let l = Math.sqrt(x * x + y * y);
+      l = ((l - dist[i]) / l) * a * str[i];
+      x *= l; y *= l;
+      const b = bias[i];
+      t.vx = (t.vx ?? 0) - x * b; t.vy = (t.vy ?? 0) - y * b;
+      s.vx = (s.vx ?? 0) + x * (1 - b); s.vy = (s.vy ?? 0) + y * (1 - b);
+    }
+  }) as Force & { id: () => unknown; links: () => unknown };
+  f.initialize = (nodes) => {
+    const ids = new Set(nodes);
+    ls = links.current.filter((l) => ids.has(l.source) && ids.has(l.target));
+    const count = new Map<GNode, number>();
+    for (const l of ls) { count.set(l.source, (count.get(l.source) ?? 0) + 1); count.set(l.target, (count.get(l.target) ?? 0) + 1); }
+    dist = new Float64Array(ls.length); str = new Float64Array(ls.length); bias = new Float64Array(ls.length);
+    ls.forEach((l, i) => {
+      const s = l.source, t = l.target, inside = s.file?.module === t.file?.module;
+      dist[i] = inside ? reachOf(s.r) + reachOf(t.r) + 2 * AIR + 8 : 110;
+      str[i] = inside ? 0.2 : 0.03;
+      const cs = count.get(s) ?? 1, ct = count.get(t) ?? 1;
+      bias[i] = cs / (cs + ct);
+    });
+  };
+  // force-graph hands its own (empty) link list to the force named "link": ours keeps the map's.
+  f.id = () => f; f.links = () => f;
+  return f;
 }
 
 /**
@@ -224,13 +293,42 @@ function moduleForce(strength: number) {
 
 // ---------- import links ----------
 // Their colours (imports, used by) belong to the map theme: see themes.ts.
-const endId = (e: unknown) => (typeof e === "object" && e ? (e as GNode).id : (e as string));
+const HIDE_LINKS_FROM = 4000;   // a map with more import lines than this...
+const HIDE_LINKS_BELOW = 0.4;   // ...hides the idle ones below this zoom (a grey haze over the files); the selected file's stay
+const ARROW = 3.5, ARROW_AT = 0.92;
+const METRO_ONE_BY_ONE = 2500;  // Metro lines on screen up to which each is its own stroke (crossings darken); beyond, batched
 function linkRole(l: GLink, focus: string | null): "imports" | "usedBy" | null {
   if (!focus) return null;
-  if (endId(l.source) === focus) return "imports";
-  if (endId(l.target) === focus) return "usedBy";
+  if (l.source.id === focus) return "imports";
+  if (l.target.id === focus) return "usedBy";
   return null;
 }
+/** force-graph's arrowhead on a straight line, `ARROW_AT` of the way from the source's edge to the target's. */
+function arrowHead(ctx: CanvasRenderingContext2D, s: GNode, t: GNode) {
+  const sx = s.x ?? 0, sy = s.y ?? 0, dx = (t.x ?? 0) - sx, dy = (t.y ?? 0) - sy, len = Math.sqrt(dx * dx + dy * dy);
+  if (!len) return;
+  const at = (k: number) => ({ x: sx + dx * k || 0, y: sy + dy * k || 0 });
+  const pos = s.r + ARROW + (len - s.r - t.r - ARROW) * ARROW_AT;
+  const head = at(pos / len), tail = at((pos - ARROW) / len), vert = at((pos - ARROW * 0.8) / len);
+  const ang = Math.atan2(head.y - tail.y, head.x - tail.x) - Math.PI / 2, hw = ARROW / 1.6 / 2;
+  ctx.beginPath();
+  ctx.moveTo(head.x, head.y);
+  ctx.lineTo(tail.x + hw * Math.cos(ang), tail.y + hw * Math.sin(ang));
+  ctx.lineTo(vert.x, vert.y);
+  ctx.lineTo(tail.x - hw * Math.cos(ang), tail.y - hw * Math.sin(ang));
+  ctx.fill();
+}
+
+// ---------- one frame ----------
+const FILE_LABELS_MAX = 500;    // file names placed per frame at most (the most important first)
+/** What a frame needs to know once, not per file: where the camera looks, the time, the theme, what moves. */
+type Frame = {
+  id: number; scale: number; x0: number; y0: number; x1: number; y1: number;
+  now: number; t: number; st: MapStyle; sel: string | null; hover: string | null; coolCss: string;
+  looks: boolean; anyLook: boolean; lookSum: number; motion: Motion; linksDone: boolean;
+  labN: GNode[]; labP: number[];
+};
+type Dots = Map<string, { css: string; a: number; xyr: number[] }>;
 
 // ---------- view ----------
 export function MapView() {
@@ -238,12 +336,17 @@ export function MapView() {
   const { focusFile, setFocusFile, hiddenAgents, replay, step, showReads } = useNav();
   const mock = useMemo(() => new URLSearchParams(location.search).has("mockmap"), []);
   const map = useMemo(() => (mock ? mockMap() : state.map), [mock, state.map]);
-  const graph = useGraph(map);
-  const [wrapRef, size] = useSize<HTMLDivElement>();
-  const fg = useRef<ForceGraphMethods<GNode, GLink> | undefined>(undefined);
   const theme = useTheme();
+  const graph = useGraph(map);
+  const graphRef = useRef(graph); graphRef.current = graph;
+  const linksRef = useRef(graph.links); linksRef.current = graph.links;
+  const [wrapRef, size] = useSize<HTMLDivElement>();
+  const sizeRef = useRef(size); sizeRef.current = size;
+  const fg = useRef<ForceGraphMethods<GNode, never> | undefined>(undefined);
   const tokens = useMemo(readTokens, [theme]);   // each theme sets its own colours (themes.css)
+  const tokensRef = useRef(tokens); tokensRef.current = tokens;
   const style = mapStyle();
+  const stepWindow = useStepWindow();
   const [selected, setSelected] = useSelectedFile(map?.root ?? ""); // in the link: /file/<path>
   const [hover, setHover] = useState<string | null>(null);
   const settledFit = useRef(false);
@@ -251,6 +354,10 @@ export function MapView() {
   // The camera works in the part of the canvas the sidebar, the side panels, the stats line and the footer leave free.
   const cam = useCamera(fg as never, wrapRef);
   const camRef = useRef<Camera>(cam); camRef.current = cam;
+
+  // ---- redraws: only while something moves (redraw.ts) ----
+  const redraw = useMemo(() => createRedraw(() => { const g = fg.current; if (g) g.zoom(g.zoom()); }), []);
+  useEffect(() => () => redraw.stop(), [redraw]);
 
   // ---- live agents ----
   const [mockTick, setMockTick] = useState(0);
@@ -280,37 +387,35 @@ export function MapView() {
   const selectedRef = useRef(selected); selectedRef.current = selected;
   const space = useRef(new LabelSpace());         // taken this frame: files, replay badges, folder names, file names
   const markedRef = useRef<string | null>(null);  // the file the replay's marker names this frame
-  const labelQueue = useRef<QueuedLabel[]>([]);   // file names to draw this frame, after the files
   const nodeIndex = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n])), [graph.nodes]);
   const nodeIndexRef = useRef(nodeIndex); nodeIndexRef.current = nodeIndex;
   /** Map an agent's file (or a searched directory) to a node id on the map. */
-  const fileResolver = useMemo(() => makeFileResolver(map), [map]);
-  const fileResolverRef = useRef(fileResolver); fileResolverRef.current = fileResolver;
+  const fileResolver = useMemo(() => makeFileResolver(map), [nodeIndex, map?.root, map?.formerRoots]);   // paths only: not every file update
+  // Every answer is kept (misses too) until the files change: agents ask for the same few files on every frame.
+  const resolved = useMemo(() => new Map<string, string | null>(), [nodeIndex, fileResolver]);
+  const resolvedRef = useRef({ resolved, fileResolver }); resolvedRef.current = { resolved, fileResolver };
   const resolveId = useCallback((file: string): string | undefined => {
+    const { resolved: memo, fileResolver: same } = resolvedRef.current;
+    const hit = memo.get(file);
+    if (hit !== undefined) return hit ?? undefined;
     const idx = nodeIndexRef.current;
-    if (idx.has(file)) return file;
-    const same = fileResolverRef.current(file); // same file in another worktree of this repo
-    if (same && idx.has(same)) return same;
-    const dir = file.replace(/\/+$/, "") + "/";
-    for (const id of idx.keys()) if (id.startsWith(dir)) return id;
-    return undefined;
+    let id: string | undefined;
+    if (idx.has(file)) id = file;
+    else {
+      const other = same(file); // same file in another worktree of this repo
+      if (other && idx.has(other)) id = other;
+      else {
+        const dir = file.replace(/\/+$/, "") + "/";
+        for (const k of idx.keys()) if (k.startsWith(dir)) { id = k; break; }
+      }
+    }
+    memo.set(file, id ?? null);
+    return id;
   }, []);
   const replayLayer = useReplayLayer({ fg: fg as never, wrapRef, nodeIndexRef, accent: tokens.accent, font: tokens.body, camera: camRef });
   const replayRef = useRef<ReplayLayerApi>(replayLayer); replayRef.current = replayLayer;
   const openRef = useRef(!!replay); openRef.current = !!replay;
-  const drawAgentLayer = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
-    // File names go on after every file is drawn, so no circle covers a name (the selected one's last, on top).
-    // The file the replay's marker names (drawModules) isn't named twice.
-    const named = markedRef.current;
-    drawQueuedLabels(ctx, named ? labelQueue.current.filter((l) => l.at?.id !== named || l.must) : labelQueue.current, space.current);
-    labelQueue.current = [];
-    replayRef.current.draw(ctx, scale);
-    drawAgents({
-      ctx, scale, agents: agentsRef.current, anim: anim.current, accent: tokens.accent, font: tokens.body,
-      hoverFile: hoverRef.current, followId: followRef.current, resolveId, showReads: mapPrefs.showReads, quiet: !openRef.current, waiting: waitingRef.current,
-      resolve: (id) => { const n = nodeIndexRef.current.get(id); return n && n.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y, r: n.r } : undefined; },
-    });
-  }, [tokens, resolveId]);
+  const playingRef = useRef(false); playingRef.current = !!replay?.playing;
 
   // ---- camera intent: what the camera is framing, so it can frame it again when a panel opens or the window resizes ----
   // "fit": the whole project (or the open thread's footprint); "file": the open file; "free": the user's own view.
@@ -396,6 +501,7 @@ export function MapView() {
   }, [resolveId, setIntent, applyIntent]);
 
   // Forces
+  const hasNodes = graph.nodes.length > 0;
   useEffect(() => {
     const g = fg.current;
     if (!g) return;
@@ -404,17 +510,13 @@ export function MapView() {
     // off each other, which used to blow the whole map apart while big files in one folder still overlapped.
     g.d3Force("module", moduleForce(0.12) as never);
     g.d3Force("collide", collideForce(0.8) as never);
+    g.d3Force("link", linkForce(linksRef) as never);   // the import lines are the map's: force-graph no longer holds them
     (g.d3Force("charge") as any)?.strength?.((n: GNode) => -20 - n.r * 2)?.distanceMax?.(140);
-    (g.d3Force("link") as any)?.distance?.((l: GLink) => {
-      const s = l.source as GNode, t = l.target as GNode;
-      return s.file?.module === t.file?.module ? reachOf(s.r) + reachOf(t.r) + 2 * AIR + 8 : 110;
-    })?.strength?.((l: GLink) => ((l.source as GNode).file?.module === (l.target as GNode).file?.module ? 0.2 : 0.03));
     (g.d3Force("center") as any)?.strength?.(0.02);
     g.d3ReheatSimulation();
   }, [graph, theme]);
 
   // Frame the map once, after the first layout settles a bit (and again when it stops: see onEngineStop).
-  const hasNodes = graph.nodes.length > 0;
   useEffect(() => {
     if (!hasNodes) return;
     const t = setTimeout(() => applyIntent(900), 1600);
@@ -441,13 +543,13 @@ export function MapView() {
   // Focus from Follow (and file links)
   useEffect(() => {
     if (!focusFile) return;
-    const n = graph.nodes.find((x) => x.id === focusFile);
+    const n = nodeIndex.get(focusFile);
     if (!n) return;
     zoomTo.current = n.id;
     setSelected(n.id);
     setFocusFile(null);
     if (selectedRef.current === n.id) { setIntent({ kind: "file", id: n.id, zoom: true }); applyIntent(900); }
-  }, [focusFile, graph.nodes, setFocusFile, setIntent, applyIntent]);
+  }, [focusFile, nodeIndex, setFocusFile, setIntent, applyIntent]);
 
   // The file panel: opening it brings the file into the uncovered map (zoomed in when it came from a list or a link);
   // closing it puts the camera back where it was before (or frames the map, if it had never been framed).
@@ -480,57 +582,228 @@ export function MapView() {
   // Import links show only around the selected file.
   const linkFocus = selected; // on click, not hover: moving the mouse across the map shouldn't flash lines everywhere
   const linkFocusRef = useRef(linkFocus); linkFocusRef.current = linkFocus;
-  const activePaths = useMemo(() => new Set((map?.files ?? []).filter((f) => f.activeSessionId).map((f) => f.path)), [map?.files]);
 
   // One-shot ripples: start one when a file receives a new agent edit (not on first load).
   const ripples = useRef(new Map<string, number>());
-  const seenEdits = useRef<Map<string, string> | null>(null);
+  const seenEdits = useRef<Map<string, FileNode> | null>(null);
   useEffect(() => {
     const files = map?.files ?? [];
     const first = seenEdits.current === null;
-    const seen = seenEdits.current ?? new Map<string, string>();
+    const seen = seenEdits.current ?? new Map<string, FileNode>();
+    let started = false;
     for (const f of files) {
-      const sig = `${f.lastChangedAt ?? ""}|${f.activeSessionId ?? ""}`;
       const prev = seen.get(f.path);
-      if (!first && prev !== undefined && prev !== sig && f.activeSessionId && f.lastChangedAt !== prev.split("|")[0]) ripples.current.set(f.path, performance.now());
-      seen.set(f.path, sig);
+      if (prev === f) continue;   // the store keeps unchanged files as they were: only the changed ones are compared
+      if (!first && prev !== undefined && (prev.lastChangedAt !== f.lastChangedAt || prev.activeSessionId !== f.activeSessionId)
+        && f.activeSessionId && f.lastChangedAt !== prev.lastChangedAt) { ripples.current.set(f.path, performance.now()); started = true; }
+      seen.set(f.path, f);
     }
     seenEdits.current = seen;
-  }, [map?.files]);
+    if (started) redraw.kick(RIPPLE_MS);
+  }, [map?.files, redraw]);
+
+  // ---- colours: kept per file, worked out again when its time changes, and every few seconds (recency fades) ----
+  const epoch = useRef(0);
+  useEffect(() => {
+    const t = setInterval(() => { epoch.current++; redraw.kick(); }, 5000);
+    return () => clearInterval(t);
+  }, [redraw]);
+  useEffect(() => { epoch.current++; clearSprites(); }, [tokens]);
+  useEffect(() => {
+    // A web font arrived: names were measured in the fallback font.
+    const f = typeof document !== "undefined" ? document.fonts : undefined;
+    if (!f) return;
+    const done = () => { clearTextWidths(); redraw.kick(); };
+    f.addEventListener?.("loadingdone", done);
+    return () => f.removeEventListener?.("loadingdone", done);
+  }, [redraw]);
+  const focusColours = useRef(new Map<string, { rgb: RGB; css: string; ep: number }>());
+  /** A file's own colour (when anyone last changed it), cached on the node. */
+  const ownColour = (n: GNode, now: number) => {
+    if (n.cAt !== n.file.lastChangedAt || n.cEp !== epoch.current || !n.c) {
+      n.c = recencyRGB(tokensRef.current, n.file.lastChangedAt, now); n.css = css(n.c);
+      n.cAt = n.file.lastChangedAt; n.cEp = epoch.current;
+    }
+    return n;
+  };
+  /** The focus's colour for a time the thread changed a file (or the quiet colour: undefined). */
+  const focusColour = (edited: string | undefined, now: number) => {
+    const k = edited ?? "", m = focusColours.current;
+    let c = m.get(k);
+    if (!c || c.ep !== epoch.current) {
+      const rgb = recencyRGB(tokensRef.current, edited, now);
+      c = { rgb, css: css(rgb), ep: epoch.current };
+      if (m.size > 2000) m.clear();
+      m.set(k, c);
+    }
+    return c;
+  };
+
+  // ---- the frame ----
+  const frame = useRef<Frame>({ id: 0, scale: 1, x0: -Infinity, y0: -Infinity, x1: Infinity, y1: Infinity, now: 0, t: 0, st: style,
+    sel: null, hover: null, coolCss: "", looks: true, anyLook: false, lookSum: 0, motion: Motion.None, linksDone: false, labN: [], labP: [] });
+  const lastLookSum = useRef(0);
+  const dots = useRef<Dots>(new Map());
+  const ticks = useRef(0);
+  /** The focus look of a file this frame (eased by the replay layer), asked once per file per frame. */
+  const lookOf = (n: GNode, F: Frame): Look | null => {
+    if (n.lf === F.id) return n.lk ?? null;
+    n.lf = F.id;
+    n.lk = F.looks ? replayRef.current.look(n.id) : null;
+    return n.lk;
+  };
+
+  const startFrame = useCallback((_: CanvasRenderingContext2D, scale: number) => {
+    const F = frame.current, g = fg.current, { w, h } = sizeRef.current;
+    F.id++; F.scale = scale; F.now = clock(); F.t = performance.now(); F.st = mapStyle();
+    F.sel = selectedRef.current; F.hover = hoverRef.current; F.coolCss = css(tokensRef.current.cool);
+    spriteFrame();
+    // Off-screen files aren't drawn: the part of the map the camera shows, in graph units.
+    const a = g?.screen2GraphCoords(0, 0), b = g?.screen2GraphCoords(w, h);
+    if (a && b) { F.x0 = Math.min(a.x, b.x); F.x1 = Math.max(a.x, b.x); F.y0 = Math.min(a.y, b.y); F.y1 = Math.max(a.y, b.y); }
+    // The focus is asked about every file only while a thread is open, or its fade back hasn't finished.
+    F.looks = replayRef.current.active || F.anyLook;
+    F.anyLook = false; F.lookSum = 0; F.motion = Motion.None; F.linksDone = false;
+    F.labN.length = 0; F.labP.length = 0;
+    for (const d of dots.current.values()) d.xyr.length = 0;
+    settleLandings(F.t);
+  }, []);
+  const moreMotion = (m: Motion) => { const F = frame.current; if (m === Motion.Smooth || F.motion === Motion.None) F.motion = m; };
+
+  /** Import lines, under the files: idle ones batched in one path per colour (and per strength in Metro). */
+  const linkBatches = useRef(new Map<string, { c: string; a: number; ls: GLink[] }>());
+  const metroVisible = useRef<GLink[]>([]), metroAlpha = useRef<number[]>([]);
+  const drawLinks = (ctx: CanvasRenderingContext2D, scale: number) => {
+    const links = graphRef.current.links, F = frame.current, st = F.st;
+    if (!links.length) return;
+    const focus = linkFocusRef.current, tracing = replayRef.current.tracing;
+    const hideIdle = links.length > HIDE_LINKS_FROM && scale < HIDE_LINKS_BELOW;
+    const { x0, x1, y0, y1 } = F;
+    const off = (s: GNode, t: GNode) => {
+      const sx = s.x!, sy = s.y!, tx = t.x!, ty = t.y!;
+      return (sx < x0 && tx < x0) || (sx > x1 && tx > x1) || (sy < y0 && ty < y0) || (sy > y1 && ty > y1);
+    };
+    const roles: GLink[] = [];
+    if (st.link === "metro") {
+      // Metro: imports as transit lines (horizontal, vertical and 45°), coloured by the importing file's folder.
+      // While a thread plays, the import lines step back so the thread's own line reads over them.
+      const base = focus ? 0.12 : tracing ? 0.18 : 0.55;
+      const vis = metroVisible.current, va = metroAlpha.current;
+      vis.length = 0; va.length = 0;
+      for (const l of links) {
+        const s = l.source, t = l.target;
+        if (s.x === undefined || t.x === undefined || off(s, t)) continue;
+        if (focus && (s.id === focus || t.id === focus)) { roles.push(l); continue; }
+        if (hideIdle) continue;
+        vis.push(l); va.push(base * Math.min(lookOf(s, F)?.alpha ?? 1, lookOf(t, F)?.alpha ?? 1));
+      }
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.lineWidth = Math.max(1.6 / scale, 2.2);
+      if (vis.length <= METRO_ONE_BY_ONE) {
+        // As many lines as a project usually shows: one stroke each, so where two cross they darken as they always did.
+        for (let i = 0; i < vis.length; i++) {
+          const l = vis[i];
+          ctx.globalAlpha = va[i]; ctx.strokeStyle = moduleColor(l.source.file.module);
+          metroPath(ctx, l.source.x!, l.source.y!, l.target.x!, l.target.y!);
+          ctx.stroke();
+        }
+      } else {
+        // Thousands on screen: one stroke per folder colour and strength.
+        const batches = linkBatches.current;
+        for (const b of batches.values()) b.ls.length = 0;
+        for (let i = 0; i < vis.length; i++) {
+          const l = vis[i], a = Math.round(va[i] * 100) / 100, c = moduleColor(l.source.file.module), k = c + "|" + a;
+          let b = batches.get(k);
+          if (!b) { if (batches.size > 3000) batches.clear(); batches.set(k, (b = { c, a, ls: [] })); }
+          b.ls.push(l);
+        }
+        for (const b of batches.values()) {
+          if (!b.ls.length) continue;
+          ctx.globalAlpha = b.a; ctx.strokeStyle = b.c;
+          ctx.beginPath();
+          for (const l of b.ls) metroSegment(ctx, l.source.x!, l.source.y!, l.target.x!, l.target.y!);
+          ctx.stroke();
+        }
+      }
+      ctx.lineWidth = Math.max(3 / scale, 3.2);
+      for (const l of roles) {
+        const s = l.source, t = l.target;
+        ctx.globalAlpha = Math.min(lookOf(s, F)?.alpha ?? 1, lookOf(t, F)?.alpha ?? 1);
+        ctx.strokeStyle = s.id === focus ? st.imports : st.usedBy;
+        metroPath(ctx, s.x!, s.y!, t.x!, t.y!);
+        ctx.stroke();
+      }
+      ctx.lineCap = "butt"; ctx.lineJoin = "miter";
+    } else {
+      ctx.globalAlpha = 1;
+      if (!hideIdle) {
+        ctx.beginPath();
+        for (const l of links) {
+          const s = l.source, t = l.target;
+          if (s.x === undefined || t.x === undefined || off(s, t)) continue;
+          if (focus && (s.id === focus || t.id === focus)) continue;
+          ctx.moveTo(s.x, s.y!); ctx.lineTo(t.x, t.y!);
+        }
+        ctx.strokeStyle = focus || tracing ? st.linkDim : st.linkIdle;
+        ctx.lineWidth = 0.6 / scale;
+        ctx.stroke();
+      }
+      if (focus) for (const l of links) if (l.source.id === focus || l.target.id === focus) roles.push(l);
+      for (const role of ["imports", "usedBy"] as const) {
+        const ls = roles.filter((l) => linkRole(l, focus) === role && l.source.x !== undefined && l.target.x !== undefined);
+        if (!ls.length) continue;
+        ctx.strokeStyle = ctx.fillStyle = st[role];
+        ctx.lineWidth = 1.6 / scale;
+        ctx.beginPath();
+        for (const l of ls) { ctx.moveTo(l.source.x!, l.source.y!); ctx.lineTo(l.target.x!, l.target.y!); }
+        ctx.stroke();
+        for (const l of ls) arrowHead(ctx, l.source, l.target);
+      }
+    }
+  };
 
   const drawNode = useCallback((node: NodeObject, ctx: CanvasRenderingContext2D, scale: number) => {
+    const F = frame.current;
+    if (!F.linksDone) { F.linksDone = true; drawLinks(ctx, scale); }   // after the layout's tick, before the first file
     const n = node as GNode;
-    const x = n.x ?? 0, y = n.y ?? 0, r = n.r;
-    const now = clock();
+    const x = n.x, y = n.y, r = n.r;
+    if (x === undefined || y === undefined) return;
+    // Off screen (with room for a glow, a ripple and a name): nothing to draw.
+    const m = 3.7 * r + 34 / scale;
+    if (x + m < F.x0 || x - m > F.x1 || y + m < F.y0 || y - m > F.y1) return;
+    const tokens = tokensRef.current, st = F.st, t = F.t;
     const active = !!n.file.activeSessionId;
-    const isSel = n.id === selected, isHover = n.id === hover;
-    const look = replayRef.current.look(n.id);   // an open thread: its own footprint, the rest dimmed back
+    const isSel = n.id === F.sel, isHover = n.id === F.hover;
+    const look = lookOf(n, F);   // an open thread: its own footprint, the rest dimmed back
+    if (look) { F.anyLook = true; F.lookSum += look.alpha * 3 + look.tone; }
     const alpha = look?.alpha ?? 1;
-    ctx.save();
     ctx.globalAlpha = alpha;
-    const st = mapStyle();
     const plain = st.node !== "dot"; // themed files stay plain: no ripple or outlines, one mark where an agent is
 
     // An edit lands: one ripple, once. While the file stays active: a steady outline, no motion.
     const rippleStart = ripples.current.get(n.id);
-    if (plain) ripples.current.delete(n.id);
-    else if (rippleStart !== undefined) {
-      const t = (performance.now() - rippleStart) / RIPPLE_MS;
-      if (t >= 1) ripples.current.delete(n.id);
+    let rippling = false;
+    if (rippleStart !== undefined) {
+      if (plain) ripples.current.delete(n.id);
       else {
-        const e = 1 - Math.pow(1 - t, 3); // ease-out
-        ctx.beginPath();
-        ctx.arc(x, y, r + (3 + e * 26) / scale, 0, Math.PI * 2); // screen-constant size, readable at any zoom
-        ctx.strokeStyle = tokens.accent;
-        ctx.globalAlpha = (1 - t) * 0.75 * alpha;
-        ctx.lineWidth = 2 / scale;
-        ctx.stroke();
-        ctx.globalAlpha = alpha;
+        const k = (t - rippleStart) / RIPPLE_MS;
+        if (k >= 1) ripples.current.delete(n.id);
+        else {
+          rippling = true; moreMotion(Motion.Smooth);
+          const e = 1 - Math.pow(1 - k, 3); // ease-out
+          ctx.beginPath();
+          ctx.arc(x, y, r + (3 + e * 26) / scale, 0, TAU); // screen-constant size, readable at any zoom
+          ctx.strokeStyle = tokens.accent;
+          ctx.globalAlpha = (1 - k) * 0.75 * alpha;
+          ctx.lineWidth = 2 / scale;
+          ctx.stroke();
+          ctx.globalAlpha = alpha;
+        }
       }
     }
     if (active && !plain) {
       ctx.beginPath();
-      ctx.arc(x, y, r + 3.5 / scale, 0, Math.PI * 2);
+      ctx.arc(x, y, r + 3.5 / scale, 0, TAU);
       ctx.strokeStyle = tokens.accent;
       ctx.globalAlpha = 0.9 * alpha;
       ctx.lineWidth = 1.6 / scale;
@@ -539,22 +812,44 @@ export function MapView() {
     }
 
     // In a focus, a file takes the focus's colour (when the thread changed it, or the quiet one), not the project's.
-    const own = recencyRGB(tokens, n.file.lastChangedAt, now);
-    const rgb = look ? mixRGB(own, recencyRGB(tokens, look.edited, now), look.tone) : own, lit = active || !same(rgb, tokens.cool);
+    const own = ownColour(n, F.now);
+    let rgb = own.c!, rgbCss = own.css!;
+    if (look && look.tone > 0) {
+      const fc = focusColour(look.edited, F.now);
+      if (look.tone >= 1) { rgb = fc.rgb; rgbCss = fc.css; }
+      else { rgb = mixRGB(rgb, fc.rgb, steps(look.tone, 8)); rgbCss = css(rgb); }   // easing in 8 steps: few colours to draw
+    }
+    const lit = active || !same(rgb, tokens.cool);
     if (st.node === "cube") {
       // An agent lands: the cube spins up and flashes gold for a moment.
-      const landed = landings.get(n.id), k = landed === undefined ? 1 : (performance.now() - landed) / LAND_MS;
+      const landed = landings.get(n.id), k = landed === undefined ? 1 : (t - landed) / LAND_MS;
       if (k >= 1 && landed !== undefined) landings.delete(n.id);
       const kick = k < 1 ? 1 - (1 - k) ** 3 : 0, flash = k < 1 ? 1 - k : 0; // a half turn: the cube looks the same after it, so it never snaps back
-      drawCube(ctx, x, y, r * 0.78 * (active ? 1.3 : 1) * (1 + flash * 0.25), (STILL ? 0 : performance.now() / (active ? 700 : 2600) + kick * Math.PI) + spin(n.id),
-        flash ? mixRGB(rgb, tokens.warm, flash) : rgb, lit || flash > 0, scale, active ? tokens.accent : null);
+      const s = r * 0.78 * (active ? 1.3 : 1) * (1 + flash * 0.25);
+      // A cube a few pixels wide stands still: its turn wouldn't show, and the map can rest.
+      const still = STILL || (s * scale < CUBE_STILL_PX && !active && !flash);
+      const angle = (still ? 0 : t / (active ? 700 : 2600) + kick * Math.PI) + (n.sp ??= spin(n.id));
+      if (flash) moreMotion(Motion.Smooth); else if (!still) moreMotion(Motion.Slow);
+      const c = flash ? mixRGB(rgb, tokens.warm, flash) : rgb;
+      if (active || flash || !stampCube(ctx, x, y, s, angle, c, rgbCss, lit, scale, (n.stamp ??= {})))
+        drawCube(ctx, x, y, s, angle, c, lit || flash > 0, scale, active ? tokens.accent : null);
     }
-    else if (st.node === "plate") drawPlate(ctx, x, y, r * 0.9, rgb, lit, scale, active ? tokens.accent : null);
-    else if (st.node === "station") drawStation(ctx, x, y, r, same(rgb, tokens.cool) ? "#fff" : css(rgb), css(tokens.cool), active ? css(tokens.hot) : null, isSel, scale);
-    else { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = css(rgb); ctx.fill(); }
+    else if (st.node === "plate") { if (active || !stampPlate(ctx, x, y, r * 0.9, rgb, rgbCss, lit, scale, (n.stamp ??= {}))) drawPlate(ctx, x, y, r * 0.9, rgb, lit, scale, active ? tokens.accent : null); }
+    else if (st.node === "station") {
+      const fill = same(rgb, tokens.cool) ? "#fff" : rgbCss, ring = F.coolCss;
+      if (active || !stampStation(ctx, x, y, r, fill, ring, isSel, scale, (n.stamp ??= {}))) drawStation(ctx, x, y, r, fill, ring, active ? css(tokens.hot) : null, isSel, scale);
+    }
+    else if (isSel || isHover || active || rippling) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = rgbCss; ctx.fill(); }
+    else {
+      // A plain dot: batched with every dot of its colour and strength, filled once after the files (endFrame).
+      const a = alpha === 1 ? 1 : Math.round(alpha * 64) / 64, key = a === 1 ? rgbCss : rgbCss + "|" + a;
+      let d = dots.current.get(key);
+      if (!d) { if (dots.current.size > 512) dots.current.clear(); dots.current.set(key, (d = { css: rgbCss, a, xyr: [] })); }
+      d.xyr.push(x, y, r);
+    }
     if (isSel || isHover || (active && !plain)) {
       ctx.beginPath();
-      ctx.arc(x, y, st.node === "dot" ? r : r * 1.35 + 2 / scale, 0, Math.PI * 2);
+      ctx.arc(x, y, st.node === "dot" ? r : r * 1.35 + 2 / scale, 0, TAU);
       ctx.lineWidth = (isSel ? 2.4 : 1.4) / scale;
       ctx.strokeStyle = active ? tokens.accent : tokens.ink;
       ctx.stroke();
@@ -565,79 +860,194 @@ export function MapView() {
     const focusing = !!look && look.tone > 0.5, inFocus = focusing && !!look.named && look.alpha > 0.3;
     const forced = isSel || isHover || (active && !focusing);
     if (forced || inFocus || (alpha >= 1 && (r * scale > 9 || scale > 3.2))) {
-      // Queued, drawn after every file (see drawAgentLayer): a neighbour's circle never covers a name.
-      const fs = Math.max(11, Math.min(14, 11 + r * scale * 0.08)) / scale;
-      // Clear of what the theme draws (a cube's corners, a plate's rim) and of the selection ring.
-      const ringR = Math.max(reachOf(r, active, st), isSel || isHover ? (st.node === "dot" ? r : r * 1.35 + 2 / scale) : 0);
-      labelQueue.current.push({
-        text: baseName(n.id), x, y: y + ringR + 3 / scale, size: fs, scale, alpha: isSel || isHover ? 1 : inFocus ? Math.max(alpha, 0.8) : alpha,
-        at: { id: n.id, x, y, r: ringR }, must: isSel || isHover,
-        font: `${isSel || (active && !focusing) ? 600 : 500} ${fs}px ${st.labelFont ?? tokens.body}`,
-        ink: isSel || (active && !focusing) || isHover || (inFocus && look.edited) ? st.fileInk : st.fileInkQuiet, halo: st.halo,
-        // The one you point at wins, then the selected one, then where an agent works, then the focus (its edits first), then the biggest.
-        prio: (isHover ? 4e6 : 0) + (isSel ? 2e6 : 0) + (active && !focusing ? 1e6 : 0) + (inFocus ? (look.edited ? 6e5 : 5e5) : 0) + r, forced,
-      });
+      // Queued (the label is built in endFrame for the most important ones only), drawn after every file: a
+      // neighbour's circle never covers a name. The one you point at wins, then the selected one, then where an
+      // agent works, then the focus (its edits first), then the biggest.
+      F.labN.push(n);
+      F.labP.push((isHover ? 4e6 : 0) + (isSel ? 2e6 : 0) + (active && !focusing ? 1e6 : 0) + (inFocus ? (look!.edited ? 6e5 : 5e5) : 0) + r);
     }
-    ctx.restore();
-  }, [tokens, selected, hover]);
+  }, []);
 
-  // Metro: imports as transit lines (horizontal, vertical and 45°), coloured by the importing file's folder.
-  const drawMetroLink = useCallback((link: LinkObject, ctx: CanvasRenderingContext2D, scale: number) => {
-    const l = link as GLink, s = l.source as GNode, t = l.target as GNode;
-    if (s.x === undefined || t.x === undefined) return;
-    const role = linkRole(l, linkFocusRef.current);
-    const alpha = Math.min(replayRef.current.nodeAlpha(s.id), replayRef.current.nodeAlpha(t.id));
-    ctx.save();
-    ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.lineWidth = role ? Math.max(3 / scale, 3.2) : Math.max(1.6 / scale, 2.2);
-    ctx.strokeStyle = role === "imports" ? style.imports : role === "usedBy" ? style.usedBy : moduleColor(s.file.module);
-    // While a thread plays, the import lines step back so the thread's own line reads over them.
-    ctx.globalAlpha = (role ? 1 : linkFocusRef.current ? 0.12 : replayRef.current.tracing ? 0.18 : 0.55) * alpha;
-    metroPath(ctx, s.x, s.y ?? 0, t.x, t.y ?? 0);
-    ctx.stroke();
-    ctx.restore();
-  }, [style]);
+  /** A queued file's label, built in full (only for the ones that may be drawn this frame). */
+  const labelFor = (n: GNode, prio: number, F: Frame): QueuedLabel => {
+    const st = F.st, tokens = tokensRef.current, scale = F.scale, r = n.r, x = n.x!, y = n.y!;
+    const active = !!n.file.activeSessionId, isSel = n.id === F.sel, isHover = n.id === F.hover;
+    const look = n.lf === F.id ? n.lk ?? null : null, alpha = look?.alpha ?? 1;
+    const focusing = !!look && look.tone > 0.5, inFocus = focusing && !!look.named && look.alpha > 0.3;
+    const forced = isSel || isHover || (active && !focusing);
+    const fs = Math.max(11, Math.min(14, 11 + r * scale * 0.08)) / scale;
+    // Clear of what the theme draws (a cube's corners, a plate's rim) and of the selection ring.
+    const ringR = Math.max(reachOf(r, active, st), isSel || isHover ? (st.node === "dot" ? r : r * 1.35 + 2 / scale) : 0);
+    return {
+      text: (n.bn ??= baseName(n.id)), x, y: y + ringR + 3 / scale, size: fs, scale, alpha: isSel || isHover ? 1 : inFocus ? Math.max(alpha, 0.8) : alpha,
+      at: { id: n.id, x, y, r: ringR }, must: isSel || isHover,
+      weight: isSel || (active && !focusing) ? 600 : 500, family: st.labelFont ?? tokens.body,
+      ink: isSel || (active && !focusing) || isHover || (inFocus && look!.edited) ? st.fileInk : st.fileInkQuiet, halo: st.halo,
+      prio, forced,
+    };
+  };
 
+  // ---- folder names (labels.ts): the folders' outlines are kept until the files move or change ----
+  const folders = useRef<{ key: string; folders: Folders } | null>(null);
+  const focusVer = useRef<{ ids: string[] | null; v: number }>({ ids: null, v: 0 });
+  const geomVer = useRef(0);   // bumped when a file's size or activity changes (its reach, so its footprint)
+  const lastGeom = useRef<{ files: FileNode[] | null }>({ files: null });
+  useEffect(() => { if (lastGeom.current.files !== (map?.files ?? null)) { lastGeom.current.files = map?.files ?? null; geomVer.current++; } }, [map?.files]);
+  const editedAt = useRef(new Map<string, number>());
   const drawModules = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
     // Every file's footprint goes in first: no name, folder or file, prints over a file. With a thread open, the files it
     // never touched (or hasn't reached yet) are faded into the background: its own names may cross those, not the rest.
-    const st = mapStyle(), sp = space.current;
+    const F = frame.current, st = F.st, sp = space.current, g = graphRef.current;
     sp.reset(48 / scale);
-    // In a focus, folder names rank by what the thread changed, not by what the rest of the project did; a folder with
-    // none of its files in the focus steps back with them.
-    const looks = graph.nodes.map((n) => { const l = replayRef.current.look(n.id); return l && l.tone > 0.5 ? l : null; });
-    const lit = looks.some(Boolean) ? new Set<string>() : null;
-    graph.nodes.forEach((n, i) => { const l = looks[i]; if (lit && l && l.alpha > 0.3) lit.add(n.file.module); });
-    const nodes = graph.nodes.map((n, i) => ({ x: n.x, y: n.y, r: reachOf(n.r, !!n.file.activeSessionId, st), module: n.file.module,
-      lastChangedAt: looks[i] ? looks[i].edited : n.file.lastChangedAt, active: !looks[i] && !!n.file.activeSessionId }));
-    const ring = (n: GNode) => (st.node === "dot" ? n.r : n.r * 1.35 + 2 / scale);   // the selection ring (drawNode)
-    graph.nodes.forEach((n, i) => {
-      if (n.x === undefined || n.y === undefined || replayRef.current.nodeAlpha(n.id) < 0.3) return;
-      sp.file(n.id, n.x, n.y, n.id === selectedRef.current || n.id === hoverRef.current ? Math.max(nodes[i].r, ring(n)) : nodes[i].r);
+    const ids = replayRef.current.footprint();
+    const fv = focusVer.current;
+    if (ids?.length !== fv.ids?.length || (ids && fv.ids && ids.some((id, i) => id !== fv.ids![i])) || !ids !== !fv.ids) { fv.ids = ids; fv.v++; }
+    const cell = 2 ** Math.round(Math.log2(48 / scale));
+    sp.fileLayer(`${ticks.current}|${g.id}|${geomVer.current}|${theme}|${cell}|${fv.v}`, cell, (add) => {
+      const inFocus = ids ? new Set(ids) : null;
+      for (const n of g.nodes) {
+        if (n.x === undefined || n.y === undefined || (inFocus && !inFocus.has(n.id))) continue;
+        add(n.id, n.x, n.y, reachOf(n.r, !!n.file.activeSessionId, st));
+      }
     });
+    const ring = (n: GNode) => (st.node === "dot" ? n.r : n.r * 1.35 + 2 / scale);   // the selection ring (drawNode)
+    for (const id of [F.sel, F.hover]) {
+      const n = id ? nodeIndexRef.current.get(id) : undefined;
+      if (n?.x !== undefined && n.y !== undefined) sp.file(n.id, n.x, n.y, Math.max(reachOf(n.r, !!n.file.activeSessionId, st), ring(n)));
+    }
     // The replay's badges and marker are drawn last, on top, but take their space now: names keep off them too.
     const marks = replayRef.current.marks(ctx, scale);
     for (const b of marks.boxes) sp.add(b);
     markedRef.current = marks.named;
+    // The folders' outlines, kept until the files move (the layout ticks: every few ticks while it runs, and once it
+    // stops) or change.
+    const fkey = `${Math.floor(ticks.current / 6)}|${g.id}|${geomVer.current}|${theme}`;
+    if (folders.current?.key !== fkey) {
+      folders.current = { key: fkey, folders: aggregateFolders(g.nodes.map((n) => ({ x: n.x, y: n.y, r: reachOf(n.r, !!n.file.activeSessionId, st),
+        module: n.file.module, lastChangedAt: n.file.lastChangedAt, active: !!n.file.activeSessionId }))) };
+    }
+    // In a focus, folder names rank by what the thread changed, not by what the rest of the project did; a folder with
+    // none of its files in the focus steps back with them.
+    let lit: Set<string> | null = null, focusRecent: Map<string, number> | null = null;
+    if (ids) {
+      for (const id of ids) {
+        const n = nodeIndexRef.current.get(id), l = n ? lookOf(n, F) : null;
+        if (!n || !l || l.tone <= 0.5) continue;
+        lit ??= new Set(); focusRecent ??= new Map();
+        if (l.alpha > 0.3) lit.add(n.file.module);
+        if (l.edited) {
+          let ms = editedAt.current.get(l.edited);
+          if (ms === undefined) { ms = Date.parse(l.edited); if (editedAt.current.size > 5000) editedAt.current.clear(); editedAt.current.set(l.edited, ms); }
+          if (ms > (focusRecent.get(n.file.module) ?? 0)) focusRecent.set(n.file.module, ms);
+        }
+      }
+    }
     const idx = nodeIndexRef.current;
     const focus = new Set<string>();
-    for (const id of [hoverRef.current, selectedRef.current]) { const n = id ? idx.get(id) : undefined; if (n) focus.add(n.file.module); }
+    for (const id of [F.hover, F.sel]) { const n = id ? idx.get(id) : undefined; if (n) focus.add(n.file.module); }
     const busy = new Set<string>();
     for (const a of agentsRef.current) {
       if (!a.active || !a.file) continue;
       const id = resolveId(a.file), n = id ? idx.get(id) : undefined;
       if (n) busy.add(n.file.module);
     }
-    drawModuleLabels(ctx, scale, nodes, { font: tokens.display, now: clock(), focus, busy, space: sp, lit });
-  }, [graph.nodes, tokens, resolveId]);
+    drawModuleLabels(ctx, scale, folders.current.folders, { font: tokensRef.current.display, now: F.now, focus, busy, space: sp, lit, focusRecent, view: F });
+  }, [theme, resolveId]);
+
   // Labels go on after the files (folder names, then file names), so no circle covers a name; then the agents.
-  const startFrame = useCallback(() => { labelQueue.current = []; }, []);
+  const drawAgentLayer = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
+    const F = frame.current, tokens = tokensRef.current;
+    // File names go on after every file is drawn, so no circle covers a name (the selected one's last, on top).
+    // The file the replay's marker names (drawModules) isn't named twice. Only the most important ones are placed.
+    const named = markedRef.current, order = F.labN.map((_, i) => i);
+    if (order.length > FILE_LABELS_MAX) { order.sort((a, b) => F.labP[b] - F.labP[a]); order.length = FILE_LABELS_MAX; }
+    const queue: QueuedLabel[] = [];
+    for (const i of order) {
+      const l = labelFor(F.labN[i], F.labP[i], F);
+      if (named && l.at?.id === named && !l.must) continue;
+      queue.push(l);
+    }
+    drawQueuedLabels(ctx, queue, space.current);
+    replayRef.current.draw(ctx, scale);
+    drawAgents({
+      ctx, scale, agents: agentsRef.current, anim: anim.current, accent: tokens.accent, font: tokens.body,
+      hoverFile: hoverRef.current, followId: followRef.current, resolveId, showReads: mapPrefs.showReads, quiet: !openRef.current, waiting: waitingRef.current,
+      resolve: (id) => { const n = nodeIndexRef.current.get(id); return n && n.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y, r: n.r } : undefined; },
+    });
+  }, [resolveId]);
+
+  /** Whether the live agents are still moving: a glide, a fade, a read's line, a pulse, a red flash, a wait's breath. */
+  const agentsMoving = (t: number) => {
+    const now = clock(), route = mapStyle().route;
+    for (const a of agentsRef.current) {
+      const st = anim.current.get(a.id);
+      if (!st) continue;   // not on the map (its file isn't a node)
+      if (t - st.t0 < tripMs(route, 650) + 50 || st.flashes.length || t - st.pulseT0 < 700 || t - st.errT0 < 2600 || waitingRef.current.has(a.id)) return true;
+      const target = a.active || waitingRef.current.has(a.id) ? 1 : Math.max(0, 0.35 * (1 - (now - Date.parse(a.ts) - 2 * MIN) / (8 * MIN)));
+      if (Math.abs(target - st.alpha) > 0.01) return true;
+    }
+    return false;
+  };
+
   const endFrame = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
+    const F = frame.current;
+    // The batched dots (drawNode), each colour in one fill: a circle, or a square as big when it's under a pixel.
+    for (const d of dots.current.values()) {
+      if (!d.xyr.length) continue;
+      ctx.globalAlpha = d.a; ctx.fillStyle = d.css;
+      ctx.beginPath();
+      const p = d.xyr;
+      for (let i = 0; i < p.length; i += 3) {
+        const x = p[i], y = p[i + 1], r = p[i + 2];
+        if (r * scale < 0.8) { const h = r * 0.886; ctx.rect(x - h, y - h, 2 * h, 2 * h); }
+        else { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, TAU); }
+      }
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
     drawModules(ctx, scale);
     drawAgentLayer(ctx, scale);
-  }, [drawModules, drawAgentLayer]);
+    ctx.globalAlpha = 1;
+    // What still moves decides whether the next frame comes (redraw.ts).
+    if (Math.abs(F.lookSum - lastLookSum.current) > 1e-6) moreMotion(Motion.Smooth);   // files easing into or out of a focus
+    lastLookSum.current = F.lookSum;
+    if (agentsMoving(F.t) || (replayRef.current.tracing && replayRef.current.active && playingRef.current)) moreMotion(Motion.Smooth);
+    redraw.drew(F.motion);
+  }, [drawModules, drawAgentLayer, redraw]);
 
-  const sel = selected ? graph.nodes.find((n) => n.id === selected)?.file : undefined;
+  /** The hit canvas (what's under the pointer): off-screen files skipped, tiny ones as squares. */
+  const paintHit = useCallback((node: NodeObject, color: string, ctx: CanvasRenderingContext2D, scale: number) => {
+    const n = node as GNode, x = n.x, y = n.y;
+    if (x === undefined || y === undefined) return;
+    const F = frame.current, m = n.r + 3;
+    if (x + m < F.x0 || x - m > F.x1 || y + m < F.y0 || y - m > F.y1) return;
+    ctx.fillStyle = color;
+    if (m * scale < 2) { ctx.fillRect(x - m, y - m, 2 * m, 2 * m); return; }
+    ctx.beginPath(); ctx.arc(x, y, m, 0, TAU); ctx.fill();
+  }, []);
+
+  // ---- what makes a frame come ----
+  const fp = replayLayer.footprint();
+  const footprintKey = fp ? `${fp.length}|${fp[0] ?? ""}|${fp[fp.length - 1] ?? ""}` : "";
+  // Anything that changes the picture: one frame (the frame itself says if more must follow).
+  useEffect(() => { redraw.kick(); }, [redraw, graph, map?.files, drawnAgents, waiting, followId, hover, selected, tokens, theme, replay,
+    replayLayer.active, replayLayer.tracing, replayLayer.footprintMode, showReads, stepWindow, footprintKey, size.w, size.h]);
+  // A replay step: the tracer glides, a read flashes, an edit pulses (up to about a second).
+  useEffect(() => { redraw.kick(1300); }, [redraw, replay?.index, replay?.sessionId, replay?.mode]);
+  // A new agent position, error or activity: its glide, flash or pulse plays out (drawAgents), the frame keeps them coming.
+  useEffect(() => { redraw.kick(100); }, [redraw, state.agents]);
+
+  const onEngineStop = useCallback(() => {
+    if (!settledFit.current) { settledFit.current = true; applyIntent(900); }
+    geomVer.current++;   // the folders' outlines where the files came to rest
+    redraw.kick();
+  }, [applyIntent, redraw]);
+  const onEngineTick = useCallback(() => { ticks.current++; redraw.ticked(); }, [redraw]);
+  const onNodeHover = useCallback((n: NodeObject | null) => setHover(n ? (n as GNode).id : null), []);
+  const onNodeClick = useCallback((n: NodeObject) => setSelected((n as GNode).id), [setSelected]);
+  const onBackgroundClick = useCallback(() => setSelected(null), [setSelected]);
+
+  const sel = selected ? nodeIndex.get(selected)?.file : undefined;
 
   return (
     <div className="map-wrap" ref={wrapRef}>
@@ -647,33 +1057,27 @@ export function MapView() {
           <p>Files appear here as soon as the mapper has read them.</p>
         </div>
       ) : (
-        <ForceGraph2D<GNode, GLink>
+        <ForceGraph2D<GNode, never>
           ref={fg as never}
           width={size.w}
           height={size.h}
-          graphData={graph}
+          graphData={graph.data}
           backgroundColor="rgba(0,0,0,0)"
           nodeId="id"
           nodeRelSize={1}
-          nodeVal={(n) => (n as GNode).r * (n as GNode).r}
-          nodeLabel={() => ""}
+          nodeVal={nodeVal}
+          nodeLabel={noLabel}
           nodeCanvasObject={drawNode}
-          nodePointerAreaPaint={(n, color, ctx) => { const g = n as GNode; ctx.fillStyle = color; ctx.beginPath(); ctx.arc(g.x ?? 0, g.y ?? 0, g.r + 3, 0, Math.PI * 2); ctx.fill(); }}
+          nodePointerAreaPaint={paintHit}
           onRenderFramePre={startFrame}
           onRenderFramePost={endFrame}
-          linkColor={(l) => linkRole(l as GLink, linkFocus) === "imports" ? style.imports : linkRole(l as GLink, linkFocus) === "usedBy" ? style.usedBy : linkFocus || replayLayer.tracing ? style.linkDim : style.linkIdle}
-          linkCanvasObjectMode={style.link === "metro" ? () => "replace" : undefined}
-          linkCanvasObject={style.link === "metro" ? drawMetroLink : undefined}
-          linkWidth={(l) => (linkRole(l as GLink, linkFocus) ? 1.6 : 0.6)}
-          linkDirectionalArrowLength={(l) => (linkRole(l as GLink, linkFocus) ? 3.5 : 0)}
-          linkDirectionalArrowRelPos={0.92}
-          autoPauseRedraw={false}
           cooldownTicks={400}
           d3VelocityDecay={0.35}
-          onEngineStop={() => { if (!settledFit.current) { settledFit.current = true; applyIntent(900); } }}
-          onNodeHover={(n) => setHover(n ? (n as GNode).id : null)}
-          onNodeClick={(n) => setSelected((n as GNode).id)}
-          onBackgroundClick={() => setSelected(null)}
+          onEngineTick={onEngineTick}
+          onEngineStop={onEngineStop}
+          onNodeHover={onNodeHover}
+          onNodeClick={onNodeClick}
+          onBackgroundClick={onBackgroundClick}
         />
       )}
 
@@ -703,3 +1107,6 @@ export function MapView() {
     </div>
   );
 }
+
+const nodeVal = (n: NodeObject) => (n as GNode).r * (n as GNode).r;
+const noLabel = () => "";

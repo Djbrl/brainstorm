@@ -15,7 +15,8 @@ export type Step = {
 export type FileNode = { path: string; module: string; lines: number; lastChangedAt?: string; activeSessionId?: string; summary?: string };
 export type Edge = { from: string; to: string };
 /** `formerRoots`: where the repo lived before it moved, so paths in older threads still land on today's files. */
-export type ProjectMap = { root: string; files: FileNode[]; edges: Edge[]; modules: { id: string; summary?: string }[]; formerRoots?: string[] };
+/** `totalFiles`: how many mappable files the project has; more than `files.length` when the map shows a chosen subset ("800 of 20,312 files"). */
+export type ProjectMap = { root: string; files: FileNode[]; edges: Edge[]; modules: { id: string; summary?: string }[]; formerRoots?: string[]; totalFiles?: number };
 export type Snapshot = { ts: string; map: ProjectMap };
 /** What a question is about: a step, a file, or a whole thread (`sessionId`, asked from the Track). */
 export type AskRequest = { question: string; stepId?: string; filePath?: string; root?: string; sessionId?: string };

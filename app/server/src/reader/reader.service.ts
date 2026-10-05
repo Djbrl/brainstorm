@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
+import type { StatementSync } from "node:sqlite";
 import type { Step } from "../types";
 import { BusService } from "../core/bus.service";
 import { DbService } from "../core/db.service";
@@ -63,8 +64,9 @@ export class ReaderService implements OnModuleInit {
   private fileSummaryCache = new Map<string, string>(); // path -> summary (in-memory mirror of db)
   private moduleSummaryCache = new Map<string, string>();
 
-  // measurement
-  private labelLatenciesMs: number[] = [];
+  // measurement (a running total: the server can live for weeks)
+  private labelLatency = { n: 0, totalMs: 0 };
+  private stmts?: { setLabel: StatementSync; labeled: StatementSync; byRowid: StatementSync };
   private summariesDone = 0;
   private summaryTotal = 0;
   private summaryPhaseStart = 0;
@@ -78,6 +80,27 @@ export class ReaderService implements OnModuleInit {
     private listener: ListenerService,
     private mapper: MapperService,
   ) {}
+
+  /** Prepared on first use: the listener creates the steps table in its own init. */
+  private get q() {
+    return this.stmts ??= {
+      // COALESCE: a label alone (risk undefined) keeps the stored risk, as the listener's updateStep did.
+      setLabel: this.dbs.db.prepare(`UPDATE steps SET label = ?, risk = COALESCE(?, risk) WHERE id = ?`),
+      // Answered from the steps_label (kind, label) index alone.
+      labeled: this.dbs.db.prepare(`SELECT rowid AS r, label FROM steps WHERE kind IN ('edit', 'tool_call', 'prompt') AND label IS NOT NULL`),
+      byRowid: this.dbs.db.prepare(`SELECT id FROM steps WHERE rowid = ?`),
+    };
+  }
+
+  /** Store a label (and risk, when known). Returns false if the step isn't stored. */
+  private storeLabel(id: string, label: string, risk: string[] | undefined): boolean {
+    return Number(this.q.setLabel.run(label, risk ? JSON.stringify(risk) : null, id).changes) > 0;
+  }
+
+  /** Store a label and tell the open pages (for labels that come after the step was broadcast). */
+  private publishLabel(id: string, label: string, risk: string[] | undefined) {
+    if (this.storeLabel(id, label, risk)) this.gateway.broadcast({ type: "step-update", id, label, risk });
+  }
 
   onModuleInit() {
     this.dbs.db.exec(`CREATE TABLE IF NOT EXISTS summaries (
@@ -127,26 +150,22 @@ export class ReaderService implements OnModuleInit {
     return { done: this.summariesDone, total: this.summaryTotal };
   }
 
-  /** Scan already-labeled steps for ones that look like an echoed prompt and re-label them. */
+  /** Scan already-labeled steps for ones that look like an echoed prompt and re-label them. One index-only query. */
   private relabelBadSteps() {
-    let sessions: { id: string }[] = [];
-    try { sessions = this.listener.listSessions(); } catch (e) { this.log.warn(`relabel sweep: listSessions failed: ${(e as Error).message}`); return; }
-    let checked = 0;
+    let rows: { r: number; label: string }[] = [];
+    try { rows = this.q.labeled.all() as { r: number; label: string }[]; } catch (e) { this.log.warn(`relabel sweep failed: ${(e as Error).message}`); return; }
     let fixed = 0;
-    for (const s of sessions) {
-      let steps: Step[] = [];
-      try { steps = this.listener.listSteps(s.id); } catch { continue; }
-      for (const step of steps) {
-        if (!step.label) continue;
-        checked++;
-        if (!isBadLabel(step.label)) continue;
-        fixed++;
-        const heuristic = this.heuristicLabel(step);
-        this.listener.updateStep(step.id, { label: heuristic, risk: step.risk });
-        this.labelWithNemotron(step, Date.now()).catch((e) => this.log.warn(`relabel failed for ${step.id}: ${(e as Error).message}`));
-      }
+    for (const { r, label } of rows) {
+      if (!isBadLabel(label)) continue;
+      const id = (this.q.byRowid.get(r) as { id: string } | undefined)?.id;
+      const step = id ? this.listener.getStep(id) : undefined;
+      if (!step) continue;
+      fixed++;
+      const heuristic = this.heuristicLabel(step);
+      if (heuristic) this.publishLabel(step.id, heuristic, step.risk);
+      this.labelWithNemotron(step, Date.now()).catch((e) => this.log.warn(`relabel failed for ${step.id}: ${(e as Error).message}`));
     }
-    this.log.log(`relabel sweep: checked ${checked} labeled steps, fixed ${fixed} that echoed the prompt`);
+    this.log.log(`relabel sweep: checked ${rows.length} labeled steps, fixed ${fixed} that echoed the prompt`);
   }
 
   private async retryMissingSummaries() {
@@ -167,9 +186,15 @@ export class ReaderService implements OnModuleInit {
     if (step.kind !== "edit" && step.kind !== "tool_call" && step.kind !== "prompt") return;
     const arrivedAt = Date.now();
 
-    // Heuristic label immediately so the UI never sits blank.
-    const heuristic = this.heuristicLabel(step);
-    if (heuristic) this.listener.updateStep(step.id, { label: heuristic, risk: this.computeRisk(step) });
+    // Heuristic label immediately so the UI never sits blank. The bus is synchronous and the listener broadcasts this same
+    // object right after emitting it, so setting the label here puts it in the first "step" message: no step-update needed.
+    const heuristic = step.label ? undefined : this.heuristicLabel(step);
+    if (heuristic) {
+      const risk = this.computeRisk(step);
+      step.label = heuristic;
+      if (risk) step.risk = risk;
+      try { this.storeLabel(step.id, heuristic, risk); } catch (e) { this.log.warn(`storing label failed for ${step.id}: ${(e as Error).message}`); }
+    }
 
     this.labelWithNemotron(step, arrivedAt).catch((e) => this.log.warn(`label failed for ${step.id}: ${(e as Error).message}`));
   }
@@ -181,10 +206,10 @@ export class ReaderService implements OnModuleInit {
       const { text } = await this.nemotron.complete(LABEL_SYSTEM, user, 24, isBadLabel);
       const label = this.cleanLabel(text) || this.heuristicLabel(step);
       if (label) {
-        this.listener.updateStep(step.id, { label, risk: this.computeRisk(step) });
-        const latency = Date.now() - arrivedAt;
-        this.labelLatenciesMs.push(latency);
-        if (this.labelLatenciesMs.length % 10 === 0) this.logMetrics();
+        this.publishLabel(step.id, label, this.computeRisk(step));
+        this.labelLatency.n++;
+        this.labelLatency.totalMs += Date.now() - arrivedAt;
+        if (this.labelLatency.n % 10 === 0) this.logMetrics();
       }
     } catch (e) {
       this.log.warn(`nemotron label failed, keeping heuristic for ${step.id}: ${(e as Error).message}`);
@@ -197,7 +222,7 @@ export class ReaderService implements OnModuleInit {
     this.log.log(`backfilling labels for ${steps.length} steps`);
     await Promise.all(steps.map(async (step) => {
       const heuristic = this.heuristicLabel(step);
-      if (heuristic) this.listener.updateStep(step.id, { label: heuristic, risk: this.computeRisk(step) });
+      if (heuristic) this.publishLabel(step.id, heuristic, this.computeRisk(step));
       await this.labelWithNemotron(step, Date.now());
     }));
     this.log.log(`backfill complete`);
@@ -353,11 +378,9 @@ export class ReaderService implements OnModuleInit {
   private logMetrics() {
     const elapsedMin = (Date.now() - this.summaryPhaseStart) / 60000;
     const perMin = elapsedMin > 0 ? (this.summariesDone / elapsedMin).toFixed(1) : "n/a";
-    const avgLabelMs = this.labelLatenciesMs.length
-      ? Math.round(this.labelLatenciesMs.reduce((a, b) => a + b, 0) / this.labelLatenciesMs.length)
-      : undefined;
+    const avgLabelMs = this.labelLatency.n ? Math.round(this.labelLatency.totalMs / this.labelLatency.n) : undefined;
     this.log.log(
-      `[metrics] mapBuildMs=${this.mapper.buildMs} filesSummarizedPerMin=${perMin} avgLabelLatencyMs=${avgLabelMs ?? "n/a"} (n=${this.labelLatenciesMs.length}) summariesDone=${this.summariesDone}`,
+      `[metrics] mapBuildMs=${this.mapper.buildMs} filesSummarizedPerMin=${perMin} avgLabelLatencyMs=${avgLabelMs ?? "n/a"} (n=${this.labelLatency.n}) summariesDone=${this.summariesDone}`,
     );
   }
 }

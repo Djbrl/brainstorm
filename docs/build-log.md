@@ -152,6 +152,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 20:15 (5 Oct) [link-anim] The hovered or selected file's import lines are drawn over the files at full strength in every theme (in Metro they were under the stations and folder discs, and dimmed with an open thread), and they animate: they grow out of the file in 0.32 s when it's picked and fade in 0.2 s when it's let go, the old fading while the new grows (`drawFocusLinks` in `map/drawNode.ts`). Metro's own transit lines stay under the files.
 
+- 20:40 (5 Oct) [hover-stubs] Pointing at a file shows its import lines as short stubs (26 px past its edge: how many, and which way); clicking it runs them out to the other files, the stubs carrying on into the full lines. The file you point at is drawn at full strength with its outline and name, even when an open thread dims the rest.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

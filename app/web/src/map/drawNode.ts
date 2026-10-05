@@ -68,10 +68,11 @@ export type Caches = {
   focusColours: Map<string, { rgb: RGB; css: string; ep: number }>;
   linkBatches: Map<string, { c: string; a: number; ls: GLink[] }>; metroVisible: GLink[]; metroAlpha: number[];
   /** The focused file's lines (drawFocusLinks): which file and since when, and the one before, fading out. */
-  lines: { id: string | null; at: number; prev: string | null; prevAt: number; prevFrom: number };
+  lines: { id: string | null; at: number; full: boolean; fromStub: boolean; fullAt: number;
+    prev: string | null; prevAt: number; prevReach: ((stub: number) => number) | null };
 };
 export const newCaches = (): Caches => ({ ripples: new Map(), dots: new Map(), focusColours: new Map(), linkBatches: new Map(), metroVisible: [], metroAlpha: [],
-  lines: { id: null, at: 0, prev: null, prevAt: 0, prevFrom: 0 } });
+  lines: { id: null, at: 0, full: false, fromStub: false, fullAt: 0, prev: null, prevAt: 0, prevReach: null } });
 
 export const moreMotion = (F: Frame, m: Motion) => { if (m === Motion.Smooth || F.motion === Motion.None) F.motion = m; };
 
@@ -166,30 +167,43 @@ export function drawLinks(ctx: CanvasRenderingContext2D, scale: number, links: G
 // ---------- the hovered or selected file's import lines ----------
 const LINES_IN_MS = 320;    // they grow out of the file
 const LINES_OUT_MS = 200;   // and fade when it's let go
+const STUB_PX = 26;         // pointed at: each line shows this far past the file's edge, enough to count them
 const easeOut = (k: number) => 1 - (1 - k) ** 3;
+/** How the focused file's lines are drawn this frame: a stub's or the whole line's share of each (0…1). */
+type Reach = (stub: number) => number;
 /**
- * The lines of the file you point at or selected (what it imports, what uses it), drawn over the files at full
- * strength in every theme, so a station or a folder's disc never washes them out. They grow from the file to the
- * other end when it's picked, and fade when it's let go (the last one fading while the next grows).
+ * The lines of the file you point at or picked (what it imports, what uses it), drawn over the files at full strength in
+ * every theme, so a station or a folder's disc never washes them out. Pointed at, each shows as a short stub out of the
+ * file (how many, and which way); picked, they run the whole way. They grow out of the file, a stub carries on to the
+ * full line on a click, and they fade when the file is let go (the last one fading while the next grows).
  */
 export function drawFocusLinks(ctx: CanvasRenderingContext2D, scale: number, links: GLink[], F: Frame, c: Caches) {
-  const a = c.lines, t = F.t;
+  const a = c.lines, t = F.t, full = !!F.linkFocus && F.linkFocus === F.sel;
+  const at = (since: number) => easeOut(Math.min(1, (t - since) / LINES_IN_MS));
+  const now = (): Reach => {
+    if (!a.full) { const k = at(a.at); return (stub) => stub * k; }
+    if (a.fromStub) { const k = at(a.fullAt); return (stub) => stub + (1 - stub) * k; }
+    const k = at(a.at); return () => k;
+  };
   if (F.linkFocus !== a.id) {
-    if (a.id) { a.prev = a.id; a.prevAt = t; a.prevFrom = easeOut(Math.min(1, (t - a.at) / LINES_IN_MS)); }
-    a.id = F.linkFocus; a.at = t;
+    if (a.id) { const r = now(); a.prev = a.id; a.prevAt = t; a.prevReach = r; }
+    a.id = F.linkFocus; a.at = t; a.full = full; a.fromStub = false;
+  } else if (a.id && full !== a.full) {
+    // Picked after pointing at it: the stubs carry on to the whole lines (unpicked: back to stubs).
+    a.fromStub = full; a.full = full; a.fullAt = t; if (!full) a.at = t - LINES_IN_MS;
   }
-  const grow = a.id ? easeOut(Math.min(1, (t - a.at) / LINES_IN_MS)) : 1;
-  const fade = a.prev ? a.prevFrom * (1 - Math.min(1, (t - a.prevAt) / LINES_OUT_MS)) : 0;
-  if (a.prev && fade <= 0) a.prev = null;
-  if ((a.id && grow < 1) || a.prev) moreMotion(F, Motion.Smooth);
+  const fade = a.prev ? 1 - Math.min(1, (t - a.prevAt) / LINES_OUT_MS) : 0;
+  if (a.prev && fade <= 0) { a.prev = null; a.prevReach = null; }
+  const reach = a.id ? now() : null;
+  if ((a.id && t - Math.max(a.at, a.full && a.fromStub ? a.fullAt : 0) < LINES_IN_MS) || a.prev) moreMotion(F, Motion.Smooth);
   ctx.save();
   ctx.lineCap = "round"; ctx.lineJoin = "round";
-  if (a.prev && a.prev !== a.id) roleLines(ctx, scale, links, a.prev, fade, 1, F);
-  if (a.id) roleLines(ctx, scale, links, a.id, grow, grow, F);
+  if (a.prev && a.prev !== a.id && a.prevReach) roleLines(ctx, scale, links, a.prev, fade, a.prevReach, F);
+  if (a.id && reach) roleLines(ctx, scale, links, a.id, 1, reach, F);
   ctx.restore();
 }
-/** One file's lines at a strength, each drawn from the file out to `grow` of the way (arrowheads once they arrive). */
-function roleLines(ctx: CanvasRenderingContext2D, scale: number, links: GLink[], focus: string, alpha: number, grow: number, F: Frame) {
+/** One file's lines at a strength, each drawn from the file out to its `reach` (arrowheads once a line arrives). */
+function roleLines(ctx: CanvasRenderingContext2D, scale: number, links: GLink[], focus: string, alpha: number, reach: Reach, F: Frame) {
   const st = F.st, metro = st.link === "metro";
   ctx.globalAlpha = alpha;
   ctx.lineWidth = metro ? Math.max(3 / scale, 3.2) : 1.6 / scale;
@@ -200,10 +214,14 @@ function roleLines(ctx: CanvasRenderingContext2D, scale: number, links: GLink[],
       const s = l.source, tg = l.target;
       if (s.x === undefined || s.y === undefined || tg.x === undefined || tg.y === undefined) continue;
       const pts: Pt2[] = metro ? metroPoints(s.x, s.y, tg.x, tg.y) : [[s.x, s.y], [tg.x, tg.y]];
-      if (role === "usedBy") pts.reverse();   // out of the selected file, toward what uses it
-      polyPath(ctx, upTo(pts, grow));
+      if (role === "usedBy") pts.reverse();   // out of the focused file, toward what uses it
+      let len = 0;
+      for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      const from = role === "imports" ? s : tg, k = reach(len ? Math.min(1, (from.r + STUB_PX / scale) / len) : 1);
+      if (k <= 0) continue;
+      polyPath(ctx, upTo(pts, k));
       ctx.stroke();
-      if (!metro && grow >= 1) arrowHead(ctx, s, tg);
+      if (!metro && k >= 1) arrowHead(ctx, s, tg);
     }
   }
 }
@@ -223,7 +241,8 @@ export function drawFile(ctx: CanvasRenderingContext2D, n: GNode, scale: number,
   const isSel = n.id === F.sel, isHover = n.id === F.hover;
   const look = lookOf(n, F);   // an open thread: its own footprint, the rest dimmed back
   if (look) { F.anyLook = true; F.lookSum += look.alpha * 3 + look.tone; }
-  const alpha = (look?.alpha ?? 1) * shown;   // fading in as its folder opens
+  // Fading in as its folder opens, dimmed back by an open thread; the one you point at or picked shows in full.
+  const alpha = isHover || isSel ? 1 : (look?.alpha ?? 1) * shown;
   ctx.globalAlpha = alpha;
   const plain = st.node !== "dot"; // themed files stay plain: no ripple or outlines, one mark where an agent is
 
@@ -404,7 +423,7 @@ export function labelFor(n: GNode, prio: number, F: Frame): QueuedLabel {
   const ringR = n.dir ? r : Math.max(reachOf(r, active, st), isSel || isHover ? (st.node === "dot" ? r : r * 1.35 + 2 / scale) : 0);
   return {
     text: (n.bn ??= n.dir ? folderName(n) : baseName(n.id)), x, y: y + ringR + 3 / scale, size: fs, scale,
-    alpha: (isSel || isHover ? 1 : inFocus ? Math.max(alpha, 0.8) : alpha) * (n.said ?? 1) * (n.dir ? Math.max(0, 1 - (n.open ?? 0) * 3) : 1),
+    alpha: isSel || isHover ? 1 : (inFocus ? Math.max(alpha, 0.8) : alpha) * (n.said ?? 1) * (n.dir ? Math.max(0, 1 - (n.open ?? 0) * 3) : 1),
     at: { id: n.id, x, y, r: ringR }, must: isSel || isHover,
     weight: isSel || (active && !focusing) ? 600 : 500, family: st.labelFont ?? tokens.body,
     ink: isSel || (active && !focusing) || isHover || (inFocus && look!.edited) ? st.fileInk : st.fileInkQuiet, halo: st.halo,

@@ -113,7 +113,10 @@ const ERR_MS = 2600;        // how long the marker stays red
 const ERR_PULSE_MS = 1100;  // one red ring
 const WAIT_MS = 1800;       // the amber ring's breath while an agent waits on you
 const WAIT_AMBER = "#f59e0b";
-const WAIT_TEXT = "#9a5800";
+const WAIT_TEXT = "#9a5800";      // on a light outline
+const WAIT_TEXT_DARK = "#ffc56b"; // on a dark one (PS2, Dead Space)
+/** A dark theme draws labels on a dark outline (its halo). */
+const darkHalo = (halo: string) => Number(/\d+/.exec(halo)?.[0] ?? 255) < 128;
 export const isWrite = (action?: string) => action === "edit" || action === "write";
 
 /** Where the marker stands: the last file written, or before any write, the first file touched. */
@@ -290,7 +293,7 @@ export function drawAgents(opts: {
         const lx = st.x + 13 / scale, ly = st.y;
         ctx.lineWidth = 3.5 / scale; ctx.strokeStyle = style.halo;
         ctx.strokeText(label, lx, ly);
-        ctx.fillStyle = waitLabel ? WAIT_TEXT : color;
+        ctx.fillStyle = waitLabel ? (darkHalo(style.halo) ? WAIT_TEXT_DARK : WAIT_TEXT) : color;
         ctx.fillText(label, lx, ly);
       }
       ctx.globalAlpha = 1;

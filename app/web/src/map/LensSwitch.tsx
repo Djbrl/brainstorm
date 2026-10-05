@@ -1,6 +1,7 @@
 // Owned by the lead. Map | Track | Places: three views of the same thread, floating at the top of the Map tab.
 import { isReplay } from "../lib/live";
 import { useNav } from "../lib/nav";
+import "../tasks/track.css"; // its own styles live there; Places can be the first view loaded
 
 export function LensSwitch() {
   const { lens, setLens, replay } = useNav();

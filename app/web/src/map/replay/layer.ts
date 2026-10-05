@@ -43,7 +43,6 @@ const STEP_MS = 700;        // playback pace for edits and your prompts (at 1×)
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const baseName = (p: string) => p.split("/").pop() || p;
 const INK = "#1d1d1f";
-const HALO = "rgba(251,251,253,0.95)";
 
 type Anim = { x: number; y: number; fromX: number; fromY: number; t0: number; file: string | null; lastIndex: number; beatAt: number;
   cam: { x: number; y: number } | null; landedT0?: number };
@@ -224,6 +223,8 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
   const nodeAlpha = useCallback((id: string) => {
     const s = st.current;
     if (!s.active || !s.thread || !s.thread.touched.size) return 1; // a thread with no files leaves the map as it is (see TalkCard)
+    // "Show reads" off: files the thread only read stay dimmed, so what lights up is what it changed.
+    if (!mapPrefs.showReads && (s.thread.touched.get(id)?.edits ?? 0) === 0) return DIM;
     if (s.mode === "footprint") return s.thread.touched.has(id) ? 1 : DIM; // the whole footprint at once
     // Steps and replay: files light up as the thread reaches them, and fade back once they're out of the last few moments.
     const at = touchedRef.current.get(id);
@@ -340,7 +341,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
         ctx.textAlign = "center"; ctx.textBaseline = "bottom";
         const ly = n.y - n.r - 8 / scale;
         ctx.globalAlpha = 1;
-        ctx.lineWidth = 3.5 / scale; ctx.strokeStyle = HALO; ctx.strokeText(label, n.x, ly);
+        ctx.lineWidth = 3.5 / scale; ctx.strokeStyle = mapStyle().halo; ctx.strokeText(label, n.x, ly); // the theme's outline: light, or dark in PS2 / Dead Space
         ctx.fillStyle = line; ctx.fillText(label, n.x, ly);
       }
     }
@@ -388,7 +389,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
       const lx = a.x + 14 / scale;
       ctx.textAlign = "left";
       ctx.font = `600 ${12 / scale}px ${font}`;
-      ctx.lineWidth = 3.5 / scale; ctx.strokeStyle = HALO;
+      ctx.lineWidth = 3.5 / scale; ctx.strokeStyle = mapStyle().halo;
       const name = baseName(curFile);
       ctx.strokeText(name, lx, a.y); ctx.fillStyle = mark; ctx.fillText(name, lx, a.y);
       if (beat.outside) {

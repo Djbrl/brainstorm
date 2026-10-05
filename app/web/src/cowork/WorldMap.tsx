@@ -9,7 +9,6 @@ import { FitButton } from "../map/FitButton";
 import { LabelSpace } from "../map/labels";
 import { mapStyle } from "../map/themes";
 import { useTheme } from "../lib/theme";
-import "../tasks/track.css"; // the lens pill's styles (Map | Track | Places), also when Places is the first view loaded
 
 type GNode = NodeObject & {
   id: string; kind: "site" | "page"; area: CoworkArea; label: string; r: number;

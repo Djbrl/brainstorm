@@ -15,7 +15,7 @@ export class ClaudeService {
     return this.client;
   }
 
-  async complete(system: string, user: string, maxTokens = 800): Promise<{ text: string; model: string; tokensIn: number; tokensOut: number }> {
+  async complete(system: string, user: string, maxTokens = 800): Promise<{ text: string; model: string; tokensIn: number; tokensOut: number; cut: boolean }> {
     const res = await this.api.messages.create({
       model: this.cfg.claude.model,
       max_tokens: maxTokens,
@@ -23,6 +23,7 @@ export class ClaudeService {
       messages: [{ role: "user", content: user }],
     });
     const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
-    return { text, model: res.model ?? this.cfg.claude.model, tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens };
+    // cut: the answer hit max_tokens and stops mid-sentence.
+    return { text, model: res.model ?? this.cfg.claude.model, tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens, cut: res.stop_reason === "max_tokens" };
   }
 }

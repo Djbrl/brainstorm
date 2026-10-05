@@ -1,20 +1,22 @@
-# Docs (agent briefing)
+# Docs
 
-This folder is the paper trail judges need, written while we build. Keep every file short and factual. **Never invent a number:** a missing number stays `TODO`.
+How Brainstorm works, what's planned, and how it was built. Keep every file short and factual; a number we haven't measured stays `TODO`.
 
-| File | What goes in it | Who fills it |
-| --- | --- | --- |
-| `plan.md` | Pitch, features, research links (reference; don't edit) | Done |
-| `build-log.md` | Timestamped milestones, decisions, and "Requests" between agents. It also backs the "built with itself" claim. | Every agent |
-| `brev-setup.md` | Every command run on the Brev GPU, GPU type, $/hour, model, vLLM version. This is the proof of Brev use. | Agent D plus the human |
-| `numbers.md` | Measured results: read speed, cost per read, cost per question, summary quality score, hallway test | Agent D, docs agent |
-| `project-card.md` | The submission card text | Docs agent |
-| `disclosures.md` | Every AI tool, model, dataset and generated asset used | Docs agent |
-| `submission-checklist.md` | What to submit, with links, ticked off | Docs agent |
+## Today
 
-**Docs agent tasks, in order:**
-1. Keep `build-log.md` tidy. Every 20 minutes, read `git log` and add a line for anything missing.
-2. Finish `disclosures.md` and `project-card.md` from what actually got built. Cut claims for features that didn't ship.
-3. At 15:40, fill the Brev section of the card from `brev-setup.md` and `numbers.md`.
-4. Write the public repo README at `../README.md` at 15:45: what it is, a screenshot, how to run it, where the Brev proof is.
-5. At 16:10, check every link in `submission-checklist.md`.
+| File | What |
+| --- | --- |
+| [technical.md](technical.md) | Architecture, modules, the contract, API, storage, privacy |
+| [run-locally.md](run-locally.md) | Running the server and web app from a clone |
+| [todo.md](todo.md) | The to-do list: what to build next, in order |
+| [roadmap.md](roadmap.md) | Product direction, packaging, pricing, decisions |
+| [next-steps.md](next-steps.md) | Features cut at the hackathon and smaller known improvements |
+| [build-log.md](build-log.md) | Milestones with times, and "Requests" between agents |
+| [tasks.md](tasks.md) | The Track: following agents' work beyond code |
+| [cowork.md](cowork.md) | Places: web, local apps and services agents use (and the hard parts) |
+| [attention.md](attention.md) | "Waiting for you": when a thread needs you, and the plugin hooks |
+| [thread-replay.md](thread-replay.md) | Thread replay on the map |
+
+## The hackathon (27 Sep 2026)
+
+Kept as they were, for history: [plan.md](plan.md), [how-we-built-it.md](how-we-built-it.md), [numbers.md](numbers.md) (measured results), [brev-setup.md](brev-setup.md) and [nemotron.md](nemotron.md) (the GPU and model), [project-card.md](project-card.md), [submission-answers.md](submission-answers.md), [submission-checklist.md](submission-checklist.md), [judging-audit.md](judging-audit.md), [disclosures.md](disclosures.md), [status.md](status.md).

@@ -1,79 +1,44 @@
 // Owner: D. Force graph of files/modules, glow by recency, a ripple per agent edit + outline while active, side panel + AskBox.
+// The pieces: graph.ts (nodes, layout, forces), drawNode.ts (drawing a frame), color.ts (recency colours), labels.ts
+// (names), useMapCamera.ts (what the camera frames), useLiveAgents.ts (agents on the map), redraw.ts (when to redraw).
 import { LensSwitch } from "./LensSwitch";
 import { MapStats } from "./MapStats";
 import "../tasks/track.css";
 import { clock, isReplay } from "../lib/live";
 import { lastSeen, sinceMs } from "../lib/visit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
-const RIPPLE_MS = 700; // one ripple per edit
-import ForceGraph2D, { type ForceGraphMethods, type LinkObject, type NodeObject } from "react-force-graph-2d";
-import type { AgentPresence, Edge, FileNode, ProjectMap, Step } from "@contract";
+import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-force-graph-2d";
+import type { FileNode } from "@contract";
 import { useLive } from "../lib/live";
-import { attentionText, needsYou } from "../lib/attention";
 import { mapPrefs, useNav } from "../lib/nav";
-import { mockAgents, mockMap } from "./mock";
-import { drawAgents, visibleAgents, type AgentAnim } from "./agents";
+import { mockMap } from "./mock";
+import { drawAgents } from "./agents";
 import { MapSidebar } from "./sidebar/MapSidebar";
 import { Dock, LockToggle, ReadsToggle } from "./replay/ReplayBar";
-import { getCameraLock } from "./prefs";
+import { useStepWindow } from "./prefs";
 import { TalkCard } from "./replay/TalkCard";
 import { StepPanel } from "./StepPanel";
 import { FilePanel, useSelectedFile } from "./FilePanel";
 import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
 import { makeFileResolver } from "../lib/paths";
-import { drawModuleLabels, drawQueuedLabels, LabelSpace, type QueuedLabel } from "./labels";
-import { boxOf, isFitKey, useCamera, type Camera, type View } from "./camera";
+import { aggregateFolders, clearTextWidths, drawModuleLabels, drawQueuedLabels, LabelSpace, type Folders, type QueuedLabel } from "./labels";
+import { useCamera, type Camera } from "./camera";
 import { FitButton } from "./FitButton";
-import { replayCamera } from "./replay/store";
 import { useTheme } from "../lib/theme";
-import { drawCube, drawPlate, drawStation, LAND_MS, landings, mapStyle, metroPath, moduleColor, reachOf, type RGB } from "./themes";
+import { mapStyle, reachOf, settleLandings } from "./themes";
+import { clearSprites, spriteFrame } from "./sprites";
+import { createRedraw, Motion } from "./redraw";
+import { savePositions, useSavedPositions } from "./positions";
+import { css, readTokens } from "./color";
+import { useForces, useGraph, type GNode } from "./graph";
+import { drawFile, drawLinks, FILE_LABELS_MAX, flushDots, labelFor, lookOf, moreMotion, newCaches, paintHit, RIPPLE_MS, type Frame } from "./drawNode";
+import { useMapCamera } from "./useMapCamera";
+import { useLiveAgents } from "./useLiveAgents";
 import "./map.css";
 
-type GNode = NodeObject & { id: string; file: FileNode; r: number; ax: number; ay: number };
-type GLink = LinkObject & { source: string | GNode; target: string | GNode };
-
-const MIN = 60_000;
-const HOUR = 60 * MIN;
-
-// ---------- helpers ----------
-function hex(c: string): [number, number, number] {
-  const h = c.trim().replace("#", "");
-  const n = parseInt(h.length === 3 ? h.split("").map((x) => x + x).join("") : h, 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
-const mixRGB = (a: RGB, b: RGB, t: number): RGB => {
-  const k = Math.max(0, Math.min(1, t));
-  return a.map((v, i) => Math.round(v + (b[i] - v) * k)) as RGB;
-};
-function readTokens() {
-  const cs = getComputedStyle(document.documentElement);
-  const v = (name: string, fb: string) => cs.getPropertyValue(name).trim() || fb;
-  return {
-    hot: hex(v("--hot", "#ff6a3d")), warm: hex(v("--warm", "#ffb547")), cool: hex(v("--cool", "#c7cbd6")),
-    accent: v("--accent", "#5b5bd6"), ink: v("--ink", "#1d1d1f"),
-    display: v("--font-display", "-apple-system, sans-serif"), body: v("--font-body", "-apple-system, sans-serif"),
-  };
-}
-type Tokens = ReturnType<typeof readTokens>;
-
-/**
- * A file's color: hot for a few minutes after an edit, warm if it changed since you last looked (see lib/visit.ts),
- * quiet otherwise. A recording (the hosted demo) has no "last visit": there, warm fades out over an hour as before.
- */
-function recencyRGB(t: Tokens, iso: string | undefined, now: number): RGB {
-  if (!iso) return t.cool;
-  const at = Date.parse(iso), age = now - at;
-  if (!(age >= 0)) return t.hot;
-  if (age < 5 * MIN) return mixRGB(t.hot, t.warm, (age / (5 * MIN)) ** 1.5);
-  if (isReplay()) return age < HOUR ? mixRGB(t.warm, t.cool, (age - 5 * MIN) / (HOUR - 5 * MIN)) : t.cool;
-  return at > sinceMs ? t.warm : t.cool;
-}
-const css = (c: RGB) => `rgb(${c.join(",")})`;
-const same = (a: RGB, b: RGB) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
-/** A stable starting angle per file, so cubes don't all turn in step. */
-const STILL = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-const spin = (id: string) => { let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0; return (h % 628) / 100; };
+/** A recording (the hosted demo) or a shared replay: fixed for the page's life, read once (it parses the URL). */
+let replayed: boolean | undefined;
+const recorded = () => (replayed ??= isReplay());
 
 export function relTime(iso: string | undefined, now = clock()): string {
   if (!iso) return "not changed recently";
@@ -83,8 +48,6 @@ export function relTime(iso: string | undefined, now = clock()): string {
   if (s < 86400) return `changed ${Math.round(s / 3600)} h ago`;
   return `changed ${Math.round(s / 86400)} days ago`;
 }
-const baseName = (p: string) => p.split("/").pop() || p;
-const radius = (lines: number) => Math.min(22, 3.5 + Math.sqrt(Math.max(0, lines)) * 0.55);
 
 function useSize<T extends HTMLElement>() {
   const ref = useRef<T>(null);
@@ -99,151 +62,25 @@ function useSize<T extends HTMLElement>() {
   return [ref, size] as const;
 }
 
-// ---------- layout: room for every file ----------
-const AIR = 8;          // clear space around each file's mark, past its reach (graph units): neighbours sit 2×AIR apart
-const PACKED = 0.65;    // how much of a folder's disc its files fill once settled (the rest is air and link slack)
-const GAP_IN = 18;      // between subfolders of one folder
-const GAP_OUT = 36;     // between top-level folders: room for a folder name above each group
-type Disc = { x: number; y: number; r: number };
-/**
- * Greedy packing, in the order given (biggest first): each shape (a folder's discs) takes the first spot on a spiral out
- * from the middle where none of its discs comes within `gap` of one placed before. Shapes, not their bounding circles,
- * so small folders tuck into the bays around "app/web" + "app/server" instead of ringing them at a distance.
- * Cheap enough for hundreds of folders (a grid of placed discs; each search starts two turns inside the last spot found).
- */
-function pack(shapes: Disc[][], gap: number) {
-  const rs = shapes.flat().map((a) => a.r).sort((a, b) => a - b), cell = 2 * (rs[rs.length >> 1] ?? 1) + gap;
-  const grid = new Map<number, Disc[]>(), at: { x: number; y: number }[] = [];
-  const cells = (x: number, y: number, r: number, f: (k: number) => boolean | void) => {
-    const e = r + gap / 2;
-    for (let i = Math.floor((x - e) / cell); i <= Math.floor((x + e) / cell); i++) for (let j = Math.floor((y - e) / cell); j <= Math.floor((y + e) / cell); j++) if (f(i * 65536 + j)) return true;
-    return false;
-  };
-  const near = (x: number, y: number, r: number) => cells(x, y, r, (k) => grid.get(k)?.some((b) => Math.hypot(x - b.x, y - b.y) < r + b.r + gap));
-  let from = 0;
-  for (const s of shapes) {
-    const step = Math.max(6, Math.min(...s.map((a) => a.r)) * 0.75);   // about one disc's width along the spiral
-    for (let t = Math.max(0, from - 4 * Math.PI); ; t += Math.min(0.5, step / Math.max(t * 6, 8))) {
-      const d = t * 6, ox = Math.cos(t) * d * 1.25, oy = Math.sin(t) * d;   // a little wider than tall, like the screen
-      if (s.some((a) => near(a.x + ox, a.y + oy, a.r))) continue;
-      at.push({ x: ox, y: oy }); from = t;
-      for (const a of s) { const b = { x: a.x + ox, y: a.y + oy, r: a.r }; cells(b.x, b.y, b.r, (k) => { const l = grid.get(k); if (l) l.push(b); else grid.set(k, [b]); }); }
-      break;
-    }
-  }
-  return at;
-}
-
-// ---------- graph data (node objects are reused so positions survive live updates) ----------
-function useGraph(map: ProjectMap | null) {
-  const theme = useTheme();   // a theme's files take more or less room (themes.ts reach): the folders re-pack, the nodes stay
-  const nodesRef = useRef(new Map<string, GNode>());
-  const lastRef = useRef<{ key: string; edges: ProjectMap["edges"]; graph: { nodes: GNode[]; links: GLink[]; anchors: Map<string, { x: number; y: number }> } } | null>(null);
-  return useMemo(() => {
-    if (!map) return { nodes: [] as GNode[], links: [] as GLink[], anchors: new Map<string, { x: number; y: number }>() };
-    // Same files, modules and edges: update node data in place so the simulation is not disturbed.
-    // (The store only replaces the edges array when an import actually changed.)
-    const key = theme + ":" + map.files.map((f) => f.path + "|" + f.module).join(",");
-    if (lastRef.current && lastRef.current.key === key && lastRef.current.edges === map.edges) {
-      for (const f of map.files) { const n = nodesRef.current.get(f.path); if (n) { n.file = f; n.r = radius(f.lines); } }
-      return lastRef.current.graph;
-    }
-    // Module anchors, sized by the room each folder's files take once none covers another: the subfolders of one folder
-    // packed around the biggest (so "app/server" sits next to "app/web"), then the top-level folders packed the same way.
-    const st = mapStyle(), room = new Map<string, number>();
-    for (const f of map.files) room.set(f.module, (room.get(f.module) ?? 0) + (reachOf(radius(f.lines), false, st) + AIR) ** 2);
-    const disc = (m: string) => Math.sqrt((room.get(m) ?? 0) / PACKED);
-    const top = new Map<string, string[]>();
-    for (const m of room.keys()) { const p = m === "." ? "." : m.split("/")[0]; top.set(p, [...(top.get(p) ?? []), m]); }
-    const groups = [...top.values()].map((ms) => {
-      ms.sort((a, b) => disc(b) - disc(a));
-      const at = pack(ms.map((m) => [{ x: 0, y: 0, r: disc(m) }]), GAP_IN);
-      return { ms, at, size: ms.reduce((s, m) => s + (room.get(m) ?? 0), 0) };
-    }).sort((a, b) => b.size - a.size);
-    const anchors = new Map<string, { x: number; y: number }>();
-    const spots = pack(groups.map((g) => g.ms.map((m, j) => ({ ...g.at[j], r: disc(m) }))), GAP_OUT);
-    groups.forEach((g, i) => g.ms.forEach((m, j) => anchors.set(m, { x: spots[i].x + g.at[j].x, y: spots[i].y + g.at[j].y })));
-    const prev = nodesRef.current;
-    const next = new Map<string, GNode>();
-    const nodes = map.files.map((f) => {
-      const an = anchors.get(f.module) ?? { x: 0, y: 0 };
-      const n = prev.get(f.path) ?? ({ id: f.path, x: an.x + (Math.random() - 0.5) * 40, y: an.y + (Math.random() - 0.5) * 40 } as GNode);
-      n.file = f; n.r = radius(f.lines); n.ax = an.x; n.ay = an.y;
-      next.set(f.path, n);
-      return n;
-    });
-    nodesRef.current = next;
-    const links: GLink[] = map.edges.filter((e) => next.has(e.from) && next.has(e.to) && e.from !== e.to).map((e) => ({ source: e.from, target: e.to }));
-    const graph = { nodes, links, anchors };
-    lastRef.current = { key, edges: map.edges, graph };
-    return graph;
-  }, [map?.files, map?.edges, theme]);
-}
-
-/**
- * Files never cover each other: each keeps a disc as wide as its theme draws it (themes.ts reachOf) plus AIR, like
- * d3's forceCollide but with radii read on every tick (an agent arriving makes a PS2 cube bigger). A grid finds the neighbours.
- */
-function collideForce(strength = 0.8) {
-  let nodes: GNode[] = [];
-  const f = () => {
-    const st = mapStyle(), rs = nodes.map((n) => reachOf(n.r, !!n.file.activeSessionId, st) + AIR);
-    const cell = 2 * Math.max(1, ...rs), grid = new Map<string, number[]>();
-    const px = nodes.map((n) => (n.x ?? 0) + (n.vx ?? 0)), py = nodes.map((n) => (n.y ?? 0) + (n.vy ?? 0));
-    nodes.forEach((_, i) => { const k = `${Math.floor(px[i] / cell)},${Math.floor(py[i] / cell)}`; const l = grid.get(k); if (l) l.push(i); else grid.set(k, [i]); });
-    nodes.forEach((a, i) => {
-      const cx = Math.floor(px[i] / cell), cy = Math.floor(py[i] / cell);
-      for (let gx = cx - 1; gx <= cx + 1; gx++) for (let gy = cy - 1; gy <= cy + 1; gy++) for (const j of grid.get(`${gx},${gy}`) ?? []) {
-        if (j <= i) continue;
-        const b = nodes[j], r = rs[i] + rs[j];
-        let dx = px[i] - px[j], dy = py[i] - py[j], d2 = dx * dx + dy * dy;
-        if (d2 >= r * r) continue;
-        if (d2 === 0) { dx = (Math.random() - 0.5) * 1e-3; dy = (Math.random() - 0.5) * 1e-3; d2 = dx * dx + dy * dy; }
-        const d = Math.sqrt(d2), l = ((r - d) / d) * strength, ri = rs[i] ** 2, rj = rs[j] ** 2, w = rj / (ri + rj);
-        a.vx = (a.vx ?? 0) + dx * l * w; a.vy = (a.vy ?? 0) + dy * l * w;          // the smaller file moves more
-        b.vx = (b.vx ?? 0) - dx * l * (1 - w); b.vy = (b.vy ?? 0) - dy * l * (1 - w);
-      }
-    });
-  };
-  f.initialize = (ns: GNode[]) => { nodes = ns; };
-  return f;
-}
-
-/** Weak pull of each file toward its module's anchor. */
-function moduleForce(strength: number) {
-  let nodes: GNode[] = [];
-  const f = (alpha: number) => {
-    for (const n of nodes) {
-      n.vx = (n.vx ?? 0) + (n.ax - (n.x ?? 0)) * strength * alpha;
-      n.vy = (n.vy ?? 0) + (n.ay - (n.y ?? 0)) * strength * alpha;
-    }
-  };
-  f.initialize = (ns: GNode[]) => { nodes = ns; };
-  return f;
-}
-
-// ---------- import links ----------
-// Their colours (imports, used by) belong to the map theme: see themes.ts.
-const endId = (e: unknown) => (typeof e === "object" && e ? (e as GNode).id : (e as string));
-function linkRole(l: GLink, focus: string | null): "imports" | "usedBy" | null {
-  if (!focus) return null;
-  if (endId(l.source) === focus) return "imports";
-  if (endId(l.target) === focus) return "usedBy";
-  return null;
-}
-
 // ---------- view ----------
 export function MapView() {
   const { state } = useLive();
   const { focusFile, setFocusFile, hiddenAgents, replay, step, showReads } = useNav();
   const mock = useMemo(() => new URLSearchParams(location.search).has("mockmap"), []);
   const map = useMemo(() => (mock ? mockMap() : state.map), [mock, state.map]);
-  const graph = useGraph(map);
-  const [wrapRef, size] = useSize<HTMLDivElement>();
-  const fg = useRef<ForceGraphMethods<GNode, GLink> | undefined>(undefined);
   const theme = useTheme();
+  const saved = useSavedPositions(map?.root ?? null, theme);
+  // perf/web-store's structure counter when the store has it (files or imports added, removed or moved), else content.
+  const graph = useGraph(map, theme, saved, (state as unknown as { structureVersion?: number }).structureVersion);
+  const graphRef = useRef(graph); graphRef.current = graph;
+  const [wrapRef, size] = useSize<HTMLDivElement>();
+  const sizeRef = useRef(size); sizeRef.current = size;
+  const fg = useRef<ForceGraphMethods<GNode, never> | undefined>(undefined);
+  const { heat, big } = useForces(fg, graph, theme);
   const tokens = useMemo(readTokens, [theme]);   // each theme sets its own colours (themes.css)
+  const tokensRef = useRef(tokens); tokensRef.current = tokens;
   const style = mapStyle();
+  const stepWindow = useStepWindow();
   const [selected, setSelected] = useSelectedFile(map?.root ?? ""); // in the link: /file/<path>
   const [hover, setHover] = useState<string | null>(null);
   const settledFit = useRef(false);
@@ -252,392 +89,271 @@ export function MapView() {
   const cam = useCamera(fg as never, wrapRef);
   const camRef = useRef<Camera>(cam); camRef.current = cam;
 
+  // ---- redraws: only while something moves (redraw.ts) ----
+  const redraw = useMemo(() => createRedraw(() => { const g = fg.current; if (g) g.zoom(g.zoom()); }), []);
+  useEffect(() => () => redraw.stop(), [redraw]);
+
   // ---- live agents ----
-  const [mockTick, setMockTick] = useState(0);
-  useEffect(() => { if (!mock) return; const t = setInterval(() => setMockTick((x) => x + 1), 2600); return () => clearInterval(t); }, [mock]);
-  // An agent waiting on you stays on the map however long it waits.
-  const waitingIds = useMemo(() => new Set(Object.values(state.attention).filter(needsYou).map((a) => a.agentId ?? a.sessionId)), [state.attention]);
-  const agents: AgentPresence[] = useMemo(() => {
-    const all = mock && map ? mockAgents(map, mockTick) : Object.values(state.agents ?? {});
-    const shown = new Set(visibleAgents(all));
-    return all.filter((a) => shown.has(a) || waitingIds.has(a.id));
-  }, [mock, map, mockTick, state.agents, waitingIds]);
-  // Hidden agents (sidebar toggles) are not drawn. With a thread open: its own agents (main and subagents, each in its
-  // colour) while it's followed live; none while you move through its past (the replay's cursor is the marker then).
-  const threadId = replay?.sessionId ?? null, liveThread = !!replay?.live;
-  const drawnAgents = useMemo(() => agents.filter((a) => !hiddenAgents.has(a.id) && (!threadId || (liveThread && a.sessionId === threadId))),
-    [agents, hiddenAgents, threadId, liveThread]);
-  // Agents waiting on you (attention): agent id → label. A subagent waits under its own id, a main thread under the session's.
-  const waiting = useMemo(() => new Map(Object.values(state.attention).filter(needsYou).map((a) => [a.agentId ?? a.sessionId, attentionText(a).badge === "Stuck" ? "Stuck" : `Needs you · ${attentionText(a).title.toLowerCase()}`])), [state.attention]);
-  const waitingRef = useRef(waiting); waitingRef.current = waiting;
-  const agentsRef = useRef(drawnAgents); agentsRef.current = drawnAgents;
-  const anim = useRef(new Map<string, AgentAnim>());
-  const [followId, setFollowId] = useState<string | null>(null);
-  // A thread replay takes over the camera: stop following a live agent when one starts.
-  useEffect(() => { if (replay) setFollowId(null); }, [replay?.sessionId]);
-  const followRef = useRef(followId); followRef.current = followId;
+  const { agents, drawnAgents, waiting, waitingRef, agentsRef, anim, moving: agentsMoving } = useLiveAgents({
+    mock, map, agents: state.agents, attention: state.attention, hiddenAgents, threadId: replay?.sessionId ?? null, liveThread: !!replay?.live,
+  });
   const hoverRef = useRef(hover); hoverRef.current = hover;
   const selectedRef = useRef(selected); selectedRef.current = selected;
   const space = useRef(new LabelSpace());         // taken this frame: files, replay badges, folder names, file names
   const markedRef = useRef<string | null>(null);  // the file the replay's marker names this frame
-  const labelQueue = useRef<QueuedLabel[]>([]);   // file names to draw this frame, after the files
   const nodeIndex = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n])), [graph.nodes]);
   const nodeIndexRef = useRef(nodeIndex); nodeIndexRef.current = nodeIndex;
   /** Map an agent's file (or a searched directory) to a node id on the map. */
-  const fileResolver = useMemo(() => makeFileResolver(map), [map]);
-  const fileResolverRef = useRef(fileResolver); fileResolverRef.current = fileResolver;
+  const fileResolver = useMemo(() => makeFileResolver(map), [nodeIndex, map?.root, map?.formerRoots]);   // paths only: not every file update
+  // Every answer is kept (misses too) until the files change: agents ask for the same few files on every frame.
+  const resolved = useMemo(() => new Map<string, string | null>(), [nodeIndex, fileResolver]);
+  const resolvedRef = useRef({ resolved, fileResolver }); resolvedRef.current = { resolved, fileResolver };
   const resolveId = useCallback((file: string): string | undefined => {
+    const { resolved: memo, fileResolver: same } = resolvedRef.current;
+    const hit = memo.get(file);
+    if (hit !== undefined) return hit ?? undefined;
     const idx = nodeIndexRef.current;
-    if (idx.has(file)) return file;
-    const same = fileResolverRef.current(file); // same file in another worktree of this repo
-    if (same && idx.has(same)) return same;
-    const dir = file.replace(/\/+$/, "") + "/";
-    for (const id of idx.keys()) if (id.startsWith(dir)) return id;
-    return undefined;
+    let id: string | undefined;
+    if (idx.has(file)) id = file;
+    else {
+      const other = same(file); // same file in another worktree of this repo
+      if (other && idx.has(other)) id = other;
+      else {
+        const dir = file.replace(/\/+$/, "") + "/";
+        for (const k of idx.keys()) if (k.startsWith(dir)) { id = k; break; }
+      }
+    }
+    memo.set(file, id ?? null);
+    return id;
   }, []);
   const replayLayer = useReplayLayer({ fg: fg as never, wrapRef, nodeIndexRef, accent: tokens.accent, font: tokens.body, camera: camRef });
   const replayRef = useRef<ReplayLayerApi>(replayLayer); replayRef.current = replayLayer;
   const openRef = useRef(!!replay); openRef.current = !!replay;
-  const drawAgentLayer = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
-    // File names go on after every file is drawn, so no circle covers a name (the selected one's last, on top).
-    // The file the replay's marker names (drawModules) isn't named twice.
-    const named = markedRef.current;
-    drawQueuedLabels(ctx, named ? labelQueue.current.filter((l) => l.at?.id !== named || l.must) : labelQueue.current, space.current);
-    labelQueue.current = [];
-    replayRef.current.draw(ctx, scale);
-    drawAgents({
-      ctx, scale, agents: agentsRef.current, anim: anim.current, accent: tokens.accent, font: tokens.body,
-      hoverFile: hoverRef.current, followId: followRef.current, resolveId, showReads: mapPrefs.showReads, quiet: !openRef.current, waiting: waitingRef.current,
-      resolve: (id) => { const n = nodeIndexRef.current.get(id); return n && n.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y, r: n.r } : undefined; },
-    });
-  }, [tokens, resolveId]);
+  const playingRef = useRef(false); playingRef.current = !!replay?.playing;
 
-  // ---- camera intent: what the camera is framing, so it can frame it again when a panel opens or the window resizes ----
-  // "fit": the whole project (or the open thread's footprint); "file": the open file; "free": the user's own view.
-  type Intent = { kind: "fit" } | { kind: "file"; id: string; zoom: boolean } | { kind: "free" };
-  const intent = useRef<Intent>({ kind: "fit" });
-  const intentAt = useRef(0);
-  const setIntent = useCallback((i: Intent) => { intent.current = i; intentAt.current = performance.now(); }, []);
-  const framed = useRef(false);   // the camera has framed the map at least once
-  /** Locked onto something that moves (the tracer, a followed agent): the follow owns the centre, so no automatic re-frame. */
-  const lockedOn = useCallback(() => getCameraLock() && (replayRef.current.tracing || !!followRef.current), []);
-  /** Frame the open thread's focus (its recent window, or all its files), or the whole project. */
-  const fitAll = useCallback((ms = 800) => {
-    const idx = nodeIndexRef.current;
-    const fp = replayRef.current.footprint();
-    const touched = fp?.map((id) => idx.get(id)).filter((n): n is GNode => !!n && n.x !== undefined) ?? [];
-    const box = boxOf(touched.length ? touched : idx.values());
-    if (!box) return;
-    // Folder names sit above each group: leave them room at the top. A footprint of one or two files doesn't fill the screen.
-    box.y0 -= 24;
-    camRef.current.frame(box, { pad: 44, maxZoom: touched.length ? 2.4 : 4 }, ms);
-    framed.current = true;
-  }, []);
-  /** Frame what the intent says, unless the user has moved the camera since. */
-  const applyIntent = useCallback((ms = 600) => {
-    const i = intent.current, c = camRef.current;
-    if (i.kind === "free" || c.userAt() > intentAt.current) return;
-    if (i.kind === "fit") { if (!lockedOn()) fitAll(ms); return; }
-    const n = nodeIndexRef.current.get(i.id);
-    if (!n || n.x === undefined || n.y === undefined) return;
-    if (i.zoom) c.lookAt(n.x, n.y, 3, ms);
-    else c.reveal(n.x, n.y, n.r + 14, ms);   // room for its name under it
-    framed.current = true;
-  }, [fitAll, lockedOn]);
-  // Unlocked, the tracer left the view: frame the recent window again (applyIntent: unless you moved the camera since).
-  useEffect(() => { replayCamera.lost = () => applyIntent(700); return () => { replayCamera.lost = null; }; }, [applyIntent]);
-  // The safe area changed (a panel opened, the sidebar collapsed, the window resized): frame the same thing in it.
-  useEffect(() => {
-    const t = setTimeout(() => applyIntent(450), 60);
-    return () => clearTimeout(t);
-  }, [cam.version, applyIntent]);
-  /** The fit button and F / 0: the open thread's recent window, or the whole project (and stop following an agent). */
-  const fitNow = useCallback(() => {
-    setFollowId(null);
-    setIntent({ kind: "fit" });
-    fitAll(700);
-  }, [fitAll, setIntent]);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (isFitKey(e)) { e.preventDefault(); fitNow(); } };
-    addEventListener("keydown", onKey);
-    return () => removeEventListener("keydown", onKey);
-  }, [fitNow]);
-
-  // Follow an agent (from the sidebar), like the tracer: the camera frames it once; locked, it keeps it centred (easing,
-  // every frame, no stacked tweens) at whatever zoom you pick; unlocked, it stays where you put it, and frames the agent
-  // again when it leaves the view only if you haven't moved the camera since following began.
-  useEffect(() => {
-    if (!followId) return;
-    setIntent({ kind: "free" });
-    const t0 = performance.now();
-    let raf = 0, framedAt = 0;
-    const tick = () => {
-      const st = anim.current.get(followId), c = camRef.current, now = performance.now();
-      if (st) {
-        if (!framedAt) { framedAt = now; c.lookAt(st.x, st.y, Math.max(2.2, c.view()?.k ?? 0), 700); }
-        else if (getCameraLock()) { if (now - framedAt > 700) c.easeToward(st.x, st.y, 0.09); }
-        else if (c.userAt() < t0 && now - framedAt > 1200 && !c.sees(st.x, st.y)) { framedAt = now; c.lookAt(st.x, st.y, undefined, 700); }
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [followId, setIntent]);
-  /** A file to zoom to once its panel is open (the panel's own effect below does the move). */
-  const zoomTo = useRef<string | null>(null);
-  const focusOnFile = useCallback((file: string) => {
-    setFollowId(null);
-    const id = resolveId(file);
-    const n = id ? nodeIndexRef.current.get(id) : undefined;
-    if (!n) return;
-    zoomTo.current = n.id;
-    if (selectedRef.current === n.id) { setIntent({ kind: "file", id: n.id, zoom: true }); applyIntent(800); }
-    setSelected(n.id);
-  }, [resolveId, setIntent, applyIntent]);
-
-  // Forces
-  useEffect(() => {
-    const g = fg.current;
-    if (!g) return;
-    // The folders' anchors are packed with room for their files (useGraph), so the pull can hold each folder together while
-    // the collision keeps its files apart; the charge only spaces near neighbours (capped), it no longer has to keep files
-    // off each other, which used to blow the whole map apart while big files in one folder still overlapped.
-    g.d3Force("module", moduleForce(0.12) as never);
-    g.d3Force("collide", collideForce(0.8) as never);
-    (g.d3Force("charge") as any)?.strength?.((n: GNode) => -20 - n.r * 2)?.distanceMax?.(140);
-    (g.d3Force("link") as any)?.distance?.((l: GLink) => {
-      const s = l.source as GNode, t = l.target as GNode;
-      return s.file?.module === t.file?.module ? reachOf(s.r) + reachOf(t.r) + 2 * AIR + 8 : 110;
-    })?.strength?.((l: GLink) => ((l.source as GNode).file?.module === (l.target as GNode).file?.module ? 0.2 : 0.03));
-    (g.d3Force("center") as any)?.strength?.(0.02);
-    g.d3ReheatSimulation();
-  }, [graph, theme]);
-
-  // Frame the map once, after the first layout settles a bit (and again when it stops: see onEngineStop).
+  // ---- the camera (useMapCamera.ts) ----
   const hasNodes = graph.nodes.length > 0;
-  useEffect(() => {
-    if (!hasNodes) return;
-    const t = setTimeout(() => applyIntent(900), 1600);
-    return () => clearTimeout(t);
-  }, [hasNodes, applyIntent]);
-
-  // Opening a thread or starting its replay frames its recent window once, locked or not (and again as the layout settles,
-  // unlocked and untouched: a link opened straight onto a thread loads the map at the same time). Closing the thread
-  // frames the whole project again.
-  const openThread = replayLayer.active ? replay?.sessionId : undefined;
-  const playing = replay?.mode === "play";
-  const hadThread = useRef(false);
-  useEffect(() => {
-    if (openThread) hadThread.current = true;
-    else if (!hadThread.current) return;
-    if (!openThread) hadThread.current = false;
-    setIntent({ kind: "fit" });
-    if (replayCamera.pinned) return; // a file's panel is open: the camera stays on the file
-    fitAll(700);
-    const ts = openThread ? [600, 1800].map((ms) => setTimeout(() => applyIntent(700), ms)) : [];
-    return () => ts.forEach(clearTimeout);
-  }, [openThread, playing, setIntent, applyIntent, fitAll]);
-
-  // Focus from Follow (and file links)
-  useEffect(() => {
-    if (!focusFile) return;
-    const n = graph.nodes.find((x) => x.id === focusFile);
-    if (!n) return;
-    zoomTo.current = n.id;
-    setSelected(n.id);
-    setFocusFile(null);
-    if (selectedRef.current === n.id) { setIntent({ kind: "file", id: n.id, zoom: true }); applyIntent(900); }
-  }, [focusFile, graph.nodes, setFocusFile, setIntent, applyIntent]);
-
-  // The file panel: opening it brings the file into the uncovered map (zoomed in when it came from a list or a link);
-  // closing it puts the camera back where it was before (or frames the map, if it had never been framed).
-  const panelFile = step ? null : selected;
-  const before = useRef<{ view: View | null; intent: Intent } | null>(null);
-  useEffect(() => () => { replayCamera.pinned = false; }, []);
-  useEffect(() => {
-    const c = camRef.current;
-    replayCamera.pinned = !!panelFile; // the tracer's camera leaves the open file alone (it picks up again on close)
-    if (panelFile) {
-      if (!before.current) {
-        const auto = c.userAt() <= intentAt.current ? intent.current : { kind: "free" as const };
-        before.current = { view: framed.current ? c.view() : null, intent: auto.kind === "file" ? { kind: "fit" } : auto };
-      }
-      setIntent({ kind: "file", id: panelFile, zoom: zoomTo.current === panelFile });
-      zoomTo.current = null;
-      // A file with no position yet (a link that opened with the map): the intent frames it once the layout runs.
-      const n = nodeIndexRef.current.get(panelFile);
-      if (n?.x === undefined) { const t = setTimeout(() => applyIntent(900), 800); return () => clearTimeout(t); }
-      applyIntent(800);
-      return;
-    }
-    const b = before.current;
-    before.current = null;
-    if (!b) return;
-    if (b.view && b.intent.kind !== "fit") { setIntent(b.intent); c.moveTo(b.view, 700); }
-    else { setIntent({ kind: "fit" }); applyIntent(700); }
-  }, [panelFile, setIntent, applyIntent]);
+  const { followId, setFollowId, followRef, fitNow, focusOnFile, applyIntent } = useMapCamera({
+    cam, camRef, nodeIndex, nodeIndexRef, replayRef, replayActive: replayLayer.active, replay, step, selected, selectedRef, setSelected,
+    resolveId, anim, hasNodes, focusFile, setFocusFile,
+  });
 
   // Import links show only around the selected file.
   const linkFocus = selected; // on click, not hover: moving the mouse across the map shouldn't flash lines everywhere
   const linkFocusRef = useRef(linkFocus); linkFocusRef.current = linkFocus;
-  const activePaths = useMemo(() => new Set((map?.files ?? []).filter((f) => f.activeSessionId).map((f) => f.path)), [map?.files]);
 
+  // ---- what drawing keeps between frames (drawNode.ts) ----
+  const caches = useRef(newCaches());
   // One-shot ripples: start one when a file receives a new agent edit (not on first load).
-  const ripples = useRef(new Map<string, number>());
-  const seenEdits = useRef<Map<string, string> | null>(null);
+  const seenEdits = useRef<Map<string, FileNode> | null>(null);
   useEffect(() => {
     const files = map?.files ?? [];
     const first = seenEdits.current === null;
-    const seen = seenEdits.current ?? new Map<string, string>();
+    const seen = seenEdits.current ?? new Map<string, FileNode>();
+    let started = false;
     for (const f of files) {
-      const sig = `${f.lastChangedAt ?? ""}|${f.activeSessionId ?? ""}`;
       const prev = seen.get(f.path);
-      if (!first && prev !== undefined && prev !== sig && f.activeSessionId && f.lastChangedAt !== prev.split("|")[0]) ripples.current.set(f.path, performance.now());
-      seen.set(f.path, sig);
+      if (prev === f) continue;   // the store keeps unchanged files as they were: only the changed ones are compared
+      if (!first && prev !== undefined && (prev.lastChangedAt !== f.lastChangedAt || prev.activeSessionId !== f.activeSessionId)
+        && f.activeSessionId && f.lastChangedAt !== prev.lastChangedAt) { caches.current.ripples.set(f.path, performance.now()); started = true; }
+      seen.set(f.path, f);
     }
     seenEdits.current = seen;
-  }, [map?.files]);
+    if (started) redraw.kick(RIPPLE_MS);
+  }, [map?.files, redraw]);
+
+  // ---- colours: kept per file, worked out again when its time changes, and every few seconds (recency fades) ----
+  const epoch = useRef(0);
+  useEffect(() => {
+    const t = setInterval(() => { epoch.current++; redraw.kick(); }, 5000);
+    return () => clearInterval(t);
+  }, [redraw]);
+  useEffect(() => { epoch.current++; clearSprites(); }, [tokens]);
+  useEffect(() => {
+    // A web font arrived: names were measured in the fallback font.
+    const f = typeof document !== "undefined" ? document.fonts : undefined;
+    if (!f) return;
+    const done = () => { clearTextWidths(); redraw.kick(); };
+    f.addEventListener?.("loadingdone", done);
+    return () => f.removeEventListener?.("loadingdone", done);
+  }, [redraw]);
+
+  // ---- the frame ----
+  const frame = useRef<Frame>({ id: 0, scale: 1, x0: -Infinity, y0: -Infinity, x1: Infinity, y1: Infinity, now: 0, t: 0, st: style,
+    sel: null, hover: null, coolCss: "", looks: true, anyLook: false, lookSum: 0, motion: Motion.None, linksDone: false, labN: [], labP: [],
+    tokens, epoch: 0, recorded: recorded(), since: sinceMs, look: () => null, linkFocus: null, tracing: false });
+  const lastLookSum = useRef(0);
+  const ticks = useRef(0);
+
+  const startFrame = useCallback((_: CanvasRenderingContext2D, scale: number) => {
+    const F = frame.current, g = fg.current, { w, h } = sizeRef.current;
+    F.id++; F.scale = scale; F.now = clock(); F.t = performance.now(); F.st = mapStyle();
+    F.sel = selectedRef.current; F.hover = hoverRef.current; F.coolCss = css(tokensRef.current.cool);
+    F.tokens = tokensRef.current; F.epoch = epoch.current; F.look = replayRef.current.look;
+    F.linkFocus = linkFocusRef.current; F.tracing = replayRef.current.tracing;
+    spriteFrame();
+    // Off-screen files aren't drawn: the part of the map the camera shows, in graph units.
+    const a = g?.screen2GraphCoords(0, 0), b = g?.screen2GraphCoords(w, h);
+    if (a && b) { F.x0 = Math.min(a.x, b.x); F.x1 = Math.max(a.x, b.x); F.y0 = Math.min(a.y, b.y); F.y1 = Math.max(a.y, b.y); }
+    // The focus is asked about every file only while a thread is open, or its fade back hasn't finished.
+    F.looks = replayRef.current.active || F.anyLook;
+    F.anyLook = false; F.lookSum = 0; F.motion = Motion.None; F.linksDone = false;
+    F.labN.length = 0; F.labP.length = 0;
+    for (const d of caches.current.dots.values()) d.xyr.length = 0;
+    settleLandings(F.t);
+  }, []);
 
   const drawNode = useCallback((node: NodeObject, ctx: CanvasRenderingContext2D, scale: number) => {
-    const n = node as GNode;
-    const x = n.x ?? 0, y = n.y ?? 0, r = n.r;
-    const now = clock();
-    const active = !!n.file.activeSessionId;
-    const isSel = n.id === selected, isHover = n.id === hover;
-    const look = replayRef.current.look(n.id);   // an open thread: its own footprint, the rest dimmed back
-    const alpha = look?.alpha ?? 1;
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    const st = mapStyle();
-    const plain = st.node !== "dot"; // themed files stay plain: no ripple or outlines, one mark where an agent is
+    const F = frame.current;
+    if (!F.linksDone) { F.linksDone = true; drawLinks(ctx, scale, graphRef.current.links, F, caches.current); }   // after the layout's tick, before the first file
+    drawFile(ctx, node as GNode, scale, F, caches.current);
+  }, []);
 
-    // An edit lands: one ripple, once. While the file stays active: a steady outline, no motion.
-    const rippleStart = ripples.current.get(n.id);
-    if (plain) ripples.current.delete(n.id);
-    else if (rippleStart !== undefined) {
-      const t = (performance.now() - rippleStart) / RIPPLE_MS;
-      if (t >= 1) ripples.current.delete(n.id);
-      else {
-        const e = 1 - Math.pow(1 - t, 3); // ease-out
-        ctx.beginPath();
-        ctx.arc(x, y, r + (3 + e * 26) / scale, 0, Math.PI * 2); // screen-constant size, readable at any zoom
-        ctx.strokeStyle = tokens.accent;
-        ctx.globalAlpha = (1 - t) * 0.75 * alpha;
-        ctx.lineWidth = 2 / scale;
-        ctx.stroke();
-        ctx.globalAlpha = alpha;
-      }
-    }
-    if (active && !plain) {
-      ctx.beginPath();
-      ctx.arc(x, y, r + 3.5 / scale, 0, Math.PI * 2);
-      ctx.strokeStyle = tokens.accent;
-      ctx.globalAlpha = 0.9 * alpha;
-      ctx.lineWidth = 1.6 / scale;
-      ctx.stroke();
-      ctx.globalAlpha = alpha;
-    }
-
-    // In a focus, a file takes the focus's colour (when the thread changed it, or the quiet one), not the project's.
-    const own = recencyRGB(tokens, n.file.lastChangedAt, now);
-    const rgb = look ? mixRGB(own, recencyRGB(tokens, look.edited, now), look.tone) : own, lit = active || !same(rgb, tokens.cool);
-    if (st.node === "cube") {
-      // An agent lands: the cube spins up and flashes gold for a moment.
-      const landed = landings.get(n.id), k = landed === undefined ? 1 : (performance.now() - landed) / LAND_MS;
-      if (k >= 1 && landed !== undefined) landings.delete(n.id);
-      const kick = k < 1 ? 1 - (1 - k) ** 3 : 0, flash = k < 1 ? 1 - k : 0; // a half turn: the cube looks the same after it, so it never snaps back
-      drawCube(ctx, x, y, r * 0.78 * (active ? 1.3 : 1) * (1 + flash * 0.25), (STILL ? 0 : performance.now() / (active ? 700 : 2600) + kick * Math.PI) + spin(n.id),
-        flash ? mixRGB(rgb, tokens.warm, flash) : rgb, lit || flash > 0, scale, active ? tokens.accent : null);
-    }
-    else if (st.node === "plate") drawPlate(ctx, x, y, r * 0.9, rgb, lit, scale, active ? tokens.accent : null);
-    else if (st.node === "station") drawStation(ctx, x, y, r, same(rgb, tokens.cool) ? "#fff" : css(rgb), css(tokens.cool), active ? css(tokens.hot) : null, isSel, scale);
-    else { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = css(rgb); ctx.fill(); }
-    if (isSel || isHover || (active && !plain)) {
-      ctx.beginPath();
-      ctx.arc(x, y, st.node === "dot" ? r : r * 1.35 + 2 / scale, 0, Math.PI * 2);
-      ctx.lineWidth = (isSel ? 2.4 : 1.4) / scale;
-      ctx.strokeStyle = active ? tokens.accent : tokens.ink;
-      ctx.stroke();
-    }
-
-    // THE LABEL HOOK for the focus: the files in an open thread's recent window are named whatever their size (edits
-    // first), every other file only when selected or pointed at; another thread's edit doesn't pull a dimmed file forward.
-    const focusing = !!look && look.tone > 0.5, inFocus = focusing && !!look.named && look.alpha > 0.3;
-    const forced = isSel || isHover || (active && !focusing);
-    if (forced || inFocus || (alpha >= 1 && (r * scale > 9 || scale > 3.2))) {
-      // Queued, drawn after every file (see drawAgentLayer): a neighbour's circle never covers a name.
-      const fs = Math.max(11, Math.min(14, 11 + r * scale * 0.08)) / scale;
-      // Clear of what the theme draws (a cube's corners, a plate's rim) and of the selection ring.
-      const ringR = Math.max(reachOf(r, active, st), isSel || isHover ? (st.node === "dot" ? r : r * 1.35 + 2 / scale) : 0);
-      labelQueue.current.push({
-        text: baseName(n.id), x, y: y + ringR + 3 / scale, size: fs, scale, alpha: isSel || isHover ? 1 : inFocus ? Math.max(alpha, 0.8) : alpha,
-        at: { id: n.id, x, y, r: ringR }, must: isSel || isHover,
-        font: `${isSel || (active && !focusing) ? 600 : 500} ${fs}px ${st.labelFont ?? tokens.body}`,
-        ink: isSel || (active && !focusing) || isHover || (inFocus && look.edited) ? st.fileInk : st.fileInkQuiet, halo: st.halo,
-        // The one you point at wins, then the selected one, then where an agent works, then the focus (its edits first), then the biggest.
-        prio: (isHover ? 4e6 : 0) + (isSel ? 2e6 : 0) + (active && !focusing ? 1e6 : 0) + (inFocus ? (look.edited ? 6e5 : 5e5) : 0) + r, forced,
-      });
-    }
-    ctx.restore();
-  }, [tokens, selected, hover]);
-
-  // Metro: imports as transit lines (horizontal, vertical and 45°), coloured by the importing file's folder.
-  const drawMetroLink = useCallback((link: LinkObject, ctx: CanvasRenderingContext2D, scale: number) => {
-    const l = link as GLink, s = l.source as GNode, t = l.target as GNode;
-    if (s.x === undefined || t.x === undefined) return;
-    const role = linkRole(l, linkFocusRef.current);
-    const alpha = Math.min(replayRef.current.nodeAlpha(s.id), replayRef.current.nodeAlpha(t.id));
-    ctx.save();
-    ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.lineWidth = role ? Math.max(3 / scale, 3.2) : Math.max(1.6 / scale, 2.2);
-    ctx.strokeStyle = role === "imports" ? style.imports : role === "usedBy" ? style.usedBy : moduleColor(s.file.module);
-    // While a thread plays, the import lines step back so the thread's own line reads over them.
-    ctx.globalAlpha = (role ? 1 : linkFocusRef.current ? 0.12 : replayRef.current.tracing ? 0.18 : 0.55) * alpha;
-    metroPath(ctx, s.x, s.y ?? 0, t.x, t.y ?? 0);
-    ctx.stroke();
-    ctx.restore();
-  }, [style]);
-
+  // ---- folder names (labels.ts): the folders' outlines are kept until the files move or change ----
+  const folders = useRef<{ key: string; folders: Folders } | null>(null);
+  const focusVer = useRef<{ ids: string[] | null; v: number }>({ ids: null, v: 0 });
+  const geomVer = useRef(0);   // bumped when a file's size or activity changes (its reach, so its footprint)
+  const lastGeom = useRef<{ files: FileNode[] | null }>({ files: null });
+  useEffect(() => { if (lastGeom.current.files !== (map?.files ?? null)) { lastGeom.current.files = map?.files ?? null; geomVer.current++; } }, [map?.files]);
+  const editedAt = useRef(new Map<string, number>());
   const drawModules = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
     // Every file's footprint goes in first: no name, folder or file, prints over a file. With a thread open, the files it
     // never touched (or hasn't reached yet) are faded into the background: its own names may cross those, not the rest.
-    const st = mapStyle(), sp = space.current;
+    const F = frame.current, st = F.st, sp = space.current, g = graphRef.current;
     sp.reset(48 / scale);
-    // In a focus, folder names rank by what the thread changed, not by what the rest of the project did; a folder with
-    // none of its files in the focus steps back with them.
-    const looks = graph.nodes.map((n) => { const l = replayRef.current.look(n.id); return l && l.tone > 0.5 ? l : null; });
-    const lit = looks.some(Boolean) ? new Set<string>() : null;
-    graph.nodes.forEach((n, i) => { const l = looks[i]; if (lit && l && l.alpha > 0.3) lit.add(n.file.module); });
-    const nodes = graph.nodes.map((n, i) => ({ x: n.x, y: n.y, r: reachOf(n.r, !!n.file.activeSessionId, st), module: n.file.module,
-      lastChangedAt: looks[i] ? looks[i].edited : n.file.lastChangedAt, active: !looks[i] && !!n.file.activeSessionId }));
-    const ring = (n: GNode) => (st.node === "dot" ? n.r : n.r * 1.35 + 2 / scale);   // the selection ring (drawNode)
-    graph.nodes.forEach((n, i) => {
-      if (n.x === undefined || n.y === undefined || replayRef.current.nodeAlpha(n.id) < 0.3) return;
-      sp.file(n.id, n.x, n.y, n.id === selectedRef.current || n.id === hoverRef.current ? Math.max(nodes[i].r, ring(n)) : nodes[i].r);
+    const ids = replayRef.current.footprint();
+    const fv = focusVer.current;
+    if (ids?.length !== fv.ids?.length || (ids && fv.ids && ids.some((id, i) => id !== fv.ids![i])) || !ids !== !fv.ids) { fv.ids = ids; fv.v++; }
+    const cell = 2 ** Math.round(Math.log2(48 / scale));
+    sp.fileLayer(`${ticks.current}|${g.id}|${geomVer.current}|${theme}|${cell}|${fv.v}`, cell, (add) => {
+      const inFocus = ids ? new Set(ids) : null;
+      for (const n of g.nodes) {
+        if (n.x === undefined || n.y === undefined || (inFocus && !inFocus.has(n.id))) continue;
+        add(n.id, n.x, n.y, reachOf(n.r, !!n.file.activeSessionId, st));
+      }
     });
+    const ring = (n: GNode) => (st.node === "dot" ? n.r : n.r * 1.35 + 2 / scale);   // the selection ring (drawNode)
+    for (const id of [F.sel, F.hover]) {
+      const n = id ? nodeIndexRef.current.get(id) : undefined;
+      if (n?.x !== undefined && n.y !== undefined) sp.file(n.id, n.x, n.y, Math.max(reachOf(n.r, !!n.file.activeSessionId, st), ring(n)));
+    }
     // The replay's badges and marker are drawn last, on top, but take their space now: names keep off them too.
     const marks = replayRef.current.marks(ctx, scale);
     for (const b of marks.boxes) sp.add(b);
     markedRef.current = marks.named;
+    // The folders' outlines, kept until the files move (the layout ticks: every few ticks while it runs, and once it
+    // stops) or change.
+    const fkey = `${Math.floor(ticks.current / 6)}|${g.id}|${geomVer.current}|${theme}`;
+    if (folders.current?.key !== fkey) {
+      folders.current = { key: fkey, folders: aggregateFolders(g.nodes.map((n) => ({ x: n.x, y: n.y, r: reachOf(n.r, !!n.file.activeSessionId, st),
+        module: n.file.module, lastChangedAt: n.file.lastChangedAt, active: !!n.file.activeSessionId }))) };
+    }
+    // In a focus, folder names rank by what the thread changed, not by what the rest of the project did; a folder with
+    // none of its files in the focus steps back with them.
+    let lit: Set<string> | null = null, focusRecent: Map<string, number> | null = null;
+    if (ids) {
+      // Every file eases into the focus together: one of them says whether it has taken over (a thread that changed
+      // nothing has no files of its own in it, and every folder steps back).
+      const one = g.nodes[0] ? lookOf(g.nodes[0], F) : null;
+      if (one && one.tone > 0.5) { lit = new Set(); focusRecent = new Map(); }
+      for (const id of ids) {
+        const n = nodeIndexRef.current.get(id), l = n ? lookOf(n, F) : null;
+        if (!n || !l || l.tone <= 0.5) continue;
+        lit ??= new Set(); focusRecent ??= new Map();
+        if (l.alpha > 0.3) lit.add(n.file.module);
+        if (l.edited) {
+          let ms = editedAt.current.get(l.edited);
+          if (ms === undefined) { ms = Date.parse(l.edited); if (editedAt.current.size > 5000) editedAt.current.clear(); editedAt.current.set(l.edited, ms); }
+          if (ms > (focusRecent.get(n.file.module) ?? 0)) focusRecent.set(n.file.module, ms);
+        }
+      }
+    }
     const idx = nodeIndexRef.current;
     const focus = new Set<string>();
-    for (const id of [hoverRef.current, selectedRef.current]) { const n = id ? idx.get(id) : undefined; if (n) focus.add(n.file.module); }
+    for (const id of [F.hover, F.sel]) { const n = id ? idx.get(id) : undefined; if (n) focus.add(n.file.module); }
     const busy = new Set<string>();
     for (const a of agentsRef.current) {
       if (!a.active || !a.file) continue;
       const id = resolveId(a.file), n = id ? idx.get(id) : undefined;
       if (n) busy.add(n.file.module);
     }
-    drawModuleLabels(ctx, scale, nodes, { font: tokens.display, now: clock(), focus, busy, space: sp, lit });
-  }, [graph.nodes, tokens, resolveId]);
+    drawModuleLabels(ctx, scale, folders.current.folders, { font: tokensRef.current.display, now: F.now, focus, busy, space: sp, lit, focusRecent, view: F });
+  }, [theme, resolveId]);
+
   // Labels go on after the files (folder names, then file names), so no circle covers a name; then the agents.
-  const startFrame = useCallback(() => { labelQueue.current = []; }, []);
+  const drawAgentLayer = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
+    const F = frame.current, tokens = tokensRef.current;
+    // File names go on after every file is drawn, so no circle covers a name (the selected one's last, on top).
+    // The file the replay's marker names (drawModules) isn't named twice. Only the most important ones are placed.
+    const named = markedRef.current, order = F.labN.map((_, i) => i);
+    if (order.length > FILE_LABELS_MAX) { order.sort((a, b) => F.labP[b] - F.labP[a]); order.length = FILE_LABELS_MAX; }
+    const queue: QueuedLabel[] = [];
+    for (const i of order) {
+      const l = labelFor(F.labN[i], F.labP[i], F);
+      if (named && l.at?.id === named && !l.must) continue;
+      queue.push(l);
+    }
+    drawQueuedLabels(ctx, queue, space.current);
+    replayRef.current.draw(ctx, scale);
+    drawAgents({
+      ctx, scale, agents: agentsRef.current, anim: anim.current, accent: tokens.accent, font: tokens.body,
+      hoverFile: hoverRef.current, followId: followRef.current, resolveId, showReads: mapPrefs.showReads, quiet: !openRef.current, waiting: waitingRef.current,
+      resolve: (id) => { const n = nodeIndexRef.current.get(id); return n && n.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y, r: n.r } : undefined; },
+    });
+  }, [resolveId]);
+
   const endFrame = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
+    const F = frame.current;
+    flushDots(ctx, caches.current.dots, scale);
     drawModules(ctx, scale);
     drawAgentLayer(ctx, scale);
-  }, [drawModules, drawAgentLayer]);
+    ctx.globalAlpha = 1;
+    // What still moves decides whether the next frame comes (redraw.ts).
+    if (Math.abs(F.lookSum - lastLookSum.current) > 1e-6) moreMotion(F, Motion.Smooth);   // files easing into or out of a focus
+    lastLookSum.current = F.lookSum;
+    if (agentsMoving(F.t) || (replayRef.current.tracing && replayRef.current.active && playingRef.current)) moreMotion(F, Motion.Smooth);
+    redraw.drew(F.motion);
+  }, [drawModules, drawAgentLayer, redraw]);
 
-  const sel = selected ? graph.nodes.find((n) => n.id === selected)?.file : undefined;
+  const paintHitArea = useCallback((node: NodeObject, color: string, ctx: CanvasRenderingContext2D, scale: number) =>
+    paintHit(node as GNode, color, ctx, scale, frame.current), []);
+
+  // ---- what makes a frame come ----
+  const fp = replayLayer.footprint();
+  const footprintKey = fp ? `${fp.length}|${fp[0] ?? ""}|${fp[fp.length - 1] ?? ""}` : "";
+  // Anything that changes the picture: one frame (the frame itself says if more must follow).
+  useEffect(() => { redraw.kick(); }, [redraw, graph, map?.files, drawnAgents, waiting, followId, hover, selected, tokens, theme, replay,
+    replayLayer.active, replayLayer.tracing, replayLayer.footprintMode, showReads, stepWindow, footprintKey, size.w, size.h]);
+  // A replay step: the tracer glides, a read flashes, an edit pulses (up to about a second).
+  useEffect(() => { redraw.kick(1300); }, [redraw, replay?.index, replay?.sessionId, replay?.mode]);
+  // A new agent position, error or activity: its glide, flash or pulse plays out (drawAgents), the frame keeps them coming.
+  useEffect(() => { redraw.kick(100); }, [redraw, state.agents]);
+
+  // Where the files settled, remembered for the next visit (positions.ts).
+  const saveTimer = useRef(0);
+  useEffect(() => () => clearTimeout(saveTimer.current), []);
+  const onEngineStop = useCallback(() => {
+    if (!settledFit.current) { settledFit.current = true; applyIntent(900); }
+    geomVer.current++;   // the folders' outlines where the files came to rest
+    const g = graphRef.current, r = root;
+    clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => { if (g.nodes.length) void savePositions(r, theme, g.nodes); }, 800);
+    redraw.kick();
+  }, [applyIntent, root, theme, redraw]);
+  const onEngineTick = useCallback(() => { ticks.current++; redraw.ticked(); }, [redraw]);
+  const onNodeHover = useCallback((n: NodeObject | null) => setHover(n ? (n as GNode).id : null), []);
+  const onNodeClick = useCallback((n: NodeObject) => setSelected((n as GNode).id), [setSelected]);
+  const onBackgroundClick = useCallback(() => setSelected(null), [setSelected]);
+  // A file dragged by hand: its neighbours answer in full, for as long as the drag lasts (a full run's stopping point).
+  const [dragged, setDragged] = useState<typeof graph | null>(null);
+  const onNodeDrag = useCallback(() => { heat.current = 1; setDragged(() => graphRef.current); }, []);
+
+  const sel = selected ? nodeIndex.get(selected)?.file : undefined;
+  // A layout run stops once its push is spent (d3AlphaMin, in force-graph's alpha). A big map cools faster: fewer, bigger
+  // steps. A small map's full layout runs as it always did (cooldownTicks). A gentle run is short: about 40 steps to make
+  // room for a few new files, 15 to settle positions put back from the last visit.
+  const alphaDecay = big ? 0.05 : 0.0228;
+  const alphaMin = graph.heat >= 1 || dragged === graph ? (big ? 0.002 : 0) : (1 - alphaDecay) ** (graph.heat <= 0.02 ? 15 : 40);
 
   return (
     <div className="map-wrap" ref={wrapRef}>
@@ -647,33 +363,30 @@ export function MapView() {
           <p>Files appear here as soon as the mapper has read them.</p>
         </div>
       ) : (
-        <ForceGraph2D<GNode, GLink>
+        <ForceGraph2D<GNode, never>
           ref={fg as never}
           width={size.w}
           height={size.h}
-          graphData={graph}
+          graphData={graph.data}
           backgroundColor="rgba(0,0,0,0)"
           nodeId="id"
           nodeRelSize={1}
-          nodeVal={(n) => (n as GNode).r * (n as GNode).r}
-          nodeLabel={() => ""}
+          nodeVal={nodeVal}
+          nodeLabel={noLabel}
           nodeCanvasObject={drawNode}
-          nodePointerAreaPaint={(n, color, ctx) => { const g = n as GNode; ctx.fillStyle = color; ctx.beginPath(); ctx.arc(g.x ?? 0, g.y ?? 0, g.r + 3, 0, Math.PI * 2); ctx.fill(); }}
+          nodePointerAreaPaint={paintHitArea}
           onRenderFramePre={startFrame}
           onRenderFramePost={endFrame}
-          linkColor={(l) => linkRole(l as GLink, linkFocus) === "imports" ? style.imports : linkRole(l as GLink, linkFocus) === "usedBy" ? style.usedBy : linkFocus || replayLayer.tracing ? style.linkDim : style.linkIdle}
-          linkCanvasObjectMode={style.link === "metro" ? () => "replace" : undefined}
-          linkCanvasObject={style.link === "metro" ? drawMetroLink : undefined}
-          linkWidth={(l) => (linkRole(l as GLink, linkFocus) ? 1.6 : 0.6)}
-          linkDirectionalArrowLength={(l) => (linkRole(l as GLink, linkFocus) ? 3.5 : 0)}
-          linkDirectionalArrowRelPos={0.92}
-          autoPauseRedraw={false}
           cooldownTicks={400}
+          d3AlphaMin={alphaMin}
+          d3AlphaDecay={alphaDecay}
           d3VelocityDecay={0.35}
-          onEngineStop={() => { if (!settledFit.current) { settledFit.current = true; applyIntent(900); } }}
-          onNodeHover={(n) => setHover(n ? (n as GNode).id : null)}
-          onNodeClick={(n) => setSelected((n as GNode).id)}
-          onBackgroundClick={() => setSelected(null)}
+          onEngineTick={onEngineTick}
+          onEngineStop={onEngineStop}
+          onNodeHover={onNodeHover}
+          onNodeClick={onNodeClick}
+          onNodeDrag={onNodeDrag}
+          onBackgroundClick={onBackgroundClick}
         />
       )}
 
@@ -703,3 +416,6 @@ export function MapView() {
     </div>
   );
 }
+
+const nodeVal = (n: NodeObject) => (n as GNode).r * (n as GNode).r;
+const noLabel = () => "";

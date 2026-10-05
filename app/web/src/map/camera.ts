@@ -122,13 +122,20 @@ export function useCamera(fg: RefObject<Graph | undefined | null>, hostRef: RefO
     const schedule = () => { if (!raf) raf = requestAnimationFrame(update); };
     const ro = new ResizeObserver(schedule);
     const watched = new Set<Element>();
+    // Panels open and close by class, the sidebar collapses by swapping elements: watch both, but only on the covering
+    // elements themselves and the map's own children. Not the whole subtree: a class change on every Track row would
+    // otherwise run the lookups below and force a layout each time.
+    const classes = new MutationObserver(schedule);
     const observe = () => {
-      for (const el of scope.querySelectorAll(WATCH)) if (!watched.has(el)) { watched.add(el); ro.observe(el); }
-      for (const el of watched) if (!el.isConnected) { watched.delete(el); ro.unobserve(el); }
+      let changed = false;
+      for (const el of scope.querySelectorAll(WATCH)) if (!watched.has(el)) { watched.add(el); ro.observe(el); changed = true; }
+      for (const el of watched) if (!el.isConnected) { watched.delete(el); ro.unobserve(el); changed = true; }
+      if (!changed) return;
+      classes.disconnect();
+      for (const el of watched) classes.observe(el, { attributes: true, attributeFilter: ["class"] });
     };
-    // Panels open and close by class, the sidebar collapses by swapping elements: watch both.
     const mo = new MutationObserver(() => { observe(); schedule(); });
-    mo.observe(scope, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+    mo.observe(scope, { childList: true });
     ro.observe(host);
     observe();
     safe.current = measureSafe(host);
@@ -147,7 +154,7 @@ export function useCamera(fg: RefObject<Graph | undefined | null>, hostRef: RefO
     addEventListener("pointermove", onMove, true);
     addEventListener("pointerup", onUp, true);
     return () => {
-      ro.disconnect(); mo.disconnect(); cancelAnimationFrame(raf); cancelAnimationFrame(glide.current);
+      ro.disconnect(); mo.disconnect(); classes.disconnect(); cancelAnimationFrame(raf); cancelAnimationFrame(glide.current);
       host.removeEventListener("wheel", onWheel, { capture: true });
       host.removeEventListener("pointerdown", onDown, true);
       removeEventListener("pointermove", onMove, true);

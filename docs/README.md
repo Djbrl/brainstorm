@@ -17,6 +17,7 @@ How Brainstorm works, what's planned, and how it was built. Keep every file shor
 | [cowork.md](cowork.md) | Places: web, local apps and services agents use (and the hard parts) |
 | [attention.md](attention.md) | "Waiting for you": when a thread needs you, and the plugin hooks |
 | [thread-replay.md](thread-replay.md) | Thread replay on the map |
+| [performance.md](performance.md) | The benchmark (`app/scripts/bench/`), baseline numbers, and what slows down on big projects |
 
 ## The hackathon (27 Sep 2026)
 

@@ -18,7 +18,7 @@ measure your branch. A full run of the three sizes at two CPU rates takes about 
    lines per file (median about 90), each TS file importing 1–8 others (half from its own folder, then neighbours, its
    package, anywhere), some JSON, Markdown and CSS. Two git commits (300 and 3 days ago), file times to match. Cached
    between runs (same `--files` and seed), reset with `git checkout` before each run.
-2. **Thread** (`gen-thread.mjs`): a finished thread of `--steps` steps (default 10,000; about half in subagents) in
+2. **Thread** (`gen-thread.mjs`): a finished thread of `--steps` steps (default 10,000; about 40% in subagents) in
    Claude Code's log shape: one line per content block, tool results in user lines, Read results with the file's
    numbered lines, edits with old and new strings, about 4% failing calls, noise lines the listener skips, subagents in
    `<session>/subagents/agent-<id>.jsonl` with their `.meta.json`. Made-up content, no real logs copied.

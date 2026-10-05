@@ -124,6 +124,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 03:40 (5 Oct) [track-tab] At the human's request: Track moves into the sidebar, next to the map. Tabs are Threads | Track | Files; opening a thread stays on the map and turns the sidebar to its Track (the chapter list that moves the tracer as you scroll, brought back); on Places the tab lists the places. The full-screen Track lens is unmounted (old `/track` links open the map). The dock offers Replay for every thread, beside Live for a running one. Settings is a word in the header instead of a gear. Also on main: the server accepts `*.localhost` names, so the Multiprise URL gets the live feed (it sat on "Connecting…").
 
+- 04:35 (5 Oct) [bench] Performance benchmark (`perf/bench`): `node app/scripts/bench/run.mjs --files 5000 --cpu 4` generates a fake repo and a 10k-step thread, boots the server empty, cold and warm, times the APIs, runs a live writer, and measures the web app in its own headless Chrome (first render, frames at rest, panning, live, replay, heap). Baseline on main `2d1de72` for 1k, 5k and 20k files at 1× and 4× CPU in [performance.md](performance.md). Worst: the map stops at 800 files; the server is unreachable for 3–6 s while it reads a 10k-step thread it hasn't seen; a 20k-file repo keeps it busy 8 s after it answers and doubles its memory; opening a long thread downloads its 12 MB of steps up to 6 times; the map redraws every frame (18% of a core at rest, 56–72% at 4×), so panning and live updates fall to 21–35 fps at 4×.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

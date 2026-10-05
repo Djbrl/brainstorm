@@ -21,18 +21,17 @@ import { StepPanel } from "./StepPanel";
 import { FilePanel, useSelectedFile } from "./FilePanel";
 import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
 import { makeFileResolver } from "../lib/paths";
-import { aggregateFolders, clearTextWidths, drawModuleLabels, drawQueuedLabels, LabelSpace, type Folders, type QueuedLabel } from "./labels";
+import { clearTextWidths, drawQueuedLabels, LabelSpace, type QueuedLabel } from "./labels";
 import { useCamera, type Camera } from "./camera";
 import { FitButton } from "./FitButton";
 import { useTheme } from "../lib/theme";
 import { mapStyle, settleLandings } from "./themes";
 import { clearSprites, spriteFrame } from "./sprites";
 import { createRedraw, Motion } from "./redraw";
-import { savePositions, useSavedPositions } from "./positions";
 import { css, readTokens } from "./color";
-import { nodeReach, useForces, useGraph, type GNode } from "./graph";
-import { useFolding, useFoldOn } from "./fold";
-import { drawFile, drawLinks, FILE_LABELS_MAX, flushDots, labelFor, lookOf, moreMotion, newCaches, paintHit, RIPPLE_MS, type Frame } from "./drawNode";
+import { nodeReach, shownLinks, stepTween, useGraph, type GLink, type GNode } from "./graph";
+import { foldFrame, openAround, useFoldOn } from "./fold";
+import { drawFile, drawFolderNames, drawLinks, FILE_LABELS_MAX, flushDots, labelFor, lookOf, moreMotion, newCaches, paintHit, RIPPLE_MS, type Frame } from "./drawNode";
 import { useMapCamera } from "./useMapCamera";
 import { useLiveAgents } from "./useLiveAgents";
 import "./map.css";
@@ -69,31 +68,25 @@ export function MapView() {
   const { focusFile, setFocusFile, hiddenAgents, replay, step, showReads } = useNav();
   const map = state.map;
   const theme = useTheme();
-  const saved = useSavedPositions(map?.root ?? null, theme);
-  // ---- folders (fold.ts): the biggest open by default; a click opens one; the files you look at open theirs ----
+  // ---- the layout (graph.ts): files placed once by folder; laid out again only when files come or go ----
+  // perf/web-store's structure counter when the store has it (files or imports added, removed or moved).
+  const sv = (state as unknown as { structureVersion?: number }).structureVersion;
+  const { graph, tween } = useGraph(map, theme, sv);
+  const graphRef = useRef(graph); graphRef.current = graph;
+  // ---- folders (fold.ts): open as you zoom; the files you look at, a thread's, an agent's open theirs at any zoom ----
   const foldOn = useFoldOn();
-  const [opened, setOpened] = useState<{ root: string; dirs: ReadonlySet<string> }>({ root: "", dirs: new Set() });
-  const openDirs = opened.root === (map?.root ?? "") ? opened.dirs : NONE;
+  const foldOnRef = useRef(foldOn); foldOnRef.current = foldOn;
   const [selected, setSelected] = useSelectedFile(map?.root ?? ""); // in the link: /file/<path>
   // What an open thread showed on the map and where a followed agent worked: their folders stay open while you watch.
   const [watched, setWatched] = useState<{ key: string; files: string[] }>({ key: "", files: [] });
-  const shown = useMemo(() => [selected, focusFile, ...watched.files].filter((f): f is string => !!f), [selected, focusFile, watched.files]);
-  const folding = useFolding(map, foldOn, openDirs, shown);
-  // perf/web-store's structure counter when the store has it (files or imports added, removed or moved), else content;
-  // and what's folded.
-  const sv = (state as unknown as { structureVersion?: number }).structureVersion;
-  const graph = useGraph(folding.map, theme, saved, sv === undefined ? undefined : `${sv}|${folding.key}`);
-  const graphRef = useRef(graph); graphRef.current = graph;
   const [wrapRef, size] = useSize<HTMLDivElement>();
   const sizeRef = useRef(size); sizeRef.current = size;
   const fg = useRef<ForceGraphMethods<GNode, never> | undefined>(undefined);
-  const { heat, big } = useForces(fg, graph, theme);
   const tokens = useMemo(readTokens, [theme]);   // each theme sets its own colours (themes.css)
   const tokensRef = useRef(tokens); tokensRef.current = tokens;
   const style = mapStyle();
   const stepWindow = useStepWindow();
   const [hover, setHover] = useState<string | null>(null);
-  const settledFit = useRef(false);
   const root = map?.root ?? "";
   // The camera works in the part of the canvas the sidebar, the side panels, the stats line and the footer leave free.
   const cam = useCamera(fg as never, wrapRef);
@@ -111,13 +104,8 @@ export function MapView() {
   const selectedRef = useRef(selected); selectedRef.current = selected;
   const space = useRef(new LabelSpace());         // taken this frame: files, replay badges, folder names, file names
   const markedRef = useRef<string | null>(null);  // the file the replay's marker names this frame
-  // Every node by id, and every folded file by its path to its folder's circle: whatever looks a file up lands on what
-  // shows it (the tracer, an agent, a footprint go to the circle until the folder opens).
-  const nodeIndex = useMemo(() => {
-    const idx = new Map(graph.nodes.map((n) => [n.id, n]));
-    for (const [file, dir] of folding.folded) { const n = idx.get(dir); if (n) idx.set(file, n); }
-    return idx;
-  }, [graph.nodes, folding.folded]);
+  // Every file and folder by id (a folder's ends in "/").
+  const nodeIndex = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n])), [graph.nodes]);
   const nodeIndexRef = useRef(nodeIndex); nodeIndexRef.current = nodeIndex;
   /** Map an agent's file (or a searched directory) to a node id on the map. */
   const fileResolver = useMemo(() => makeFileResolver(map), [nodeIndex, map?.root, map?.formerRoots]);   // paths only: not every file update
@@ -174,9 +162,17 @@ export function MapView() {
   const linkFocus = hover ?? selected;
   const linkFocusRef = useRef(linkFocus); linkFocusRef.current = linkFocus;
 
+  // The folders that show open at any zoom: around the selected file, the one a link focuses, what the thread showed
+  // and where a followed agent worked (agents at work are added per frame).
+  const pinned = useMemo(() => {
+    const set = new Set<GNode>();
+    for (const f of [selected, focusFile, ...watched.files]) if (f) openAround(nodeIndex.get(f), set);
+    return set;
+  }, [nodeIndex, selected, focusFile, watched.files]);
+  const pinnedRef = useRef(pinned); pinnedRef.current = pinned;
+
   // ---- what drawing keeps between frames (drawNode.ts) ----
   const caches = useRef(newCaches());
-  const foldedRef = useRef(folding.folded); foldedRef.current = folding.folded;
   // One-shot ripples: start one when a file receives a new agent edit (not on first load).
   const seenEdits = useRef<Map<string, FileNode> | null>(null);
   useEffect(() => {
@@ -188,7 +184,7 @@ export function MapView() {
       const prev = seen.get(f.path);
       if (prev === f) continue;   // the store keeps unchanged files as they were: only the changed ones are compared
       if (!first && prev !== undefined && (prev.lastChangedAt !== f.lastChangedAt || prev.activeSessionId !== f.activeSessionId)
-        && f.activeSessionId && f.lastChangedAt !== prev.lastChangedAt) { caches.current.ripples.set(foldedRef.current.get(f.path) ?? f.path, performance.now()); started = true; }
+        && f.activeSessionId && f.lastChangedAt !== prev.lastChangedAt) { caches.current.ripples.set(f.path, performance.now()); started = true; }
       seen.set(f.path, f);
     }
     seenEdits.current = seen;
@@ -216,7 +212,8 @@ export function MapView() {
     sel: null, hover: null, coolCss: "", looks: true, anyLook: false, lookSum: 0, motion: Motion.None, linksDone: false, labN: [], labP: [],
     tokens, epoch: 0, recorded: recorded(), since: sinceMs, look: () => null, linkFocus: null, tracing: false });
   const lastLookSum = useRef(0);
-  const ticks = useRef(0);
+  const vis = useRef({ sig: 0, ver: 0 });   // what's open (fold.ts), and a counter bumped when it or the positions change
+  const linkCache = useRef<{ key: string; links: GLink[]; g: typeof graph | null }>({ key: "", links: [], g: null });
 
   const startFrame = useCallback((_: CanvasRenderingContext2D, scale: number) => {
     const F = frame.current, g = fg.current, { w, h } = sizeRef.current;
@@ -234,38 +231,56 @@ export function MapView() {
     F.labN.length = 0; F.labP.length = 0;
     for (const d of caches.current.dots.values()) d.xyr.length = 0;
     settleLandings(F.t);
-  }, []);
+    // Files came or went: the circles that moved glide to their new places.
+    if (stepTween(tween, F.t)) { moreMotion(F, Motion.Smooth); vis.current.ver++; }
+    // What's open at this zoom; an agent at work shows its folders open too.
+    let forced: ReadonlySet<GNode> = pinnedRef.current;
+    for (const ag of agentsRef.current) {
+      if (!ag.active || !ag.file) continue;
+      const id = resolveId(ag.file), n = id ? nodeIndexRef.current.get(id) : undefined;
+      if (!n) continue;
+      if (forced === pinnedRef.current) forced = new Set(forced);
+      openAround(n, forced as Set<GNode>);
+    }
+    const sig = foldFrame(graphRef.current, scale, forced, foldOnRef.current);
+    if (sig !== vis.current.sig) { vis.current.sig = sig; vis.current.ver++; }
+  }, [resolveId]);
 
   const drawNode = useCallback((node: NodeObject, ctx: CanvasRenderingContext2D, scale: number) => {
     const F = frame.current;
-    if (!F.linksDone) { F.linksDone = true; drawLinks(ctx, scale, graphRef.current.links, F, caches.current); }   // after the layout's tick, before the first file
+    // The import lines first, under everything (a line into a closed folder ends on its circle).
+    // Only worked out when some are drawn: Metro draws them all, the others only the hovered or selected file's.
+    if (!F.linksDone) {
+      F.linksDone = true;
+      if (F.st.link === "metro" || F.linkFocus) drawLinks(ctx, scale, shownLinks(graphRef.current, linkCache.current, `${vis.current.sig}`), F, caches.current);
+    }
     drawFile(ctx, node as GNode, scale, F, caches.current);
   }, []);
 
-  // ---- folder names (labels.ts): the folders' outlines are kept until the files move or change ----
-  const folders = useRef<{ key: string; folders: Folders } | null>(null);
+  // ---- names: the space they may take (labels.ts), then the open folders' names (drawNode.ts) ----
   const focusVer = useRef<{ ids: string[] | null; v: number }>({ ids: null, v: 0 });
   const geomVer = useRef(0);   // bumped when a file's size or activity changes (its reach, so its footprint)
   const lastGeom = useRef<{ files: FileNode[] | null }>({ files: null });
   useEffect(() => { if (lastGeom.current.files !== (map?.files ?? null)) { lastGeom.current.files = map?.files ?? null; geomVer.current++; } }, [map?.files]);
-  const editedAt = useRef(new Map<string, number>());
   const drawModules = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
-    // Every file's footprint goes in first: no name, folder or file, prints over a file. With a thread open, the files it
-    // never touched (or hasn't reached yet) are faded into the background: its own names may cross those, not the rest.
+    // Every file's footprint that shows goes in first (and every closed folder's circle): no name prints over a file.
+    // With a thread open, the files it never touched (or hasn't reached yet) are faded into the background: its own
+    // names may cross those, not the rest.
     const F = frame.current, st = F.st, sp = space.current, g = graphRef.current;
     sp.reset(48 / scale);
     const ids = replayRef.current.footprint();
     const fv = focusVer.current;
     if (ids?.length !== fv.ids?.length || (ids && fv.ids && ids.some((id, i) => id !== fv.ids![i])) || !ids !== !fv.ids) { fv.ids = ids; fv.v++; }
     const cell = 2 ** Math.round(Math.log2(48 / scale));
-    sp.fileLayer(`${ticks.current}|${g.id}|${geomVer.current}|${theme}|${cell}|${fv.v}`, cell, (add) => {
+    sp.fileLayer(`${vis.current.ver}|${g.id}|${geomVer.current}|${theme}|${cell}|${fv.v}`, cell, (add) => {
       const inFocus = ids ? new Set(ids) : null;
       for (const n of g.nodes) {
-        if (n.x === undefined || n.y === undefined || (inFocus && !inFocus.has(n.id))) continue;
+        if (n.x === undefined || n.y === undefined || (n.shown ?? 1) < 0.5 || (n.dir && (n.open ?? 0) >= 0.5)) continue;
+        if (inFocus && !n.dir && !inFocus.has(n.id)) continue;
         add(n.id, n.x, n.y, nodeReach(n, st));
       }
     });
-    const ring = (n: GNode) => (st.node === "dot" || n.fold ? n.r : n.r * 1.35 + 2 / scale);   // the selection ring (drawNode)
+    const ring = (n: GNode) => (st.node === "dot" || n.dir ? n.r : n.r * 1.35 + 2 / scale);   // the selection ring (drawNode)
     for (const id of [F.sel, F.hover]) {
       const n = id ? nodeIndexRef.current.get(id) : undefined;
       if (n?.x !== undefined && n.y !== undefined) sp.file(n.id, n.x, n.y, Math.max(nodeReach(n, st), ring(n)));
@@ -274,45 +289,8 @@ export function MapView() {
     const marks = replayRef.current.marks(ctx, scale);
     for (const b of marks.boxes) sp.add(b);
     markedRef.current = marks.named;
-    // The folders' outlines, kept until the files move (the layout ticks: every few ticks while it runs, and once it
-    // stops) or change.
-    const fkey = `${Math.floor(ticks.current / 6)}|${g.id}|${geomVer.current}|${theme}`;
-    if (folders.current?.key !== fkey) {
-      // A folder's circle that is its whole group ("docs") already says its name: the group isn't named again above it.
-      folders.current = { key: fkey, folders: aggregateFolders(g.nodes.filter((n) => n.fold?.rel !== n.file.module).map((n) => ({ x: n.x, y: n.y, r: nodeReach(n, st),
-        module: n.file.module, lastChangedAt: n.file.lastChangedAt, active: !!n.file.activeSessionId }))) };
-    }
-    // In a focus, folder names rank by what the thread changed, not by what the rest of the project did; a folder with
-    // none of its files in the focus steps back with them.
-    let lit: Set<string> | null = null, focusRecent: Map<string, number> | null = null;
-    if (ids) {
-      // Every file eases into the focus together: one of them says whether it has taken over (a thread that changed
-      // nothing has no files of its own in it, and every folder steps back).
-      const one = g.nodes[0] ? lookOf(g.nodes[0], F) : null;
-      if (one && one.tone > 0.5) { lit = new Set(); focusRecent = new Map(); }
-      for (const id of ids) {
-        const n = nodeIndexRef.current.get(id), l = n ? lookOf(n, F) : null;
-        if (!n || !l || l.tone <= 0.5) continue;
-        lit ??= new Set(); focusRecent ??= new Map();
-        if (l.alpha > 0.3) lit.add(n.file.module);
-        if (l.edited) {
-          let ms = editedAt.current.get(l.edited);
-          if (ms === undefined) { ms = Date.parse(l.edited); if (editedAt.current.size > 5000) editedAt.current.clear(); editedAt.current.set(l.edited, ms); }
-          if (ms > (focusRecent.get(n.file.module) ?? 0)) focusRecent.set(n.file.module, ms);
-        }
-      }
-    }
-    const idx = nodeIndexRef.current;
-    const focus = new Set<string>();
-    for (const id of [F.hover, F.sel]) { const n = id ? idx.get(id) : undefined; if (n) focus.add(n.file.module); }
-    const busy = new Set<string>();
-    for (const a of agentsRef.current) {
-      if (!a.active || !a.file) continue;
-      const id = resolveId(a.file), n = id ? idx.get(id) : undefined;
-      if (n) busy.add(n.file.module);
-    }
-    drawModuleLabels(ctx, scale, folders.current.folders, { font: tokensRef.current.display, now: F.now, focus, busy, space: sp, lit, focusRecent, view: F });
-  }, [theme, resolveId]);
+    drawFolderNames(ctx, scale, g.folders, F, sp);
+  }, [theme]);
 
   // Labels go on after the files (folder names, then file names), so no circle covers a name; then the agents.
   const drawAgentLayer = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
@@ -363,36 +341,19 @@ export function MapView() {
   // A new agent position, error or activity: its glide, flash or pulse plays out (drawAgents), the frame keeps them coming.
   useEffect(() => { redraw.kick(100); }, [redraw, state.agents]);
 
-  // Where the files settled, remembered for the next visit (positions.ts).
-  const saveTimer = useRef(0);
-  useEffect(() => () => clearTimeout(saveTimer.current), []);
-  const onEngineStop = useCallback(() => {
-    if (!settledFit.current) { settledFit.current = true; applyIntent(900); }
-    geomVer.current++;   // the folders' outlines where the files came to rest
-    const g = graphRef.current, r = root;
-    clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => { if (g.nodes.length) void savePositions(r, theme, g.nodes); }, 800);
-    redraw.kick();
-  }, [applyIntent, root, theme, redraw]);
-  const onEngineTick = useCallback(() => { ticks.current++; redraw.ticked(); }, [redraw]);
+  // Files came or went: the frame keeps coming while the circles that moved glide (stepTween).
+  useEffect(() => { if (tween.current) redraw.kick(700); }, [graph, redraw, tween]);
   const onNodeHover = useCallback((n: NodeObject | null) => setHover(n ? (n as GNode).id : null), []);
-  // A folder's circle opens; a file is selected.
+  // A closed folder: the camera goes into it (which opens it, fold.ts). A file: selected.
   const onNodeClick = useCallback((n: NodeObject) => {
-    const g = n as GNode, root = map?.root ?? "";
-    if (g.fold) setOpened((o) => ({ root, dirs: new Set([...(o.root === root ? o.dirs : []), g.fold!.rel]) }));
-    else setSelected(g.id);
-  }, [setSelected, map?.root]);
+    const g = n as GNode;
+    if (!g.dir) { setSelected(g.id); return; }
+    const x = g.x ?? 0, y = g.y ?? 0, r = g.r;
+    camRef.current.frame({ x0: x - r, x1: x + r, y0: y - r, y1: y + r }, { pad: 24, maxZoom: 12 }, 750);
+  }, [setSelected]);
   const onBackgroundClick = useCallback(() => setSelected(null), [setSelected]);
-  // A file dragged by hand: its neighbours answer in full, for as long as the drag lasts (a full run's stopping point).
-  const [dragged, setDragged] = useState<typeof graph | null>(null);
-  const onNodeDrag = useCallback(() => { heat.current = 1; setDragged(() => graphRef.current); }, []);
 
   const sel = selected ? nodeIndex.get(selected)?.file : undefined;
-  // A layout run stops once its push is spent (d3AlphaMin, in force-graph's alpha). A big map cools faster: fewer, bigger
-  // steps. A small map's full layout runs as it always did (cooldownTicks). A gentle run is short: about 40 steps to make
-  // room for a few new files, 15 to settle positions put back from the last visit.
-  const alphaDecay = big ? 0.05 : 0.0228;
-  const alphaMin = graph.heat >= 1 || dragged === graph ? (big ? 0.002 : 0) : (1 - alphaDecay) ** (graph.heat <= 0.02 ? 15 : 40);
 
   return (
     <div className="map-wrap" ref={wrapRef}>
@@ -416,15 +377,11 @@ export function MapView() {
           nodePointerAreaPaint={paintHitArea}
           onRenderFramePre={startFrame}
           onRenderFramePost={endFrame}
-          cooldownTicks={400}
-          d3AlphaMin={alphaMin}
-          d3AlphaDecay={alphaDecay}
-          d3VelocityDecay={0.35}
-          onEngineTick={onEngineTick}
-          onEngineStop={onEngineStop}
+          warmupTicks={0}
+          cooldownTicks={0}
+          enableNodeDrag={false}
           onNodeHover={onNodeHover}
           onNodeClick={onNodeClick}
-          onNodeDrag={onNodeDrag}
           onBackgroundClick={onBackgroundClick}
         />
       )}
@@ -436,7 +393,6 @@ export function MapView() {
       <TalkCard />
       <LensSwitch />
       {graph.nodes.length > 0 && <FitButton onFit={fitNow} label={replay ? "Fit the thread's files" : "Fit the whole project"} />}
-      {openDirs.size > 0 && <button className="map-fold-all" onClick={() => setOpened({ root, dirs: NONE })}>Fold folders</button>}
 
       <MapKey thread={!!replay} reads={showReads} imports={sel ? style.imports : null} />
       <Peek />
@@ -452,6 +408,5 @@ export function MapView() {
   );
 }
 
-const NONE: ReadonlySet<string> = new Set();
 const nodeVal = (n: NodeObject) => (n as GNode).r * (n as GNode).r;
 const noLabel = () => "";

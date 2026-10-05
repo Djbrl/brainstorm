@@ -1,20 +1,10 @@
-// Owned by the lead. Folder names on the map without the pile-up.
-// 1. Labels are drawn by priority (folder under the pointer or selected, then where agents work, then recent edits,
-//    then size), and a label that would overlap one already drawn is skipped, like town names on a map.
-// 2. Subfolders fold into one label for their parent folder while the group is small on screen; zoomed in, each
-//    subfolder shows its own name, without the parent's when the parent has many ("alpha", not "projects/alpha").
-// Colours and fonts follow the map theme (map/themes.ts).
-// 3. Folder names sit above their group (or below it), never on its files.
-// File names use the same idea: one LabelSpace per frame holds the files' footprints, the folder names, the replay's
-// badges and the file names, so no name prints over a file, a badge or another name.
-// For big maps (perf-canvas): the files' footprints and the folders' outlines are kept between frames until something
-// moves, text widths are measured once per font, and only the names on screen are placed and drawn.
+// Owned by the lead. Names on the map without the pile-up. One LabelSpace per frame holds the files' footprints, the
+// open folders' names (drawNode.ts drawFolderNames), the replay's badges and the file names, so no name prints over a
+// file, a badge or another name; a name with no room waits for the zoom, like town names on a map. Names are stamped
+// from small cached pictures (their outline stroked once), measured at their size on screen, and only the ones on
+// screen are placed and drawn. Colours and fonts follow the map theme (map/themes.ts).
 
-import { mapStyle, moduleColor } from "./themes";
 import { bucket, sprite, type Sprite } from "./sprites";
-
-/** `r`: how far the file reaches on the canvas (themes.ts reachOf), not its bare radius. */
-export type LabelNode = { x?: number; y?: number; r: number; module: string; lastChangedAt?: string; active: boolean };
 
 export type Box = { x0: number; y0: number; x1: number; y1: number; own?: string };
 
@@ -145,6 +135,18 @@ export function drawQueuedLabels(ctx: CanvasRenderingContext2D, queue: QueuedLab
   ctx.restore();
 }
 
+/** A name with its outline, `px` pixels on screen, its top centre at graph point (x, y): stamped like the file names. */
+export function drawName(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, px: number, weight: number, family: string, ink: string, halo: string, alpha: number) {
+  const s = nameSprite(ctx, { text, x, y, size: px, scale: 1, alpha, weight, family, ink, halo, prio: 0, forced: false });
+  if (!s) return;
+  const m = ctx.getTransform(), dpr = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(s.canvas, Math.round(x * m.a + y * m.c + m.e - s.ox * dpr), Math.round(x * m.b + y * m.d + m.f - s.oy * dpr));
+  ctx.restore();
+}
+
 /** A name with its outline, as the label pass draws it, at its size on screen (half-pixel buckets): (ox, oy) is its top centre. */
 function nameSprite(ctx: CanvasRenderingContext2D, l: QueuedLabel): Sprite | null {
   const px = bucket(l.size * l.scale), halo = 1.5, w = textWidth(ctx, l.text, l.weight, l.family, px, px);
@@ -157,132 +159,4 @@ function nameSprite(ctx: CanvasRenderingContext2D, l: QueuedLabel): Sprite | nul
     c.fillStyle = l.ink;
     c.fillText(l.text, ox, oy);
   });
-}
-
-const HOUR = 3_600_000;
-const COLLAPSE_PX = 280;          // a parent's subfolders fold into one label below this size on screen
-const SHORTEN_FROM = 4;           // subfolders a parent needs before their labels drop its name
-const MAX_FOLDER_LABELS = 240;    // drawn per frame at most (the most important first): a huge map stays readable and quick
-
-const parentOf = (m: string) => (!m || m === "." ? "." : m.split("/")[0]);
-const display = (m: string) => (!m || m === "." ? "root" : m);
-
-/** The edge of a group, leaving out a stray file or two (a far import can pull one out), so the name doesn't follow it. */
-const edge = (ys: Float64Array, k: number) => { const t = ys.sort(); return t[Math.min(t.length - 1, Math.floor(t.length * k))]; };
-
-/** A folder's files on the map: where they are, how far they spread, its group's edges, how recently and whether busy. */
-export type FolderAgg = { m: string; n: number; sx: number; x0: number; x1: number; y0: number; y1: number; top: number; bot: number; recent: number; busy: boolean };
-/** A parent folder and its subfolders (the label that folds them together while they're small). */
-export type ParentAgg = { parent: string; mods: FolderAgg[]; n: number; sx: number; span: number; x0: number; x1: number; y0: number; y1: number; top: number; bot: number };
-export type Folders = { parents: ParentAgg[] };
-
-/**
- * The folders' outlines, from the files: one pass, kept by MapView until the layout moves, the files change or the
- * focus changes (sorting every file's edge on every frame was the cost on a big map).
- */
-export function aggregateFolders(nodes: Iterable<LabelNode>): Folders {
-  type Acc = FolderAgg & { tops: number[]; bots: number[] };
-  const mods = new Map<string, Acc>();
-  for (const n of nodes) {
-    if (n.x === undefined || n.y === undefined) continue;
-    let a = mods.get(n.module);
-    if (!a) mods.set(n.module, (a = { m: n.module, n: 0, sx: 0, x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity, top: 0, bot: 0, recent: 0, busy: false, tops: [], bots: [] }));
-    a.n++; a.sx += n.x;
-    a.x0 = Math.min(a.x0, n.x - n.r); a.x1 = Math.max(a.x1, n.x + n.r);
-    a.y0 = Math.min(a.y0, n.y - n.r); a.y1 = Math.max(a.y1, n.y + n.r); a.tops.push(n.y - n.r); a.bots.push(n.y + n.r);
-    const t = n.lastChangedAt ? Date.parse(n.lastChangedAt) : 0;
-    if (t > a.recent) a.recent = t;
-    if (n.active) a.busy = true;
-  }
-  const groups = new Map<string, Acc[]>();
-  for (const a of mods.values()) { const p = parentOf(a.m); const l = groups.get(p); if (l) l.push(a); else groups.set(p, [a]); }
-  const parents: ParentAgg[] = [];
-  for (const [parent, list] of groups) {
-    let n = 0, sx = 0, x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, len = 0;
-    for (const a of list) { n += a.n; sx += a.sx; x0 = Math.min(x0, a.x0); x1 = Math.max(x1, a.x1); y0 = Math.min(y0, a.y0); y1 = Math.max(y1, a.y1); len += a.tops.length; }
-    let top = 0, bot = 0;
-    if (list.length > 1) {
-      const tops = new Float64Array(len), bots = new Float64Array(len);
-      let i = 0;
-      for (const a of list) { tops.set(a.tops, i); bots.set(a.bots, i); i += a.tops.length; }
-      top = edge(tops, 0.04); bot = edge(bots, 0.96);
-    }
-    const mods: FolderAgg[] = list.map((a) => ({ m: a.m, n: a.n, sx: a.sx, x0: a.x0, x1: a.x1, y0: a.y0, y1: a.y1,
-      top: edge(Float64Array.from(a.tops), 0.04), bot: edge(Float64Array.from(a.bots), 0.96), recent: a.recent, busy: a.busy }));
-    if (list.length === 1) { top = mods[0].top; bot = mods[0].bot; }
-    parents.push({ parent, mods, n, sx, span: Math.max(x1 - x0, y1 - y0), x0, x1, y0, y1, top, bot });
-  }
-  return { parents };
-}
-
-export function drawModuleLabels(ctx: CanvasRenderingContext2D, scale: number, folders: Folders, opts: {
-  font: string; now: number; focus: Set<string>; busy: Set<string>; space: LabelSpace;
-  /** With a thread open: the folders that have files in its focus. The others' names step back with their files. */
-  lit?: Set<string> | null;
-  /** With a thread open: when the thread last changed something in each folder (its files' own times don't count then). */
-  focusRecent?: Map<string, number> | null;
-  /** The part of the map on screen (graph units): names elsewhere aren't placed. */
-  view?: Box;
-}) {
-  type Cand = { text: string; x: number; top: number; bot: number; px: number; prio: number; mods: string[] };
-  const fr = opts.focusRecent;
-  const recentOf = (a: FolderAgg) => (fr ? fr.get(a.m) ?? 0 : a.recent);
-  const prio = (list: FolderAgg[]) => {
-    let p = 0, recent = 0, busy = false, focus = false;
-    for (const a of list) {
-      p += a.n; recent = Math.max(recent, recentOf(a));
-      if ((!fr && a.busy) || opts.busy.has(a.m)) busy = true;
-      if (opts.focus.has(a.m)) focus = true;
-    }
-    if (recent && opts.now - recent < HOUR) p += 1000 * (1 - (opts.now - recent) / HOUR);
-    if (busy) p += 1e5;
-    if (focus) p += 1e6;
-    return p;
-  };
-  const cands: Cand[] = [];
-  for (const g of folders.parents) {
-    const small = g.span * scale < COLLAPSE_PX;
-    if (g.mods.length > 1 && small) {
-      cands.push({ text: display(g.parent), x: g.sx / g.n, top: g.top, bot: g.bot, px: Math.min(34, 18 + Math.sqrt(g.n) * 2.6), prio: prio(g.mods), mods: g.mods.map((a) => a.m) });
-    } else {
-      for (const a of g.mods) {
-        // Drop the parent only where it repeats a lot (a "projects/" folder with dozens of entries); small repos keep "app/server".
-        const short = g.mods.length >= SHORTEN_FROM && a.m !== g.parent ? a.m.slice(g.parent.length + 1) : display(a.m);
-        cands.push({ text: short, x: a.sx / a.n, top: a.top, bot: a.bot, px: Math.min(28, 15 + Math.sqrt(a.n) * 2.4), prio: prio([a]), mods: [a.m] });
-      }
-    }
-  }
-  // Two short names that read the same ("src" in two places) keep their full path.
-  const seen = new Map<string, number>();
-  for (const c of cands) seen.set(c.text, (seen.get(c.text) ?? 0) + 1);
-  for (const c of cands) if ((seen.get(c.text) ?? 0) > 1 && c.mods.length === 1) c.text = display(c.mods[0]);
-
-  cands.sort((a, b) => b.prio - a.prio);
-  const style = mapStyle(), font = style.moduleFont ?? opts.font, v = opts.view;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "bottom";
-  let drawn = 0;
-  for (const c of cands) {
-    if (drawn >= MAX_FOLDER_LABELS) break;
-    const px = c.px / scale, gap = 6 / scale;
-    // Off screen (with room for the widest name): not placed, not drawn.
-    if (v && (c.x + 40 * px < v.x0 || c.x - 40 * px > v.x1 || c.bot + gap + px < v.y0 || c.top - gap - 2 * px > v.y1)) continue;
-    const w = textWidth(ctx, c.text, 700, font, px), pad = 8 / scale;
-    const box = (y: number) => ({ x0: c.x - w / 2 - pad, x1: c.x + w / 2 + pad, y0: y - px - pad / 2, y1: y + pad / 2 });
-    // The name sits above its group, never on its files (they're in the space already): just above, a little higher, then below.
-    const spots = [c.top - gap, c.top - gap - px * 0.8, c.bot + gap + px];
-    const focused = c.mods.some((m) => opts.focus.has(m));
-    const y = spots.find((s) => !opts.space.hits(box(s))) ?? (focused ? spots[0] : undefined);
-    if (y === undefined) continue;
-    opts.space.add(box(y));
-    drawn++;
-    const lively = focused || c.prio >= 1e5;
-    const back = !focused && !!opts.lit && !c.mods.some((m) => opts.lit!.has(m));   // none of its files in the thread's focus
-    ctx.font = `700 ${px}px ${font}`;
-    if (style.moduleColored) { ctx.globalAlpha = lively ? 0.95 : 0.7; ctx.fillStyle = moduleColor(c.mods[0]); }
-    else ctx.fillStyle = lively ? style.moduleInkLively : style.moduleInk;
-    if (back) ctx.globalAlpha *= 0.3;
-    ctx.fillText(c.text, c.x, y);
-    ctx.globalAlpha = 1;
-  }
 }

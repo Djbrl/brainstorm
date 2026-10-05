@@ -62,7 +62,7 @@ function WindowSetting() {
   );
 }
 
-/** Folders as one circle until opened (map/fold.ts). */
+/** Folders as one circle until zoomed into (map/fold.ts). */
 function FoldSetting() {
   const on = useFoldOn();
   return (
@@ -70,7 +70,7 @@ function FoldSetting() {
       <h3>Folders</h3>
       <label className="notify-opt">
         <input type="checkbox" checked={on} onChange={() => setFoldOn(!on)} />
-        <span><b>Group files into folders</b><small>Big folders show as one circle until you click it, or an agent you follow works in it</small></span>
+        <span><b>Group files into folders</b><small>A folder shows as one circle until you zoom in or click it, or an agent works in it</small></span>
       </label>
     </>
   );

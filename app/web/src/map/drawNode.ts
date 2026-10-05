@@ -2,7 +2,7 @@
 // frame (Frame: what's asked once per frame) and of caches that live as long as the map. MapView calls them from
 // force-graph's frame callbacks.
 import type { Look } from "./replay/layer";
-import type { QueuedLabel } from "./labels";
+import { drawName, textWidth, type LabelSpace, type QueuedLabel } from "./labels";
 import { Motion } from "./redraw";
 import {
   CUBE_STILL_PX, drawCube, drawPlate, drawStation, LAND_MS, landings, metroPath, metroSegment, moduleColor, reachOf,
@@ -187,13 +187,15 @@ export function drawFile(ctx: CanvasRenderingContext2D, n: GNode, scale: number,
   // Off screen (with room for a glow, a ripple and a name): nothing to draw.
   const m = 3.7 * r + 34 / scale;
   if (x + m < F.x0 || x - m > F.x1 || y + m < F.y0 || y - m > F.y1) return;
-  if (n.fold) { drawFolder(ctx, n, scale, F, c); return; }
+  const shown = n.shown ?? 1;
+  if (shown < 0.02) return;   // inside a folder closed at this zoom (fold.ts)
+  if (n.dir) { drawFolder(ctx, n, scale, F, c, shown); return; }
   const tokens = F.tokens, st = F.st, t = F.t;
   const active = !!n.file.activeSessionId;
   const isSel = n.id === F.sel, isHover = n.id === F.hover;
   const look = lookOf(n, F);   // an open thread: its own footprint, the rest dimmed back
   if (look) { F.anyLook = true; F.lookSum += look.alpha * 3 + look.tone; }
-  const alpha = look?.alpha ?? 1;
+  const alpha = (look?.alpha ?? 1) * shown;   // fading in as its folder opens
   ctx.globalAlpha = alpha;
   const plain = st.node !== "dot"; // themed files stay plain: no ripple or outlines, one mark where an agent is
 
@@ -285,60 +287,83 @@ export function drawFile(ctx: CanvasRenderingContext2D, n: GNode, scale: number,
   }
 }
 
-/** Under this size on screen (radius, px) a folder's circle is named below it, like a file; above, inside it. */
+/** Under this size on screen (radius, px) a closed folder is named below its circle, like a file; above, inside it. */
 const FOLDER_TEXT_PX = 15;
 
 /**
- * A folded folder (fold.ts): a soft disc in its files' latest colour, ringed, with its name and how many files it
- * holds inside. Every theme draws it the same way: it reads as a group, not as one more file. A click opens it.
+ * A folder (graph.ts, fold.ts). Closed (small on screen): a soft disc in its files' latest colour, ringed, with its
+ * name and how many files it holds inside: it reads as a group, not as one more file. Open: a faint outline around its
+ * files (its name sits on the outline: drawFolderNames). In between, as you zoom, one fades into the other. Every
+ * theme draws folders the same way. A click on a closed folder zooms into it.
  */
-function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: Frame, c: Caches) {
-  const x = n.x!, y = n.y!, r = n.r, tokens = F.tokens, st = F.st;
+function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: Frame, c: Caches, shown: number) {
+  const x = n.x!, y = n.y!, r = n.r, tokens = F.tokens, st = F.st, open = n.open ?? 1;
   const active = !!n.file.activeSessionId, isSel = n.id === F.sel, isHover = n.id === F.hover;
   const look = lookOf(n, F);
   if (look) { F.anyLook = true; F.lookSum += look.alpha * 3 + look.tone; }
-  const alpha = look?.alpha ?? 1;
+  const alpha = (look?.alpha ?? 1) * shown;
+  // Open: the outline, and a breath of fill so folders inside folders read as levels.
+  if (open > 0) {
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU);
+    if (n.dir!.depth <= 3) { ctx.globalAlpha = alpha * open * 0.02; ctx.fillStyle = tokens.ink; ctx.fill(); }   // deeper, the levels would add up to grey
+    ctx.globalAlpha = alpha * open * (active ? 0.6 : 0.16); ctx.lineWidth = (active ? 1.4 : 1) / scale;
+    ctx.strokeStyle = active ? tokens.accent : tokens.ink; ctx.stroke();
+  }
+  const closed = alpha * (1 - open);
+  if (closed <= 0.01) { ctx.globalAlpha = 1; return; }
   const own = ownColour(n, F);
   let rgbCss = own.css!;
   if (look && look.tone >= 1) rgbCss = focusColour(look.edited, F, c.focusColours).css;
   ctx.beginPath(); ctx.arc(x, y, r, 0, TAU);
-  ctx.globalAlpha = alpha * (isHover ? 0.24 : 0.16); ctx.fillStyle = rgbCss; ctx.fill();
-  ctx.globalAlpha = alpha * (isHover || isSel ? 0.9 : 0.5);
+  // Metro: a white disc like its stations, its lines passing under it; elsewhere a tint of the folder's colour.
+  const metro = st.node === "station";
+  if (metro) { ctx.globalAlpha = closed * 0.92; ctx.fillStyle = "#fff"; ctx.fill(); if (!same(own.c!, tokens.cool)) { ctx.globalAlpha = closed * 0.22; ctx.fillStyle = rgbCss; ctx.fill(); } }
+  else { ctx.globalAlpha = closed * (isHover ? 0.24 : 0.16); ctx.fillStyle = rgbCss; ctx.fill(); }
+  ctx.globalAlpha = closed * (isHover || isSel ? 0.9 : 0.5);
   ctx.lineWidth = (isHover || isSel ? 1.8 : 1.2) / scale;
   ctx.strokeStyle = active ? tokens.accent : isHover || isSel ? tokens.ink : rgbCss;
   ctx.stroke();
-  if (active) { ctx.beginPath(); ctx.arc(x, y, r + 3.5 / scale, 0, TAU); ctx.globalAlpha = 0.9 * alpha; ctx.lineWidth = 1.6 / scale; ctx.strokeStyle = tokens.accent; ctx.stroke(); }
+  if (active) { ctx.beginPath(); ctx.arc(x, y, r + 3.5 / scale, 0, TAU); ctx.globalAlpha = 0.9 * closed; ctx.lineWidth = 1.6 / scale; ctx.strokeStyle = tokens.accent; ctx.stroke(); }
   ctx.globalAlpha = 1;
-  const px = r * scale, count = n.fold!.files.length;
+  const px = r * scale, count = n.dir!.files.length;
   if (px < FOLDER_TEXT_PX) {
     // Small on screen: named below, like a file (drawn in the label pass).
     if (isSel || isHover || px > 6 || active) { F.labN.push(n); F.labP.push((isHover ? 4e6 : 0) + (active ? 1e6 : 0) + 7e5 + r); }
     return;
   }
-  const name = folderName(n), family = st.labelFont ?? tokens.body, size = Math.min(22, Math.max(11, px * 0.2));
-  screenText(ctx, name, x, y, size, 650, family, st.fileInk, alpha * (isHover || active ? 1 : 0.85), -0.15 * size);
-  if (px > 34) screenText(ctx, count === 1 ? "1 file" : `${count} files`, x, y, Math.max(11, size * 0.62), 500, family, st.fileInkQuiet, alpha * 0.9, 0.85 * size);
+  // Its name goes first as it opens: by the time its files show, it's gone (its name is on the outline then).
+  const said = (look?.alpha ?? 1) * (n.said ?? 1) * Math.max(0, 1 - open * 3);
+  if (said <= 0.01) return;
+  // A few sizes only, stamped from cached pictures (labels.ts drawName): zooming doesn't draw new text every frame.
+  const name = folderName(n), family = st.labelFont ?? tokens.body, size = px > 110 ? 20 : px > 70 ? 16 : px > 40 ? 13 : 11;
+  const clear = "rgba(0,0,0,0)", k = 1 / scale;
+  drawName(ctx, name, x, y - 0.75 * size * k, size, 650, family, st.fileInk, clear, said * (isHover || active ? 1 : 0.85));
+  if (px > 34) drawName(ctx, count === 1 ? "1 file" : `${count} files`, x, y + 0.35 * size * k, 11, 500, family, st.fileInkQuiet, clear, said * 0.9);
+}
+
+/**
+ * Open folders' names, on the top of their outline (after the files, before the file names: those keep off them). The
+ * outer folders first; a name with no room waits for the zoom.
+ */
+export function drawFolderNames(ctx: CanvasRenderingContext2D, scale: number, folders: GNode[], F: Frame, space: LabelSpace) {
+  const st = F.st, family = st.labelFont ?? F.tokens.body;
+  for (const n of folders) {
+    const shown = n.shown ?? 1, open = n.open ?? 1, x = n.x!, y = n.y!, r = n.r;
+    if (shown * open < 0.3 || (n.said ?? 1) < 0.05 || r * scale < 40) continue;
+    const top = y - r;
+    if (x + r < F.x0 || x - r > F.x1 || top > F.y1 || top < F.y0 - 30 / scale) continue;
+    const name = folderName(n), px = n.dir!.depth <= 1 ? 15 : 13, w = textWidth(ctx, name, 650, family, px, px) / scale, h = px * 1.3 / scale, pad = 6 / scale;
+    const box = { x0: x - w / 2 - pad, x1: x + w / 2 + pad, y0: top - h / 2 - pad / 2, y1: top + h / 2 + pad / 2 };
+    if (!space.claim(box)) continue;
+    const look = n.lf === F.id ? n.lk ?? null : null;
+    drawName(ctx, name, x, top - h / 2, px, 650, family, n.file.activeSessionId ? st.fileInk : st.fileInkQuiet, st.halo, shown * open * Math.max(0.55, look?.alpha ?? 1));
+  }
 }
 /** A folder's name: its last folder, or two when the last alone says little ("src", "lib"). */
 const folderName = (n: GNode) => {
-  const segs = n.fold!.rel.split("/"), last = segs[segs.length - 1];
+  const segs = n.dir!.name.split("/"), last = segs[segs.length - 1];
   return segs.length > 1 && /^(src|lib|test|tests|app|components|utils|internal|pkg)$/.test(last) ? segs.slice(-2).join("/") : last;
 };
-/**
- * Text at a size on screen, at a graph point (its middle `dy` screen pixels down), set in device pixels: small text
- * drawn at a tiny size and scaled up comes out spaced wrong with system fonts.
- */
-function screenText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, px: number, weight: number, family: string, color: string, alpha: number, dy = 0) {
-  const m = ctx.getTransform(), dpr = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1;
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.font = `${weight} ${px * dpr}px ${family}`;
-  ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.globalAlpha = alpha; ctx.fillStyle = color;
-  ctx.fillText(text, Math.round(x * m.a + y * m.c + m.e), Math.round(x * m.b + y * m.d + m.f + dy * dpr));
-  ctx.restore();
-}
-
 /** A queued file's label, built in full (only for the ones that may be drawn this frame). */
 export function labelFor(n: GNode, prio: number, F: Frame): QueuedLabel {
   const st = F.st, tokens = F.tokens, scale = F.scale, r = n.r, x = n.x!, y = n.y!;
@@ -348,9 +373,10 @@ export function labelFor(n: GNode, prio: number, F: Frame): QueuedLabel {
   const forced = isSel || isHover || (active && !focusing);
   const fs = Math.max(11, Math.min(14, 11 + r * scale * 0.08)) / scale;
   // Clear of what the theme draws (a cube's corners, a plate's rim) and of the selection ring.
-  const ringR = n.fold ? r : Math.max(reachOf(r, active, st), isSel || isHover ? (st.node === "dot" ? r : r * 1.35 + 2 / scale) : 0);
+  const ringR = n.dir ? r : Math.max(reachOf(r, active, st), isSel || isHover ? (st.node === "dot" ? r : r * 1.35 + 2 / scale) : 0);
   return {
-    text: (n.bn ??= n.fold ? folderName(n) : baseName(n.id)), x, y: y + ringR + 3 / scale, size: fs, scale, alpha: isSel || isHover ? 1 : inFocus ? Math.max(alpha, 0.8) : alpha,
+    text: (n.bn ??= n.dir ? folderName(n) : baseName(n.id)), x, y: y + ringR + 3 / scale, size: fs, scale,
+    alpha: (isSel || isHover ? 1 : inFocus ? Math.max(alpha, 0.8) : alpha) * (n.said ?? 1) * (n.dir ? Math.max(0, 1 - (n.open ?? 0) * 3) : 1),
     at: { id: n.id, x, y, r: ringR }, must: isSel || isHover,
     weight: isSel || (active && !focusing) ? 600 : 500, family: st.labelFont ?? tokens.body,
     ink: isSel || (active && !focusing) || isHover || (inFocus && look!.edited) ? st.fileInk : st.fileInkQuiet, halo: st.halo,
@@ -379,6 +405,8 @@ export function flushDots(ctx: CanvasRenderingContext2D, dots: Dots, scale: numb
 export function paintHit(n: GNode, color: string, ctx: CanvasRenderingContext2D, scale: number, F: Frame) {
   const x = n.x, y = n.y;
   if (x === undefined || y === undefined) return;
+  // What shows takes clicks: a file whose folder is open, a closed folder (an open one lets clicks through to its files).
+  if ((n.shown ?? 1) < 0.5 || (n.dir && (n.open ?? 0) >= 0.5)) return;
   const m = n.r + 3;
   if (x + m < F.x0 || x - m > F.x1 || y + m < F.y0 || y - m > F.y1) return;
   ctx.fillStyle = color;

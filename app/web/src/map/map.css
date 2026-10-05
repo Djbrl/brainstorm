@@ -106,13 +106,6 @@
   border: 1px solid var(--line); background: var(--sheet, rgba(255,255,255,.92)); backdrop-filter: blur(12px); color: var(--ink-2);
   box-shadow: 0 8px 24px rgba(0,0,0,.07); cursor: pointer; padding: 0; transition: right .38s cubic-bezier(.2,.8,.2,1), bottom .38s cubic-bezier(.2,.8,.2,1), color .15s; }
 .map-fit:hover { color: var(--ink); }
-/* Folders you opened fold back (fold.ts): beside the fit button, only once you've opened one. */
-.map-fold-all { position: absolute; right: 72px; bottom: 30px; z-index: 5; height: 34px; padding: 0 14px; border-radius: 17px; font: 500 13px/1 var(--font-body);
-  border: 1px solid var(--line); background: var(--sheet, rgba(255,255,255,.92)); backdrop-filter: blur(12px); color: var(--ink-2);
-  box-shadow: 0 8px 24px rgba(0,0,0,.07); cursor: pointer; transition: right .38s cubic-bezier(.2,.8,.2,1), bottom .38s cubic-bezier(.2,.8,.2,1), color .15s; }
-.map-fold-all:hover { color: var(--ink); }
-.map-fold-all:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.map-wrap:has(.map-panel.open) .map-fold-all { right: 512px; bottom: 92px; }
 .map-fit:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* A side panel open: the button rides beside it, just above the footer (which then fills the space left). */
 .map-wrap:has(.map-panel.open) .map-fit { right: 464px; bottom: 90px; }

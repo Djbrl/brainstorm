@@ -10,6 +10,8 @@
     "build:share": "node scripts/build-share.mjs"
   },
   "dependencies": {
+    "@types/d3-hierarchy": "^3.1.7",
+    "d3-hierarchy": "^3.1.2",
     "react": "^19.3.0",
     "react-diff-viewer-continued": "^4.4.0",
     "react-dom": "^19.3.0",

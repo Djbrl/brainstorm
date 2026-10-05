@@ -106,11 +106,11 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
     setSelected(n.id);
   }, [resolveId, setIntent, applyIntent]);
 
-  // Frame the map once, after the first layout settles a bit (and again when it stops: see onEngineStop).
+  // Frame the map as soon as it has files: the layout is final from the first frame (graph.ts), so no glide.
   useEffect(() => {
     if (!hasNodes) return;
-    const t = setTimeout(() => applyIntent(900), 1600);
-    return () => clearTimeout(t);
+    const t = requestAnimationFrame(() => applyIntent(0));
+    return () => cancelAnimationFrame(t);
   }, [hasNodes, applyIntent]);
 
   // Opening a thread or starting its replay frames its recent window once, locked or not (and again as the layout settles,

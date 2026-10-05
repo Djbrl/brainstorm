@@ -1,17 +1,14 @@
-// Owner: D. Live agents on the Map: markers that glide between files, fading trails, and the tracker list.
-import { useEffect, useState } from "react";
+// Live agents on the Map: markers that glide between files, fading trails, lines of sight to the files they read.
 import type { AgentPresence } from "@contract";
 import { clock } from "../lib/live";
-import { relTime } from "../follow/format";
 import { along, casing, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs } from "./themes";
 
-// Colors that do not clash with the recency scale (orange/amber/grey). Main threads get the accent (Metro: their own ink line).
-const PALETTE = ["#2f7ae5", "#0f9d8a", "#c2409a", "#7c4dde", "#2e9e4f", "#0b8fb3", "#b5487a", "#4a6fa5"];
+/** Main threads get the accent (Metro: their own ink line); subagents a colour from the theme's palette, by id. */
 export function agentColor(a: Pick<AgentPresence, "id" | "isSubagent">, accent: string): string {
   if (!a.isSubagent) return mapStyle().track ?? accent;
   let h = 0;
   for (let i = 0; i < a.id.length; i++) h = (h * 31 + a.id.charCodeAt(i)) >>> 0;
-  const palette = mapStyle().palette ?? PALETTE;   // each map theme has its own subagent colours
+  const palette = mapStyle().palette;
   return palette[h % palette.length];
 }
 
@@ -24,71 +21,16 @@ export const initial = (a: AgentPresence) => {
   return (a.isSubagent ? "S" : (n[0] || "A")).toUpperCase();
 };
 
-const VERB: Record<string, [string, string]> = {
-  edit: ["Editing", "Edit"], write: ["Writing", "Write"], read: ["Reading", "Read"],
-  search: ["Searching", "Search"], run: ["Running", "Run"], delegate: ["Delegating", "Delegate"],
+const VERB_ING: Record<string, string> = {
+  edit: "Editing", write: "Writing", read: "Reading", search: "Searching", run: "Running", delegate: "Delegating",
 };
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-export const verbIng = (a?: string) => (a ? VERB[a]?.[0] ?? cap(a) : "Working");
-export const verb = (a?: string) => (a ? VERB[a]?.[1] ?? cap(a) : "Touch");
+export const verbIng = (a?: string) => (a ? VERB_ING[a] ?? cap(a) : "Working");
 export const baseName = (p: string) => p.split("/").pop() || p;
 
 /** Agents worth drawing: active, or inactive for up to 10 minutes (faded). */
 export function visibleAgents(agents: AgentPresence[], now = clock()): AgentPresence[] {
   return agents.filter((a) => a.active || now - Date.parse(a.ts) < 10 * 60_000);
-}
-
-function useTick(ms: number) {
-  const [, set] = useState(0);
-  useEffect(() => { const t = setInterval(() => set((x) => x + 1), ms); return () => clearInterval(t); }, [ms]);
-}
-
-/** Compact list of agents at work. Click an agent to follow it; click a move to focus that file. */
-export function AgentTracker({ agents, accent, followId, onFollow, onFocusFile }: {
-  agents: AgentPresence[]; accent: string; followId: string | null;
-  onFollow: (id: string | null) => void; onFocusFile: (path: string) => void;
-}) {
-  useTick(5000);
-  const now = clock();
-  const list = agents.filter((a) => a.active).sort((a, b) => b.ts.localeCompare(a.ts));
-  return (
-    <div className="map-agents" aria-label="Agents">
-      <h3>Agents</h3>
-      {list.length === 0 ? (
-        <p className="map-agents-empty">No agents working right now</p>
-      ) : (
-        <ul>
-          {list.map((a) => {
-            const moves = a.trail.slice(-5);
-            const following = followId === a.id;
-            return (
-              <li key={a.id} className={following ? "following" : ""}>
-                <button className="map-agent-head" onClick={() => onFollow(following ? null : a.id)} title={following ? "Stop following" : "Follow this agent"}>
-                  <i style={{ background: agentColor(a, accent) }} />
-                  <span className="map-agent-name">{shortName(a, 40)}</span>
-                  <time>{relTime(a.ts, now)}</time>
-                </button>
-                <p className="map-agent-now">
-                  {verbIng(a.action)}{a.file ? <> <b>{baseName(a.file)}</b></> : null}
-                  {following && <span className="map-agent-following"> · following</span>}
-                </p>
-                {moves.length > 1 && (
-                  <p className="map-agent-route">
-                    {moves.map((m, i) => (
-                      <span key={i}>
-                        {i > 0 && <span className="arrow">→</span>}
-                        <button onClick={() => onFocusFile(m.file)}>{verb(m.action)} {baseName(m.file)}</button>
-                      </span>
-                    ))}
-                  </p>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
-  );
 }
 
 // ---------- canvas layer ----------

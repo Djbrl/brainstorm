@@ -20,8 +20,8 @@
 :root[data-theme="ps2"], :root[data-theme="deadspace"] { color-scheme: dark; }
 :root[data-theme="ps2"] .topbar, :root[data-theme="deadspace"] .topbar { background: var(--chrome); }
 :root[data-theme="ps2"] .crumbs > button:hover, :root[data-theme="deadspace"] .crumbs > button:hover { background: var(--hover); }
-:root[data-theme="ps2"] :is(.map-sidebar, .sidebar-collapsed, .map-panel, .map-agents, .rp-bar, .dock-pill, .map-legend, .welcome),
-:root[data-theme="deadspace"] :is(.map-sidebar, .sidebar-collapsed, .map-panel, .map-agents, .rp-bar, .dock-pill, .map-legend, .welcome) {
+:root[data-theme="ps2"] :is(.map-sidebar, .sidebar-collapsed, .map-panel, .rp-bar, .dock-pill, .map-legend, .welcome),
+:root[data-theme="deadspace"] :is(.map-sidebar, .sidebar-collapsed, .map-panel, .rp-bar, .dock-pill, .map-legend, .welcome) {
   background: var(--sheet); box-shadow: 0 18px 50px rgba(0,0,0,.35);
 }
 :root[data-theme="ps2"] :is(.map-close, .map-seg, .sidebar-tabs, .rp-speed, .pl-panel-nav button),
@@ -29,7 +29,6 @@
 :root[data-theme="ps2"] :is(.map-close:hover, .sidebar-collapse:hover, .sidebar-agent-eye:hover, .sidebar-agent-main:hover, .sidebar-tree-dir:hover, .sidebar-tree-file:hover, .rp-icon:hover:not(:disabled), .rp-text:hover),
 :root[data-theme="deadspace"] :is(.map-close:hover, .sidebar-collapse:hover, .sidebar-agent-eye:hover, .sidebar-agent-main:hover, .sidebar-tree-dir:hover, .sidebar-tree-file:hover, .rp-icon:hover:not(:disabled), .rp-text:hover) { background: var(--hover-2); }
 :root[data-theme="ps2"] :is(.rp-diff, .rp-speed button.on), :root[data-theme="deadspace"] :is(.rp-diff, .rp-speed button.on) { background: var(--surface); }
-:root[data-theme="ps2"] .map-agent-head i, :root[data-theme="deadspace"] .map-agent-head i { box-shadow: 0 0 0 3px var(--surface); }
 /* light hovers, pills and code blocks hard-coded elsewhere */
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) .lens-switch { background: var(--sheet); }
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) { --you: var(--hover-2); --you-hover: rgba(160,170,255,.28); }

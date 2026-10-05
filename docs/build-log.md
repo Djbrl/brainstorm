@@ -122,6 +122,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 03:10 (5 Oct) [review] Plugin 0.4.0: the step panel shaped per tool, "waiting for you" states with new background hooks (PermissionRequest, Notification, Stop, UserPromptSubmit), and the UX review work (Track as the thread view, the map camera, one wording for counts and times, consistent panels with file links, tablet and phone widths). Built and smoke-tested (health, app, deep links, hooks endpoint).
 
+- 03:40 (5 Oct) [track-tab] At the human's request: Track moves into the sidebar, next to the map. Tabs are Threads | Track | Files; opening a thread stays on the map and turns the sidebar to its Track (the chapter list that moves the tracer as you scroll, brought back); on Places the tab lists the places. The full-screen Track lens is unmounted (old `/track` links open the map). The dock offers Replay for every thread, beside Live for a running one. Settings is a word in the header instead of a gear. Also on main: the server accepts `*.localhost` names, so the Multiprise URL gets the live feed (it sat on "Connecting…").
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

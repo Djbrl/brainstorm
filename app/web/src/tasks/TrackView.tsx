@@ -268,8 +268,14 @@ export function TrackView() {
     return () => { el.removeEventListener("scroll", on); cancelAnimationFrame(raf); };
   }, [measure]);
 
-  const goTo = useCallback((i: number, smooth = true) => {
-    const el = scroller.current, n = el?.querySelector<HTMLElement>(`[data-stop="${i}"]`);
+  const rowsRef = useRef(rows); rowsRef.current = rows;
+  const goTo = useCallback((i: number, smooth = true, unfold = true) => {
+    const el = scroller.current;
+    let n = el?.querySelector<HTMLElement>(`[data-stop="${i}"]`);
+    // A stop inside a folded "back and forth" row has no row of its own: unfold it, then go there.
+    const fold = n || !unfold ? undefined : rowsRef.current.find((r) => r.type === "bounce" && r.rows.some((x) => x.index === i));
+    if (fold) { setOpen((o) => new Set(o).add(fold.id)); setCur(i); setTimeout(() => goTo(i, smooth, false), 0); return; }
+    n ??= [...(el?.querySelectorAll<HTMLElement>("[data-stop]") ?? [])].filter((x) => Number(x.dataset.stop) <= i).pop();
     // Positions relative to the scrolling area (offsetTop would be relative to the line).
     if (el && n) el.scrollTo({ top: n.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - el.clientHeight * 0.4 + 10, behavior: smooth ? "smooth" : "auto" });
     setCur(i);

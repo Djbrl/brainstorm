@@ -140,3 +140,5 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 /* Under the open thread: what it waits on you for (the full row, with "Show the step", ends its Track). */
 .sidebar-thread-note { margin: 12px 0 0 16px; font-size: 13px; line-height: 1.4; color: #9a5800; font-weight: 600; }
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) .sidebar-thread-note.blocked { color: #f5b544; }
+:root:is([data-theme="ps2"], [data-theme="deadspace"]) .sidebar-thread-attn.turn { background: var(--hover); color: var(--ink-2); }
+:root:is([data-theme="ps2"], [data-theme="deadspace"]) .sidebar-thread-attn.blocked { background: rgba(245,158,11,.18); color: #f5c06a; }

@@ -18,6 +18,8 @@ const RECENT_MS = 14 * 24 * 60 * 60 * 1000;
 const IDLE_AFTER_MS = 2 * 60 * 1000;
 const TEXT_LIMIT = 20_000;
 const TOOL_RESULT_LIMIT = 2_000;
+/** How far past the limit a long text is cut before masking (see sanitizeText). */
+const MASK_MARGIN = 1024;
 
 /** Recursively mask string leaves and clip them to `limit` chars, keeping JSON-shaped values intact. */
 function sanitizeDeep(v: unknown, limit = TEXT_LIMIT): unknown {
@@ -30,9 +32,31 @@ function sanitizeDeep(v: unknown, limit = TEXT_LIMIT): unknown {
   }
   return v;
 }
-function sanitizeText(s: string, limit = TEXT_LIMIT): string {
-  const masked = maskSecrets(s);
+/** Mask, then clip to `limit` chars. A long text (a 5 MB tool output kept to 2,000 chars) is cut first, a margin past
+ * the limit, so the masking runs on what is kept rather than on all of it. The cut lands on a line break (else a
+ * space): no key, token or connection string spans one, and a PEM block cut short is still masked to its end. If
+ * masking shortens the kept part a lot (big keys replaced), text near the cut could move inside the limit: then the
+ * whole text is masked, as before. */
+export function sanitizeText(s: string, limit = TEXT_LIMIT): string {
+  let masked: string | undefined;
+  if (s.length > limit + MASK_MARGIN) {
+    const cut = safeCut(s, limit + MASK_MARGIN);
+    if (cut > 0) {
+      const head = s.slice(0, cut);
+      const m = maskSecrets(head);
+      if (head.length - m.length <= MASK_MARGIN / 4) masked = m;
+    }
+  }
+  masked ??= maskSecrets(s);
   return masked.length > limit ? masked.slice(0, limit) + "\n…(truncated)" : masked;
+}
+/** Where to cut `s` at or after `from`: the next line break, else the next space or tab, within 16k chars; -1 if none. */
+function safeCut(s: string, from: number): number {
+  const to = Math.min(s.length, from + 16_384);
+  const nl = s.indexOf("\n", from);
+  if (nl !== -1 && nl < to) return nl;
+  for (let i = from; i < to; i++) { const c = s.charCodeAt(i); if (c === 32 || c === 9 || c === 13) return i; }
+  return -1;
 }
 
 type RawLine = {

@@ -25,7 +25,7 @@ body { background: var(--bg); color: var(--ink); font-family: var(--font-body); 
 button { font: inherit; color: inherit; cursor: pointer; }
 h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; margin: 0; }
 
-.shell { display: grid; grid-template-rows: 64px 1fr; height: 100%; }
+.shell { display: grid; grid-template-rows: 64px 1fr; grid-template-columns: minmax(0, 1fr); height: 100%; }
 .topbar { display: flex; align-items: center; gap: 24px; padding: 0 28px; border-bottom: 1px solid var(--line); background: rgba(251,251,253,.85); backdrop-filter: saturate(180%) blur(20px); }
 .wordmark { font-family: var(--font-display); font-weight: 800; font-size: 20px; letter-spacing: -0.03em; }
 a.wordmark { color: inherit; text-decoration: none; cursor: pointer; border-radius: 6px; }
@@ -55,3 +55,22 @@ a.wordmark:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px
 .next-cta:hover { background: var(--accent); }
 .next-cta:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 700px) { .next-cta { padding: 5px 10px; font-size: 12px; margin-right: 8px; } }
+
+/* "Change project": the words on a wide screen, a folder icon on a phone. */
+.ws-change svg { display: none; width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+/* Phone header: the wordmark, then where you are (each part cut with an ellipsis), then three round buttons. */
+@media (max-width: 600px) {
+  .topbar { gap: 12px; padding: 0 14px 0 16px; }
+  .wordmark { font-size: 18px; flex: none; }
+  .crumbs { gap: 2px; font-size: 13.5px; }
+  .crumbs > button, .crumbs > span[aria-current], .crumbs > .here { padding: 4px 4px; min-width: 2.2em; }
+  .crumbs > button:not(.here) { flex-shrink: 6; } /* the parts above the current one give way first */
+  .status { min-width: 0; gap: 8px; flex: none; }
+  .status-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .ws-chip { margin-right: 0; padding: 4px 10px; }
+  .ws-change { width: 34px; height: 34px; padding: 0; display: grid; place-items: center; font-size: 0; color: var(--ink-2); }
+  .ws-change svg { display: block; }
+  .ws-change:hover { color: var(--ink); border-color: var(--ink-3); }
+  .status .settings { margin-right: 2px; }
+  .settings .settings-pop { width: min(340px, calc(100vw - 24px)); }
+}

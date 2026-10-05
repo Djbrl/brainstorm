@@ -79,11 +79,14 @@ function Shell() {
             <button className="ws-chip" title="Play back a recorded setup run" onClick={() => setSetupOpen(true)}>Setup preview</button>
           )}
           {!state.replay && state.setup?.root && (
-            <button className="ws-chip" title={state.setup.root} onClick={() => setSetupOpen(true)}>Change project</button>
+            <button className="ws-chip ws-change" title={state.setup.root} onClick={() => setSetupOpen(true)}>
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.75 6.25V15a1.25 1.25 0 0 0 1.25 1.25h12A1.25 1.25 0 0 0 17.25 15V8A1.25 1.25 0 0 0 16 6.75h-6.2L8.3 4.5a1 1 0 0 0-.83-.45H4A1.25 1.25 0 0 0 2.75 5.3Z" /></svg>
+              Change project
+            </button>
           )}
           <SettingsButton />
           <span className={`dot ${state.connected ? "live" : ""}`} />
-          {state.shared ? "Shared replay" : state.replay ? "Recorded demo" : state.connected ? "Live" : "Connecting…"}
+          <span className="status-text">{state.shared ? "Shared replay" : state.replay ? "Recorded demo" : state.connected ? "Live" : "Connecting…"}</span>
         </div>
       </header>
       {state.preview && (

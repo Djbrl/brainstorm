@@ -2,7 +2,7 @@
 // Colours that also style the chrome (recency, accent) come from CSS variables set per theme in themes.css;
 // this file holds what CSS can't reach. The current theme is read on every frame (getTheme()).
 import { getTheme, type ThemeId } from "../lib/theme";
-import { bucket, sprite, stamp, type Sprite, type StampMemo } from "./sprites";
+import { bucket, faded, sprite, stamp, type Sprite, type StampMemo } from "./sprites";
 
 export type RGB = [number, number, number];
 
@@ -155,7 +155,7 @@ const QUARTER = Math.PI / 2;
  * CUBE_STAMP_PX on screen (all of them on a big map); false when it's bigger (drawCube draws it then). Looks like drawCube.
  * `css`: its colour as a string, the stamp's key.
  */
-export function stampCube(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, angle: number, c: RGB, css: string, glow: boolean, scale: number, memo: StampMemo = {}): boolean {
+export function stampCube(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, angle: number, c: RGB, css: string, glow: boolean, scale: number, memo: StampMemo = {}, alpha = 1): boolean {
   const S = s * scale;
   if (S > CUBE_STAMP_PX) return false;
   const b = bucket(S), k = (1 / scale) * (S / b);
@@ -166,14 +166,14 @@ export function stampCube(ctx: CanvasRenderingContext2D, x: number, y: number, s
     if (g) stamp(ctx, g, x, y, k);
   }
   let a = angle % QUARTER; if (a < 0) a += QUARTER;
-  const step = Math.round((a / QUARTER) * ANGLES) % ANGLES, half = b * 1.8 + 1;
+  const step = Math.round((a / QUARTER) * ANGLES) % ANGLES, half = b * 1.8 + 1, fa = faded(alpha);   // the glow is one fill: it fades as is
   let body: Sprite | null | undefined = memo.s;
-  if (!body || memo.a !== css || memo.c !== b || memo.d !== step) {
-    body = memo.s = sprite("cb|" + css + "|" + b + "|" + step, half * 2, half * 2, half, half, (cx) => cubeBody(cx, half, half, b, (step / ANGLES) * QUARTER, c, 0.9));
-    memo.a = css; memo.c = b; memo.d = step;
+  if (!body || memo.a !== css || memo.c !== b || memo.d !== step || memo.e !== fa) {
+    body = memo.s = sprite("cb|" + css + "|" + b + "|" + step + "|" + fa, half * 2, half * 2, half, half, (cx) => { cx.globalAlpha = fa; cubeBody(cx, half, half, b, (step / ANGLES) * QUARTER, c, 0.9); });
+    memo.a = css; memo.c = b; memo.d = step; memo.e = fa;
   }
   if (!body) { cubeBody(ctx, x, y, s, angle, c, 0.9 / scale); return true; }
-  stamp(ctx, body, x, y, k);
+  stamp(ctx, body, x, y, k, fa < 1);
   return true;
 }
 
@@ -204,19 +204,19 @@ export function drawPlate(ctx: CanvasRenderingContext2D, x: number, y: number, r
 }
 const PLATE_STAMP_PX = 40;
 /** A Dead Space plate as a stamp (up to PLATE_STAMP_PX on screen, no agent square); false when drawPlate must draw it. */
-export function stampPlate(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: RGB, css: string, lit: boolean, scale: number, memo: StampMemo = {}): boolean {
+export function stampPlate(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: RGB, css: string, lit: boolean, scale: number, memo: StampMemo = {}, alpha = 1): boolean {
   const R = r * scale;
   if (R > PLATE_STAMP_PX) return false;
-  const b = bucket(R), key = lit ? css : "";
+  const b = bucket(R), key = lit ? css : "", fa = faded(alpha);
   let sp: Sprite | null | undefined = memo.s;
-  if (!sp || memo.a !== key || memo.c !== b) {
+  if (!sp || memo.a !== key || memo.c !== b || memo.e !== fa) {
     const rx = b * 1.3, ry = b * 0.72, depth = Math.max(b * 0.35, 2.5);
     const half = lit ? rx * 2.2 : rx + 1, top = lit ? rx * 2.2 : ry + 1, h = top + Math.max(lit ? rx * 2.2 : 0, depth + ry + 1);
-    sp = memo.s = sprite("p|" + key + "|" + b, half * 2, h, half, top, (cx) => plateBody(cx, half, top, b, c, lit, 1));
-    memo.a = key; memo.c = b;
+    sp = memo.s = sprite("p|" + key + "|" + b + "|" + fa, half * 2, h, half, top, (cx) => { cx.globalAlpha = fa; plateBody(cx, half, top, b, c, lit, 1); });
+    memo.a = key; memo.c = b; memo.e = fa;
   }
   if (!sp) return false;
-  stamp(ctx, sp, x, y, (1 / scale) * (R / b));
+  stamp(ctx, sp, x, y, (1 / scale) * (R / b), fa < 1);
   return true;
 }
 
@@ -236,23 +236,24 @@ export function drawStation(ctx: CanvasRenderingContext2D, x: number, y: number,
 }
 const STATION_STAMP_PX = 40;
 /** A Metro station as a stamp (up to STATION_STAMP_PX on screen, no agent ring); false when drawStation must draw it. */
-export function stampStation(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, fill: string, ring: string, bold: boolean, scale: number, memo: StampMemo = {}): boolean {
+export function stampStation(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, fill: string, ring: string, bold: boolean, scale: number, memo: StampMemo = {}, alpha = 1): boolean {
   const rr = Math.max(2.6, r * 0.6), R = rr * scale;
   if (R > STATION_STAMP_PX) return false;
-  const b = bucket(R);
+  const b = bucket(R), fa = faded(alpha);
   let sp: Sprite | null | undefined = memo.s;
-  if (!sp || memo.a !== fill || memo.b !== ring || memo.c !== b || memo.d !== bold) {
+  if (!sp || memo.a !== fill || memo.b !== ring || memo.c !== b || memo.d !== bold || memo.e !== fa) {
     // The ring's width is in pixels plus a share of the station (drawStation): the same, measured on screen.
     const lw = (bold ? 2.4 : 1.6) + b * 0.18, half = b + lw / 2 + 1;
-    sp = memo.s = sprite("s|" + fill + "|" + ring + "|" + (bold ? 1 : 0) + "|" + b, half * 2, half * 2, half, half, (cx) => {
+    sp = memo.s = sprite("s|" + fill + "|" + ring + "|" + (bold ? 1 : 0) + "|" + b + "|" + fa, half * 2, half * 2, half, half, (cx) => {
+      cx.globalAlpha = fa;
       cx.beginPath(); cx.arc(half, half, b, 0, TAU);
       cx.fillStyle = fill; cx.fill();
       cx.lineWidth = lw; cx.strokeStyle = ring; cx.stroke();
     });
-    memo.a = fill; memo.b = ring; memo.c = b; memo.d = bold;
+    memo.a = fill; memo.b = ring; memo.c = b; memo.d = bold; memo.e = fa;
   }
   if (!sp) return false;
-  stamp(ctx, sp, x, y, (1 / scale) * (R / b));
+  stamp(ctx, sp, x, y, (1 / scale) * (R / b), fa < 1);
   return true;
 }
 

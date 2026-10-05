@@ -5,9 +5,9 @@
 
 export type Sprite = { canvas: HTMLCanvasElement; w: number; h: number; ox: number; oy: number };
 /** What a file's last stamp was made of, and the stamp: the next frame reuses it while those stay the same. */
-export type StampMemo = { a?: unknown; b?: unknown; c?: unknown; d?: unknown; s?: Sprite | null; g?: Sprite | null; gk?: unknown };
+export type StampMemo = { a?: unknown; b?: unknown; c?: unknown; d?: unknown; e?: unknown; s?: Sprite | null; g?: Sprite | null; gk?: unknown };
 
-const MAX = 2000;
+const MAX = 3000;
 const cache = new Map<string, Sprite>();
 let dpr = 1;
 
@@ -38,10 +38,22 @@ export function sprite(key: string, w: number, h: number, ox: number, oy: number
   return s;
 }
 
-/** Stamp a sprite on the map: its centre at graph point (x, y), drawn at `k` graph units per sprite pixel (1 / scale). */
-export function stamp(ctx: CanvasRenderingContext2D, s: Sprite, x: number, y: number, k: number) {
+/** Stamp a sprite on the map: its centre at graph point (x, y), drawn at `k` graph units per sprite pixel (1 / scale).
+ *  `baked`: the sprite already holds the file's strength (see faded), so it goes on at full strength. */
+export function stamp(ctx: CanvasRenderingContext2D, s: Sprite, x: number, y: number, k: number, baked = false) {
+  if (!baked) { ctx.drawImage(s.canvas, x - s.ox * k, y - s.oy * k, s.w * k, s.h * k); return; }
+  const a = ctx.globalAlpha;
+  ctx.globalAlpha = 1;
   ctx.drawImage(s.canvas, x - s.ox * k, y - s.oy * k, s.w * k, s.h * k);
+  ctx.globalAlpha = a;
 }
+
+/**
+ * A faded file's strength for its stamp, to 1/32. A mark drawn in several strokes at an alpha shows each stroke at that
+ * alpha (overlaps add up); a stamp drawn at the alpha would fade the mark as one piece, a little fainter. So a faded
+ * file's stamp is drawn with the alpha inside it, as the strokes would be, and goes on at full strength.
+ */
+export const faded = (alpha: number) => (alpha >= 1 ? 1 : Math.max(1 / 32, Math.round(alpha * 32) / 32));
 
 /** Screen sizes are bucketed to half pixels: few sprites, and a mark never jumps by more than a quarter pixel. */
 export const bucket = (px: number) => Math.max(0.5, Math.round(px * 2) / 2);

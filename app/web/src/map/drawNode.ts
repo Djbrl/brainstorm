@@ -257,13 +257,13 @@ export function drawFile(ctx: CanvasRenderingContext2D, n: GNode, scale: number,
     const angle = (still ? 0 : t / (active ? 700 : 2600) + kick * Math.PI) + (n.sp ??= spin(n.id));
     if (flash) moreMotion(F, Motion.Smooth); else if (!still) moreMotion(F, Motion.Slow);
     const col = flash ? mixRGB(rgb, tokens.warm, flash) : rgb;
-    if (active || flash || !stampCube(ctx, x, y, s, angle, col, rgbCss, lit, scale, (n.stamp ??= {})))
+    if (active || flash || !stampCube(ctx, x, y, s, angle, col, rgbCss, lit, scale, (n.stamp ??= {}), alpha))
       drawCube(ctx, x, y, s, angle, col, lit || flash > 0, scale, active ? tokens.accent : null);
   }
-  else if (st.node === "plate") { if (active || !stampPlate(ctx, x, y, r * 0.9, rgb, rgbCss, lit, scale, (n.stamp ??= {}))) drawPlate(ctx, x, y, r * 0.9, rgb, lit, scale, active ? tokens.accent : null); }
+  else if (st.node === "plate") { if (active || !stampPlate(ctx, x, y, r * 0.9, rgb, rgbCss, lit, scale, (n.stamp ??= {}), alpha)) drawPlate(ctx, x, y, r * 0.9, rgb, lit, scale, active ? tokens.accent : null); }
   else if (st.node === "station") {
     const fill = same(rgb, tokens.cool) ? "#fff" : rgbCss, ring = F.coolCss;
-    if (active || !stampStation(ctx, x, y, r, fill, ring, isSel, scale, (n.stamp ??= {}))) drawStation(ctx, x, y, r, fill, ring, active ? css(tokens.hot) : null, isSel, scale);
+    if (active || !stampStation(ctx, x, y, r, fill, ring, isSel, scale, (n.stamp ??= {}), alpha)) drawStation(ctx, x, y, r, fill, ring, active ? css(tokens.hot) : null, isSel, scale);
   }
   else if (isSel || isHover || active || rippling) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = rgbCss; ctx.fill(); }
   else {

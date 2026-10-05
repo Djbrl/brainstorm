@@ -252,6 +252,10 @@ export function MapView() {
     // none of its files in the focus steps back with them.
     let lit: Set<string> | null = null, focusRecent: Map<string, number> | null = null;
     if (ids) {
+      // Every file eases into the focus together: one of them says whether it has taken over (a thread that changed
+      // nothing has no files of its own in it, and every folder steps back).
+      const one = g.nodes[0] ? lookOf(g.nodes[0], F) : null;
+      if (one && one.tone > 0.5) { lit = new Set(); focusRecent = new Map(); }
       for (const id of ids) {
         const n = nodeIndexRef.current.get(id), l = n ? lookOf(n, F) : null;
         if (!n || !l || l.tone <= 0.5) continue;

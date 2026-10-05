@@ -79,6 +79,12 @@ export function FilesPanel({ map, onFocusFile }: { map: ProjectMap | null; onFoc
       <div className="sidebar-search">
         <input type="search" placeholder="Search files" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search files" />
       </div>
+      {(map.totalFiles ?? 0) > map.files.length && (
+        <p className="sidebar-files-note">
+          The map shows {map.files.length.toLocaleString()} of {map.totalFiles!.toLocaleString()} files: from every folder, the ones agents
+          touched, changed lately or that many files use. A file an agent edits always joins.
+        </p>
+      )}
       {replay && (
         <button className={`sidebar-chip ${touchedOnly ? "active" : ""}`} aria-pressed={touchedOnly} onClick={() => setTouchedOnly((v) => !v)}>
           Touched by this thread

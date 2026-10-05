@@ -219,8 +219,10 @@ mapper, bus), `node app/web/scripts/perf-thread.mjs` (thread model equivalence).
    sidebar's Track tab, or drop it? Then the old Track and its `/api/tasks` routes can go (the screenshot route stays).
 3. **Save the subagent id** with each step (a small schema change), so threads with parallel subagents group the same
    way after a reload as they do live.
-4. **The 800-file cap.** With the canvas work, 20k files render smoothly. Raise the default (2–5k), and show
-   "800 of 20,312 files" when a repo is bigger?
+4. **The file cap: decided 5 Oct, raised from 800 to 3,000.** On a 20k-file repo at 4× CPU, a 5,000-file map held
+   51–60 fps at rest, panning, live and in replay (server quiet 3 s after boot, map payload 4.9 MB); 3,000 keeps the
+   map readable. `BRAINSTORM_MAX_FILES` overrides it. Bigger repos say "showing 3,000 of 20,312 files" in the stats
+   line, and the Files tab explains which files were chosen.
 5. **Fonts.** The Fontshare stylesheet is the one request that leaves the computer and blocks the first paint for
    0.3–1.3 s on a cold cache. Self-host the fonts (license check needed) or use system fonts?
 6. **`?mockmap`,** the dev-only fake map: keep it as a test fixture or delete it?

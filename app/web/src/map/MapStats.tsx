@@ -54,9 +54,13 @@ export function MapStats() {
   const threads = threadsSince(state.sessions);
   const files = filesSince(map.files);
   const when = lastSeen ? `since you last looked, ${sinceLabel(lastSeen)}` : "in the last day";
+  // A big repo: the map shows a chosen part of it (the server picks across every folder), and says so.
+  const total = map.totalFiles ?? 0;
   const parts = [
     working ? `${n(working, "agent")} working now` : "",
     threads || files ? `${n(threads, "thread")} and ${n(files, "file")} changed ${when}` : `Nothing changed ${when}`,
+    total > map.files.length ? `showing ${map.files.length.toLocaleString()} of ${n(total, "file")}` : "",
   ].filter(Boolean);
-  return <p className="map-stats">{parts.join(" · ")}</p>;
+  const line = parts.join(" · ");
+  return <p className="map-stats" title={line}>{line}</p>;
 }

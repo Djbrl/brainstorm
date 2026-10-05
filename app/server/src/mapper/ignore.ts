@@ -19,7 +19,7 @@ export const SOURCE_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
  */
 export function maxFiles(): number {
   const n = Number(process.env.BRAINSTORM_MAX_FILES);
-  return Number.isInteger(n) && n > 0 ? n : 800;
+  return Number.isInteger(n) && n > 0 ? n : 3000; // 800 until 6 Oct; the canvas pass made 5,000 smooth at 4× CPU (docs/performance.md)
 }
 /** New files that appear while the map is open may take it this far past maxFiles(). */
 export const liveHeadroom = () => Math.max(100, Math.round(maxFiles() / 8));

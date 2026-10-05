@@ -1,28 +1,25 @@
-// Owner: D. The live agents the map draws (moved out of MapView.tsx): who is shown, who waits on you, their markers'
+// The live agents the map draws (moved out of MapView.tsx): who is shown, who waits on you, their markers'
 // animation state (agents.tsx keeps it in `anim`), and whether any of them is still moving.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AgentPresence, Attention, ProjectMap } from "@contract";
+import { useCallback, useMemo, useRef } from "react";
+import type { AgentPresence, Attention } from "@contract";
 import { clock } from "../lib/live";
 import { attentionText, needsYou } from "../lib/attention";
 import { visibleAgents, type AgentAnim } from "./agents";
-import { mockAgents } from "./mock";
 import { mapStyle, tripMs } from "./themes";
 
 const MIN = 60_000;
 
-export function useLiveAgents({ mock, map, agents: live, attention, hiddenAgents, threadId, liveThread }: {
-  mock: boolean; map: ProjectMap | null; agents: Record<string, AgentPresence> | undefined; attention: Record<string, Attention>;
+export function useLiveAgents({ agents: live, attention, hiddenAgents, threadId, liveThread }: {
+  agents: Record<string, AgentPresence> | undefined; attention: Record<string, Attention>;
   hiddenAgents: ReadonlySet<string>; threadId: string | null; liveThread: boolean;
 }) {
-  const [mockTick, setMockTick] = useState(0);
-  useEffect(() => { if (!mock) return; const t = setInterval(() => setMockTick((x) => x + 1), 2600); return () => clearInterval(t); }, [mock]);
   // An agent waiting on you stays on the map however long it waits.
   const waitingIds = useMemo(() => new Set(Object.values(attention).filter(needsYou).map((a) => a.agentId ?? a.sessionId)), [attention]);
   const agents: AgentPresence[] = useMemo(() => {
-    const all = mock && map ? mockAgents(map, mockTick) : Object.values(live ?? {});
+    const all = Object.values(live ?? {});
     const shown = new Set(visibleAgents(all));
     return all.filter((a) => shown.has(a) || waitingIds.has(a.id));
-  }, [mock, map, mockTick, live, waitingIds]);
+  }, [live, waitingIds]);
   // Hidden agents (sidebar toggles) are not drawn. With a thread open: its own agents (main and subagents, each in its
   // colour) while it's followed live; none while you move through its past (the replay's cursor is the marker then).
   const drawnAgents = useMemo(() => agents.filter((a) => !hiddenAgents.has(a.id) && (!threadId || (liveThread && a.sessionId === threadId))),

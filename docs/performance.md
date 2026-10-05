@@ -224,6 +224,9 @@ mapper, bus), `node app/web/scripts/perf-thread.mjs` (thread model equivalence).
    51–60 fps at rest, panning, live and in replay (server quiet 3 s after boot, map payload 4.9 MB); 3,000 keeps the
    map readable. `BRAINSTORM_MAX_FILES` overrides it. Bigger repos say "showing 3,000 of 20,312 files" in the stats
    line, and the Files tab explains which files were chosen.
-5. **Fonts.** The Fontshare stylesheet is the one request that leaves the computer and blocks the first paint for
-   0.3–1.3 s on a cold cache. Self-host the fonts (license check needed) or use system fonts?
-6. **`?mockmap`,** the dev-only fake map: keep it as a test fixture or delete it?
+5. **Fonts: decided 5 Oct, system fonts.** The Fontshare stylesheet was the one request that left the computer and
+   blocked the first paint for 0.3–1.3 s on a cold cache. Self-hosting was ruled out: the ITF Free Font License
+   allows using the fonts in your own app but not making the files available through a public repository, which is
+   how the plugin ships. The app now uses the computer's own fonts (San Francisco, Segoe UI). The landing page keeps
+   Cabinet Grotesk and Satoshi through the Fontshare service, which the license allows for a website.
+6. **`?mockmap`: decided 5 Oct, deleted** (`map/mock.ts`, a fake 32-file map with fake agents from the hackathon).

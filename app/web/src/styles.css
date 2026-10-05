@@ -15,8 +15,9 @@
   --ok: #1f9d55;
   --risk: #d93025;
   --radius: 14px;
-  --font-display: "Cabinet Grotesk", -apple-system, system-ui, sans-serif;
-  --font-body: "Satoshi", -apple-system, system-ui, sans-serif;
+  /* The computer's own fonts (San Francisco on a Mac, Segoe UI on Windows): nothing to download, nothing leaves the machine. */
+  --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 }
 * { box-sizing: border-box; }

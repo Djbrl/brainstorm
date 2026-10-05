@@ -10,7 +10,6 @@ import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-for
 import type { FileNode } from "@contract";
 import { useLive } from "../lib/live";
 import { mapPrefs, useNav } from "../lib/nav";
-import { mockMap } from "./mock";
 import { drawAgents } from "./agents";
 import { MapSidebar } from "./sidebar/MapSidebar";
 import { Dock, LockToggle, ReadsToggle } from "./replay/ReplayBar";
@@ -65,8 +64,7 @@ function useSize<T extends HTMLElement>() {
 export function MapView() {
   const { state } = useLive();
   const { focusFile, setFocusFile, hiddenAgents, replay, step, showReads } = useNav();
-  const mock = useMemo(() => new URLSearchParams(location.search).has("mockmap"), []);
-  const map = useMemo(() => (mock ? mockMap() : state.map), [mock, state.map]);
+  const map = state.map;
   const theme = useTheme();
   const saved = useSavedPositions(map?.root ?? null, theme);
   // perf/web-store's structure counter when the store has it (files or imports added, removed or moved), else content.
@@ -94,7 +92,7 @@ export function MapView() {
 
   // ---- live agents ----
   const { agents, drawnAgents, waiting, waitingRef, agentsRef, anim, moving: agentsMoving } = useLiveAgents({
-    mock, map, agents: state.agents, attention: state.attention, hiddenAgents, threadId: replay?.sessionId ?? null, liveThread: !!replay?.live,
+    agents: state.agents, attention: state.attention, hiddenAgents, threadId: replay?.sessionId ?? null, liveThread: !!replay?.live,
   });
   const hoverRef = useRef(hover); hoverRef.current = hover;
   const selectedRef = useRef(selected); selectedRef.current = selected;

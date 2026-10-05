@@ -260,7 +260,7 @@ export function WorldMap({ data, areas, selected, highlight, onSelect, rightInse
           ctx.save();
           ctx.textAlign = "center";
           ctx.textBaseline = "bottom";
-          ctx.font = `800 ${Math.round(HEAD_PX / Math.max(scale, 0.6))}px "Cabinet Grotesk", system-ui, sans-serif`;
+          ctx.font = `800 ${Math.round(HEAD_PX / Math.max(scale, 0.6))}px system-ui, -apple-system, "Segoe UI", sans-serif`;
           ctx.fillStyle = ink.head;
           ctx.globalAlpha = 0.45;
           const hs = headings(graph.nodes);
@@ -289,7 +289,7 @@ export function WorldMap({ data, areas, selected, highlight, onSelect, rightInse
             const k = Math.min(Math.max(scale, 0.7), 2.2), fs = (n.kind === "site" ? 12.5 : 10.5) / k;
             labels.current.push({
               text: short(n.label, n.kind === "site" ? 30 : 36), x: n.x!, y: n.y! + n.r + 4 / Math.max(scale, 0.7), size: fs,
-              font: `${n.kind === "site" ? 650 : 500} ${fs}px Satoshi, system-ui, sans-serif`, ink: n.kind === "site" ? ink.site : ink.page,
+              font: `${n.kind === "site" ? 650 : 500} ${fs}px system-ui, -apple-system, "Segoe UI", sans-serif`, ink: n.kind === "site" ? ink.site : ink.page,
               prio: (n.id === hover ? 4e6 : 0) + (on ? 2e6 : 0) + (n.kind === "site" ? 1e5 : 0) + n.r, forced: on || n.id === hover, alpha: dim ? 0.45 : 1,
             });
           }

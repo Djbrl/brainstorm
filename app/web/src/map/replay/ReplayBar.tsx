@@ -116,8 +116,8 @@ export function Dock({ children }: { children: ReactNode }) {
   const on = replay?.mode === "play";
   const toggle = () => {
     if (on) { setThreadMode("steps"); return; }
-    const len = thread?.beats.length ?? 0;
-    togglePlay(Math.min(replay?.index ?? 0, Math.max(0, len - 1)), len, false, setReplayIndex, setReplayPlaying); // from the start at the end
+    setReplayIndex(0); // a replay starts from the first moment and plays, at the speed set in the player
+    setReplayPlaying(true);
   };
   return (
     <div className="dock">
@@ -128,12 +128,28 @@ export function Dock({ children }: { children: ReactNode }) {
               title={replay.live ? "Following its newest step. Click to stop" : "Jump to its newest step and follow it"}>
               <i className="dock-live-dot" aria-hidden="true" />{replay.live ? "Live" : "Follow live"}
             </button>
-          : <button className={`dock-replay${on ? " on" : ""}`} onClick={toggle} disabled={!thread?.beats.length} aria-pressed={on}>
+          : <button className={`dock-replay${on ? " on" : ""}`} onClick={toggle} disabled={!thread?.beats.length} aria-pressed={on}
+              title={on ? "Hide the player (Esc)" : "Play this thread from the start"}>
               {Icon.small}{on ? "Hide replay" : "Replay"}
             </button>)}
         {replay && !isReplay() && <ShareMenu sessionId={replay.sessionId} className="dock-share" />}
         {children}
       </div>
     </div>
+  );
+}
+
+/**
+ * Whether the map draws reads: a line from the agent to each file it reads, and a ring on the file, as it reads it.
+ * Only a thread (replayed or followed live) draws them, so the switch shows only with a thread open.
+ */
+export function ReadsToggle() {
+  const { replay, showReads, setShowReads } = useNav();
+  if (!replay) return null;
+  return (
+    <button className="dock-reads" role="switch" aria-checked={showReads} onClick={() => setShowReads(!showReads)}
+      title="Lines to the files the agent reads, as it reads them (in a replay or while it works)">
+      Show reads<i aria-hidden="true" />
+    </button>
   );
 }

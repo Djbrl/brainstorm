@@ -8,6 +8,7 @@ import { Welcome } from "./map/Welcome";
 import { SettingsButton } from "./settings/Settings";
 import { useAttentionAlerts } from "./lib/attention";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import "./boot.css";
 
 // The views (and the graph library the Map needs) load when they're opened.
 const MapView = lazy(() => import("./map/MapView").then((m) => ({ default: m.MapView })));
@@ -42,7 +43,8 @@ function Shell() {
   const { lens, replay, back, startReplay } = useNav();
   useAttentionAlerts((sid) => startReplay(sid, END, { live: true, lens: threadLens() })); // a notification opens the thread's Track
 
-  // Esc goes up one level: step → thread → project (not while typing).
+  // Esc closes the innermost thing first: a popover (it handles Esc itself and marks it handled), then a panel (step,
+  // file), then the player, then the thread (not while typing).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -52,6 +54,10 @@ function Shell() {
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
   }, [back]);
+
+  // First load: a quiet "Loading" until we know whether to show setup or the map, rather than a blank page or a flash of either.
+  const booting = useBooting();
+  if (booting) return <Loading />;
 
   // Local app: pick a workspace first (and whenever "Change" is clicked). The hosted demo never shows setup,
   // except the post-deadline preview, which plays back a recorded setup run (see lib/preview.ts).
@@ -95,13 +101,29 @@ function Shell() {
       {state.shared && <OpenShared />}
       <LiveFollow />
       {!replay && !state.shared && <Welcome />}
-      <main className="view"><Suspense fallback={null}>{
+      <main className="view"><Suspense fallback={<Loading />}>{
         replay && lens === "track" && !state.replay ? <TrackView />
           : replay && lens === "places" ? <PlacesView />
           : <MapView />
       }</Suspense></main>
     </div>
   );
+}
+
+/**
+ * Still loading: the workspace status (setup or map?) and, once there's a project, its map; a recording, until it's in.
+ * Gives up after a while so a server that doesn't answer shows the app (and its "Connecting…") instead.
+ */
+function useBooting(): boolean {
+  const { state } = useLive();
+  const ready = isReplay() ? state.replay : !!state.setup && (!state.setup.root || !!state.map);
+  const [waited, setWaited] = useState(false);
+  useEffect(() => { if (ready) return; const t = setTimeout(() => setWaited(true), 8000); return () => clearTimeout(t); }, [ready]);
+  return !ready && !waited;
+}
+
+function Loading() {
+  return <div className="boot" role="status" aria-live="polite"><p>Loading your project…</p></div>;
 }
 
 /** A shared replay holds one thread: it opens on that thread's footprint (unless its link names a place). */

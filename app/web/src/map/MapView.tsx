@@ -12,13 +12,13 @@ import type { AgentPresence, Edge, FileNode, ProjectMap, Step } from "@contract"
 import { useLive } from "../lib/live";
 import { attentionText, needsYou } from "../lib/attention";
 import { mapPrefs, useNav } from "../lib/nav";
-import { AskBox } from "../ask/AskBox";
 import { mockAgents, mockMap } from "./mock";
 import { drawAgents, visibleAgents, type AgentAnim } from "./agents";
 import { MapSidebar } from "./sidebar/MapSidebar";
-import { Dock } from "./replay/ReplayBar";
+import { Dock, ReadsToggle } from "./replay/ReplayBar";
 import { TalkCard } from "./replay/TalkCard";
 import { StepPanel } from "./StepPanel";
+import { FilePanel, useSelectedFile } from "./FilePanel";
 import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
 import { makeFileResolver } from "../lib/paths";
 import { drawModuleLabels, LabelSpace } from "./labels";
@@ -79,8 +79,6 @@ export function relTime(iso: string | undefined, now = clock()): string {
   if (s < 86400) return `changed ${Math.round(s / 3600)} h ago`;
   return `changed ${Math.round(s / 86400)} days ago`;
 }
-const relPath = (p: string, root: string) => (p.startsWith(root) ? p.slice(root.length).replace(/^\/+/, "") : p);
-const modName = (m: string) => (!m || m === "." ? "root" : m);
 const baseName = (p: string) => p.split("/").pop() || p;
 const radius = (lines: number) => Math.min(22, 3.5 + Math.sqrt(Math.max(0, lines)) * 0.55);
 
@@ -95,12 +93,6 @@ function useSize<T extends HTMLElement>() {
     return () => ro.disconnect();
   }, []);
   return [ref, size] as const;
-}
-
-function useNow(ms = 20000) {
-  const [now, setNow] = useState(clock());
-  useEffect(() => { const t = setInterval(() => setNow(clock()), ms); return () => clearInterval(t); }, [ms]);
-  return now;
 }
 
 // ---------- graph data (node objects are reused so positions survive live updates) ----------
@@ -178,7 +170,7 @@ function linkRole(l: GLink, focus: string | null): "imports" | "usedBy" | null {
 // ---------- view ----------
 export function MapView() {
   const { state } = useLive();
-  const { focusFile, setFocusFile, hiddenAgents, replay, step, showReads, setShowReads } = useNav();
+  const { focusFile, setFocusFile, hiddenAgents, replay, step } = useNav();
   const mock = useMemo(() => new URLSearchParams(location.search).has("mockmap"), []);
   const map = useMemo(() => (mock ? mockMap() : state.map), [mock, state.map]);
   const graph = useGraph(map);
@@ -187,7 +179,7 @@ export function MapView() {
   const theme = useTheme();
   const tokens = useMemo(readTokens, [theme]);   // each theme sets its own colours (themes.css)
   const style = mapStyle();
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useSelectedFile(map?.root ?? ""); // in the link: /file/<path>
   const [hover, setHover] = useState<string | null>(null);
   const fitted = useRef(false);
   const settledFit = useRef(false);
@@ -290,7 +282,7 @@ export function MapView() {
   // Zoom to fit once, after the first layout settles a bit.
   useEffect(() => {
     if (fitted.current || graph.nodes.length === 0) return;
-    const t = setTimeout(() => { fg.current?.zoomToFit(900, 130); fitted.current = true; }, 1600);
+    const t = setTimeout(() => { if (!fitted.current) fg.current?.zoomToFit(900, 130); fitted.current = true; }, 1600); // not over a file a link opened
     return () => clearTimeout(t);
   }, [graph.nodes.length]);
 
@@ -496,82 +488,11 @@ export function MapView() {
           <span><i style={{ background: "var(--cool)" }} />Earlier</span>
           {sel && <span title="What the selected file imports"><i className="line" style={{ background: style.imports }} />Imports</span>}
         </div>
-        <div className="map-seg" role="radiogroup" aria-label="Agent activity shown">
-          <button role="radio" aria-checked={!showReads} onClick={() => setShowReads(false)}>Writes</button>
-          <button role="radio" aria-checked={showReads} onClick={() => setShowReads(true)}>Reads too</button>
-        </div>
+        <ReadsToggle />
       </Dock>
 
       <StepPanel />
       <FilePanel file={step ? undefined : sel} root={root} steps={state.steps} edges={map?.edges ?? []} onFocus={focusOnFile} onClose={() => setSelected(null)} />
     </div>
-  );
-}
-
-function FilePanel({ file, root, steps, edges, onFocus, onClose }: {
-  file?: FileNode; root: string; steps: Record<string, Step[]>; edges: Edge[]; onFocus: (path: string) => void; onClose: () => void;
-}) {
-  const now = useNow();
-  // Unique: a file can import from the same module in several statements.
-  const imports = useMemo(() => (file ? [...new Set(edges.filter((e) => e.from === file.path).map((e) => e.to))] : []), [file?.path, edges]);
-  const usedBy = useMemo(() => (file ? [...new Set(edges.filter((e) => e.to === file.path).map((e) => e.from))] : []), [file?.path, edges]);
-  const touching = useMemo(() => {
-    if (!file) return [];
-    const out: Step[] = [];
-    for (const list of Object.values(steps)) for (const s of list) if (s.filePath === file.path) out.push(s);
-    return out.sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 6);
-  }, [file?.path, steps]);
-
-  return (
-    <aside className={`map-panel ${file ? "open" : ""}`} aria-hidden={!file}>
-      {file && (
-        <div className="map-panel-inner">
-          <button className="map-close" onClick={onClose} aria-label="Close">×</button>
-          <h2>{baseName(file.path)}</h2>
-          <p className="map-path">{relPath(file.path, root)}</p>
-          <p className="map-meta">
-            {modName(file.module)} · {file.lines.toLocaleString()} lines · {relTime(file.lastChangedAt, now)}
-          </p>
-          {file.activeSessionId && <p className="map-live"><i />An agent is editing this file right now</p>}
-
-          <section>
-            <h3>What it does</h3>
-            {file.summary ? <p className="map-summary">{file.summary}</p> : <p className="map-quiet">Summarizing…</p>}
-          </section>
-
-          {(imports.length > 0 || usedBy.length > 0) && (
-            <section className="map-deps">
-              {imports.length > 0 && (<>
-                <h3><i style={{ background: mapStyle().imports }} />Imports</h3>
-                <ul>{imports.map((p) => <li key={p}><button onClick={() => onFocus(p)} title={relPath(p, root)}>{baseName(p)}</button></li>)}</ul>
-              </>)}
-              {usedBy.length > 0 && (<>
-                <h3><i style={{ background: mapStyle().usedBy }} />Used by</h3>
-                <ul>{usedBy.map((p) => <li key={p}><button onClick={() => onFocus(p)} title={relPath(p, root)}>{baseName(p)}</button></li>)}</ul>
-              </>)}
-            </section>
-          )}
-
-          {touching.length > 0 && (
-            <section>
-              <h3>Recent agent steps</h3>
-              <ul className="map-steps">
-                {touching.map((s) => (
-                  <li key={s.id}>
-                    <span>{s.label ?? (s.tool ? `${s.tool} ${baseName(file.path)}` : s.kind)}</span>
-                    <time>{relTime(s.ts, now).replace("changed ", "")}</time>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          <section>
-            <h3>Ask about this file</h3>
-            <AskBox key={file.path} context={{ filePath: file.path }} placeholder={`What does ${baseName(file.path)} do?`} />
-          </section>
-        </div>
-      )}
-    </aside>
   );
 }

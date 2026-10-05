@@ -111,7 +111,7 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
       ) : (
         <p className="su-none">{isPath ? "Press Enter to open this folder." : list?.length ? `No project matches “${q}”. Paste its folder path to open it.` : "No Claude Code projects found on this computer yet. Paste a folder path above."}</p>
       )}
-      {shown && shown.length > 0 && <p className="su-count">{q ? `${shown.length} of ${list!.length} projects` : plural(list!.length, "project")} with Claude Code threads</p>}
+      {shown && shown.length > 0 && <p className="su-count">{q ? `${shown.length} of ${list!.length} Claude Code projects` : plural(list!.length, "Claude Code project")} on this computer</p>}
     </div>
   );
 }

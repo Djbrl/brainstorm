@@ -1,5 +1,7 @@
 # Brainstorm: app (agent briefing)
 
+> **Historical (27 Sep 2026).** This is the briefing the agents worked from on hackathon day: the deadline, ports, ownership and the planned views (Follow, Map, History) are as they were then. Some of it changed or was never built (the History view, for one). For how the app works today, read [docs/technical.md](../docs/technical.md); for what's planned, [docs/todo.md](../docs/todo.md) and [docs/roadmap.md](../docs/roadmap.md).
+
 **Every agent: read this whole file before writing code.** Deadline: submission 16:30. Code freeze 15:40.
 
 Brainstorm is a live map of your code and of the AI agents writing it. It runs locally, next to Claude Code, and has three views:

@@ -1,6 +1,6 @@
 // Owned by the lead. When you last looked, so the map can show what changed since then instead of everything.
-// The time is saved when the page is hidden or closed, and read once when it opens: looking at the map doesn't move
-// the line, coming back later does. Per browser; a blocked storage means every visit counts as the first.
+// The time is saved when the page is hidden or closed, and read once per tab: looking at the map or reloading doesn't
+// move the line, coming back later in a new tab does. Per browser; a blocked storage means every visit counts as the first.
 
 const KEY = "brainstorm-last-seen";
 const WELCOMED = "brainstorm-welcomed";
@@ -12,7 +12,21 @@ function write(key: string, v: string) {
   try { localStorage.setItem(key, v); } catch { /* storage blocked */ }
 }
 
-const saved = Number(read(KEY)) || 0;
+/**
+ * The line for this tab. A reload keeps it (the review found a refresh wiped every highlight): the first load in a tab
+ * reads when you last left, and stores it for the tab's later reloads in sessionStorage. A new tab or window starts over.
+ */
+const BASELINE = "brainstorm-baseline";
+function baseline(): number {
+  try {
+    const kept = Number(sessionStorage.getItem(BASELINE)) || 0;
+    if (kept > 0) return kept;
+    const saved = Number(read(KEY)) || 0;
+    sessionStorage.setItem(BASELINE, String(saved || -1)); // -1: a first visit, remembered as such across reloads
+    return saved;
+  } catch { return Number(read(KEY)) || 0; }
+}
+const saved = baseline();
 
 /** When you last had Brainstorm open (ms), or null on a first visit. */
 export const lastSeen: number | null = saved > 0 ? saved : null;

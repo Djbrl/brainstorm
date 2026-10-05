@@ -34,8 +34,10 @@ const diffStyles = {
   },
   contentText: { fontFamily: "var(--font-mono)", fontSize: "12.5px", lineHeight: "1.55 !important" },
   lineNumber: { fontSize: "11.5px" },
-  gutter: { minWidth: "36px", padding: "0 6px" },
-  diffContainer: { borderRadius: "10px", overflow: "hidden" },
+  gutter: { minWidth: "28px", width: "28px", padding: "0 4px" },
+  // The viewer sets minWidth 1000px (unset only on narrow screens), so in the 440px panel every line scrolled sideways.
+  // Fill the panel instead; long lines wrap (follow.css, .sd-diff pre).
+  diffContainer: { borderRadius: "10px", overflow: "hidden", minWidth: 0 },
 };
 
 function inputOf(s: Step): Record<string, unknown> {

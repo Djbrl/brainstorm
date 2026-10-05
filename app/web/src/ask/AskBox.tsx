@@ -34,7 +34,10 @@ export function AskBox({ context, placeholder, suggestions = SUGGESTIONS }: { co
   // New context → fresh conversation.
   useEffect(() => { setItems([]); setValue(""); setBusy(false); }, [key]);
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [items]);
+  // Keep the newest exchange in view, starting from its question: a long answer is read from the top, not the end.
+  const lastRef = useRef<HTMLDivElement>(null);
+  const lastAnswer = items[items.length - 1]?.answer;
+  useEffect(() => { (lastRef.current ?? endRef.current)?.scrollIntoView({ behavior: "smooth", block: lastAnswer ? "start" : "nearest" }); }, [items.length, lastAnswer]);
 
   const submit = async (q: string) => {
     const question = q.trim();
@@ -61,8 +64,8 @@ export function AskBox({ context, placeholder, suggestions = SUGGESTIONS }: { co
     <div className="askbox">
       {items.length > 0 && (
         <div className="ask-thread">
-          {items.map((it) => (
-            <div key={it.id} className="ask-qa">
+          {items.map((it, i) => (
+            <div key={it.id} className="ask-qa" ref={i === items.length - 1 ? lastRef : undefined}>
               <div className="ask-q">{it.question}</div>
               {it.answer ? (
                 <div className="ask-a">

@@ -9,13 +9,22 @@ import { clock, useLive } from "../lib/live";
 import { missingSummary } from "../lib/ai";
 import { useNav } from "../lib/nav";
 import { mapStyle } from "./themes";
-import { relTime } from "./MapView";
 import { KEEPS_OPEN, useClickAway, useLastShown } from "./panel";
 import "./map.css";
 
 const relPath = (p: string, root: string) => (root && p.startsWith(root) ? p.slice(root.length).replace(/^\/+/, "") : p);
 const modName = (m: string) => (!m || m === "." ? "root" : m);
 const baseName = (p: string) => p.split("/").pop() || p;
+
+/** "changed just now" (under 45 s), "changed 5 min ago", "changed 3 h ago", "changed 2 days ago" (rounded). */
+function changedAgo(iso: string | undefined, now: number): string {
+  if (!iso) return "not changed recently";
+  const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
+  if (s < 45) return "changed just now";
+  if (s < 3600) return `changed ${Math.max(1, Math.round(s / 60))} min ago`;
+  if (s < 86400) return `changed ${Math.round(s / 3600)} h ago`;
+  return `changed ${Math.round(s / 86400)} days ago`;
+}
 
 const SETTLE_MS = 1800;
 
@@ -92,7 +101,7 @@ function FileDetail({ file, root, steps, edges, onFocus }: {
       <h2>{baseName(file.path)}</h2>
       <p className="map-path">{relPath(file.path, root)}</p>
       <p className="map-meta">
-        {modName(file.module)} · {file.lines.toLocaleString()} lines · {relTime(file.lastChangedAt, now)}
+        {modName(file.module)} · {file.lines.toLocaleString()} lines · {changedAgo(file.lastChangedAt, now)}
       </p>
       {file.activeSessionId && <p className="map-live"><i />An agent is editing this file right now</p>}
 
@@ -121,7 +130,7 @@ function FileDetail({ file, root, steps, edges, onFocus }: {
             {touching.map((s) => (
               <li key={s.id}>
                 <span>{s.label ?? (s.tool ? `${s.tool} ${baseName(file.path)}` : s.kind)}</span>
-                <time>{relTime(s.ts, now).replace("changed ", "")}</time>
+                <time>{changedAgo(s.ts, now).replace("changed ", "")}</time>
               </li>
             ))}
           </ul>

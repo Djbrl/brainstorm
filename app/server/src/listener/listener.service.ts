@@ -261,6 +261,8 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       stepById: db.prepare(`SELECT * FROM steps WHERE id = ?`),
       stepsOf: db.prepare(`SELECT * FROM steps WHERE session_id = ? ORDER BY seq ASC`),
       stepsAfter: db.prepare(`SELECT * FROM steps WHERE session_id = ? AND seq > ? ORDER BY seq ASC`),
+      stepsJson: db.prepare(stepsJsonSql(`session_id = ?`)),
+      stepsJsonAfter: db.prepare(stepsJsonSql(`session_id = ? AND seq > ?`)),
       stepPos: db.prepare(`SELECT session_id, seq FROM steps WHERE id = ?`),
       stepsBefore: db.prepare(`SELECT * FROM steps WHERE session_id = ? AND seq < ? ORDER BY seq DESC LIMIT ?`),
       stepLabel: db.prepare(`SELECT label, risk FROM steps WHERE id = ?`),
@@ -863,10 +865,8 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   /** `JSON.stringify(listSteps(sessionId, afterSeq))`, byte for byte, built from the stored JSON text without parsing
    * it (GET /sessions/:id/steps: a long thread is thousands of steps). */
   listStepsJson(sessionId: string, afterSeq?: number): string {
-    const rows = afterSeq === undefined ? this.st.stepsOf.iterate(sessionId) : this.st.stepsAfter.iterate(sessionId, afterSeq);
-    const parts: string[] = [];
-    for (const r of rows) parts.push(stepJson(r));
-    return `[${parts.join(",")}]`;
+    const row = (afterSeq === undefined ? this.st.stepsJson.get(sessionId) : this.st.stepsJsonAfter.get(sessionId, afterSeq)) as { out: string };
+    return row.out;
   }
 
   /** The n steps immediately before `stepId` in the same session, chronological order. */
@@ -893,21 +893,22 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   }
 }
 
-const q = JSON.stringify;
-/** A steps row as the JSON of rowToStep(row): same keys, same order; input, diff and risk are stored as JSON already. */
-function stepJson(r: any): string {
-  let s = `{"id":${q(r.id)},"sessionId":${q(r.session_id)},"seq":${q(r.seq)},"ts":${q(r.ts)},"kind":${q(r.kind)}`;
-  if (r.text != null) s += `,"text":${q(r.text)}`;
-  if (r.tool != null) s += `,"tool":${q(r.tool)}`;
-  if (r.input) s += `,"input":${r.input}`;
-  if (r.file_path != null) s += `,"filePath":${q(r.file_path)}`;
-  if (r.diff) s += `,"diff":${r.diff}`;
-  if (r.label != null) s += `,"label":${q(r.label)}`;
-  if (r.risk) s += `,"risk":${r.risk}`;
-  s += `,"isSubagent":${r.is_subagent ? "true" : "false"}`;
-  if (r.tool_use_id) s += `,"toolUseId":${q(r.tool_use_id)}`;
-  return s + "}";
-}
+/** A text column as JSON, as JSON.stringify gives it for the value node:sqlite reads (which stops at a NUL char). */
+const jq = (c: string) => `CASE WHEN instr(${c}, char(0)) > 0 THEN json_quote(substr(${c}, 1, instr(${c}, char(0)) - 1)) ELSE json_quote(${c}) END`;
+/** A steps row as the JSON of rowToStep(row), built by SQLite: same keys, same order, same escapes; input, diff and
+ * risk are stored as JSON already and go in as they are. */
+const STEP_JSON = `'{"id":' || ${jq("id")} || ',"sessionId":' || ${jq("session_id")} || ',"seq":' || seq || ',"ts":' || ${jq("ts")} || ',"kind":' || ${jq("kind")}
+  || CASE WHEN text IS NOT NULL THEN ',"text":' || ${jq("text")} ELSE '' END
+  || CASE WHEN tool IS NOT NULL THEN ',"tool":' || ${jq("tool")} ELSE '' END
+  || CASE WHEN input IS NOT NULL AND input != '' THEN ',"input":' || input ELSE '' END
+  || CASE WHEN file_path IS NOT NULL THEN ',"filePath":' || ${jq("file_path")} ELSE '' END
+  || CASE WHEN diff IS NOT NULL AND diff != '' THEN ',"diff":' || diff ELSE '' END
+  || CASE WHEN label IS NOT NULL THEN ',"label":' || ${jq("label")} ELSE '' END
+  || CASE WHEN risk IS NOT NULL AND risk != '' THEN ',"risk":' || risk ELSE '' END
+  || ',"isSubagent":' || CASE WHEN is_subagent THEN 'true' ELSE 'false' END
+  || CASE WHEN tool_use_id IS NOT NULL AND tool_use_id != '' THEN ',"toolUseId":' || ${jq("tool_use_id")} ELSE '' END || '}'`;
+const stepsJsonSql = (where: string) =>
+  `SELECT '[' || coalesce(group_concat(j, ','), '') || ']' AS out FROM (SELECT ${STEP_JSON} AS j FROM steps WHERE ${where} ORDER BY seq ASC)`;
 
 const PASTE = /<pasted_content\b[^>]*>([\s\S]*?)(<\/pasted_content>|$)/g;
 

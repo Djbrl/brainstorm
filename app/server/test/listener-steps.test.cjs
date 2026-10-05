@@ -17,6 +17,9 @@ test("the steps JSON is byte for byte the serialized step objects, and afterSeq 
     line("edit", { i: 4, input: { file_path: "/work/demo-repo/a.ts", old_string: "before " + odd, new_string: "after" } }),
     { type: "assistant", uuid: "sub-1", sessionId: "s1", isSidechain: true, agentId: "a1", cwd: "/work/demo-repo", timestamp: "2026-10-01T12:00:05.000Z", message: { content: [{ type: "thinking", thinking: "hmm" }, { type: "text", text: "from a subagent" }] } },
     line("text", { i: 6, text: "" }), // empty text: no step
+    line("text", { i: 7, text: Array.from({ length: 128 }, (_, c) => String.fromCharCode(c)).join("").slice(1) + " ­   ￿ �" }),
+    line("text", { i: 8, text: "lone \ud800 surrogates \udfff x \ud83d" }),
+    line("tool", { i: 9, tool: "Weird\u0001Tool", input: { file_path: "/work/demo-repo/dir with spaces/ñ.ts", ctl: "\u0000\u001f\u007f" } }),
   ]));
   await t.readNow(f, true);
   const L = t.listener;

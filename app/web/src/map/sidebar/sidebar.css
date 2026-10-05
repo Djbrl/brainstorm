@@ -89,7 +89,7 @@
 @keyframes sidebar-pulse { 0% { box-shadow: 0 0 0 0 rgba(91,91,214,.5); } 100% { box-shadow: 0 0 0 8px rgba(91,91,214,0); } }
 
 /* Keep the map title and legend clear of the sidebar. */
-.map-wrap:has(.map-sidebar) .map-legend { left: 388px; }
+.map-wrap:has(.map-sidebar:not(.sidebar-overlay)) .map-legend { left: 388px; }
 .map-wrap:has(.sidebar-collapsed) .map-legend { left: 86px; }
 
 /* Threads: click to open (its Track). The open one is a pill; a running one pulses blue. */
@@ -148,3 +148,28 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 
 /* Dark themes: the amber badge glows on the dark sheet instead of a light chip. */
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) .sidebar-thread-attn.blocked { background: rgba(245,158,11,.2); color: #ffc56b; }
+
+/* Narrow (tablet and phone): the sidebar starts folded and opens over the content, with a light scrim behind it
+   (tap it, ‹ or Esc to fold). The folded tab stays put underneath, so nothing behind the sheet moves. */
+@media (max-width: 1100px) {
+  .map-sidebar.sidebar-overlay { z-index: 8; box-shadow: 0 24px 70px rgba(0,0,0,.16); background: rgba(255,255,255,.96); }
+  .sidebar-scrim { position: absolute; inset: 0; z-index: 7; border: 0; padding: 0; margin: 0; cursor: default;
+    background: rgba(29,29,31,.10); animation: sidebar-scrim-in .2s ease-out; }
+  .map-sidebar.sidebar-overlay { animation: sidebar-sheet-in .26s cubic-bezier(.2,.8,.2,1); }
+}
+@keyframes sidebar-scrim-in { from { opacity: 0; } }
+@keyframes sidebar-sheet-in { from { opacity: 0; transform: translateX(-16px); } }
+@media (prefers-reduced-motion: reduce) { .sidebar-scrim, .map-sidebar.sidebar-overlay { animation: none; } }
+
+/* Phone: the folded tab is a small pill in the top-left corner (the lens pill sits at the right of the same row), and
+   the open sheet takes the whole view but a margin. */
+@media (max-width: 600px) {
+  .sidebar-collapsed { top: 16px; left: 12px; width: auto; height: 38px; padding: 0 14px 0 16px; flex-direction: row; gap: 6px; border-radius: 999px; z-index: 6; }
+  .sidebar-collapsed span { writing-mode: horizontal-tb; font-size: 13.5px; letter-spacing: 0; }
+  .map-sidebar.sidebar-overlay { left: 10px; right: 10px; top: 10px; bottom: 10px; width: auto; max-width: none; height: auto; }
+}
+
+/* The stats line: Track's head already says the same thing, so narrow Track drops it; on a phone it sits under the
+   row of pills, full width. */
+@media (max-width: 1100px) { .trk-wrap .map-stats { display: none; } }
+@media (max-width: 600px) { .map-stats { top: 66px; left: 16px; max-width: calc(100% - 32px); font-size: 13.5px; } }

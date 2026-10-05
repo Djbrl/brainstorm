@@ -34,8 +34,8 @@
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) { --you: var(--hover-2); --you-hover: rgba(160,170,255,.28); }
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) .dock-share { background: var(--hover); }
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) :is(button.sidebar-thread-head:hover, .sidebar-thread-headrow:hover, .sidebar-fold:hover, .sidebar-more:hover,
-  .rp-ch-head:hover, .rp-m:hover, .trk-stop:hover, .trk-return:hover) { background: var(--hover-2); }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) :is(.md code, .md-pre, .sd-expand, .trk-screen, .trk-screen img, .trk-screen video, .trk-steps li span, .trk-bounce em, .sd-glyph) { background: var(--hover); }
+  .rp-ch-head:hover, .rp-m:hover) { background: var(--hover-2); }
+:root:is([data-theme="ps2"], [data-theme="deadspace"]) :is(.md code, .md-pre, .sd-expand, .sd-glyph) { background: var(--hover); }
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) .rp-slider input::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--accent) var(--rp-pct), var(--hover-2) var(--rp-pct)); }
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) .rp-slider input::-moz-range-track { background: var(--hover-2); }
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) .rp-slider input::-webkit-slider-thumb { background: var(--surface); }

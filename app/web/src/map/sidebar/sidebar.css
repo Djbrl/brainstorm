@@ -100,11 +100,11 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .sidebar-thread-head time { font-variant-numeric: tabular-nums; }
 
 /* The stats line sits just above the sidebar. */
-/* One line, no wider than the sidebar under it: it stops before the lens switch and before Track's line. */
+/* One line, no wider than the sidebar under it: it stops before the lens switch. */
 .map-stats { position: absolute; left: 40px; top: 84px; margin: 0; color: var(--ink-3); font-size: 14.5px; pointer-events: none; z-index: 3; white-space: nowrap; max-width: min(calc(50% - 160px), 330px); overflow: hidden; text-overflow: ellipsis; }
 
-/* The sidebar keeps one height and sits centered; the stats line rides just above it (Map, Track, Places). */
-.map-wrap, .trk-wrap, .cw-wrap { --sb-h: min(720px, calc(100% - 170px)); --sb-top: calc(50% - var(--sb-h) / 2 + 18px); }
+/* The sidebar keeps one height and sits centered; the stats line rides just above it (Map, Places). */
+.map-wrap, .cw-wrap { --sb-h: min(720px, calc(100% - 170px)); --sb-top: calc(50% - var(--sb-h) / 2 + 18px); }
 .map-sidebar { top: var(--sb-top); bottom: auto; height: var(--sb-h); }
 .sidebar-collapsed { top: var(--sb-top); }
 .map-stats { top: calc(var(--sb-top) - 34px); }
@@ -169,11 +169,7 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
   .map-sidebar.sidebar-overlay { left: 10px; right: 10px; top: 10px; bottom: 10px; width: auto; max-width: none; height: auto; }
 }
 
-/* The stats line: Track's head already says the same thing, so narrow Track drops it; on a phone it sits under the
-   row of pills, full width. */
-@media (max-width: 1100px) { .trk-wrap .map-stats { display: none; } }
-/* Desktop with the sidebar folded: the stats line would sit over Track's first rows, and Track's header has the same numbers. */
-.trk-wrap:has(.sidebar-collapsed) .map-stats { display: none; }
+/* The stats line: on a phone it sits under the row of pills, full width. */
 @media (max-width: 600px) { .map-stats { top: 66px; left: 16px; max-width: calc(100% - 32px); font-size: 13.5px; } }
 
 /* The Track tab: the step list scrolls by itself (its scroll moves the tracer), so the body doesn't. */

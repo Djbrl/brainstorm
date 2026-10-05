@@ -1,7 +1,7 @@
 // Owned by the lead. Map | Places: two views of the same thread, floating at the top of the Map tab. (A thread's Track
 // is the sidebar's second tab, next to the map.)
 import { useNav } from "../lib/nav";
-import "../tasks/track.css"; // its own styles live there; Places can be the first view loaded
+import "./lens.css";
 
 export function LensSwitch() {
   const { lens, setLens, replay } = useNav();

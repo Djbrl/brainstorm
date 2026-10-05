@@ -3,7 +3,6 @@
 // (names), useMapCamera.ts (what the camera frames), useLiveAgents.ts (agents on the map), redraw.ts (when to redraw).
 import { LensSwitch } from "./LensSwitch";
 import { MapStats } from "./MapStats";
-import "../tasks/track.css";
 import { clock, isReplay } from "../lib/live";
 import { lastSeen, sinceMs } from "../lib/visit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";

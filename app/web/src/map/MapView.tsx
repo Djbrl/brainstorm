@@ -26,7 +26,7 @@ import { boxOf, isFitKey, useCamera, type Camera, type View } from "./camera";
 import { FitButton } from "./FitButton";
 import { replayCamera } from "./replay/store";
 import { useTheme } from "../lib/theme";
-import { drawCube, drawPlate, drawStation, LAND_MS, landings, mapStyle, metroPath, moduleColor, type RGB } from "./themes";
+import { drawCube, drawPlate, drawStation, LAND_MS, landings, mapStyle, metroPath, moduleColor, reachOf, type RGB } from "./themes";
 import "./map.css";
 
 type GNode = NodeObject & { id: string; file: FileNode; r: number; ax: number; ay: number };
@@ -98,38 +98,70 @@ function useSize<T extends HTMLElement>() {
   return [ref, size] as const;
 }
 
+// ---------- layout: room for every file ----------
+const AIR = 8;          // clear space around each file's mark, past its reach (graph units): neighbours sit 2×AIR apart
+const PACKED = 0.65;    // how much of a folder's disc its files fill once settled (the rest is air and link slack)
+const GAP_IN = 18;      // between subfolders of one folder
+const GAP_OUT = 36;     // between top-level folders: room for a folder name above each group
+type Disc = { x: number; y: number; r: number };
+/**
+ * Greedy packing, in the order given (biggest first): each shape (a folder's discs) takes the first spot on a spiral out
+ * from the middle where none of its discs comes within `gap` of one placed before. Shapes, not their bounding circles,
+ * so small folders tuck into the bays around "app/web" + "app/server" instead of ringing them at a distance.
+ * Cheap enough for hundreds of folders (a grid of placed discs; each search starts two turns inside the last spot found).
+ */
+function pack(shapes: Disc[][], gap: number) {
+  const rs = shapes.flat().map((a) => a.r).sort((a, b) => a - b), cell = 2 * (rs[rs.length >> 1] ?? 1) + gap;
+  const grid = new Map<number, Disc[]>(), at: { x: number; y: number }[] = [];
+  const cells = (x: number, y: number, r: number, f: (k: number) => boolean | void) => {
+    const e = r + gap / 2;
+    for (let i = Math.floor((x - e) / cell); i <= Math.floor((x + e) / cell); i++) for (let j = Math.floor((y - e) / cell); j <= Math.floor((y + e) / cell); j++) if (f(i * 65536 + j)) return true;
+    return false;
+  };
+  const near = (x: number, y: number, r: number) => cells(x, y, r, (k) => grid.get(k)?.some((b) => Math.hypot(x - b.x, y - b.y) < r + b.r + gap));
+  let from = 0;
+  for (const s of shapes) {
+    const step = Math.max(6, Math.min(...s.map((a) => a.r)) * 0.75);   // about one disc's width along the spiral
+    for (let t = Math.max(0, from - 4 * Math.PI); ; t += Math.min(0.5, step / Math.max(t * 6, 8))) {
+      const d = t * 6, ox = Math.cos(t) * d * 1.25, oy = Math.sin(t) * d;   // a little wider than tall, like the screen
+      if (s.some((a) => near(a.x + ox, a.y + oy, a.r))) continue;
+      at.push({ x: ox, y: oy }); from = t;
+      for (const a of s) { const b = { x: a.x + ox, y: a.y + oy, r: a.r }; cells(b.x, b.y, b.r, (k) => { const l = grid.get(k); if (l) l.push(b); else grid.set(k, [b]); }); }
+      break;
+    }
+  }
+  return at;
+}
+
 // ---------- graph data (node objects are reused so positions survive live updates) ----------
 function useGraph(map: ProjectMap | null) {
+  const theme = useTheme();   // a theme's files take more or less room (themes.ts reach): the folders re-pack, the nodes stay
   const nodesRef = useRef(new Map<string, GNode>());
   const lastRef = useRef<{ key: string; edges: ProjectMap["edges"]; graph: { nodes: GNode[]; links: GLink[]; anchors: Map<string, { x: number; y: number }> } } | null>(null);
   return useMemo(() => {
     if (!map) return { nodes: [] as GNode[], links: [] as GLink[], anchors: new Map<string, { x: number; y: number }>() };
     // Same files, modules and edges: update node data in place so the simulation is not disturbed.
     // (The store only replaces the edges array when an import actually changed.)
-    const key = map.files.map((f) => f.path + "|" + f.module).join(",");
+    const key = theme + ":" + map.files.map((f) => f.path + "|" + f.module).join(",");
     if (lastRef.current && lastRef.current.key === key && lastRef.current.edges === map.edges) {
       for (const f of map.files) { const n = nodesRef.current.get(f.path); if (n) { n.file = f; n.r = radius(f.lines); } }
       return lastRef.current.graph;
     }
-    // Module anchors: top-level folders on a sunflower spiral, biggest in the middle; the subfolders of one folder
-    // gather around its spot (a small spiral of their own), so "app/server" sits next to "app/web".
-    const counts = new Map<string, number>();
-    for (const f of map.files) counts.set(f.module, (counts.get(f.module) ?? 0) + 1);
+    // Module anchors, sized by the room each folder's files take once none covers another: the subfolders of one folder
+    // packed around the biggest (so "app/server" sits next to "app/web"), then the top-level folders packed the same way.
+    const st = mapStyle(), room = new Map<string, number>();
+    for (const f of map.files) room.set(f.module, (room.get(f.module) ?? 0) + (reachOf(radius(f.lines), false, st) + AIR) ** 2);
+    const disc = (m: string) => Math.sqrt((room.get(m) ?? 0) / PACKED);
     const top = new Map<string, string[]>();
-    for (const m of counts.keys()) { const p = m === "." ? "." : m.split("/")[0]; top.set(p, [...(top.get(p) ?? []), m]); }
-    const size = (ms: string[]) => ms.reduce((s, m) => s + (counts.get(m) ?? 0), 0);
-    const groups = [...top.values()].map((ms) => ms.sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0))).sort((a, b) => size(b) - size(a));
+    for (const m of room.keys()) { const p = m === "." ? "." : m.split("/")[0]; top.set(p, [...(top.get(p) ?? []), m]); }
+    const groups = [...top.values()].map((ms) => {
+      ms.sort((a, b) => disc(b) - disc(a));
+      const at = pack(ms.map((m) => [{ x: 0, y: 0, r: disc(m) }]), GAP_IN);
+      return { ms, at, size: ms.reduce((s, m) => s + (room.get(m) ?? 0), 0) };
+    }).sort((a, b) => b.size - a.size);
     const anchors = new Map<string, { x: number; y: number }>();
-    const spread = 70 + Math.sqrt(map.files.length) * 4, inner = 46;
-    const extent = (ms: string[]) => (ms.length > 1 ? inner * Math.sqrt(ms.length) : 0);
-    groups.forEach((ms, i) => {
-      const r = i === 0 ? 0 : extent(groups[0]) + spread * Math.sqrt(i + 0.5), a = i * 2.39996;
-      const gx = Math.cos(a) * r, gy = Math.sin(a) * r;
-      ms.forEach((m, j) => {
-        const rr = j === 0 ? 0 : inner * Math.sqrt(j + 0.5), aa = j * 2.39996 + a;
-        anchors.set(m, { x: gx + Math.cos(aa) * rr, y: gy + Math.sin(aa) * rr });
-      });
-    });
+    const spots = pack(groups.map((g) => g.ms.map((m, j) => ({ ...g.at[j], r: disc(m) }))), GAP_OUT);
+    groups.forEach((g, i) => g.ms.forEach((m, j) => anchors.set(m, { x: spots[i].x + g.at[j].x, y: spots[i].y + g.at[j].y })));
     const prev = nodesRef.current;
     const next = new Map<string, GNode>();
     const nodes = map.files.map((f) => {
@@ -144,7 +176,36 @@ function useGraph(map: ProjectMap | null) {
     const graph = { nodes, links, anchors };
     lastRef.current = { key, edges: map.edges, graph };
     return graph;
-  }, [map?.files, map?.edges]);
+  }, [map?.files, map?.edges, theme]);
+}
+
+/**
+ * Files never cover each other: each keeps a disc as wide as its theme draws it (themes.ts reachOf) plus AIR, like
+ * d3's forceCollide but with radii read on every tick (an agent arriving makes a PS2 cube bigger). A grid finds the neighbours.
+ */
+function collideForce(strength = 0.8) {
+  let nodes: GNode[] = [];
+  const f = () => {
+    const st = mapStyle(), rs = nodes.map((n) => reachOf(n.r, !!n.file.activeSessionId, st) + AIR);
+    const cell = 2 * Math.max(1, ...rs), grid = new Map<string, number[]>();
+    const px = nodes.map((n) => (n.x ?? 0) + (n.vx ?? 0)), py = nodes.map((n) => (n.y ?? 0) + (n.vy ?? 0));
+    nodes.forEach((_, i) => { const k = `${Math.floor(px[i] / cell)},${Math.floor(py[i] / cell)}`; const l = grid.get(k); if (l) l.push(i); else grid.set(k, [i]); });
+    nodes.forEach((a, i) => {
+      const cx = Math.floor(px[i] / cell), cy = Math.floor(py[i] / cell);
+      for (let gx = cx - 1; gx <= cx + 1; gx++) for (let gy = cy - 1; gy <= cy + 1; gy++) for (const j of grid.get(`${gx},${gy}`) ?? []) {
+        if (j <= i) continue;
+        const b = nodes[j], r = rs[i] + rs[j];
+        let dx = px[i] - px[j], dy = py[i] - py[j], d2 = dx * dx + dy * dy;
+        if (d2 >= r * r) continue;
+        if (d2 === 0) { dx = (Math.random() - 0.5) * 1e-3; dy = (Math.random() - 0.5) * 1e-3; d2 = dx * dx + dy * dy; }
+        const d = Math.sqrt(d2), l = ((r - d) / d) * strength, ri = rs[i] ** 2, rj = rs[j] ** 2, w = rj / (ri + rj);
+        a.vx = (a.vx ?? 0) + dx * l * w; a.vy = (a.vy ?? 0) + dy * l * w;          // the smaller file moves more
+        b.vx = (b.vx ?? 0) - dx * l * (1 - w); b.vy = (b.vy ?? 0) - dy * l * (1 - w);
+      }
+    });
+  };
+  f.initialize = (ns: GNode[]) => { nodes = ns; };
+  return f;
 }
 
 /** Weak pull of each file toward its module's anchor. */
@@ -213,8 +274,8 @@ export function MapView() {
   const followRef = useRef(followId); followRef.current = followId;
   const hoverRef = useRef(hover); hoverRef.current = hover;
   const selectedRef = useRef(selected); selectedRef.current = selected;
-  const moduleSpace = useRef(new LabelSpace());   // folder names taken this frame
-  const fileSpace = useRef(new LabelSpace());     // file names taken this frame
+  const space = useRef(new LabelSpace());         // taken this frame: files, replay badges, folder names, file names
+  const markedRef = useRef<string | null>(null);  // the file the replay's marker names this frame
   const labelQueue = useRef<QueuedLabel[]>([]);   // file names to draw this frame, after the files
   const nodeIndex = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n])), [graph.nodes]);
   const nodeIndexRef = useRef(nodeIndex); nodeIndexRef.current = nodeIndex;
@@ -235,7 +296,9 @@ export function MapView() {
   const openRef = useRef(!!replay); openRef.current = !!replay;
   const drawAgentLayer = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
     // File names go on after every file is drawn, so no circle covers a name (the selected one's last, on top).
-    drawQueuedLabels(ctx, labelQueue.current, fileSpace.current);
+    // The file the replay's marker names (drawModules) isn't named twice.
+    const named = markedRef.current;
+    drawQueuedLabels(ctx, named ? labelQueue.current.filter((l) => l.at?.id !== named || l.must) : labelQueue.current, space.current);
     labelQueue.current = [];
     replayRef.current.draw(ctx, scale);
     drawAgents({
@@ -324,15 +387,19 @@ export function MapView() {
   useEffect(() => {
     const g = fg.current;
     if (!g) return;
-    g.d3Force("module", moduleForce(0.1) as never);
-    (g.d3Force("charge") as any)?.strength?.((n: GNode) => -30 - n.r * 6);
+    // The folders' anchors are packed with room for their files (useGraph), so the pull can hold each folder together while
+    // the collision keeps its files apart; the charge only spaces near neighbours (capped), it no longer has to keep files
+    // off each other, which used to blow the whole map apart while big files in one folder still overlapped.
+    g.d3Force("module", moduleForce(0.12) as never);
+    g.d3Force("collide", collideForce(0.8) as never);
+    (g.d3Force("charge") as any)?.strength?.((n: GNode) => -20 - n.r * 2)?.distanceMax?.(140);
     (g.d3Force("link") as any)?.distance?.((l: GLink) => {
       const s = l.source as GNode, t = l.target as GNode;
-      return s.file?.module === t.file?.module ? 34 : 110;
-    })?.strength?.((l: GLink) => ((l.source as GNode).file?.module === (l.target as GNode).file?.module ? 0.25 : 0.03));
+      return s.file?.module === t.file?.module ? reachOf(s.r) + reachOf(t.r) + 2 * AIR + 8 : 110;
+    })?.strength?.((l: GLink) => ((l.source as GNode).file?.module === (l.target as GNode).file?.module ? 0.2 : 0.03));
     (g.d3Force("center") as any)?.strength?.(0.02);
     g.d3ReheatSimulation();
-  }, [graph]);
+  }, [graph, theme]);
 
   // Frame the map once, after the first layout settles a bit (and again when it stops: see onEngineStop).
   const hasNodes = graph.nodes.length > 0;
@@ -483,9 +550,11 @@ export function MapView() {
     if (forced || (alpha >= 1 && (r * scale > 9 || scale > 3.2))) {
       // Queued, drawn after every file (see drawAgentLayer): a neighbour's circle never covers a name.
       const fs = Math.max(11, Math.min(14, 11 + r * scale * 0.08)) / scale;
-      const ringR = st.node === "dot" ? r : r * 1.35 + 2 / scale;   // under the selection ring, not on it
+      // Clear of what the theme draws (a cube's corners, a plate's rim) and of the selection ring.
+      const ringR = Math.max(reachOf(r, active, st), isSel || isHover ? (st.node === "dot" ? r : r * 1.35 + 2 / scale) : 0);
       labelQueue.current.push({
-        text: baseName(n.id), x, y: y + (isSel || isHover ? ringR : r) + 3 / scale, size: fs, scale, alpha: isSel || isHover ? 1 : alpha,
+        text: baseName(n.id), x, y: y + ringR + 3 / scale, size: fs, scale, alpha: isSel || isHover ? 1 : alpha,
+        at: { id: n.id, x, y, r: ringR }, must: isSel || isHover,
         font: `${isSel || active ? 600 : 500} ${fs}px ${st.labelFont ?? tokens.body}`,
         ink: isSel || active || isHover ? st.fileInk : st.fileInkQuiet, halo: st.halo,
         // The one you point at wins, then the selected one, then where an agent works, then the biggest.
@@ -513,7 +582,20 @@ export function MapView() {
   }, [style]);
 
   const drawModules = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
-    moduleSpace.current.reset(); fileSpace.current.reset();
+    // Every file's footprint goes in first: no name, folder or file, prints over a file. With a thread open, the files it
+    // never touched (or hasn't reached yet) are faded into the background: its own names may cross those, not the rest.
+    const st = mapStyle(), sp = space.current;
+    sp.reset(48 / scale);
+    const nodes = graph.nodes.map((n) => ({ x: n.x, y: n.y, r: reachOf(n.r, !!n.file.activeSessionId, st), module: n.file.module, lastChangedAt: n.file.lastChangedAt, active: !!n.file.activeSessionId }));
+    const ring = (n: GNode) => (st.node === "dot" ? n.r : n.r * 1.35 + 2 / scale);   // the selection ring (drawNode)
+    graph.nodes.forEach((n, i) => {
+      if (n.x === undefined || n.y === undefined || replayRef.current.nodeAlpha(n.id) < 0.3) return;
+      sp.file(n.id, n.x, n.y, n.id === selectedRef.current || n.id === hoverRef.current ? Math.max(nodes[i].r, ring(n)) : nodes[i].r);
+    });
+    // The replay's badges and marker are drawn last, on top, but take their space now: names keep off them too.
+    const marks = replayRef.current.marks(ctx, scale);
+    for (const b of marks.boxes) sp.add(b);
+    markedRef.current = marks.named;
     const idx = nodeIndexRef.current;
     const focus = new Set<string>();
     for (const id of [hoverRef.current, selectedRef.current]) { const n = id ? idx.get(id) : undefined; if (n) focus.add(n.file.module); }
@@ -523,8 +605,7 @@ export function MapView() {
       const id = resolveId(a.file), n = id ? idx.get(id) : undefined;
       if (n) busy.add(n.file.module);
     }
-    drawModuleLabels(ctx, scale, graph.nodes.map((n) => ({ x: n.x, y: n.y, r: n.r, module: n.file.module, lastChangedAt: n.file.lastChangedAt, active: !!n.file.activeSessionId })),
-      { font: tokens.display, now: clock(), focus, busy, space: moduleSpace.current });
+    drawModuleLabels(ctx, scale, nodes, { font: tokens.display, now: clock(), focus, busy, space: sp });
   }, [graph.nodes, tokens, resolveId]);
   // Labels go on after the files (folder names, then file names), so no circle covers a name; then the agents.
   const startFrame = useCallback(() => { labelQueue.current = []; }, []);

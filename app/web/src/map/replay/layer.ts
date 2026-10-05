@@ -5,6 +5,7 @@ import type { ForceGraphMethods } from "react-force-graph-2d";
 import { mapPrefs, replayCursor, useNav } from "../../lib/nav";
 import { useThread, type Thread } from "../../lib/thread";
 import { replayCamera, USER_CAMERA_MS } from "./store";
+import type { Camera } from "../camera";
 import { along, casing, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs } from "../themes";
 
 export type NodePos = { x?: number; y?: number; r: number };
@@ -16,6 +17,10 @@ export type ReplayLayerApi = {
   nodeAlpha: (id: string) => number;
   /** True while the tracer is drawn (a replay or steps, not the footprint): Metro quiets the import lines then. */
   tracing: boolean;
+  /** The thread's footprint mode (its files lit, no tracer): MapView frames it. */
+  footprintMode: boolean;
+  /** The files the open thread touched (what a fit frames), or null with no thread open. */
+  footprint: () => string[] | null;
   /** Draw the tracer, numbered stops, the current marker and read flashes. Called every frame after the agent layer. */
   draw: (ctx: CanvasRenderingContext2D, scale: number) => void;
 };
@@ -29,7 +34,6 @@ const DIM = 0.18;           // files the thread never touches (or hasn't reached
 const PAST = 0.42;          // files it touched earlier than the window below
 /** Fog of war: in a replay, only the last few moments are drawn in full (path, numbers, files); older ones fade back. */
 const WINDOW = 25;
-const MAX_FIT = 2.4;        // a footprint of one or two files doesn't fill the screen
 const BEAT_PX = 60;         // trackpad pixels per beat
 const OTHER_MS = 120;       // playback pace for single "other" steps (every-step detail)
 const SUMMARY_MS = 380;     // playback pace for summary beats (light detail)
@@ -50,12 +54,14 @@ function isTyping(t: EventTarget | null) {
   return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable;
 }
 
-export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
+export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera }: {
   fg: RefObject<ForceGraphMethods | undefined>;
   wrapRef: RefObject<HTMLDivElement | null>;
   nodeIndexRef: RefObject<Map<string, NodePos>>;
   accent: string;
   font: string;
+  /** MapView's camera: the follow keeps the marker in the middle of the part of the map no panel covers. */
+  camera: RefObject<Camera>;
 }): ReplayLayerApi {
   const { replay, setReplayIndex, setReplayPlaying, landReplay } = useNav();
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
@@ -76,6 +82,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
   }, [active, replay?.atStep, thread, landReplay]);
 
   replayCamera.fg = fg;
+  replayCamera.safe = camera.current.safe;
 
   const speed = replay?.speed ?? 1;
   const st = useRef<{ active: boolean; thread: Thread | null; index: number; len: number; mode: string; speed: number }>({ active, thread, index, len, mode, speed });
@@ -104,29 +111,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     return () => clearTimeout(t);
   }, [active, replay?.playing, replay?.speed, index, last, thread, setReplayIndex, setReplayPlaying]);
 
-  // ---- footprint: frame the files the thread touched, in the space right of the sidebar, never closer than MAX_FIT ----
-  useEffect(() => {
-    const g = fg.current, el = wrapRef.current;
-    if (!active || mode !== "footprint" || !g || !el || !thread!.touched.size) return;
-    const touched = [...thread!.touched.keys()];
-    const frame = () => {
-      const pts = touched.map((id) => nodeIndexRef.current.get(id)).filter((n): n is NodePos & { x: number; y: number } => n?.x !== undefined && n?.y !== undefined);
-      if (!pts.length) return false;
-      const x0 = Math.min(...pts.map((p) => p.x - p.r)), x1 = Math.max(...pts.map((p) => p.x + p.r));
-      const y0 = Math.min(...pts.map((p) => p.y - p.r)), y1 = Math.max(...pts.map((p) => p.y + p.r));
-      const LEFT = 380, PAD = 120;                              // the sidebar, and room around the files
-      const w = Math.max(1, el.clientWidth - LEFT - 2 * PAD), h = Math.max(1, el.clientHeight - 2 * PAD);
-      const z = Math.min(MAX_FIT, w / Math.max(1, x1 - x0), h / Math.max(1, y1 - y0));
-      g.centerAt((x0 + x1) / 2 - LEFT / 2 / z, (y0 + y1) / 2, 700);
-      g.zoom(z, 700);
-      return true;
-    };
-    // Now, and again as the layout settles (a link opened straight onto a thread loads the map at the same time).
-    frame();
-    const ts = [600, 1800].map((ms) => setTimeout(frame, ms));
-    return () => ts.forEach(clearTimeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, mode, replay?.sessionId, thread?.touched.size, fg, wrapRef, nodeIndexRef]);
+  // ---- footprint: MapView frames the files the thread touched (fitAll there), in the part of the map no panel covers ----
 
   // ---- keyboard ----
   const replayPlayingRef = useRef(false);
@@ -206,11 +191,19 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     const tick = () => {
       const g = fg.current;
       const a = anim.current;
-      if (g && a.cam && performance.now() - replayCamera.userAt > USER_CAMERA_MS) {
-        const c = g.centerAt() as unknown as { x: number; y: number };
+      const cam = camera.current;
+      // After a fit, the camera stays on the whole thread while the marker is in sight; the user taking over the camera,
+      // or the marker leaving the uncovered part of the map, hands it back to the follow.
+      if (g && a.cam && replayCamera.heldAt !== null) {
+        const s = cam.safe.current, c = g.centerAt() as unknown as { x: number; y: number }, z = g.zoom();
+        const sx = s.w / 2 + (a.cam.x - c.x) * z, sy = s.h / 2 + (a.cam.y - c.y) * z, m = 24;
+        const inSight = sx > s.left + m && sx < s.w - s.right - m && sy > s.top + m && sy < s.h - s.bottom - m;
+        if (!inSight || Math.max(replayCamera.userAt, cam.userAt()) > replayCamera.heldAt) replayCamera.heldAt = null;
+      }
+      if (g && a.cam && replayCamera.heldAt === null && !replayCamera.pinned && performance.now() - Math.max(replayCamera.userAt, cam.userAt()) > USER_CAMERA_MS) {
+        // The marker goes to the middle of the part of the map no panel covers, not under the sidebar.
+        cam.easeToward(a.cam.x, a.cam.y, 0.08);
         const z = g.zoom();
-        const dx = a.cam.x - c.x, dy = a.cam.y - c.y;
-        if (Math.hypot(dx, dy) * z > 1.5) g.centerAt(c.x + dx * 0.08, c.y + dy * 0.08);
         const tz = replayCamera.targetZoom;
         if (tz && Math.abs(z - tz) > 0.01) g.zoom(z + (tz - z) * 0.06);
       }
@@ -218,7 +211,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [active, mode, fg]);
+  }, [active, mode, fg, camera]);
 
   // For the fog: the moments at which each file was touched (edited or read), in order.
   const touchedAt = useMemo(() => {
@@ -408,7 +401,12 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font }: {
     ctx.restore();
   }, [accent, font, nodeIndexRef]);
 
-  return { active, tracing: active && mode !== "footprint", nodeAlpha, draw };
+  const footprint = useCallback(() => {
+    const s = st.current;
+    return s.active && s.thread ? [...s.thread.touched.keys()] : null;
+  }, []);
+
+  return { active, tracing: active && mode !== "footprint", footprintMode: active && mode === "footprint", footprint, nodeAlpha, draw };
 }
 
 /** Play/pause; pressing play at the last beat starts over. Shared by the keyboard and the ReplayBar. */

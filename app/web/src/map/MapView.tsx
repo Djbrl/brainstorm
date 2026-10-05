@@ -200,8 +200,11 @@ export function MapView() {
     const shown = new Set(visibleAgents(all));
     return all.filter((a) => shown.has(a) || waitingIds.has(a.id));
   }, [mock, map, mockTick, state.agents, waitingIds]);
-  // Hidden agents (sidebar toggles) and all live agents while a thread replay is on are not drawn.
-  const drawnAgents = useMemo(() => (replay ? [] : agents.filter((a) => !hiddenAgents.has(a.id))), [agents, hiddenAgents, replay]);
+  // Hidden agents (sidebar toggles) are not drawn. With a thread open: its own agents (main and subagents, each in its
+  // colour) while it's followed live; none while you move through its past (the replay's cursor is the marker then).
+  const threadId = replay?.sessionId ?? null, liveThread = !!replay?.live;
+  const drawnAgents = useMemo(() => agents.filter((a) => !hiddenAgents.has(a.id) && (!threadId || (liveThread && a.sessionId === threadId))),
+    [agents, hiddenAgents, threadId, liveThread]);
   // Agents waiting on you (attention): agent id → label. A subagent waits under its own id, a main thread under the session's.
   const waiting = useMemo(() => new Map(Object.values(state.attention).filter(needsYou).map((a) => [a.agentId ?? a.sessionId, attentionText(a).badge === "Stuck" ? "Stuck" : `Needs you · ${attentionText(a).title.toLowerCase()}`])), [state.attention]);
   const waitingRef = useRef(waiting); waitingRef.current = waiting;

@@ -84,14 +84,18 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
   replayCamera.safe = camera.current.safe;
 
   const speed = replay?.speed ?? 1;
-  const st = useRef<{ active: boolean; thread: Thread | null; index: number; len: number; mode: string; speed: number }>({ active, thread, index, len, mode, speed });
-  st.current = { active, thread, index, len, mode, speed };
+  // Following live, the thread's own agents are drawn by the live layer (each in its colour): no single cursor marker.
+  const live = !!replay?.live;
+  const st = useRef<{ active: boolean; thread: Thread | null; index: number; len: number; mode: string; speed: number; live: boolean }>({ active, thread, index, len, mode, speed, live });
+  st.current = { active, thread, index, len, mode, speed, live };
   const anim = useRef<Anim>({ x: 0, y: 0, fromX: 0, fromY: 0, t0: -1e9, file: null, lastIndex: -1, beatAt: -1e9, cam: null });
 
   // Bounds: clamp the cursor whenever the thread (or its length) changes.
   useEffect(() => {
-    if (active && replay && !replay.atStep && replay.index > last) setReplayIndex(last); // not while landing on a step
-  }, [active, last, replay?.index, replay?.atStep, setReplayIndex]);
+    // Not while landing on a step. landReplay, not setReplayIndex: a live thread's moments can regroup one shorter as
+    // steps arrive, and that clamp must not stop it following live.
+    if (active && replay && !replay.atStep && replay.index > last) landReplay(last);
+  }, [active, last, replay?.index, replay?.atStep, landReplay]);
 
   // A new replay: fresh marker and camera.
   useEffect(() => {
@@ -349,7 +353,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     // Current marker with a soft halo. Red, with one red ring, when this beat has a failed tool call.
     const failed = beat.failed > 0;
     const mark = failed ? RED : line;
-    if (target && curFile) {
+    if (target && curFile && !s.live) {
       if (trip) drawTrip(ctx, style.route, trip, tp, te, mark, 10 / scale, 1, scale);
       const halo = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, 26 / scale);
       halo.addColorStop(0, hexA(mark, 0.28));

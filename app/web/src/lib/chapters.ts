@@ -43,41 +43,67 @@ export function injectedLabel(s: Step): string | undefined {
 
 const oneLine = (t: string, max = 160) => { const l = t.replace(/\s+/g, " ").trim(); return l.length > max ? `${l.slice(0, max - 1).trimEnd()}…` : l; };
 
+const chaptersSeen = new WeakMap<Thread, Chapter[]>();
+
+/** The thread's chapters. Worked out once per thread (the Track and the player's bar both ask): don't change them. */
 export function chaptersOf(thread: Thread): Chapter[] {
+  let out = chaptersSeen.get(thread);
+  if (!out) chaptersSeen.set(thread, (out = cutChapters(thread)));
+  return out;
+}
+
+function cutChapters(thread: Thread): Chapter[] {
   const out: Chapter[] = [];
   const add = (b: Beat, hasPrompt: boolean) => out.push({
     index: out.length, title: hasPrompt ? oneLine(stripInjected(b.step.text)) : "Before your first message",
     first: b.index, last: b.index, hasPrompt, at: b.step.ts, end: b.step.ts, ms: 0, files: 0, failed: 0,
   });
-  const changed: Set<string>[] = [], stepsOf: { ts: string }[][] = [];
+  // Working time: activeMs over the chapter's steps in beat order, added up as they come.
+  let changed = new Set<string>(), prev = 0, first = true;
+  const close = () => { if (out.length) out[out.length - 1].files = changed.size; };
   for (const b of thread.beats) {
     const starts = b.kind === "prompt" && isPersonPrompt(b.step);
-    if (starts || !out.length) { add(b, starts); changed.push(new Set()); stepsOf.push([]); }
-    stepsOf[stepsOf.length - 1].push(...b.steps);
+    if (starts || !out.length) { close(); add(b, starts); changed = new Set(); first = true; }
     const c = out[out.length - 1];
     c.last = b.index;
     c.failed += b.failed;
     const lastStep = b.steps[b.steps.length - 1] ?? b.step;
     if (lastStep.ts > c.end) c.end = lastStep.ts;
-    for (const s of b.steps) if (s.kind === "edit" && s.filePath) changed[changed.length - 1].add(s.filePath);
+    for (const s of b.steps) {
+      if (s.kind === "edit" && s.filePath) changed.add(s.filePath);
+      const t = stepTime(s);
+      if (!first) { const d = t - prev; if (d > 0 && d < BREAK_MS) c.ms += d; }
+      prev = t; first = false;
+    }
   }
-  out.forEach((c, i) => { c.files = changed[i].size; c.ms = activeMs(stepsOf[i]); });
+  close();
   return out;
 }
 
 /** The chapter holding a beat. */
 export const chapterAt = (chapters: Chapter[], beat: number) => chapters.find((c) => beat >= c.first && beat <= c.last) ?? chapters[chapters.length - 1];
 
-const BREAK_MS = 30 * 60_000;
+export const BREAK_MS = 30 * 60_000;
 
 /** Time spent working, not the span: a thread resumed the next day isn't 30 hours long. Pauses over 30 minutes don't count. */
 export function activeMs(steps: { ts: string }[]): number {
   let ms = 0;
+  let prev = steps.length ? stepTime(steps[0]) : 0;
   for (let i = 1; i < steps.length; i++) {
-    const d = Date.parse(steps[i].ts) - Date.parse(steps[i - 1].ts);
+    const t = stepTime(steps[i]);
+    const d = t - prev;
     if (d > 0 && d < BREAK_MS) ms += d;
+    prev = t;
   }
   return ms;
+}
+
+/** A step's time in ms (Date.parse), parsed once per step. */
+const parsed = new WeakMap<object, { ts: string; ms: number }>();
+export function stepTime(s: { ts: string }): number {
+  let p = parsed.get(s);
+  if (!p || p.ts !== s.ts) parsed.set(s, (p = { ts: s.ts, ms: Date.parse(s.ts) }));
+  return p.ms;
 }
 
 /** "4 min", "1 h 20 min". */

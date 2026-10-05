@@ -2,7 +2,7 @@
 // stretch of work in a place. A row selects its place on the map and opens its newest step in the side panel.
 import type { ReactNode } from "react";
 import type { CoworkArea } from "@contract";
-import { clockTime } from "../follow/format";
+import { timeIn } from "../follow/format";
 import { VERB_NAME, placeRuns, placeTitle, placesStore, selectPlace, usePlaces } from "./data";
 
 const ICON: Record<CoworkArea, ReactNode> = {
@@ -36,7 +36,7 @@ export function PlaceSteps() {
               <span className="rp-row-text">
                 <span className="rp-row-label">{title}</span>
                 <span className="rp-row-meta">
-                  <time>{clockTime(r.first.ts)}</time>
+                  <time>{timeIn(r.first.ts)}</time>
                   {changed && <span className="pl-verbs">{[...r.verbs].map(([v, n]) => `${VERB_NAME[v].toLowerCase()}${n > 1 ? ` ×${n}` : ""}`).join(", ")}</span>}
                   {!changed && r.count > 1 && <span>{r.count} steps</span>}
                   {r.failed > 0 && <span className="rp-fail-dot" aria-label={`${r.failed} failed`} />}

@@ -7,7 +7,7 @@ import { Markdown } from "../ask/Markdown";
 import { useNav } from "../lib/nav";
 import { FileIcon, Glyph, RiskIcon } from "./Glyph";
 import { ToolView } from "./content/ToolView";
-import { basename, clockTime, displayLabel, stepFile, toolName, unwrapPastes } from "./format";
+import { basename, displayLabel, stepFile, timeIn, toolName, unwrapPastes } from "./format";
 
 const BIG_DIFF = 400; // lines; above this the diff starts collapsed
 
@@ -91,7 +91,7 @@ export function StepDetail({ step, result }: { step: Step; result?: Step; onClos
           <h2 className="sd-title" title={label}>{step.kind === "prompt" ? "Your prompt" : label}</h2>
         </header>
         <div className="sd-meta">
-          <span>{clockTime(step.ts)}</span>
+          <span>{timeIn(step.ts, false, { seconds: true })}</span>
           {step.tool && step.kind !== "edit" && <><span className="sep">·</span><span>{toolName(step.tool)}</span></>}
           {step.isSubagent && <><span className="sep">·</span><span>Subagent</span></>}
           {file && (

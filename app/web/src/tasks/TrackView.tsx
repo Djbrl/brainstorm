@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { TaskArtifact, TaskDetail, TaskStep } from "@contract";
 import { useLive } from "../lib/live";
 import { END, replayCursor, useNav } from "../lib/nav";
-import { clockTime, stripInjected } from "../follow/format";
+import { stripInjected, timeIn } from "../follow/format";
 import { MapSidebar } from "../map/sidebar/MapSidebar";
 import { LensSwitch } from "../map/LensSwitch";
 import { MapStats } from "../map/MapStats";
@@ -169,7 +169,7 @@ function Window({ task, stop, onMap }: { task: TaskDetail; stop: Stop; onMap: ()
       <header>
         <span className={`trk-ico a-${stop.area} ${stop.failed.length ? "err" : ""}`}><Icon k={stop.failed.length ? "error" : stop.action} /></span>
         <div><b>{stop.name}</b>{stop.sub && <small>{stop.sub}</small>}</div>
-        <time>{clockTime(stop.steps[0].ts)}</time>
+        <time>{timeIn(stop.steps[0].ts)}</time>
       </header>
       <div className="trk-screen">
         {media?.kind === "video" ? <video key={media.src} src={media.src} controls muted playsInline poster={`${media.src}&frame=1`} />

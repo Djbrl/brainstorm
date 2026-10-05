@@ -23,7 +23,11 @@ export type ReplayLayerApi = {
   footprint: () => string[] | null;
   /** Draw the tracer, numbered stops, the current marker and read flashes. Called every frame after the agent layer. */
   draw: (ctx: CanvasRenderingContext2D, scale: number) => void;
+  /** Where draw() will put its numbered stops, the marker and its name this frame, so file names keep off them;
+   *  and the file the marker names (its own label would say the same thing twice). */
+  marks: (ctx: CanvasRenderingContext2D, scale: number) => { boxes: Box[]; named: string | null };
 };
+type Box = { x0: number; y0: number; x1: number; y1: number };
 
 const GLIDE_MS = 650;       // same glide as the live agent markers (map/agents.tsx)
 const FLASH_MS = 600;       // read flash
@@ -41,6 +45,19 @@ const READ_MS = 520;        // playback pace for reads
 const STEP_MS = 700;        // playback pace for edits and your prompts (at 1×)
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+/** The numbered stops: each file visited within the window, by its latest stop (the marker's own file has none). */
+function stopsOf(moves: Thread["moves"], mi: number, fogBefore: number, curFile: string | null) {
+  const last = new Map<string, number>();
+  for (let k = 0; k <= mi; k++) last.set(moves[k].file, k);
+  for (const [file, k] of last) if (moves[k].beatIndex < fogBefore || file === curFile) last.delete(file);
+  return last;
+}
+/** A stop's badge: just off the file's top-left. */
+const badgeAt = (n: { x: number; y: number; r: number }, scale: number) => {
+  const d = n.r + 8 / scale, ang = (-3 * Math.PI) / 4;
+  return { x: n.x + Math.cos(ang) * d, y: n.y + Math.sin(ang) * d };
+};
+const BADGE_FONT = 9.5, MARK_R = 10, NAME_FONT = 12;
 const baseName = (p: string) => p.split("/").pop() || p;
 const INK = "#1d1d1f";
 
@@ -293,19 +310,14 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     }
 
     // Numbered stops: each file visited within the window shows its latest stop number (top-left of the file).
-    const lastVisit = new Map<string, number>();
-    for (let k = 0; k <= mi; k++) lastVisit.set(moves[k].file, k);
-    for (const [file, k] of lastVisit) if (moves[k].beatIndex < fogBefore) lastVisit.delete(file);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = `700 ${9.5 / scale}px ${font}`;
-    for (const [file, k] of lastVisit) {
-      if (file === curFile) continue;
+    ctx.font = `700 ${BADGE_FONT / scale}px ${font}`;
+    for (const [file, k] of stopsOf(moves, mi, fogBefore, curFile)) {
       const n = pos(file);
       if (!n) continue;
       const label = String(k + 1);
-      const d = n.r + 8 / scale, ang = (-3 * Math.PI) / 4;
-      const bx = n.x + Math.cos(ang) * d, by = n.y + Math.sin(ang) * d;
+      const { x: bx, y: by } = badgeAt(n, scale);
       const h = 15 / scale, wdt = Math.max(h, ctx.measureText(label).width + 8 / scale);
       ctx.globalAlpha = 0.5 + 0.5 * Math.pow(0.9, mi - k);
       ctx.beginPath();
@@ -402,12 +414,42 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     ctx.restore();
   }, [accent, font, nodeIndexRef]);
 
+  const marks = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
+    const s = st.current, boxes: Box[] = [];
+    const beat = s.active && s.thread && s.mode !== "footprint" ? s.thread.beats[s.index] : undefined;
+    if (!beat || !s.thread) return { boxes, named: null };
+    const { moves } = s.thread, mi = beat.moveIndex, curFile = mi >= 0 ? moves[mi].file : null, nodes = nodeIndexRef.current;
+    const h = 15 / scale, pad = 2 / scale;
+    for (const [file, k] of stopsOf(moves, mi, s.index - WINDOW, curFile)) {
+      const n = nodes?.get(file);
+      if (n?.x === undefined || n.y === undefined) continue;
+      const b = badgeAt({ x: n.x, y: n.y, r: n.r }, scale), w = Math.max(h, (String(k + 1).length * BADGE_FONT * 0.62 + 8) / scale);
+      boxes.push({ x0: b.x - w / 2 - pad, x1: b.x + w / 2 + pad, y0: b.y - h / 2 - pad, y1: b.y + h / 2 + pad });
+    }
+    const a = anim.current;
+    if (curFile && a.file === curFile) {   // the marker (where it is this frame) and its name to the right
+      ctx.save(); ctx.font = `600 ${NAME_FONT / scale}px ${font}`;
+      const w = ctx.measureText(baseName(curFile)).width; ctx.restore();
+      const m = (MARK_R + 3) / scale;
+      boxes.push({ x0: a.x - m, x1: a.x + m, y0: a.y - m, y1: a.y + m });
+      boxes.push({ x0: a.x + 12 / scale, x1: a.x + 16 / scale + w, y0: a.y - 9 / scale, y1: a.y + (beat.outside ? 23 : 9) / scale });
+    }
+    const read = beat.action === "read" && mapPrefs.showReads && beat.file ? nodes?.get(beat.file) : undefined;
+    if (read?.x !== undefined && read.y !== undefined) {   // "Read x.ts +2", above the last file read
+      ctx.save(); ctx.font = `600 ${11.5 / scale}px ${font}`;
+      const more = beat.files.length - 1, w = ctx.measureText(`Read ${baseName(beat.file!)}${more > 0 ? ` +${more}` : ""}`).width; ctx.restore();
+      const by = read.y - read.r - 8 / scale;
+      boxes.push({ x0: read.x - w / 2 - pad, x1: read.x + w / 2 + pad, y0: by - 14 / scale, y1: by + pad });
+    }
+    return { boxes, named: curFile };
+  }, [font, nodeIndexRef]);
+
   const footprint = useCallback(() => {
     const s = st.current;
     return s.active && s.thread ? [...s.thread.touched.keys()] : null;
   }, []);
 
-  return { active, tracing: active && mode !== "footprint", footprintMode: active && mode === "footprint", footprint, nodeAlpha, draw };
+  return { active, tracing: active && mode !== "footprint", footprintMode: active && mode === "footprint", footprint, nodeAlpha, draw, marks };
 }
 
 /** Play/pause; pressing play at the last beat starts over. Shared by the keyboard and the ReplayBar. */

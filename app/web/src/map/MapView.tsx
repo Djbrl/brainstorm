@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const RIPPLE_MS = 700; // one ripple per edit
 import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-force-graph-2d";
-import type { AgentPresence, FileNode, ProjectMap } from "@contract";
+import type { AgentPresence, Edge, FileNode, ProjectMap } from "@contract";
 import { useLive } from "../lib/live";
 import { attentionText, needsYou } from "../lib/attention";
 import { mapPrefs, useNav } from "../lib/nav";
@@ -33,6 +33,7 @@ import {
 } from "./themes";
 import { clearSprites, spriteFrame, type StampMemo } from "./sprites";
 import { createRedraw, Motion } from "./redraw";
+import { savePositions, useSavedPositions, type Positions } from "./positions";
 import "./map.css";
 
 type GNode = NodeObject & {
@@ -122,6 +123,8 @@ const AIR = 8;          // clear space around each file's mark, past its reach (
 const PACKED = 0.65;    // how much of a folder's disc its files fill once settled (the rest is air and link slack)
 const GAP_IN = 18;      // between subfolders of one folder
 const GAP_OUT = 36;     // between top-level folders: room for a folder name above each group
+/** A big map: the layout settles in fewer, looser steps, and idle import lines step out when zoomed out. */
+const BIG = 5000;
 type Disc = { x: number; y: number; r: number };
 /**
  * Greedy packing, in the order given (biggest first): each shape (a folder's discs) takes the first spot on a spiral out
@@ -153,8 +156,11 @@ function pack(shapes: Disc[][], gap: number) {
 }
 
 // ---------- graph data (node objects are reused so positions survive live updates) ----------
+type Pt = { x: number; y: number };
 type Graph = {
-  nodes: GNode[]; links: GLink[]; anchors: Map<string, { x: number; y: number }>;
+  nodes: GNode[]; links: GLink[]; anchors: Map<string, Pt>;
+  /** How hard this layout run pushes: 1 a full layout, less to settle a few new files (or restored ones) in place. */
+  heat: number;
   /** What force-graph gets: the files only. Import lines are drawn by the map and pulled by its own link force. */
   data: { nodes: GNode[]; links: never[] };
   /** Bumped per rebuild: what the label caches key on. */
@@ -162,62 +168,140 @@ type Graph = {
 };
 let graphIds = 0;
 const NO_LINKS: never[] = [];
-function useGraph(map: ProjectMap | null) {
-  const theme = useTheme();   // a theme's files take more or less room (themes.ts reach): the folders re-pack, the nodes stay
+const EMPTY: Graph = { nodes: [], links: [], anchors: new Map(), heat: 1, data: { nodes: [], links: NO_LINKS }, id: 0 };
+
+/** Same files in the same folders (a "map" message that resends the project, a file's lines or times changing). */
+function sameFiles(a: FileNode[], b: FileNode[]) {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) { const x = a[i], y = b[i]; if (x !== y && (x.path !== y.path || x.module !== y.module)) return false; }
+  return true;
+}
+function sameEdges(a: Edge[], b: Edge[]) {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) { const x = a[i], y = b[i]; if (x !== y && (x.from !== y.from || x.to !== y.to)) return false; }
+  return true;
+}
+
+/**
+ * The map's files as graph nodes. Nothing is rebuilt (and the layout isn't disturbed) while the files, their folders and
+ * the imports stay the same, compared by content: a resent project or a changed file updates the nodes in place.
+ * When files come or go, the folders keep their places if they barely changed size, and a new file starts by an import
+ * of it or among its folder's files: the layout only needs a gentle push. On first load, the positions saved last time
+ * (positions.ts) put every file back where it was.
+ */
+function useGraph(map: ProjectMap | null, theme: string, saved: { pos: Positions; sameTheme: boolean } | null | undefined, structureVersion?: number) {
   const nodesRef = useRef(new Map<string, GNode>());
-  const lastRef = useRef<{ key: string; edges: ProjectMap["edges"]; graph: Graph } | null>(null);
-  return useMemo((): Graph => {
-    if (!map) return { nodes: [], links: [], anchors: new Map(), data: { nodes: [], links: NO_LINKS }, id: 0 };
-    // Same files, modules and edges: update node data in place so the simulation is not disturbed.
-    // (The store only replaces the edges array when an import actually changed.)
-    const key = theme + ":" + map.files.map((f) => f.path + "|" + f.module).join(",");
-    if (lastRef.current && lastRef.current.key === key && lastRef.current.edges === map.edges) {
+  const lastRef = useRef<{ root: string; files: FileNode[]; edges: Edge[]; theme: string; sv?: number; graph: Graph; discs: Map<string, number> } | null>(null);
+  return useMemo(() => {
+    if (!map || saved === undefined) return EMPTY;   // saved positions still loading (a moment at most)
+    const last = lastRef.current;
+    const sameRoot = last?.root === map.root;
+    if (last && sameRoot && last.theme === theme && ((structureVersion !== undefined && structureVersion === last.sv) || (sameFiles(last.files, map.files) && sameEdges(last.edges, map.edges)))) {
       for (const f of map.files) { const n = nodesRef.current.get(f.path); if (n) { n.file = f; n.r = radius(f.lines); } }
-      return lastRef.current.graph;
+      last.files = map.files; last.edges = map.edges; last.sv = structureVersion;
+      return last.graph;
     }
     // Module anchors, sized by the room each folder's files take once none covers another: the subfolders of one folder
     // packed around the biggest (so "app/server" sits next to "app/web"), then the top-level folders packed the same way.
     const st = mapStyle(), room = new Map<string, number>();
     for (const f of map.files) room.set(f.module, (room.get(f.module) ?? 0) + (reachOf(radius(f.lines), false, st) + AIR) ** 2);
     const disc = (m: string) => Math.sqrt((room.get(m) ?? 0) / PACKED);
-    const top = new Map<string, string[]>();
-    for (const m of room.keys()) { const p = m === "." ? "." : m.split("/")[0]; top.set(p, [...(top.get(p) ?? []), m]); }
-    const groups = [...top.values()].map((ms) => {
-      ms.sort((a, b) => disc(b) - disc(a));
-      const at = pack(ms.map((m) => [{ x: 0, y: 0, r: disc(m) }]), GAP_IN);
-      return { ms, at, size: ms.reduce((s, m) => s + (room.get(m) ?? 0), 0) };
-    }).sort((a, b) => b.size - a.size);
-    const anchors = new Map<string, { x: number; y: number }>();
-    const spots = pack(groups.map((g) => g.ms.map((m, j) => ({ ...g.at[j], r: disc(m) }))), GAP_OUT);
-    groups.forEach((g, i) => g.ms.forEach((m, j) => anchors.set(m, { x: spots[i].x + g.at[j].x, y: spots[i].y + g.at[j].y })));
-    const prev = nodesRef.current;
+    const discs = new Map([...room.keys()].map((m) => [m, disc(m)]));
+    // Same folders, each within 15% of its size: they keep their places (a repack would move every folder for one file).
+    const keep = last && sameRoot && last.theme === theme && last.discs.size === discs.size
+      && [...discs].every(([m, d]) => { const o = last.discs.get(m); return o !== undefined && d <= o * 1.15 && d >= o / 1.15; });
+    let anchors: Map<string, Pt>;
+    if (keep) anchors = last!.graph.anchors;
+    else {
+      const top = new Map<string, string[]>();
+      for (const m of room.keys()) { const p = m === "." ? "." : m.split("/")[0]; top.set(p, [...(top.get(p) ?? []), m]); }
+      const groups = [...top.values()].map((ms) => {
+        ms.sort((a, b) => disc(b) - disc(a));
+        const at = pack(ms.map((m) => [{ x: 0, y: 0, r: disc(m) }]), GAP_IN);
+        return { ms, at, size: ms.reduce((s, m) => s + (room.get(m) ?? 0), 0) };
+      }).sort((a, b) => b.size - a.size);
+      anchors = new Map();
+      const spots = pack(groups.map((g) => g.ms.map((m, j) => ({ ...g.at[j], r: disc(m) }))), GAP_OUT);
+      groups.forEach((g, i) => g.ms.forEach((m, j) => anchors.set(m, { x: spots[i].x + g.at[j].x, y: spots[i].y + g.at[j].y })));
+    }
+    const prev = sameRoot ? nodesRef.current : new Map<string, GNode>();
     const next = new Map<string, GNode>();
+    const restore = prev.size === 0 && saved ? saved : null;
+    let fresh = 0, restored = 0;
+    const placeLater: GNode[] = [];
     const nodes = map.files.map((f) => {
       const an = anchors.get(f.module) ?? { x: 0, y: 0 };
-      const n = prev.get(f.path) ?? ({ id: f.path, x: an.x + (Math.random() - 0.5) * 40, y: an.y + (Math.random() - 0.5) * 40 } as GNode);
+      let n = prev.get(f.path);
+      if (!n) {
+        const at = restore?.pos.get(f.path);
+        n = { id: f.path } as GNode;
+        if (at) { n.x = at.x; n.y = at.y; restored++; }
+        else { fresh++; placeLater.push(n); }
+      }
       n.file = f; n.r = radius(f.lines); n.ax = an.x; n.ay = an.y;
       next.set(f.path, n);
       return n;
     });
+    // New files: by a file they import or that imports them (in their own folder first), else among their folder's
+    // files, else at the folder's anchor. Random only within their own room.
+    if (placeLater.length) {
+      const near = new Map<string, string[]>();
+      if (next.size > placeLater.length) for (const e of map.edges) {
+        (near.get(e.from) ?? near.set(e.from, []).get(e.from)!).push(e.to);
+        (near.get(e.to) ?? near.set(e.to, []).get(e.to)!).push(e.from);
+      }
+      const centre = new Map<string, { x: number; y: number; n: number }>();
+      for (const n of next.values()) if (n.x !== undefined && n.y !== undefined) {
+        const c = centre.get(n.file.module) ?? { x: 0, y: 0, n: 0 };
+        c.x += n.x; c.y += n.y; c.n++; centre.set(n.file.module, c);
+      }
+      for (const n of placeLater) {
+        const jit = reachOf(n.r, false, st) + AIR;
+        const nb = (near.get(n.id) ?? []).map((id) => next.get(id)).filter((o): o is GNode => !!o && o.x !== undefined)
+          .sort((a, b) => Number(b.file.module === n.file.module) - Number(a.file.module === n.file.module))[0];
+        const c = centre.get(n.file.module);
+        const at = nb ? { x: nb.x!, y: nb.y! } : c ? { x: c.x / c.n, y: c.y / c.n } : null;
+        if (at) { n.x = at.x + (Math.random() - 0.5) * 2 * jit; n.y = at.y + (Math.random() - 0.5) * 2 * jit; }
+        else { n.x = n.ax + (Math.random() - 0.5) * 40; n.y = n.ay + (Math.random() - 0.5) * 40; }
+      }
+    }
     nodesRef.current = next;
     const links: GLink[] = [];
     for (const e of map.edges) { const s = next.get(e.from), t = next.get(e.to); if (s && t && s !== t) links.push({ source: s, target: t }); }
-    const graph: Graph = { nodes, links, anchors, data: { nodes, links: NO_LINKS }, id: ++graphIds };
-    lastRef.current = { key, edges: map.edges, graph };
+    // How hard to push: a full layout for a new map (or a theme's new room), gently when a few files come or go,
+    // barely when the saved positions came back.
+    const total = nodes.length || 1;
+    let heat = 1;
+    if (!last || !sameRoot || prev.size === 0) heat = restore ? (restored / total >= 0.95 && restore.sameTheme ? 0.02 : restored / total >= 0.5 ? 0.1 : 1) : 1;
+    else if (last.theme !== theme) heat = 1;
+    else heat = fresh / total > 0.3 ? 1 : fresh || prev.size !== next.size ? 0.1 : 0.05;
+    const graph: Graph = { nodes, links, anchors, heat, data: { nodes, links: NO_LINKS }, id: ++graphIds };
+    lastRef.current = { root: map.root, files: map.files, edges: map.edges, theme, sv: structureVersion, graph, discs };
     return graph;
-  }, [map?.files, map?.edges, theme]);
+  }, [map?.files, map?.edges, map?.root, theme, saved, structureVersion]);
 }
 
 // ---------- forces ----------
+type HeatRef = { current: number };
 type Force = ((alpha: number) => void) & { initialize?: (nodes: GNode[], ...rest: unknown[]) => void };
+/** A d3 force run at `heat` times the simulation's strength (alpha): a gentle reheat without touching force-graph's alpha. */
+function heated(inner: Force, heat: HeatRef): Force & { inner: Force } {
+  const f = ((alpha: number) => inner(alpha * heat.current)) as Force & { inner: Force };
+  f.initialize = (nodes, ...rest) => inner.initialize?.(nodes, ...rest);
+  f.inner = inner;
+  return f;
+}
+
 /**
  * Import lines pull their two files together (d3's forceLink, one iteration): a file and its imports in one folder sit
  * close, across folders the pull is weak. The map's own link force, so force-graph needn't hold (or scan) the lines.
  */
-function linkForce(links: { current: GLink[] }) {
+function linkForce(links: { current: GLink[] }, heat: HeatRef) {
   let ls: GLink[] = [], dist = new Float64Array(0), str = dist, bias = dist;
   const f = ((alpha: number) => {
-    const a = alpha;
+    const a = alpha * heat.current;
     for (let i = 0; i < ls.length; i++) {
       const s = ls[i].source, t = ls[i].target;
       let x = (t.x ?? 0) + (t.vx ?? 0) - (s.x ?? 0) - (s.vx ?? 0) || (Math.random() - 0.5) * 1e-6;
@@ -251,40 +335,57 @@ function linkForce(links: { current: GLink[] }) {
 
 /**
  * Files never cover each other: each keeps a disc as wide as its theme draws it (themes.ts reachOf) plus AIR, like
- * d3's forceCollide but with radii read on every tick (an agent arriving makes a PS2 cube bigger). A grid finds the neighbours.
+ * d3's forceCollide but with radii read on every tick (an agent arriving makes a PS2 cube bigger). A grid finds the
+ * neighbours (numeric cells and linked lists in typed arrays: nothing allocated per tick).
  */
 function collideForce(strength = 0.8) {
   let nodes: GNode[] = [];
+  let rs = new Float64Array(0), px = rs, py = rs, next = new Int32Array(0);
+  const head = new Map<number, number>();
   const f = () => {
-    const st = mapStyle(), rs = nodes.map((n) => reachOf(n.r, !!n.file.activeSessionId, st) + AIR);
-    const cell = 2 * Math.max(1, ...rs), grid = new Map<string, number[]>();
-    const px = nodes.map((n) => (n.x ?? 0) + (n.vx ?? 0)), py = nodes.map((n) => (n.y ?? 0) + (n.vy ?? 0));
-    nodes.forEach((_, i) => { const k = `${Math.floor(px[i] / cell)},${Math.floor(py[i] / cell)}`; const l = grid.get(k); if (l) l.push(i); else grid.set(k, [i]); });
-    nodes.forEach((a, i) => {
-      const cx = Math.floor(px[i] / cell), cy = Math.floor(py[i] / cell);
-      for (let gx = cx - 1; gx <= cx + 1; gx++) for (let gy = cy - 1; gy <= cy + 1; gy++) for (const j of grid.get(`${gx},${gy}`) ?? []) {
-        if (j <= i) continue;
-        const b = nodes[j], r = rs[i] + rs[j];
-        let dx = px[i] - px[j], dy = py[i] - py[j], d2 = dx * dx + dy * dy;
-        if (d2 >= r * r) continue;
-        if (d2 === 0) { dx = (Math.random() - 0.5) * 1e-3; dy = (Math.random() - 0.5) * 1e-3; d2 = dx * dx + dy * dy; }
-        const d = Math.sqrt(d2), l = ((r - d) / d) * strength, ri = rs[i] ** 2, rj = rs[j] ** 2, w = rj / (ri + rj);
-        a.vx = (a.vx ?? 0) + dx * l * w; a.vy = (a.vy ?? 0) + dy * l * w;          // the smaller file moves more
-        b.vx = (b.vx ?? 0) - dx * l * (1 - w); b.vy = (b.vy ?? 0) - dy * l * (1 - w);
+    const n = nodes.length;
+    if (rs.length < n) { rs = new Float64Array(n); px = new Float64Array(n); py = new Float64Array(n); next = new Int32Array(n); }
+    const st = mapStyle();
+    let max = 1;
+    for (let i = 0; i < n; i++) {
+      const a = nodes[i], r = reachOf(a.r, !!a.file.activeSessionId, st) + AIR;
+      rs[i] = r; if (r > max) max = r;
+      px[i] = (a.x ?? 0) + (a.vx ?? 0); py[i] = (a.y ?? 0) + (a.vy ?? 0);
+    }
+    const cell = 2 * max;
+    head.clear();
+    for (let i = 0; i < n; i++) {
+      const k = Math.floor(px[i] / cell) * 65536 + Math.floor(py[i] / cell), h = head.get(k);
+      next[i] = h === undefined ? -1 : h; head.set(k, i);
+    }
+    for (let i = 0; i < n; i++) {
+      const a = nodes[i], cx = Math.floor(px[i] / cell), cy = Math.floor(py[i] / cell);
+      for (let gx = cx - 1; gx <= cx + 1; gx++) for (let gy = cy - 1; gy <= cy + 1; gy++) {
+        for (let j = head.get(gx * 65536 + gy) ?? -1; j !== -1; j = next[j]) {
+          if (j <= i) continue;
+          const b = nodes[j], r = rs[i] + rs[j];
+          let dx = px[i] - px[j], dy = py[i] - py[j], d2 = dx * dx + dy * dy;
+          if (d2 >= r * r) continue;
+          if (d2 === 0) { dx = (Math.random() - 0.5) * 1e-3; dy = (Math.random() - 0.5) * 1e-3; d2 = dx * dx + dy * dy; }
+          const d = Math.sqrt(d2), l = ((r - d) / d) * strength, ri = rs[i] ** 2, rj = rs[j] ** 2, w = rj / (ri + rj);
+          a.vx = (a.vx ?? 0) + dx * l * w; a.vy = (a.vy ?? 0) + dy * l * w;          // the smaller file moves more
+          b.vx = (b.vx ?? 0) - dx * l * (1 - w); b.vy = (b.vy ?? 0) - dy * l * (1 - w);
+        }
       }
-    });
+    }
   };
   f.initialize = (ns: GNode[]) => { nodes = ns; };
   return f;
 }
 
 /** Weak pull of each file toward its module's anchor. */
-function moduleForce(strength: number) {
+function moduleForce(strength: number, heat: HeatRef) {
   let nodes: GNode[] = [];
   const f = (alpha: number) => {
+    const k = strength * alpha * heat.current;
     for (const n of nodes) {
-      n.vx = (n.vx ?? 0) + (n.ax - (n.x ?? 0)) * strength * alpha;
-      n.vy = (n.vy ?? 0) + (n.ay - (n.y ?? 0)) * strength * alpha;
+      n.vx = (n.vx ?? 0) + (n.ax - (n.x ?? 0)) * k;
+      n.vy = (n.vy ?? 0) + (n.ay - (n.y ?? 0)) * k;
     }
   };
   f.initialize = (ns: GNode[]) => { nodes = ns; };
@@ -337,9 +438,15 @@ export function MapView() {
   const mock = useMemo(() => new URLSearchParams(location.search).has("mockmap"), []);
   const map = useMemo(() => (mock ? mockMap() : state.map), [mock, state.map]);
   const theme = useTheme();
-  const graph = useGraph(map);
+  const saved = useSavedPositions(map?.root ?? null, theme);
+  // perf/web-store's structure counter when the store has it (files or imports added, removed or moved), else content.
+  const graph = useGraph(map, theme, saved, (state as unknown as { structureVersion?: number }).structureVersion);
   const graphRef = useRef(graph); graphRef.current = graph;
+  const heat = useRef(graph.heat);
+  const lastGraph = useRef(graph);
+  if (lastGraph.current !== graph) { lastGraph.current = graph; heat.current = graph.heat; }
   const linksRef = useRef(graph.links); linksRef.current = graph.links;
+  const big = graph.nodes.length > BIG;
   const [wrapRef, size] = useSize<HTMLDivElement>();
   const sizeRef = useRef(size); sizeRef.current = size;
   const fg = useRef<ForceGraphMethods<GNode, never> | undefined>(undefined);
@@ -500,7 +607,8 @@ export function MapView() {
     setSelected(n.id);
   }, [resolveId, setIntent, applyIntent]);
 
-  // Forces
+  // Forces: set once per canvas and again when the theme changes (a theme's files take more or less room). They don't
+  // reheat the layout: a new graph does that itself (force-graph), at the graph's heat (useGraph).
   const hasNodes = graph.nodes.length > 0;
   useEffect(() => {
     const g = fg.current;
@@ -508,13 +616,16 @@ export function MapView() {
     // The folders' anchors are packed with room for their files (useGraph), so the pull can hold each folder together while
     // the collision keeps its files apart; the charge only spaces near neighbours (capped), it no longer has to keep files
     // off each other, which used to blow the whole map apart while big files in one folder still overlapped.
-    g.d3Force("module", moduleForce(0.12) as never);
+    g.d3Force("module", moduleForce(0.12, heat) as never);
     g.d3Force("collide", collideForce(0.8) as never);
-    g.d3Force("link", linkForce(linksRef) as never);   // the import lines are the map's: force-graph no longer holds them
-    (g.d3Force("charge") as any)?.strength?.((n: GNode) => -20 - n.r * 2)?.distanceMax?.(140);
-    (g.d3Force("center") as any)?.strength?.(0.02);
-    g.d3ReheatSimulation();
-  }, [graph, theme]);
+    g.d3Force("link", linkForce(linksRef, heat) as never);
+    const charge = g.d3Force("charge") as (Force & { inner?: Force }) | undefined;
+    const inner = (charge?.inner ?? charge) as unknown as { strength?: (f: (n: GNode) => number) => { distanceMax?: (d: number) => { theta?: (t: number) => unknown } } } | undefined;
+    // A big map: a looser approximation of the far files' push (Barnes-Hut theta) is plenty with the collision doing the spacing.
+    inner?.strength?.((n: GNode) => -20 - n.r * 2)?.distanceMax?.(140)?.theta?.(big ? 1.3 : 0.9);
+    if (charge && !charge.inner) g.d3Force("charge", heated(charge, heat) as never);
+    (g.d3Force("center") as unknown as { strength?: (k: number) => unknown } | undefined)?.strength?.(0.02);
+  }, [hasNodes, theme, big]);
 
   // Frame the map once, after the first layout settles a bit (and again when it stops: see onEngineStop).
   useEffect(() => {
@@ -1037,17 +1148,27 @@ export function MapView() {
   // A new agent position, error or activity: its glide, flash or pulse plays out (drawAgents), the frame keeps them coming.
   useEffect(() => { redraw.kick(100); }, [redraw, state.agents]);
 
+  // Where the files settled, remembered for the next visit (positions.ts).
+  const saveTimer = useRef(0);
+  useEffect(() => () => clearTimeout(saveTimer.current), []);
   const onEngineStop = useCallback(() => {
     if (!settledFit.current) { settledFit.current = true; applyIntent(900); }
     geomVer.current++;   // the folders' outlines where the files came to rest
+    const g = graphRef.current, r = root;
+    clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => { if (g.nodes.length) void savePositions(r, theme, g.nodes); }, 800);
     redraw.kick();
-  }, [applyIntent, redraw]);
+  }, [applyIntent, root, theme, redraw]);
   const onEngineTick = useCallback(() => { ticks.current++; redraw.ticked(); }, [redraw]);
   const onNodeHover = useCallback((n: NodeObject | null) => setHover(n ? (n as GNode).id : null), []);
   const onNodeClick = useCallback((n: NodeObject) => setSelected((n as GNode).id), [setSelected]);
   const onBackgroundClick = useCallback(() => setSelected(null), [setSelected]);
+  const onNodeDrag = useCallback(() => { heat.current = 1; }, []);   // a file dragged by hand: its neighbours answer in full
 
   const sel = selected ? nodeIndex.get(selected)?.file : undefined;
+  // A layout run stops once its push is spent (d3AlphaMin, in force-graph's alpha): a gentle reheat stops sooner. A big
+  // map also cools faster: fewer, bigger steps. A small map's full layout runs as it always did (cooldownTicks).
+  const alphaMin = big ? 0.002 / graph.heat : graph.heat < 1 ? 0.001 / graph.heat : 0;
 
   return (
     <div className="map-wrap" ref={wrapRef}>
@@ -1072,11 +1193,14 @@ export function MapView() {
           onRenderFramePre={startFrame}
           onRenderFramePost={endFrame}
           cooldownTicks={400}
+          d3AlphaMin={alphaMin}
+          d3AlphaDecay={big ? 0.05 : 0.0228}
           d3VelocityDecay={0.35}
           onEngineTick={onEngineTick}
           onEngineStop={onEngineStop}
           onNodeHover={onNodeHover}
           onNodeClick={onNodeClick}
+          onNodeDrag={onNodeDrag}
           onBackgroundClick={onBackgroundClick}
         />
       )}

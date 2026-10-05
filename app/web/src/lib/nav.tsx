@@ -5,7 +5,7 @@
 //   /thread/<id>                        one thread on the map, its steps in the sidebar's Track tab, at the end (a running one
 //                                       follows live); its replay from the footer
 //   /thread/<id>/step/<stepId>          one step, in a side panel (its diff, its output, Ask)
-//   …/file/<path>                       a file open in the side panel (its path from the project root), on the project or a thread's map
+//   …/file/<path>                       a file selected on the map, its details in the sidebar (its path from the project root)
 // A thread can be seen two ways, the lens: /thread/<id> (the map) and /thread/<id>/places. Links from when Track was a
 // view of its own (/thread/<id>/track) open the map.
 // Opening or closing a thread, a step or a lens adds a browser history entry, so Back and Esc go up one level. Moving
@@ -57,9 +57,9 @@ type Nav = {
   focusFile: string | null; setFocusFile: (p: string | null) => void;
   /** Select a file on the map. */
   openFile: (path: string) => void;
-  /** The file open in the side panel, as a path from the project root (it's in the link), or null. See map/FilePanel. */
+  /** The selected file (its details show in the sidebar), as a path from the project root (it's in the link), or null. See map/useSelectedFile. */
   file: string | null;
-  /** Open a file in the panel (a path from the project root), or close it with null. */
+  /** Select a file (a path from the project root), or let go of it with null. */
   selectFile: (rel: string | null) => void;
 
   /** The open thread, or null on the project overview. */

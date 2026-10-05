@@ -38,6 +38,7 @@ export const FileTreeView = memo(function FileTreeView({ rows, now, toggleDir, o
     const ul = ref.current, sc = scrollParent(ul);
     if (!ul || !sc) return;
     const update = () => {
+      if (!ul.getClientRects().length) return; // hidden (a file shows in its place): keep the lines it had
       const top = ul.getBoundingClientRect().top - sc.getBoundingClientRect().top;
       const a = Math.floor(-top / rowH), b = Math.ceil((sc.clientHeight - top) / rowH);
       setView((cur) => (a - OVERSCAN / 2 < cur[0] && cur[0] > 0) || (b + OVERSCAN / 2 > cur[1] && cur[1] < rows.length) || b < cur[0] || a > cur[1]
@@ -47,6 +48,8 @@ export const FileTreeView = memo(function FileTreeView({ rows, now, toggleDir, o
     sc.addEventListener("scroll", update, { passive: true });
     const ro = new ResizeObserver(update);
     ro.observe(sc);
+    ro.observe(ul); // shown again
+
     return () => { sc.removeEventListener("scroll", update); ro.disconnect(); };
   }, [rowH, rows.length]);
   useLayoutEffect(() => {

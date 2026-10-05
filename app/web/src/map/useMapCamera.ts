@@ -94,7 +94,7 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [followId, setIntent]);
-  /** A file to zoom to once its panel is open (the panel's own effect below does the move). */
+  /** A file to zoom to once it's selected (the selected file's effect below does the move). */
   const zoomTo = useRef<string | null>(null);
   const focusOnFile = useCallback((file: string) => {
     setFollowId(null);
@@ -124,7 +124,7 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
     else if (!hadThread.current) return;
     if (!openThread) hadThread.current = false;
     setIntent({ kind: "fit" });
-    if (replayCamera.pinned) return; // a file's panel is open: the camera stays on the file
+    if (replayCamera.pinned) return; // a file is selected: the camera stays on the file
     fitAll(700);
     const ts = openThread ? [600, 1800].map((ms) => setTimeout(() => applyIntent(700), ms)) : [];
     return () => ts.forEach(clearTimeout);
@@ -141,14 +141,15 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
     if (selectedRef.current === n.id) { setIntent({ kind: "file", id: n.id, zoom: true }); applyIntent(900); }
   }, [focusFile, nodeIndex, setFocusFile, setIntent, applyIntent]);
 
-  // The file panel: opening it brings the file into the uncovered map (zoomed in when it came from a list or a link);
-  // closing it puts the camera back where it was before (or frames the map, if it had never been framed).
+  // A selected file (its details in the sidebar, which unfolds for it): the camera brings it into the uncovered map
+  // (zoomed in when it came from a list or a link); letting go of it puts the camera back where it was before (or frames
+  // the map, if it had never been framed). An open step takes the camera back (the tracer shows the step).
   const panelFile = step ? null : selected;
   const before = useRef<{ view: View | null; intent: Intent } | null>(null);
   useEffect(() => () => { replayCamera.pinned = false; }, []);
   useEffect(() => {
     const c = camRef.current;
-    replayCamera.pinned = !!panelFile; // the tracer's camera leaves the open file alone (it picks up again on close)
+    replayCamera.pinned = !!panelFile; // the tracer's camera leaves the selected file alone (it picks up again on close)
     if (panelFile) {
       if (!before.current) {
         const auto = c.userAt() <= intentAt.current ? intent.current : { kind: "free" as const };

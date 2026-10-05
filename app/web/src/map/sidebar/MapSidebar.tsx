@@ -1,14 +1,19 @@
 // Owner: sidebar agent. Floating left sidebar on the map: [Threads | Track | Files] tabs, collapsible to a slim tab.
 // Threads lists them; Track is the open thread's steps (its places, on the Places lens), next to the map: scrolling it
-// moves the tracer; Files is the project's folder tree.
+// moves the tracer; Files is the project's folder tree, or the selected file (FileView) in its place.
+// Picking a file anywhere (the map, the tree, a link, a step's file) turns the sidebar to Files and opens it there,
+// unfolding the sidebar if it was folded; "All files" (or Esc) goes back to the tree. Another tab keeps it: back on
+// Files, the file is still there until you let go of it.
 // Below 1100px wide it starts folded and opens over the content (tap outside or ‹ to fold it); on a phone, picking a
-// thread or a file folds it too. That narrow state isn't saved, so the desktop's folded-or-not choice stays as it was.
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { AgentPresence, ProjectMap } from "@contract";
+// thread folds it too, and picking a file opens it. That narrow state isn't saved, so the desktop's folded-or-not
+// choice stays as it was.
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import type { AgentPresence, FileNode, ProjectMap } from "@contract";
 import { useNav } from "../../lib/nav";
 import { ThreadsPanel } from "./ThreadsPanel";
 import { TrackPanel } from "./TrackPanel";
 import { FilesPanel } from "./FilesPanel";
+import { FileView, FileViewBack } from "./FileView";
 import "./sidebar.css";
 
 export type MapSidebarProps = {
@@ -17,9 +22,15 @@ export type MapSidebarProps = {
   accent: string;
   followId: string | null;
   onFollow: (id: string | null) => void;
-  /** Center the map on a file and open its panel. */
+  /** Center the map on a file and select it (its details then show here). */
   onFocusFile: (path: string) => void;
   map: ProjectMap | null;
+  /** The selected file, shown in the Files tab in place of the tree. */
+  file?: FileNode;
+  /** Goes up every time a file is picked (the same one again too): the sidebar turns to Files and unfolds. */
+  picked?: number;
+  /** Let go of the selected file (back to the tree). */
+  onCloseFile?: () => void;
 };
 
 type Tab = "threads" | "track" | "files";
@@ -43,9 +54,10 @@ function useMedia(query: string): boolean {
 export const NARROW = "(max-width: 1100px)";
 const PHONE = "(max-width: 600px)";
 
-export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, map }: MapSidebarProps) {
-  const { replay } = useNav();
-  const [tab, setTab] = useState<Tab>(() => (replay ? "track" : loadTab())); // a thread link opens on its Track
+export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, map, file, picked, onCloseFile }: MapSidebarProps) {
+  const { replay, file: fileLink } = useNav();
+  // A file link opens on Files, a thread link on its Track.
+  const [tab, setTab] = useState<Tab>(() => (fileLink ? "files" : replay ? "track" : loadTab()));
   const [folded, setFolded] = useState<boolean>(loadCollapsed); // the desktop choice, saved
   const narrow = useMedia(NARROW), phone = useMedia(PHONE);
   const [over, setOver] = useState(false); // narrow: open over the content, never saved
@@ -64,6 +76,12 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
   }, [thread]);
   const shown: Tab = !thread && tab === "track" ? "threads" : tab;
   useEffect(() => { if (!narrow) setOver(false); }, [narrow]);
+  // A file picked: show it here, unfolded (over the content when narrow).
+  useEffect(() => {
+    if (!picked) return;
+    setTab("files");
+    if (narrow) setOver(true); else setFolded(false);
+  }, [picked]);
   // Esc folds the open sheet first (before the app's Esc steps back out of a thread).
   useEffect(() => {
     if (!over) return;
@@ -71,8 +89,22 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
     addEventListener("keydown", esc, true);
     return () => removeEventListener("keydown", esc, true);
   }, [over]);
-  // Picking a file opens its panel on the right: the sheet folds at any narrow width so the panel can be seen.
-  const fold = <T,>(f: (x: T) => void, always = false) => (x: T) => { if (phone || always) setOver(false); f(x); };
+  // On a phone, following an agent folds the sheet to show the map. A file opens here instead (see above).
+  const fold = <T,>(f: (x: T) => void) => (x: T) => { if (phone) setOver(false); f(x); };
+
+  // Every view shares the scrolling body: the tree keeps its place while a file or another tab shows, the rest open at
+  // their top.
+  const body = useRef<HTMLDivElement>(null);
+  const viewing = shown === "files" && file ? file.path : null;
+  const view = viewing ? `file:${viewing}` : shown; // "files" is the tree
+  const viewRef = useRef(view); viewRef.current = view;
+  const treeTop = useRef(0), lastView = useRef(view);
+  useLayoutEffect(() => {
+    const el = body.current, prev = lastView.current;
+    lastView.current = view;
+    if (el && prev !== view) el.scrollTop = view === "files" ? treeTop.current : 0;
+  });
+  const onScroll = () => { if (viewRef.current === "files" && body.current) treeTop.current = body.current.scrollTop; };
 
   const tabButton = (
     <button className="sidebar-collapsed" onClick={() => setCollapsed(false)} aria-label="Open sidebar" aria-expanded={!collapsed}>
@@ -96,14 +128,17 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
         </nav>
         <button className="sidebar-collapse" onClick={() => setCollapsed(true)} aria-label="Collapse sidebar" title="Collapse">‹</button>
       </div>
-      <div className="sidebar-body">
+      {viewing && <FileViewBack onBack={() => onCloseFile?.()} />}
+      <div className="sidebar-body" ref={body} onScroll={onScroll}>
         {shown === "threads" ? (
-          <ThreadsPanel agents={agents} accent={accent} followId={followId} onFollow={fold(onFollow)} onFocusFile={fold(onFocusFile, true)} />
+          <ThreadsPanel agents={agents} accent={accent} followId={followId} onFollow={fold(onFollow)} onFocusFile={onFocusFile} />
         ) : shown === "track" ? (
           <TrackPanel />
-        ) : (
-          <FilesPanel map={map} onFocusFile={fold(onFocusFile, true)} />
-        )}
+        ) : viewing && file ? (
+          <FileView file={file} root={map?.root ?? ""} edges={map?.edges ?? []} onFocus={onFocusFile} />
+        ) : null}
+        {/* The tree stays (hidden) under an open file and the other tabs, so it comes back as it was: search, open folders. */}
+        <FilesPanel map={map} onFocusFile={onFocusFile} hidden={view !== "files"} />
       </div>
     </div>
     </>

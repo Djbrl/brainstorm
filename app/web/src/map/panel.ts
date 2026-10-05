@@ -1,4 +1,4 @@
-// The side panels' shared rules (the step panel and the file panel): Esc or Back closes them (lib/nav `back`), and so
+// The side panels' shared rules (the step panel, and Places' place panel): Esc or Back closes them (lib/nav `back`), and so
 // does a click outside them. A drag isn't a click: panning the map with a panel open keeps it.
 import { useEffect, useRef } from "react";
 

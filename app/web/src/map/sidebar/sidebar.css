@@ -179,3 +179,40 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 
 /* Files tab, big repos: the map shows a chosen part of the project (see the server's mapper/select.ts). */
 .sidebar-files-note { margin: 2px 2px 10px; font-size: 12.5px; line-height: 1.45; color: var(--ink-3); }
+
+/* ---------- Files tab: the selected file, in place of the tree (FileView) ---------- */
+.sidebar-files[hidden] { display: none; }
+.file-view { padding: 0 2px 10px; }
+/* "All files": under the tabs, outside the scroll, so it stays in reach however far down the file goes. */
+.file-view-bar { flex: none; padding: 0 14px 4px; }
+.file-view-back { display: inline-flex; align-items: center; gap: 5px; margin-left: -8px; padding: 6px 12px 6px 8px; border: 0; border-radius: 999px;
+  background: none; color: var(--accent); font-size: 14px; font-weight: 600; }
+.file-view-back i { font-style: normal; font-size: 19px; line-height: 1; margin-top: -2px; }
+.file-view-back:hover { background: var(--accent-soft); }
+.file-view h2 { font-size: 26px; font-weight: 800; line-height: 1.15; margin: 14px 0 0; overflow-wrap: anywhere; }
+/* A long path loses its start, not its end (the folder the file is in stays): the whole of it on hover. */
+.file-view-path { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); margin: 8px 0 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
+.file-view-meta { color: var(--ink-2); margin: 10px 0 0; font-size: 13.5px; line-height: 1.45; }
+.file-view-live { display: flex; align-items: center; gap: 10px; margin: 14px 0 0; color: var(--accent); font-weight: 500; font-size: 14px; }
+.file-view-live i { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--accent); box-shadow: 0 0 0 0 rgba(91,91,214,.5); animation: sidebar-pulse 1.6s infinite; }
+.file-view section { margin-top: 28px; }
+.file-view h3 { font-size: 15.5px; font-weight: 700; margin: 0 0 9px; }
+.file-view-summary { margin: 0; font-size: 15px; line-height: 1.55; color: var(--ink); }
+.file-view-quiet { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink-3); }
+.file-view-deps h3 { display: flex; align-items: center; gap: 8px; }
+.file-view-deps h3 i { width: 16px; height: 2px; border-radius: 1px; display: inline-block; flex: none; }
+.file-view-deps ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.file-view-deps li { min-width: 0; max-width: 100%; }
+.file-view-deps button { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; font-family: var(--font-mono); color: var(--ink); }
+.file-view-deps button:hover { border-color: var(--accent); color: var(--accent); }
+.file-view-steps { list-style: none; margin: 0; padding: 0; }
+.file-view-steps li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 13.5px; line-height: 1.4; }
+.file-view-steps li:first-child { border-top: 0; padding-top: 2px; }
+.file-view-steps span { min-width: 0; overflow-wrap: anywhere; }
+.file-view-steps time { flex: none; color: var(--ink-3); white-space: nowrap; font-size: 12.5px; }
+/* Ask in the sidebar's width: answers wrap, code scrolls sideways in its block. */
+.file-view .ask-a { font-size: 15px; overflow-wrap: anywhere; }
+.file-view .ask-input { font-size: 15px; }
+.file-view .md-pre { max-width: 100%; }

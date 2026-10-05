@@ -139,6 +139,7 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 13:50 (5 Oct) [map-cap] The map's file cap goes from 800 to 3,000 (`BRAINSTORM_MAX_FILES` still overrides it); a bigger repo says "showing 3,000 of N files" in the stats line and the Files tab says which files were chosen. The benchmark passes `BRAINSTORM_MAX_FILES` through.
 - 13:50 (5 Oct) [cleanup] The old full-screen Track and "Ask about this thread" are gone, as decided (`refactor/drop-old-track`): `tasks/TrackView.tsx`, `lib/ThreadCounts.tsx`, `tasks/track.css` (the Map | Places switch keeps its rules in `map/lens.css`), dead `.trk-*` selectors; on the server `/api/tasks`, `/api/tasks/:id` and `/api/tasks/:id/file` (it served files agents touched), `TasksService`, `tasks/commands.ts`, the `Task*` types, and Ask's whole-thread context. Screenshots stay: `shots/` serves the same `/api/tasks/shot/:stepId/:idx` for the step panel. 1,128 lines removed from app/, 84 added.
+- 13:55 (5 Oct) [agent-id] Each step keeps the subagent it comes from (`steps.agent_id`, branch `feature/agent-id`): stored on insert, returned by every read (including the SQL-built `/steps` JSON, unchanged byte for byte for steps without one). A one-time background pass fills it for older steps from their subagent logs: on a copy of the dev database, 6,907 subagent steps from 42 logs in 0.5 s (97 left without, their log is gone). Thread 27368a18 (26 subagents, several at once) now groups the same after a reload as live: 1,673 beats, against 1,751 when every subagent shared one stream.
 
 ## Requests
 

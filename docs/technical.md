@@ -97,6 +97,8 @@ One SQLite file, `app/server/data/brainstorm.db`, ignored by git. Each module cr
 | `ask_answers` | Ask | Questions and Claude answers, reused while the file is unchanged |
 | `failure_names` | Failures | Nemotron's title and advice per failure group |
 
+A `steps` row is one `Step` (`app/server/src/types.ts`): `id` (`<line uuid>:<block index>`), `session_id`, `seq`, `ts`, `kind`, `text`, `tool`, `input`, `file_path`, `diff`, `label`, `risk` (JSON where structured), `is_subagent`, `tool_use_id` (pairs a result with its call, since 30 Sep 2026) and `agent_id` (the subagent the step comes from, null on the main thread, since 5 Oct 2026). Columns added later come with a guarded `ALTER TABLE` at startup. Subagent steps stored before `agent_id` existed get it once, in the background after the server listens (`listener/agent-ids.ts`): it re-reads the stored part of those threads' `subagents/agent-*.jsonl` logs, only sets `agent_id` where it is missing, skips logs that are gone, and records `agent_ids_backfilled` in `settings` so it never runs again. With it, a reloaded thread keeps parallel subagents apart as the live one does.
+
 ## How the models are used
 
 **Nemotron 3 Nano (30B, FP8) on NVIDIA Brev.**

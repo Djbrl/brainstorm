@@ -11,6 +11,7 @@ import { EventsGateway } from "../core/events.gateway";
 import { ConfigService } from "../core/config.service";
 import { maskSecrets } from "../privacy/mask";
 import { encodeRoot, formerRoots, repoBase, underPrefix } from "./moved";
+import { backfillAgentIds } from "./agent-ids";
 
 // Owner: A. Tail ~/.claude/projects/**/*.jsonl, parse into Steps, store, emit on bus, broadcast over ws.
 
@@ -152,6 +153,9 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   private sessionsCache: SessionRow[] | null = null;
   /** Thread id → its transcript files (<project>/<sessionId>.jsonl), from the files read. Dropped when one is added. */
   private transcripts: Map<string, string[]> | null = null;
+  private destroyed = false;
+  /** The one-time pass that gives older subagent steps their agent id (see agent-ids.ts); resolves when it's over. */
+  agentIdsDone?: Promise<void>;
 
   constructor(
     private dbs: DbService,
@@ -184,7 +188,11 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       } catch (e) { db.exec("ROLLBACK"); throw e; }
     }
     // Added 30 Sep 2026: pairs a tool result with its call exactly (older rows are paired by order).
-    if (!(db.prepare(`PRAGMA table_info(steps)`).all() as { name: string }[]).some((c) => c.name === "tool_use_id")) db.exec(`ALTER TABLE steps ADD COLUMN tool_use_id TEXT`);
+    const stepCols = (db.prepare(`PRAGMA table_info(steps)`).all() as { name: string }[]).map((c) => c.name);
+    if (!stepCols.includes("tool_use_id")) db.exec(`ALTER TABLE steps ADD COLUMN tool_use_id TEXT`);
+    // Added 5 Oct 2026: which subagent a step comes from, so parallel subagents stay apart after a reload. Steps stored
+    // before then get theirs from their logs, once (see agent-ids.ts).
+    if (!stepCols.includes("agent_id")) db.exec(`ALTER TABLE steps ADD COLUMN agent_id TEXT`);
     db.exec(`CREATE INDEX IF NOT EXISTS steps_session_seq ON steps(session_id, seq)`);
     db.exec(`CREATE INDEX IF NOT EXISTS steps_label ON steps(kind, label)`);
     // Added 3 Oct 2026: compacted-conversation recaps were stored as prompts; they read as the agent's text.
@@ -198,6 +206,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       this.nextSeq.set(row.session_id, row.m + 1);
     }
     this.listening = this.whenListening();
+    this.agentIdsDone = this.fillAgentIds();
 
     // Start out scoped to the configured default root (repo root, or MAP_ROOT) until a workspace
     // is explicitly chosen (WorkspaceService then emits "workspace" and we re-scope, see below).
@@ -232,7 +241,22 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     this.backfillGen++; // stops a backfill between files
+    this.destroyed = true;
+    await this.agentIdsDone;
     await this.watcher?.close();
+  }
+
+  /** Once the server is up, in the background: subagent steps stored before agent_id was kept get it from their logs. */
+  private async fillAgentIds() {
+    await this.listening;
+    if (this.destroyed) return;
+    const started = Date.now();
+    try {
+      const r = await backfillAgentIds(this.dbs.db, { stopped: () => this.destroyed });
+      if (r && (r.files || r.missing)) this.log.log(`agent ids: ${r.filled} subagent step(s) given theirs from ${r.files} log(s) (${r.missing} gone) in ${Date.now() - started} ms`);
+    } catch (e) {
+      if (!this.destroyed) this.log.warn(`agent ids: the pass failed, tried again next start: ${(e as Error).message}`);
+    }
   }
 
   /** Resolves when the HTTP server is listening (at once in tests, where there is none). */
@@ -250,8 +274,8 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     const db = this.dbs.db;
     return {
       insertStep: db.prepare(
-        `INSERT OR REPLACE INTO steps (id, session_id, seq, ts, kind, text, tool, input, file_path, diff, label, risk, is_subagent, tool_use_id)
-         VALUES (@id, @session_id, @seq, @ts, @kind, @text, @tool, @input, @file_path, @diff, @label, @risk, @is_subagent, @tool_use_id)`,
+        `INSERT OR REPLACE INTO steps (id, session_id, seq, ts, kind, text, tool, input, file_path, diff, label, risk, is_subagent, tool_use_id, agent_id)
+         VALUES (@id, @session_id, @seq, @ts, @kind, @text, @tool, @input, @file_path, @diff, @label, @risk, @is_subagent, @tool_use_id, @agent_id)`,
       ),
       sessionRow: db.prepare(`SELECT * FROM sessions WHERE id = ?`),
       insertSession: db.prepare(`INSERT INTO sessions (id, cwd, title, started_at, last_event_at, custom_title, title_set, worked) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`),
@@ -675,6 +699,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       risk: step.risk ? JSON.stringify(step.risk) : null,
       is_subagent: step.isSubagent ? 1 : 0,
       tool_use_id: step.toolUseId ?? null,
+      agent_id: step.agentId ?? null,
     });
     this.upsertSession(b, step.sessionId, opts?.cwd ?? "", step.ts, opts?.promptTitle, step.kind === "tool_call" || step.kind === "edit");
     if (!b.quiet) b.events.push({ step });
@@ -847,6 +872,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       label: row.label ?? undefined,
       risk: row.risk ? JSON.parse(row.risk) : undefined,
       isSubagent: !!row.is_subagent,
+      ...(row.agent_id ? { agentId: row.agent_id } : {}),
       ...(row.tool_use_id ? { toolUseId: row.tool_use_id } : {}),
     };
   }
@@ -906,6 +932,7 @@ const STEP_JSON = `'{"id":' || ${jq("id")} || ',"sessionId":' || ${jq("session_i
   || CASE WHEN label IS NOT NULL THEN ',"label":' || ${jq("label")} ELSE '' END
   || CASE WHEN risk IS NOT NULL AND risk != '' THEN ',"risk":' || risk ELSE '' END
   || ',"isSubagent":' || CASE WHEN is_subagent THEN 'true' ELSE 'false' END
+  || CASE WHEN agent_id IS NOT NULL AND agent_id != '' THEN ',"agentId":' || ${jq("agent_id")} ELSE '' END
   || CASE WHEN tool_use_id IS NOT NULL AND tool_use_id != '' THEN ',"toolUseId":' || ${jq("tool_use_id")} ELSE '' END || '}'`;
 const stepsJsonSql = (where: string) =>
   `SELECT '[' || coalesce(group_concat(j, ','), '') || ']' AS out FROM (SELECT ${STEP_JSON} AS j FROM steps WHERE ${where} ORDER BY seq ASC)`;

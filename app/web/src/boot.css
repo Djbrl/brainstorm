@@ -5,3 +5,8 @@
 @keyframes boot-in { to { opacity: 1; } }
 @keyframes boot-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) { .boot p { animation: boot-in .2s ease .25s forwards; } }
+/* A link to a thread this project doesn't have (App.tsx MissingThread). */
+.boot.missing { align-content: center; justify-items: center; gap: 10px; text-align: center; padding: 24px; }
+.boot.missing h2 { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+.boot.missing p { animation: none; opacity: 1; font-family: var(--font-body); font-size: 16px; color: var(--ink-2); }
+.boot.missing .next-cta { margin: 8px 0 0; border: 0; font: inherit; font-size: 14px; font-weight: 600; padding: 9px 18px; }

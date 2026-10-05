@@ -40,7 +40,7 @@ function Crumbs({ project }: { project: string }) {
 function Shell() {
   const { state, reload } = useLive();
   const [setupOpen, setSetupOpen] = useState(false);
-  const { lens, replay, back, startReplay } = useNav();
+  const { lens, replay, back, startReplay, stopReplay, selectFile } = useNav();
   useAttentionAlerts((sid) => startReplay(sid, END, { live: true, lens: threadLens() })); // a notification opens the thread's Track
 
   // Esc closes the innermost thing first: a popover (it handles Esc itself and marks it handled), then a panel (step,
@@ -62,7 +62,8 @@ function Shell() {
   // Local app: pick a workspace first (and whenever "Change" is clicked). The hosted demo never shows setup,
   // except the post-deadline preview, which plays back a recorded setup run (see lib/preview.ts).
   if ((setupOpen && (!state.replay || state.preview)) || (!state.replay && state.setup && !state.setup.root)) {
-    return <SetupView onDone={() => { setSetupOpen(false); reload(); }} onCancel={state.setup?.root || state.preview ? () => setSetupOpen(false) : undefined} />;
+    // Another project: whatever was open (a thread, a step, a file) belonged to the old one.
+    return <SetupView onDone={() => { setSetupOpen(false); stopReplay(); selectFile(null); reload(); }} onCancel={state.setup?.root || state.preview ? () => setSetupOpen(false) : undefined} />;
   }
   const project = state.setup?.name || "brainstorm";
 
@@ -102,7 +103,8 @@ function Shell() {
       <LiveFollow />
       {!replay && !state.shared && <Welcome />}
       <main className="view"><Suspense fallback={<Loading />}>{
-        replay && lens === "track" && !state.replay ? <TrackView />
+        replay && state.sessionsLoaded && !state.sessions.some((s) => s.id === replay.sessionId) ? <MissingThread onBack={stopReplay} />
+          : replay && lens === "track" && !state.replay ? <TrackView />
           : replay && lens === "places" ? <PlacesView />
           : <MapView />
       }</Suspense></main>
@@ -120,6 +122,17 @@ function useBooting(): boolean {
   const [waited, setWaited] = useState(false);
   useEffect(() => { if (ready) return; const t = setTimeout(() => setWaited(true), 8000); return () => clearTimeout(t); }, [ready]);
   return !ready && !waited;
+}
+
+/** A link to a thread this project doesn't have: another project's, a deleted one, or a typo. */
+function MissingThread({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="boot missing" role="status">
+      <h2>This thread isn't in this project</h2>
+      <p>It may belong to another project, or it was deleted.</p>
+      <button className="next-cta" onClick={onBack}>Back to the project</button>
+    </div>
+  );
 }
 
 function Loading() {

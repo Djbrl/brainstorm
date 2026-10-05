@@ -5,7 +5,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Edge, FileNode, Step } from "@contract";
 import { AskBox } from "../ask/AskBox";
-import { clock } from "../lib/live";
+import { clock, useLive } from "../lib/live";
+import { missingSummary } from "../lib/ai";
 import { useNav } from "../lib/nav";
 import { mapStyle } from "./themes";
 import { relTime } from "./MapView";
@@ -72,6 +73,7 @@ function FileDetail({ file, root, steps, edges, onFocus }: {
   file: FileNode; root: string; steps: Record<string, Step[]>; edges: Edge[]; onFocus: (path: string) => void;
 }) {
   const now = useNow();
+  const setup = useLive().state.setup;
   // Unique: a file can import from the same module in several statements.
   const imports = useMemo(() => [...new Set(edges.filter((e) => e.from === file.path).map((e) => e.to))], [file.path, edges]);
   const usedBy = useMemo(() => [...new Set(edges.filter((e) => e.to === file.path).map((e) => e.from))], [file.path, edges]);
@@ -92,7 +94,7 @@ function FileDetail({ file, root, steps, edges, onFocus }: {
 
       <section>
         <h3>What it does</h3>
-        {file.summary ? <p className="map-summary">{file.summary}</p> : <p className="map-quiet">Summarizing…</p>}
+        {file.summary ? <p className="map-summary">{file.summary}</p> : <p className="map-quiet">{missingSummary(setup)}</p>}
       </section>
 
       {(imports.length > 0 || usedBy.length > 0) && (

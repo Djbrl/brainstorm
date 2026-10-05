@@ -153,6 +153,7 @@ function ReadView({ input, result }: { input: Input; result?: Step }) {
       {!result ? <p className="cv-muted">Reading…</p>
         : numbered ? <Code start={numbered.start} lines={numbered.lines} />
         : text ? <Clip text={text} className="cv-code" />
+        : IMAGE.test(path) ? <Shots resultId={result.id} label="Image" />
         : <p className="cv-muted">Empty file.</p>}
     </Block>
   );
@@ -257,7 +258,14 @@ function describe(name: string, input: Input): { verb: string; detail?: ReactNod
 }
 
 /** Screenshots the tool returned, served by the local app (none in hosted replays: the images just don't load). */
-function Shots({ resultId }: { resultId: string }) {
+/** A file read as a picture: Claude Code passes the image itself to the model, kept like a screenshot (server shots/). */
+export const IMAGE = /\.(png|jpe?g|gif|webp|bmp)$/i;
+
+/**
+ * The pictures a tool returned (screenshots, an image read), loaded from the local server only when shown, one after
+ * the other (a probe asks for the next until there's none).
+ */
+export function Shots({ resultId, label = "Screenshot" }: { resultId: string; label?: string }) {
   const [count, setCount] = useState(0);
   const [done, setDone] = useState(false);
   useEffect(() => { setCount(0); setDone(false); }, [resultId]);
@@ -267,7 +275,7 @@ function Shots({ resultId }: { resultId: string }) {
       {count > 0 && (
         <div className={`cv-shots${count > 1 ? " many" : ""}`}>
           {Array.from({ length: count }, (_, i) => (
-            <a key={i} href={src(i)} target="_blank" rel="noreferrer noopener" title="Open full size"><img src={src(i)} alt={`Screenshot ${i + 1}`} /></a>
+            <a key={i} href={src(i)} target="_blank" rel="noreferrer noopener" title="Open full size"><img src={src(i)} alt={`${label} ${i + 1}`} decoding="async" /></a>
           ))}
         </div>
       )}

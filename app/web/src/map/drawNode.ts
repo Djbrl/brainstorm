@@ -349,7 +349,8 @@ function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: F
   const active = !!n.file.activeSessionId, isSel = n.id === F.sel, isHover = n.id === F.hover;
   const look = lookOf(n, F);
   if (look) { F.anyLook = true; F.lookSum += look.alpha * 3 + look.tone; }
-  const alpha = (look?.alpha ?? 1) * shown;
+  // A thread's focus dims folders less than files: they're the lay of the land around what it did.
+  const dim = look ? 0.5 + 0.5 * look.alpha : 1, alpha = dim * shown;
   // Open: the outline, and a breath of fill so folders inside folders read as levels.
   if (open > 0) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, TAU);
@@ -380,7 +381,7 @@ function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: F
     return;
   }
   // Its name goes first as it opens: by the time its files show, it's gone (its name is on the outline then).
-  const said = (look?.alpha ?? 1) * (n.said ?? 1) * Math.max(0, 1 - open * 3);
+  const said = dim * (n.said ?? 1) * Math.max(0, 1 - open * 3);
   if (said <= 0.01) return;
   // A few sizes only, stamped from cached pictures (labels.ts drawName): zooming doesn't draw new text every frame.
   const name = folderName(n), family = st.labelFont ?? tokens.body, size = px > 110 ? 20 : px > 70 ? 16 : px > 40 ? 13 : 11;

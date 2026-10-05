@@ -161,6 +161,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 22:00 (5 Oct) [map] When a selected file lets go by itself: it stays through sidebar tabs, zooms, a closed folder's zoom, an open step and the Places lens; entering a thread keeps it only if the thread touched it (checked once the thread is built); leaving a thread, pressing Play and changing project always let go. Esc, "All files", empty map and a second click let go as before.
 
+- 22:50 (5 Oct) [map] With a thread open, the files outside its focus show at 30% instead of 15%, and folders dim half as much as files (the lay of the land stays readable). An image an agent reads (png, jpg, gif, webp, bmp) now shows in the step panel and the file window: Claude Code passes the picture itself to the model, and the server already keeps those like screenshots (`shots/`), loaded only when shown.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

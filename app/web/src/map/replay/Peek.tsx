@@ -16,7 +16,7 @@ import { repoBase, repoRelative } from "../../lib/paths";
 import { THEMES, useTheme } from "../../lib/theme";
 import { actionOf, useThread, type Thread } from "../../lib/thread";
 import { diffStyles, editPair } from "../../follow/StepDetail";
-import { Code } from "../../follow/content/ToolView";
+import { Code, IMAGE, Shots } from "../../follow/content/ToolView";
 import { cleanResult, parseNumbered } from "../../follow/content/parse";
 import { basename, stepFile } from "../../follow/format";
 import { setShowFile, useShowFile } from "../prefs";
@@ -119,7 +119,8 @@ function Body({ step, result }: { step: Step; result?: Step }) {
   if (numbered) return <Code key={step.id} start={numbered.start} lines={numbered.lines} />;
   if (text) return <Code key={step.id} start={1} lines={lines(text)} />;
   // An image or a PDF comes back as a picture for the model, not text: nothing to show here, but it isn't empty.
-  return <p className="peek-muted">{/\.(png|jpe?g|gif|webp|svg|ico|bmp|pdf)$/i.test(step.filePath ?? "") ? "A picture: open the step to see it." : "Empty file."}</p>;
+  if (IMAGE.test(step.filePath ?? "")) return <div className="peek-image"><Shots key={result.id} resultId={result.id} label="Image" /></div>;
+  return <p className="peek-muted">{/\.pdf$/i.test(step.filePath ?? "") ? "A PDF: open the step to see what was read." : "Empty file."}</p>;
 }
 
 /** What a read covered: "Lines 40–120". */

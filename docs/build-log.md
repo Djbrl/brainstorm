@@ -155,6 +155,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 20:40 (5 Oct) [hover-stubs] Pointing at a file shows its import lines as short stubs (26 px past its edge: how many, and which way); clicking it runs them out to the other files, the stubs carrying on into the full lines. Each line ends in a small dot. The file you point at is drawn at full strength with its outline and name, even when an open thread dims the rest.
 
+- 21:10 (5 Oct) [map] Clicking the selected file again lets go of it (the sidebar goes back to the tree). Saved for later: the import graph as a tool for agents, blast radius first ([graph-for-agents.md](graph-for-agents.md), linked from the to-do list).
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

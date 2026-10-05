@@ -9,6 +9,7 @@ How Brainstorm works, what's planned, and how it was built. Keep every file shor
 | [technical.md](technical.md) | Architecture, modules, the contract, API, storage, privacy |
 | [run-locally.md](run-locally.md) | Running the server and web app from a clone |
 | [todo.md](todo.md) | The to-do list: what to build next, in order |
+| [graph-for-agents.md](graph-for-agents.md) | Saved for later: the import graph as a tool for agents (blast radius, likely files, collisions) |
 | [roadmap.md](roadmap.md) | Product direction, packaging, pricing, decisions |
 | [share-and-experiments.md](share-and-experiments.md) | The next big directions: sharing and live replays, and the experiments lab |
 | [next-steps.md](next-steps.md) | Features cut at the hackathon and smaller known improvements |

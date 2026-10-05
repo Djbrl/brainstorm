@@ -346,10 +346,10 @@ export function MapView() {
   // Files came or went: the frame keeps coming while the circles that moved glide (stepTween).
   useEffect(() => { if (tween.current) redraw.kick(700); }, [graph, redraw, tween]);
   const onNodeHover = useCallback((n: NodeObject | null) => setHover(n ? (n as GNode).id : null), []);
-  // A closed folder: the camera goes into it (which opens it, fold.ts). A file: selected.
+  // A closed folder: the camera goes into it (which opens it, fold.ts). A file: selected, or let go if it already was.
   const onNodeClick = useCallback((n: NodeObject) => {
     const g = n as GNode;
-    if (!g.dir) { setSelected(g.id); return; }
+    if (!g.dir) { setSelected(selectedRef.current === g.id ? null : g.id); return; }   // the selected file again: let go of it
     const x = g.x ?? 0, y = g.y ?? 0, r = g.r;
     camRef.current.frame({ x0: x - r, x1: x + r, y0: y - r, y1: y + r }, { pad: 24, maxZoom: 12 }, 750);
   }, [setSelected]);

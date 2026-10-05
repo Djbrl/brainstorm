@@ -1,7 +1,9 @@
 // Owned by the lead. The shell: the header with where you are (project › thread › step), and the view for that place.
-import { isReplay, useLive } from "./lib/live";
-import { END, NavProvider, useNav } from "./lib/nav";
-import { useThread } from "./lib/thread";
+// Each part reads only the slices it shows (useLiveSelector, useNavState), so a live message or a replay cursor move
+// re-renders the parts that changed, not the whole app.
+import { isReplay, shallowEqual, useLiveActions, useLiveSelector, useLiveStep } from "./lib/live";
+import { END, NavProvider, useNavActions, useNavState, useReplayCursor } from "./lib/nav";
+import { useThread, type ReplayDetail } from "./lib/thread";
 import { displayLabel } from "./follow/format";
 import { SetupView } from "./setup/SetupView";
 import { Welcome } from "./map/Welcome";
@@ -10,37 +12,54 @@ import { useAttentionAlerts } from "./lib/attention";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import "./boot.css";
 
-// The views (and the graph library the Map needs) load when they're opened.
-const MapView = lazy(() => import("./map/MapView").then((m) => ({ default: m.MapView })));
+// The views (and the graph library the Map needs) load when they're opened. The Map is what almost every visit
+// shows, so its chunk starts downloading now, while the app boots, rather than once the project has loaded.
+let mapChunk: Promise<typeof import("./map/MapView")> | null = null;
+const loadMapView = () => (mapChunk ??= import("./map/MapView").catch((e) => { mapChunk = null; throw e; }));
+loadMapView().catch(() => {}); // a failed prefetch is retried when the view mounts
+const MapView = lazy(() => loadMapView().then((m) => ({ default: m.MapView })));
 const PlacesView = lazy(() => import("./cowork/CoworkView").then((m) => ({ default: m.PlacesView })));
 
 /** Project › Thread › Step: each part takes you back up to it. */
 function Crumbs({ project }: { project: string }) {
-  const { state } = useLive();
-  const { replay, step, stopReplay, closeStep, setThreadMode } = useNav();
-  const session = replay ? state.sessions.find((s) => s.id === replay.sessionId) : undefined;
-  const st = replay && step ? state.steps[replay.sessionId]?.find((s) => s.id === step) : undefined;
+  const { replay, step } = useNavState();
+  const { stopReplay, closeStep, setThreadMode } = useNavActions();
+  const sid = replay?.sessionId;
+  const title = useLiveSelector((s) => (sid ? s.sessions.find((x) => x.id === sid)?.title : undefined));
+  const st = useLiveStep(replay && step ? step : null);
   return (
     <nav className="crumbs" aria-label="Where you are">
       {replay ? <button onClick={stopReplay}>{project}</button> : <span aria-current="page">{project}</span>}
       {replay && <>
         <span className="sep" aria-hidden="true">›</span>
-        {step ? <button onClick={closeStep}>{session?.title || "Thread"}</button>
-          : <button className="here" aria-current="page" onClick={() => setThreadMode("steps")}>{session?.title || "Thread"}</button>}
+        {step ? <button onClick={closeStep}>{title || "Thread"}</button>
+          : <button className="here" aria-current="page" onClick={() => setThreadMode("steps")}>{title || "Thread"}</button>}
       </>}
       {replay && step && <>
         <span className="sep" aria-hidden="true">›</span>
-        <span className="here" aria-current="page">{st ? displayLabel(st) : "Step"}</span>
+        <span className="here" aria-current="page">{st && st.sessionId === sid ? displayLabel(st) : "Step"}</span>
       </>}
     </nav>
   );
 }
 
-function Shell() {
-  const { state, reload } = useLive();
-  const [setupOpen, setSetupOpen] = useState(false);
-  const { lens, replay, back, startReplay, stopReplay, selectFile } = useNav();
+/** Mounted once: the tab title and notifications for threads that need you (on its own, so the shell doesn't re-render with every live change). */
+function AttentionAlerts() {
+  const { startReplay } = useNavActions();
   useAttentionAlerts((sid) => startReplay(sid, END, { live: true, lens: "map" })); // a notification opens the thread, its Track in the sidebar
+  return null;
+}
+
+function Shell() {
+  const { reload } = useLiveActions();
+  const { lens, replay } = useNavState();
+  const { back, stopReplay, selectFile } = useNavActions();
+  const replayId = replay?.sessionId ?? null;
+  const state = useLiveSelector((s) => ({
+    replay: s.replay, preview: s.preview, shared: s.shared, connected: s.connected, setup: s.setup,
+    missing: !!replayId && s.sessionsLoaded && !s.sessions.some((x) => x.id === replayId), // a thread this project doesn't have
+  }), shallowEqual);
+  const [setupOpen, setSetupOpen] = useState(false);
 
   // Esc closes the innermost thing first: a popover (it handles Esc itself and marks it handled), then a panel (step,
   // file), then the player, then the thread (not while typing).
@@ -105,7 +124,7 @@ function Shell() {
       <LiveFollow />
       {!replay && !state.shared && <Welcome />}
       <main className="view"><Suspense fallback={<Loading />}>{
-        replay && state.sessionsLoaded && !state.sessions.some((s) => s.id === replay.sessionId) ? <MissingThread onBack={stopReplay} />
+        replay && state.missing ? <MissingThread onBack={stopReplay} />
           : replay && lens === "places" ? <PlacesView />
           : <MapView />
       }</Suspense></main>
@@ -118,8 +137,7 @@ function Shell() {
  * Gives up after a while so a server that doesn't answer shows the app (and its "Connecting…") instead.
  */
 function useBooting(): boolean {
-  const { state } = useLive();
-  const ready = isReplay() ? state.replay : !!state.setup && (!state.setup.root || !!state.map);
+  const ready = useLiveSelector((s) => (isReplay() ? s.replay : !!s.setup && (!s.setup.root || !!s.map)));
   const [waited, setWaited] = useState(false);
   useEffect(() => { if (ready) return; const t = setTimeout(() => setWaited(true), 8000); return () => clearTimeout(t); }, [ready]);
   return !ready && !waited;
@@ -142,9 +160,9 @@ function Loading() {
 
 /** A shared replay holds one thread: it opens on that thread's footprint (unless its link names a place). */
 function OpenShared() {
-  const { state } = useLive();
-  const { replay, startReplay } = useNav();
-  const first = state.sessions[0]?.id;
+  const first = useLiveSelector((s) => s.sessions[0]?.id);
+  const { replay } = useNavState();
+  const { startReplay } = useNavActions();
   const done = useRef(false);
   useEffect(() => {
     if (!first || done.current) return;
@@ -157,21 +175,36 @@ function OpenShared() {
 /**
  * A thread you chose to follow live stays on its newest step; a replay that reaches the end of a running thread
  * starts following it. Nothing opens or plays by itself: running threads show as moving dots until you click one.
+ * The parts that build the thread are mounted only while they're needed.
  */
 function LiveFollow() {
-  const { state } = useLive();
-  const { replay, followLive, setReplayLive } = useNav();
-  const thread = useThread(replay?.live ? replay.sessionId : null, replay?.detail ?? "light");
-  const beats = thread?.beats.length ?? 0;
-  useEffect(() => { if (replay?.live && beats) followLive(beats - 1); }, [replay?.live, beats, followLive]);
-  const running = state.sessions.find((s) => s.id === replay?.sessionId)?.status === "running";
-  const all = useThread(replay && replay.mode === "play" && !replay.live && running ? replay.sessionId : null, replay?.detail ?? "light");
-  useEffect(() => {
-    if (replay && replay.mode === "play" && !replay.live && running && all && replay.index >= all.beats.length - 1 && !replay.playing) setReplayLive(true);
-  }, [replay, running, all, setReplayLive]);
+  const { replay } = useNavState();
+  const sid = replay?.sessionId;
+  const running = useLiveSelector((s) => !!sid && s.sessions.find((x) => x.id === sid)?.status === "running");
+  if (!replay) return null;
+  if (replay.live) return <FollowNewest sessionId={replay.sessionId} detail={replay.detail} />;
+  if (replay.mode === "play" && running) return <FollowAtEnd sessionId={replay.sessionId} detail={replay.detail} />;
+  return null;
+}
+
+/** Following live: keep the cursor on the newest beat as the thread grows. */
+function FollowNewest({ sessionId, detail }: { sessionId: string; detail: ReplayDetail }) {
+  const { followLive } = useNavActions();
+  const beats = useThread(sessionId, detail)?.beats.length ?? 0;
+  useEffect(() => { if (beats) followLive(beats - 1); }, [beats, followLive]);
+  return null;
+}
+
+/** Replaying a running thread: once the player stops on its last beat, follow it live. */
+function FollowAtEnd({ sessionId, detail }: { sessionId: string; detail: ReplayDetail }) {
+  const { setReplayLive } = useNavActions();
+  const all = useThread(sessionId, detail);
+  const last = all ? all.beats.length - 1 : -1;
+  const atEnd = useReplayCursor((c) => last >= 0 && c.index >= last && !c.playing);
+  useEffect(() => { if (atEnd) setReplayLive(true); }, [atEnd, setReplayLive]);
   return null;
 }
 
 export function App() {
-  return <NavProvider><Shell /></NavProvider>;
+  return <NavProvider><AttentionAlerts /><Shell /></NavProvider>;
 }

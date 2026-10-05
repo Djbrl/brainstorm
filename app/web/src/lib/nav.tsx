@@ -10,8 +10,19 @@
 // view of its own (/thread/<id>/track) open the map.
 // Opening or closing a thread, a step or a lens adds a browser history entry, so Back and Esc go up one level. Moving
 // through a replay doesn't. A file opened from disk (a shared replay) keeps the same paths after a `#`.
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+//
+// The state lives in a small external store; every action changes it in one step. Reading it:
+//   useNavActions()           every setter (startReplay, openStep, back…). Never changes, so it never re-renders you.
+//   useNavState()             where you are (thread, step, file, lens, hidden agents, reads) without the replay cursor:
+//                             its `replay` has no `index`/`playing`. Moving through a replay doesn't re-render you.
+//   useReplayCursor(sel?)     the cursor { index, playing }, or a slice of it (e.g. c => c.index === 0).
+//   useNavSelector(sel, eq?)  any slice of the raw state.
+//   useNav()                  all of it in the old shape: renders again on every change, the cursor included.
+// Migrating a component: split `const { replay, startReplay } = useNav()` into useNavState() + useNavActions(), and
+// read `index`/`playing` with useReplayCursor only where they're drawn (ideally a small child component).
+import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { ReplayDetail } from "./thread";
+import { listeners, shallowEqual, useStoreSelector } from "./store";
 
 /** How a thread is shown: where it happened in the code, or the places it went outside the code. */
 export type Lens = "map" | "places";
@@ -28,6 +39,10 @@ export const END = Number.MAX_SAFE_INTEGER;
  * `atStep` is a step id to land on once the thread is built (links, switching detail); the replay layer resolves and clears it.
  */
 export type ThreadReplay = { sessionId: string; index: number; playing: boolean; speed: ReplaySpeed; detail: ReplayDetail; mode: ThreadMode; atStep?: string; live?: boolean };
+/** The open thread without its cursor (see useNavState). */
+export type OpenThread = Omit<ThreadReplay, "index" | "playing">;
+/** The replay cursor: the beat it's on and whether it plays. */
+export type ReplayCursor = { index: number; playing: boolean };
 
 /**
  * Map display prefs read by the canvas layers (live agents, thread replay) on every frame.
@@ -88,7 +103,34 @@ type Nav = {
   showReads: boolean;
   setShowReads: (v: boolean) => void;
 };
-const Ctx = createContext<Nav | null>(null);
+
+/** Every setter of Nav. */
+export type NavActions = Pick<Nav, "setFocusFile" | "openFile" | "selectFile" | "startReplay" | "setThreadMode" | "followLive" | "setReplayLive"
+  | "setLens" | "setReplayIndex" | "setReplayPlaying" | "setReplaySpeed" | "setReplayDetail" | "landReplay" | "stopReplay" | "openStep"
+  | "showStep" | "closeStep" | "back" | "toggleAgent" | "setHiddenAgents" | "setShowReads">;
+
+/** The store's state: the open thread and its cursor are kept apart, so moving the cursor leaves `thread` as it was. */
+export type NavData = {
+  focusFile: string | null;
+  file: string | null;
+  step: string | null;
+  lens: Lens;
+  thread: OpenThread | null;
+  cursor: ReplayCursor;
+  hiddenAgents: ReadonlySet<string>;
+  showReads: boolean;
+};
+/** Where you are, without the replay cursor. */
+export type NavState = Omit<NavData, "thread" | "cursor"> & { replay: OpenThread | null };
+
+type NavStore = {
+  get: () => NavData;
+  subscribe: (l: () => void) => () => void;
+  actions: NavActions;
+  /** Set by actions, read by the URL effect: the move came from the URL / shouldn't add a history entry. */
+  flags: { fromUrl: boolean; replaceNext: boolean };
+};
+const Ctx = createContext<NavStore | null>(null);
 
 const HIDDEN_KEY = "brainstorm-hidden-agents";
 const READS_KEY = "brainstorm-map-show-reads";
@@ -138,115 +180,180 @@ function readPlace(): Place {
 const hrefFor = (p: Place) => (hashMode ? `${location.pathname}${keptQuery()}#${pathFor(p)}` : `${pathFor(p)}${keptQuery()}`);
 const hereHref = () => (hashMode ? `${location.pathname}${location.search}${location.hash || "#/"}` : `${location.pathname}${location.search}`);
 
-export function NavProvider({ children }: { children: ReactNode }) {
-  const first = useRef<Place | null>(null);
-  if (!first.current) first.current = readPlace();
-  const [focusFile, setFocusFile] = useState<string | null>(null);
-  const [replay, setReplay] = useState<ThreadReplay | null>(() => {
-    const f = first.current!;
-    return f.thread ? { sessionId: f.thread, index: END, playing: false, speed: 1, detail: "light", mode: "steps", atStep: f.step ?? undefined } : null;
-  });
-  const [step, setStep] = useState<string | null>(first.current.step);
-  const [file, setFile] = useState<string | null>(first.current.file ?? null);
-  const [lens, setLensState] = useState<Lens>(first.current.lens);
-  const [hiddenAgents, setHidden] = useState<Set<string>>(loadHidden);
-  const [showReads, setShowReadsState] = useState<boolean>(() => (mapPrefs.showReads = loadShowReads()));
-  const setShowReads = useCallback((v: boolean) => {
-    mapPrefs.showReads = v;
-    setShowReadsState(v);
-    try { localStorage.setItem(READS_KEY, v ? "1" : "0"); } catch { /* storage blocked: resets on reload */ }
-  }, []);
+/** The open thread with its cursor, as Nav's `replay`. */
+const joinReplay = (t: OpenThread | null, c: ReplayCursor): ThreadReplay | null => (t ? { ...t, index: c.index, playing: c.playing } : null);
 
+function createNavStore(): NavStore {
+  const first = readPlace();
+  let data: NavData = {
+    focusFile: null,
+    file: first.file ?? null,
+    step: first.step,
+    lens: first.lens,
+    thread: first.thread ? { sessionId: first.thread, speed: 1, detail: "light", mode: "steps", atStep: first.step ?? undefined } : null,
+    cursor: { index: first.thread ? END : 0, playing: false },
+    hiddenAgents: loadHidden(),
+    showReads: (mapPrefs.showReads = loadShowReads()),
+  };
+  const { subscribe, emit } = listeners();
+  // The first render matches the URL already (an old ?view= link is rewritten in place).
+  const flags = { fromUrl: true, replaceNext: false };
+
+  /** Change several fields in one step (one render for everyone reading them). */
+  const set = (patch: Partial<NavData>) => {
+    let changed = false;
+    for (const k in patch) if (!Object.is(patch[k as keyof NavData], data[k as keyof NavData])) { changed = true; break; }
+    if (!changed) return;
+    data = { ...data, ...patch };
+    emit();
+  };
+  /** The old `setReplay(r => …)`: the thread and cursor keep their identity when their fields didn't change. */
+  const replayPatch = (fn: (r: ThreadReplay | null) => ThreadReplay | null): Partial<NavData> => {
+    const r = joinReplay(data.thread, data.cursor), n = fn(r);
+    if (n === r) return {};
+    if (!n) return { thread: null };
+    const { index, playing, ...rest } = n;
+    return {
+      thread: shallowEqual<OpenThread | null>(rest, data.thread) ? data.thread : rest,
+      cursor: index === data.cursor.index && playing === data.cursor.playing ? data.cursor : { index, playing },
+    };
+  };
+  const setReplay = (fn: (r: ThreadReplay | null) => ThreadReplay | null) => set(replayPatch(fn));
+
+  const setShowReads = (v: boolean) => {
+    mapPrefs.showReads = v;
+    set({ showReads: v });
+    try { localStorage.setItem(READS_KEY, v ? "1" : "0"); } catch { /* storage blocked: resets on reload */ }
+  };
+  const setHidden = (h: ReadonlySet<string>) => {
+    set({ hiddenAgents: h });
+    try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...h])); } catch { /* storage blocked: hidden agents reset on reload */ }
+  };
+
+  const startReplay: NavActions["startReplay"] = (sid, at = 0, opts) => set({
+    ...replayPatch((r) => ({
+      sessionId: sid, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: opts?.mode ?? "steps",
+      index: typeof at === "number" ? Math.max(0, at) : 0, atStep: typeof at === "string" ? at : undefined, live: !!opts?.live,
+    })),
+    step: null,
+    ...(opts?.lens && { lens: opts.lens }),
+  });
+  // Back on the project, the lens is the map again (a thread opened from the map, like the Welcome replay, stays there).
+  const stopReplay = () => { replayCursor.stepId = null; set({ thread: null, step: null, lens: "map" }); };
+  const setThreadMode = (mode: ThreadMode) => setReplay((r) => (r ? { ...r, mode, playing: mode === "play" ? r.playing : false } : r));
+
+  const actions: NavActions = {
+    setFocusFile: (p) => set({ focusFile: p }),
+    openFile: (p) => set({ focusFile: p, lens: "map" }),
+    selectFile: (rel) => set({ file: rel }),
+    startReplay,
+    stopReplay,
+    setThreadMode,
+    setLens: (l) => set({ lens: l, step: null }),
+    // Moving the cursor by hand stops following live; followLive is the only setter that keeps it.
+    setReplayIndex: (i) => setReplay((r) => (r ? { ...r, live: false, index: Math.max(0, typeof i === "function" ? i(r.index) : i) } : r)),
+    followLive: (i) => setReplay((r) => (r && r.live && r.index !== i ? { ...r, index: Math.max(0, i), atStep: undefined } : r)),
+    setReplayLive: (live) => setReplay((r) => (r ? { ...r, live, playing: false, mode: r.mode === "footprint" ? "steps" : r.mode } : r)),
+    setReplayPlaying: (playing) => setReplay((r) => (r ? { ...r, playing, live: playing ? false : r.live, mode: playing ? "play" : r.mode } : r)),
+    setReplaySpeed: (speed) => setReplay((r) => (r ? { ...r, speed } : r)),
+    setReplayDetail: (detail, atStep) => setReplay((r) => (r ? { ...r, detail, playing: false, atStep: atStep ?? replayCursor.stepId ?? undefined } : r)),
+    landReplay: (index) => setReplay((r) => (r ? { ...r, index: Math.max(0, index), atStep: undefined } : r)),
+    openStep: (sid, stepId) => set({
+      ...replayPatch((r) => (r && r.sessionId === sid
+        ? { ...r, atStep: stepId, playing: false, live: false, mode: r.mode === "footprint" ? "steps" : r.mode }
+        : { sessionId: sid, index: 0, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: "steps", atStep: stepId })),
+      step: stepId,
+    }),
+    showStep: (stepId) => { flags.replaceNext = true; set({ step: stepId }); },
+    closeStep: () => set({ step: null }),
+    back: () => {
+      const { step, file, lens, thread } = data;
+      if (step) { set({ step: null }); return; }
+      if (file && lens === "map") { set({ file: null }); return; }
+      if (thread?.mode === "play") { setThreadMode("steps"); return; }
+      if (thread) stopReplay();
+    },
+    toggleAgent: (id) => { const n = new Set(data.hiddenAgents); if (n.has(id)) n.delete(id); else n.add(id); setHidden(n); },
+    setHiddenAgents: (ids) => setHidden(new Set(ids)),
+    setShowReads,
+  };
+
+  // Back and Forward: go where the URL says.
+  if (typeof window !== "undefined") {
+    addEventListener(hashMode ? "hashchange" : "popstate", () => {
+      const p = readPlace();
+      flags.fromUrl = true;
+      set({
+        lens: p.lens, step: p.step, file: p.file ?? null,
+        ...replayPatch((r) => {
+          if (!p.thread) { replayCursor.stepId = null; return null; }
+          if (r && r.sessionId === p.thread) return p.step ? { ...r, atStep: p.step, playing: false, mode: r.mode === "footprint" ? "steps" : r.mode } : r;
+          return { sessionId: p.thread, index: END, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: "steps", atStep: p.step ?? undefined };
+        }),
+      });
+    });
+  }
+
+  return { get: () => data, subscribe, actions, flags };
+}
+
+// One store per page: the URL is one too (and Back/Forward listen for the page's whole life).
+let pageStore: NavStore | null = null;
+
+export function NavProvider({ children }: { children: ReactNode }) {
+  const [store] = useState(() => (pageStore ??= createNavStore()));
   // The URL follows the place (thread, lens, step): a new history entry per move, except when the move came from the URL.
-  const fromUrl = useRef(true); // the first render matches the URL already (an old ?view= link is rewritten in place)
-  const replaceNext = useRef(false); // a move that shouldn't add a history entry (the panel following the cursor)
-  const thread = replay?.sessionId ?? null;
+  const place = useStoreSelector(store, (d) => ({ thread: d.thread?.sessionId ?? null, step: d.step, lens: d.lens, file: d.file }), shallowEqual);
+  const { thread, step, lens, file } = place;
   useEffect(() => {
     const href = hrefFor({ thread, step: thread ? step : null, lens: thread ? lens : "map", file });
     if (href !== hereHref()) {
-      if (fromUrl.current || replaceNext.current) history.replaceState(null, "", href);
+      if (store.flags.fromUrl || store.flags.replaceNext) history.replaceState(null, "", href);
       else history.pushState(null, "", href);
     }
-    fromUrl.current = false;
-    replaceNext.current = false;
-  }, [thread, step, lens, file]);
-
-  // Back and Forward: go where the URL says.
-  useEffect(() => {
-    const onPop = () => {
-      const p = readPlace();
-      fromUrl.current = true;
-      setLensState(p.lens);
-      setStep(p.step);
-      setFile(p.file ?? null);
-      setReplay((r) => {
-        if (!p.thread) { replayCursor.stepId = null; return null; }
-        if (r && r.sessionId === p.thread) return p.step ? { ...r, atStep: p.step, playing: false, mode: r.mode === "footprint" ? "steps" : r.mode } : r;
-        return { sessionId: p.thread, index: END, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: "steps", atStep: p.step ?? undefined };
-      });
-    };
-    addEventListener(hashMode ? "hashchange" : "popstate", onPop);
-    return () => removeEventListener(hashMode ? "hashchange" : "popstate", onPop);
-  }, []);
-
-  useEffect(() => {
-    try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hiddenAgents])); } catch { /* storage blocked: hidden agents reset on reload */ }
-  }, [hiddenAgents]);
-
-  const startReplay = useCallback((sid: string, at: number | string = 0, opts?: { live?: boolean; mode?: ThreadMode; lens?: Lens }) => {
-    setReplay((r) => ({
-      sessionId: sid, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: opts?.mode ?? "steps",
-      index: typeof at === "number" ? Math.max(0, at) : 0, atStep: typeof at === "string" ? at : undefined, live: !!opts?.live,
-    }));
-    setStep(null);
-    if (opts?.lens) setLensState(opts.lens);
-  }, []);
-  // Back on the project, the lens is the map again (a thread opened from the map, like the Welcome replay, stays there).
-  const stopReplay = useCallback(() => { replayCursor.stepId = null; setReplay(null); setStep(null); setLensState("map"); }, []);
-  const setThreadMode = useCallback((mode: ThreadMode) => setReplay((r) => (r ? { ...r, mode, playing: mode === "play" ? r.playing : false } : r)), []);
-  const openFile = useCallback((p: string) => { setFocusFile(p); setLensState("map"); }, []);
-  const setLens = useCallback((l: Lens) => { setLensState(l); setStep(null); }, []);
-  // Moving the cursor by hand stops following live; followLive is the only setter that keeps it.
-  const setReplayIndex = useCallback((i: number | ((prev: number) => number)) =>
-    setReplay((r) => (r ? { ...r, live: false, index: Math.max(0, typeof i === "function" ? i(r.index) : i) } : r)), []);
-  const followLive = useCallback((i: number) => setReplay((r) => (r && r.live && r.index !== i ? { ...r, index: Math.max(0, i), atStep: undefined } : r)), []);
-  const setReplayLive = useCallback((live: boolean) => setReplay((r) => (r ? { ...r, live, playing: false, mode: r.mode === "footprint" ? "steps" : r.mode } : r)), []);
-  const setReplayPlaying = useCallback((playing: boolean) => setReplay((r) => (r ? { ...r, playing, live: playing ? false : r.live, mode: playing ? "play" : r.mode } : r)), []);
-  const setReplaySpeed = useCallback((speed: ReplaySpeed) => setReplay((r) => (r ? { ...r, speed } : r)), []);
-  const setReplayDetail = useCallback((detail: ReplayDetail, atStep?: string) =>
-    setReplay((r) => (r ? { ...r, detail, playing: false, atStep: atStep ?? replayCursor.stepId ?? undefined } : r)), []);
-  const landReplay = useCallback((index: number) => setReplay((r) => (r ? { ...r, index: Math.max(0, index), atStep: undefined } : r)), []);
-
-  const openStep = useCallback((sid: string, stepId: string) => {
-    setReplay((r) => (r && r.sessionId === sid
-      ? { ...r, atStep: stepId, playing: false, live: false, mode: r.mode === "footprint" ? "steps" : r.mode }
-      : { sessionId: sid, index: 0, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: "steps", atStep: stepId }));
-    setStep(stepId);
-  }, []);
-  const showStep = useCallback((stepId: string) => { replaceNext.current = true; setStep(stepId); }, []);
-  const closeStep = useCallback(() => setStep(null), []);
-  const selectFile = useCallback((rel: string | null) => setFile(rel), []);
-  const back = useCallback(() => {
-    if (step) { setStep(null); return; }
-    if (file && lens === "map") { setFile(null); return; }
-    if (replay?.mode === "play") { setThreadMode("steps"); return; }
-    if (replay) stopReplay();
-  }, [step, file, lens, replay, setThreadMode, stopReplay]);
-
-  const toggleAgent = useCallback((id: string) => setHidden((h) => { const n = new Set(h); if (n.has(id)) n.delete(id); else n.add(id); return n; }), []);
-  const setHiddenAgents = useCallback((ids: Iterable<string>) => setHidden(new Set(ids)), []);
-
-  return (
-    <Ctx.Provider value={{
-      focusFile, setFocusFile, openFile, file, selectFile,
-      replay, startReplay, setThreadMode, setReplayIndex, setReplayPlaying, setReplaySpeed, setReplayDetail, landReplay, stopReplay, followLive, setReplayLive, lens, setLens,
-      step, openStep, showStep, closeStep, back,
-      hiddenAgents, toggleAgent, setHiddenAgents, showReads, setShowReads,
-    }}>{children}</Ctx.Provider>
-  );
+    store.flags.fromUrl = false;
+    store.flags.replaceNext = false;
+  }, [store, thread, step, lens, file]);
+  return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
 }
-export function useNav() {
-  const v = useContext(Ctx);
-  if (!v) throw new Error("useNav outside NavProvider");
-  return v;
+
+function useStore(): NavStore {
+  const store = useContext(Ctx);
+  if (!store) throw new Error("nav used outside NavProvider");
+  return store;
+}
+
+/** Every nav setter. The same object for the page's life: reading it never re-renders a component. */
+export function useNavActions(): NavActions {
+  return useStore().actions;
+}
+
+/** A slice of the nav state: renders again only when it changes (by `eq`, Object.is by default). */
+export function useNavSelector<T>(select: (d: NavData) => T, eq?: (a: T, b: T) => boolean): T {
+  return useStoreSelector(useStore(), select, eq);
+}
+
+const placeOf = (d: NavData): NavState => ({ focusFile: d.focusFile, file: d.file, step: d.step, lens: d.lens, replay: d.thread, hiddenAgents: d.hiddenAgents, showReads: d.showReads });
+/** Where you are, without the replay cursor: moving through a replay doesn't re-render you. */
+export function useNavState(): NavState {
+  return useStoreSelector(useStore(), placeOf, shallowEqual);
+}
+
+const wholeCursor = (c: ReplayCursor) => c;
+/** The replay cursor ({ index, playing }), or a slice of it. */
+export function useReplayCursor(): ReplayCursor;
+export function useReplayCursor<T>(select: (c: ReplayCursor) => T, eq?: (a: T, b: T) => boolean): T;
+export function useReplayCursor<T>(select: (c: ReplayCursor) => T = wholeCursor as (c: ReplayCursor) => T, eq?: (a: T, b: T) => boolean): T {
+  return useStoreSelector(useStore(), (d) => select(d.cursor), eq);
+}
+
+/** Everything, in one object: renders again on every change, the replay cursor included. Prefer the narrower hooks above. */
+export function useNav(): Nav {
+  const store = useStore();
+  const d = useSyncExternalStore(store.subscribe, store.get, store.get);
+  const replay = useMemo(() => joinReplay(d.thread, d.cursor), [d.thread, d.cursor]);
+  return useMemo(() => ({
+    ...store.actions,
+    focusFile: d.focusFile, file: d.file, step: d.step, lens: d.lens, hiddenAgents: d.hiddenAgents, showReads: d.showReads, replay,
+  }), [store, d, replay]);
 }

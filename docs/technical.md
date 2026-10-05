@@ -137,8 +137,9 @@ Everything is masked first. Cost is tokens × price ($5 in, $25 out per million 
 
 | Part | What it does |
 | --- | --- |
-| `lib/live.tsx` | One store. Loads `/api/sessions` and `/api/map`, polls `/api/failures` every 15 s, and applies WebSocket messages. In replay mode it loads a static JSON file instead, and `clock()` runs from the export time so "just now" and the recency colors look as they did when recorded |
-| `lib/nav.tsx` | Current view, selected session, focused file (`openFile`) and focused step (`openStep`). `?view=map` and `?view=failures` open a view directly |
+| `lib/live.tsx` | One external store. Loads the workspace, threads, map, agents and attention, then applies WebSocket messages in batches, one per animation frame, with indexes so a message touches one file or one thread. `structureVersion` changes only when the set of files (or a module, or the root) does. Read it with `useLiveSelector(sel, eq?)`; `useLive()` (everything, every change) still works. In replay mode it loads a static JSON file instead, and `clock()` runs from the export time so "just now" and the recency colors look as they did when recorded |
+| `lib/nav.tsx` | Where you are (thread, step, file, lens) and the links for it, in a small external store. `useNavActions()` never re-renders, `useNavState()` ignores the replay cursor, `useReplayCursor(sel?)` reads it; `useNav()` is all of it in one object |
+| `lib/store.ts` | The selector hook both stores use (`useSyncExternalStore`) and `shallowEqual` |
 | `follow/` | Sessions list, timeline, step detail with the diff and the Ask box |
 | `map/` | react-force-graph-2d graph: nodes are files sized by line count and colored by recency, grouped by module, with a pulsing ring where an agent is editing. Clicking a file opens its summary, recent steps and Ask |
 | `failures/` | Ranked groups; each piece of evidence opens its step in Follow |

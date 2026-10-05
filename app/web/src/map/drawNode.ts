@@ -202,7 +202,7 @@ export function drawFocusLinks(ctx: CanvasRenderingContext2D, scale: number, lin
   if (a.id && reach) roleLines(ctx, scale, links, a.id, 1, reach, F);
   ctx.restore();
 }
-/** One file's lines at a strength, each drawn from the file out to its `reach` (arrowheads once a line arrives). */
+/** One file's lines at a strength, each drawn from the file out to its `reach` and ended with a dot (arrowheads once a line arrives). */
 function roleLines(ctx: CanvasRenderingContext2D, scale: number, links: GLink[], focus: string, alpha: number, reach: Reach, F: Frame) {
   const st = F.st, metro = st.link === "metro";
   ctx.globalAlpha = alpha;
@@ -219,9 +219,12 @@ function roleLines(ctx: CanvasRenderingContext2D, scale: number, links: GLink[],
       for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
       const from = role === "imports" ? s : tg, k = reach(len ? Math.min(1, (from.r + STUB_PX / scale) / len) : 1);
       if (k <= 0) continue;
-      polyPath(ctx, upTo(pts, k));
+      const part = upTo(pts, k), end = part[part.length - 1];
+      polyPath(ctx, part);
       ctx.stroke();
       if (!metro && k >= 1) arrowHead(ctx, s, tg);
+      // A dot at its end: where a stub stops, or the file it reaches.
+      ctx.beginPath(); ctx.arc(end[0], end[1], (metro ? Math.max(3.2 / scale, 3.6) : 2.6 / scale), 0, TAU); ctx.fill();
     }
   }
 }

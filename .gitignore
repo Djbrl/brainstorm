@@ -6,3 +6,6 @@ dist-share/
 *.db-*
 .DS_Store
 video/raw/
+
+# TypeScript incremental build state (CLAUDE.md: never commit)
+*.tsbuildinfo

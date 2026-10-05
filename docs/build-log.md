@@ -150,6 +150,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 19:30 (5 Oct) [map-pack] The map stops moving on its own. The force simulation is gone: files are placed once by folder with circle packing (d3-hierarchy), every folder a circle holding its files and subfolders, so a position depends only on which files exist. Folders open as you zoom, like a city map showing its streets: a folder small on screen is one circle with its name and file count, and as it grows its name hands over to its files, which fade in where they always are (no click needed; a click on a closed folder zooms into it). The selected file, an open thread's files, a followed agent's and any working agent's file show their folders open at any zoom. Open folders are named on their outline. Saved positions (IndexedDB, `positions.ts`), the forces, the folder anchors and the "Fold folders" button are gone; when files come or go, the circles that move glide for 0.65 s. Measured in headless Chrome at 4× CPU, zooming in: this repo 56–61 fps (6 long frames), a generated 3,000-file map 59–61 fps (4 long frames).
 
+- 20:15 (5 Oct) [link-anim] The hovered or selected file's import lines are drawn over the files at full strength in every theme (in Metro they were under the stations and folder discs, and dimmed with an open thread), and they animate: they grow out of the file in 0.32 s when it's picked and fade in 0.2 s when it's let go, the old fading while the new grows (`drawFocusLinks` in `map/drawNode.ts`). Metro's own transit lines stay under the files.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

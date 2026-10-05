@@ -326,7 +326,7 @@ export function polyPath(ctx: CanvasRenderingContext2D, pts: Pt2[]) {
 }
 
 /** The polyline from its start to a fraction k of its length. */
-function upTo(pts: Pt2[], k: number): Pt2[] {
+export function upTo(pts: Pt2[], k: number): Pt2[] {
   if (k >= 1) return pts;
   const end = along(pts, k), out: Pt2[] = [pts[0]];
   let total = 0; const seg: number[] = [];

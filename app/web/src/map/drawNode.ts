@@ -5,7 +5,7 @@ import type { Look } from "./replay/layer";
 import { drawName, textWidth, type LabelSpace, type QueuedLabel } from "./labels";
 import { Motion } from "./redraw";
 import {
-  CUBE_STILL_PX, drawCube, drawPlate, drawStation, LAND_MS, landings, metroPath, metroSegment, moduleColor, reachOf,
+  CUBE_STILL_PX, drawCube, drawPlate, drawStation, LAND_MS, landings, metroPath, metroPoints, metroSegment, moduleColor, polyPath, reachOf, upTo, type Pt2,
   stampCube, stampPlate, stampStation, type MapStyle, type RGB,
 } from "./themes";
 import { css, mixRGB, recencyRGB, same, steps, type Tokens } from "./color";
@@ -67,8 +67,11 @@ export type Caches = {
   ripples: Map<string, number>; dots: Dots;
   focusColours: Map<string, { rgb: RGB; css: string; ep: number }>;
   linkBatches: Map<string, { c: string; a: number; ls: GLink[] }>; metroVisible: GLink[]; metroAlpha: number[];
+  /** The focused file's lines (drawFocusLinks): which file and since when, and the one before, fading out. */
+  lines: { id: string | null; at: number; prev: string | null; prevAt: number; prevFrom: number };
 };
-export const newCaches = (): Caches => ({ ripples: new Map(), dots: new Map(), focusColours: new Map(), linkBatches: new Map(), metroVisible: [], metroAlpha: [] });
+export const newCaches = (): Caches => ({ ripples: new Map(), dots: new Map(), focusColours: new Map(), linkBatches: new Map(), metroVisible: [], metroAlpha: [],
+  lines: { id: null, at: 0, prev: null, prevAt: 0, prevFrom: 0 } });
 
 export const moreMotion = (F: Frame, m: Motion) => { if (m === Motion.Smooth || F.motion === Motion.None) F.motion = m; };
 
@@ -101,10 +104,13 @@ const focusColour = (edited: string | undefined, F: Frame, m: Caches["focusColou
   return c;
 };
 
-/** Import lines, under the files: the hovered or selected file's; in Metro all of them, idle ones batched per colour and strength. */
+/**
+ * Metro's import lines, under the files: all of them are its transit lines, batched per colour and strength (the other
+ * themes draw only the hovered or selected file's, over the files: drawFocusLinks).
+ */
 export function drawLinks(ctx: CanvasRenderingContext2D, scale: number, links: GLink[], F: Frame, c: Caches) {
   const st = F.st;
-  if (!links.length) return;
+  if (!links.length || st.link !== "metro") return;
   const focus = F.linkFocus, tracing = F.tracing;
   const hideIdle = links.length > HIDE_LINKS_FROM && scale < HIDE_LINKS_BELOW;
   const { x0, x1, y0, y1 } = F;
@@ -112,8 +118,7 @@ export function drawLinks(ctx: CanvasRenderingContext2D, scale: number, links: G
     const sx = s.x!, sy = s.y!, tx = t.x!, ty = t.y!;
     return (sx < x0 && tx < x0) || (sx > x1 && tx > x1) || (sy < y0 && ty < y0) || (sy > y1 && ty > y1);
   };
-  const roles: GLink[] = [];
-  if (st.link === "metro") {
+  {
     // Metro: imports as transit lines (horizontal, vertical and 45°), coloured by the importing file's folder.
     // While a thread plays, the import lines step back so the thread's own line reads over them.
     const base = focus ? 0.12 : tracing ? 0.18 : 0.55;
@@ -122,7 +127,7 @@ export function drawLinks(ctx: CanvasRenderingContext2D, scale: number, links: G
     for (const l of links) {
       const s = l.source, t = l.target;
       if (s.x === undefined || t.x === undefined || off(s, t)) continue;
-      if (focus && (s.id === focus || t.id === focus)) { roles.push(l); continue; }
+      if (focus && (s.id === focus || t.id === focus)) continue;   // drawn over the files (drawFocusLinks)
       if (hideIdle) continue;
       vis.push(l); va.push(base * Math.min(lookOf(s, F)?.alpha ?? 1, lookOf(t, F)?.alpha ?? 1));
     }
@@ -154,28 +159,51 @@ export function drawLinks(ctx: CanvasRenderingContext2D, scale: number, links: G
         ctx.stroke();
       }
     }
-    ctx.lineWidth = Math.max(3 / scale, 3.2);
-    for (const l of roles) {
-      const s = l.source, t = l.target;
-      ctx.globalAlpha = Math.min(lookOf(s, F)?.alpha ?? 1, lookOf(t, F)?.alpha ?? 1);
-      ctx.strokeStyle = s.id === focus ? st.imports : st.usedBy;
-      metroPath(ctx, s.x!, s.y!, t.x!, t.y!);
-      ctx.stroke();
-    }
     ctx.lineCap = "butt"; ctx.lineJoin = "miter";
-  } else {
-    // Only the hovered or selected file's lines: the rest were a haze over the map that nobody read.
-    ctx.globalAlpha = 1;
-    if (focus) for (const l of links) if (l.source.id === focus || l.target.id === focus) roles.push(l);
-    for (const role of ["imports", "usedBy"] as const) {
-      const ls = roles.filter((l) => linkRole(l, focus) === role && l.source.x !== undefined && l.target.x !== undefined);
-      if (!ls.length) continue;
-      ctx.strokeStyle = ctx.fillStyle = st[role];
-      ctx.lineWidth = 1.6 / scale;
-      ctx.beginPath();
-      for (const l of ls) { ctx.moveTo(l.source.x!, l.source.y!); ctx.lineTo(l.target.x!, l.target.y!); }
+  }
+}
+
+// ---------- the hovered or selected file's import lines ----------
+const LINES_IN_MS = 320;    // they grow out of the file
+const LINES_OUT_MS = 200;   // and fade when it's let go
+const easeOut = (k: number) => 1 - (1 - k) ** 3;
+/**
+ * The lines of the file you point at or selected (what it imports, what uses it), drawn over the files at full
+ * strength in every theme, so a station or a folder's disc never washes them out. They grow from the file to the
+ * other end when it's picked, and fade when it's let go (the last one fading while the next grows).
+ */
+export function drawFocusLinks(ctx: CanvasRenderingContext2D, scale: number, links: GLink[], F: Frame, c: Caches) {
+  const a = c.lines, t = F.t;
+  if (F.linkFocus !== a.id) {
+    if (a.id) { a.prev = a.id; a.prevAt = t; a.prevFrom = easeOut(Math.min(1, (t - a.at) / LINES_IN_MS)); }
+    a.id = F.linkFocus; a.at = t;
+  }
+  const grow = a.id ? easeOut(Math.min(1, (t - a.at) / LINES_IN_MS)) : 1;
+  const fade = a.prev ? a.prevFrom * (1 - Math.min(1, (t - a.prevAt) / LINES_OUT_MS)) : 0;
+  if (a.prev && fade <= 0) a.prev = null;
+  if ((a.id && grow < 1) || a.prev) moreMotion(F, Motion.Smooth);
+  ctx.save();
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  if (a.prev && a.prev !== a.id) roleLines(ctx, scale, links, a.prev, fade, 1, F);
+  if (a.id) roleLines(ctx, scale, links, a.id, grow, grow, F);
+  ctx.restore();
+}
+/** One file's lines at a strength, each drawn from the file out to `grow` of the way (arrowheads once they arrive). */
+function roleLines(ctx: CanvasRenderingContext2D, scale: number, links: GLink[], focus: string, alpha: number, grow: number, F: Frame) {
+  const st = F.st, metro = st.link === "metro";
+  ctx.globalAlpha = alpha;
+  ctx.lineWidth = metro ? Math.max(3 / scale, 3.2) : 1.6 / scale;
+  for (const role of ["imports", "usedBy"] as const) {
+    ctx.strokeStyle = ctx.fillStyle = st[role];
+    for (const l of links) {
+      if (linkRole(l, focus) !== role) continue;
+      const s = l.source, tg = l.target;
+      if (s.x === undefined || s.y === undefined || tg.x === undefined || tg.y === undefined) continue;
+      const pts: Pt2[] = metro ? metroPoints(s.x, s.y, tg.x, tg.y) : [[s.x, s.y], [tg.x, tg.y]];
+      if (role === "usedBy") pts.reverse();   // out of the selected file, toward what uses it
+      polyPath(ctx, upTo(pts, grow));
       ctx.stroke();
-      for (const l of ls) arrowHead(ctx, l.source, l.target);
+      if (!metro && grow >= 1) arrowHead(ctx, s, tg);
     }
   }
 }

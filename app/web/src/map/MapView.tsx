@@ -31,7 +31,7 @@ import { createRedraw, Motion } from "./redraw";
 import { css, readTokens } from "./color";
 import { nodeReach, shownLinks, stepTween, useGraph, type GLink, type GNode } from "./graph";
 import { foldFrame, openAround, useFoldOn } from "./fold";
-import { drawFile, drawFolderNames, drawLinks, FILE_LABELS_MAX, flushDots, labelFor, lookOf, moreMotion, newCaches, paintHit, RIPPLE_MS, type Frame } from "./drawNode";
+import { drawFile, drawFocusLinks, drawFolderNames, drawLinks, FILE_LABELS_MAX, flushDots, labelFor, lookOf, moreMotion, newCaches, paintHit, RIPPLE_MS, type Frame } from "./drawNode";
 import { useMapCamera } from "./useMapCamera";
 import { useLiveAgents } from "./useLiveAgents";
 import "./map.css";
@@ -249,10 +249,10 @@ export function MapView() {
   const drawNode = useCallback((node: NodeObject, ctx: CanvasRenderingContext2D, scale: number) => {
     const F = frame.current;
     // The import lines first, under everything (a line into a closed folder ends on its circle).
-    // Only worked out when some are drawn: Metro draws them all, the others only the hovered or selected file's.
+    // Metro's lines, under everything (worked out only there; the focused file's are drawn over the files, endFrame).
     if (!F.linksDone) {
       F.linksDone = true;
-      if (F.st.link === "metro" || F.linkFocus) drawLinks(ctx, scale, shownLinks(graphRef.current, linkCache.current, `${vis.current.sig}`), F, caches.current);
+      if (F.st.link === "metro") drawLinks(ctx, scale, shownLinks(graphRef.current, linkCache.current, `${vis.current.sig}`), F, caches.current);
     }
     drawFile(ctx, node as GNode, scale, F, caches.current);
   }, []);
@@ -317,6 +317,9 @@ export function MapView() {
   const endFrame = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
     const F = frame.current;
     flushDots(ctx, caches.current.dots, scale);
+    // The hovered or selected file's import lines, over the files (growing in, fading out: drawFocusLinks).
+    const ln = caches.current.lines;
+    if (F.linkFocus || ln.id || ln.prev) drawFocusLinks(ctx, scale, shownLinks(graphRef.current, linkCache.current, `${vis.current.sig}`), F, caches.current);
     drawModules(ctx, scale);
     drawAgentLayer(ctx, scale);
     ctx.globalAlpha = 1;

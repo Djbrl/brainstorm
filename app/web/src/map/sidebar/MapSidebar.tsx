@@ -35,7 +35,7 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
 
   useEffect(() => { try { localStorage.setItem(TAB_KEY, tab); } catch { /* storage blocked: tab resets on reload */ } }, [tab]);
   useEffect(() => { try { localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0"); } catch { /* storage blocked */ } }, [collapsed]);
-  // A new replay opens the Threads tab, where its step list lives.
+  // Opening a thread shows the Threads tab, where it is highlighted.
   useEffect(() => { if (replay?.sessionId) setTab("threads"); }, [replay?.sessionId]);
 
   if (collapsed) {

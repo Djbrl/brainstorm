@@ -65,15 +65,6 @@
 .sidebar-agent-eye { flex: none; border: 0; background: none; width: 26px; height: 26px; border-radius: 50%; color: var(--ink-3); display: grid; place-content: center; }
 .sidebar-agent-eye:hover { background: #f0f0f3; color: var(--ink); }
 
-/* Replay header + step list */
-.sidebar-replay { display: flex; flex-direction: column; height: 100%; }
-.sidebar-replay-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 10px 2px 12px; border-bottom: 1px solid var(--line); flex: none; }
-.sidebar-replay-label { margin: 0; font-size: 12px; color: var(--ink-3); }
-.sidebar-replay-head h4 { margin: 2px 0 0; font-size: 15.5px; font-weight: 700; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sidebar-replay-actions { display: flex; flex-direction: column; gap: 6px; flex: none; }
-.sidebar-replay-actions button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 500; color: var(--ink-2); white-space: nowrap; }
-.sidebar-replay-actions button:hover { color: var(--accent); border-color: var(--accent); }
-.sidebar-replay-steps { flex: 1; min-height: 0; margin-top: 8px; }
 
 /* ---------- Files tab ---------- */
 .sidebar-search { position: sticky; top: 0; background: inherit; padding: 10px 0 8px; z-index: 1; }
@@ -101,19 +92,12 @@
 .map-wrap:has(.map-sidebar) .map-legend { left: 388px; }
 .map-wrap:has(.sidebar-collapsed) .map-legend { left: 86px; }
 
-/* Threads: click to play. The selected thread expands with its actions and step list; a running one pulses blue. */
+/* Threads: click to open (its Track). The open one is a pill; a running one pulses blue. */
 button.sidebar-thread-head { width: calc(100% + 16px); border: 0; background: transparent; padding: 7px 8px; margin: -7px -8px; border-radius: 10px; text-align: left; color: var(--ink); cursor: pointer; box-sizing: border-box; }
 button.sidebar-thread-head:hover { background: #f4f4f7; }
 .sidebar-thread.selected button.sidebar-thread-head { background: var(--accent-soft); cursor: default; }
 .sidebar-thread-status.running { background: var(--accent); box-shadow: 0 0 0 0 rgba(91,91,214,.55); animation: sidebar-pulse 1.6s infinite; }
 .sidebar-thread-head time { font-variant-numeric: tabular-nums; }
-/* With a thread open, the body stops scrolling as a whole: the open thread takes the height left by the other rows. */
-.sidebar-body:has(.sidebar-threads.has-open) { overflow: hidden; display: flex; flex-direction: column; }
-.sidebar-threads.has-open { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.sidebar-threads.has-open .sidebar-thread-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; margin: 0 -8px; padding: 0 8px; } /* room for the pill's rounded edges */
-.sidebar-threads.has-open .sidebar-thread { flex: none; }
-.sidebar-threads.has-open .sidebar-thread.selected { flex: 1 0 76%; min-height: 0; display: flex; flex-direction: column; } /* its steps are the view: most of the height */
-.sidebar-thread-steps { flex: 1; min-height: 0; margin: 10px -2px 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
 
 /* The stats line sits just above the sidebar. */
 .map-stats { position: absolute; left: 40px; top: 84px; margin: 0; color: var(--ink-3); font-size: 14.5px; pointer-events: none; z-index: 3; white-space: nowrap; }
@@ -152,3 +136,7 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .sidebar-thread-attn.blocked { background: #fff4e0; color: #9a5800; }
 .sidebar-thread-attn.turn { background: #f0f0f3; color: var(--ink-2); font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .sidebar-thread-status.waiting { animation: none; box-shadow: 0 0 0 3px rgba(245,158,11,.25); } }
+
+/* Under the open thread: what it waits on you for (the full row, with "Show the step", ends its Track). */
+.sidebar-thread-note { margin: 12px 0 0 16px; font-size: 13px; line-height: 1.4; color: #9a5800; font-weight: 600; }
+:root:is([data-theme="ps2"], [data-theme="deadspace"]) .sidebar-thread-note.blocked { color: #f5b544; }

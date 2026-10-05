@@ -76,6 +76,11 @@ export class ShotsService implements OnModuleInit {
     return m;
   }
 
+  /** Whether any screenshot of this result step is stored (a step's screenshots are stored together). */
+  has(stepId: string): boolean {
+    return !!this.dbs.db.prepare(`SELECT 1 FROM task_shots WHERE step_id = ? LIMIT 1`).get(stepId);
+  }
+
   get(stepId: string, idx: number): { media: string; data: Uint8Array } | undefined {
     return this.dbs.db.prepare(`SELECT media, data FROM task_shots WHERE step_id = ? AND idx = ?`).get(stepId, idx) as { media: string; data: Uint8Array } | undefined;
   }

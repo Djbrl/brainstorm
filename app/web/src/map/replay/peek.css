@@ -1,0 +1,43 @@
+/* Owner: peek. The small window with the file the agent is reading or writing (Peek.tsx): bottom right, above the fit
+   button, clear of the sidebar and the player. It hides while a side panel is open (the step panel shows the same step
+   in full, a file's panel covers its corner). */
+.map-peek { position: absolute; right: 24px; bottom: 78px; z-index: 5; width: 360px; height: 220px; display: flex; flex-direction: column;
+  border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
+  background: rgba(255,255,255,.94); backdrop-filter: saturate(180%) blur(16px); -webkit-backdrop-filter: saturate(180%) blur(16px);
+  box-shadow: 0 10px 30px rgba(0,0,0,.08); animation: peek-in .28s cubic-bezier(.2,.85,.25,1); transition: opacity .25s; }
+@keyframes peek-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .map-peek { animation: none; } }
+/* Between files: the last one stays, quieter. */
+.map-peek.past { opacity: .72; }
+.map-peek.past:hover { opacity: 1; }
+
+.peek-head { display: flex; align-items: center; gap: 8px; padding: 9px 8px 8px 14px; border-bottom: 1px solid var(--line); flex: none; min-width: 0; }
+.peek-verb { flex: none; font-size: 12.5px; font-weight: 600; color: var(--ink-3); }
+.peek-verb.edit { color: var(--accent); }
+.map-peek.past .peek-verb { color: var(--ink-3); }
+.peek-file { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 7px; border: 0; background: none; padding: 0; text-align: left; color: var(--ink); cursor: pointer; }
+.peek-file strong { flex: none; max-width: 100%; font-size: 13.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.peek-file span { min-width: 0; font-size: 12px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.peek-file:hover strong { color: var(--accent); }
+.peek-file:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.peek-stat { flex: none; display: inline-flex; gap: 8px; font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.peek-stat .add { color: var(--ok); }
+.peek-stat .del { color: var(--risk); }
+.peek-close { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: var(--ink-3); padding: 0; }
+.peek-close:hover { background: var(--hover, #f2f2f6); color: var(--ink); }
+.peek-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* The step panel's renderers, flush in the window: no frame of their own, the window scrolls. */
+.peek-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.peek-body .sd-diff { border: 0; border-radius: 0; }
+.peek-body .cv-code { border: 0; border-radius: 0; background: transparent; max-height: none; font-size: 11.5px; line-height: 1.5; padding: 8px 12px; }
+.peek-body .cv-more { margin: 4px 12px 10px; }
+.peek-muted { margin: 0; padding: 14px; font-size: 13px; color: var(--ink-3); }
+
+/* A side panel open: the window steps away (the step panel shows the same step in full). */
+.map-wrap:has(.map-panel.open) .map-peek { display: none; }
+/* Narrower screens: above the player, which reaches toward the corner there. Too narrow: no window. */
+@media (max-width: 1439px) { .map-peek { bottom: 150px; } }
+@media (max-width: 1000px) { .map-peek { display: none; } }
+
+:root:is([data-theme="ps2"], [data-theme="deadspace"]) .map-peek { background: var(--sheet); box-shadow: 0 18px 50px rgba(0,0,0,.35); }

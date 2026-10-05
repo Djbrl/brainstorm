@@ -4,7 +4,7 @@
 import { LensSwitch } from "./LensSwitch";
 import { MapStats } from "./MapStats";
 import { clock, isReplay } from "../lib/live";
-import { lastSeen, sinceMs } from "../lib/visit";
+import { sinceMs } from "../lib/visit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-force-graph-2d";
 import type { FileNode } from "@contract";
@@ -12,7 +12,9 @@ import { useLive } from "../lib/live";
 import { mapPrefs, useNav } from "../lib/nav";
 import { drawAgents } from "./agents";
 import { MapSidebar } from "./sidebar/MapSidebar";
-import { Dock, LockToggle, ReadsToggle } from "./replay/ReplayBar";
+import { Dock, FileToggle, LockToggle, ReadsToggle } from "./replay/ReplayBar";
+import { Peek } from "./replay/Peek";
+import { MapKey } from "./MapKey";
 import { useStepWindow } from "./prefs";
 import { TalkCard } from "./replay/TalkCard";
 import { StepPanel } from "./StepPanel";
@@ -436,16 +438,11 @@ export function MapView() {
       {graph.nodes.length > 0 && <FitButton onFit={fitNow} label={replay ? "Fit the thread's files" : "Fit the whole project"} />}
       {openDirs.size > 0 && <button className="map-fold-all" onClick={() => setOpened({ root, dirs: NONE })}>Fold folders</button>}
 
+      <MapKey thread={!!replay} reads={showReads} imports={sel ? style.imports : null} />
+      <Peek />
       <Dock>
-        <div className="dock-legend" aria-label="Legend">
-          <span><i style={{ background: "var(--hot)" }} />Just now</span>
-          <span><i style={{ background: "var(--warm)" }} />{isReplay() ? "This hour" : lastSeen ? "Since you last looked" : "In the last day"}</span>
-          <span><i style={{ background: "var(--cool)" }} />Earlier</span>
-          {/* With a thread open the colours are its own changes; what it only read is the faint dot. */}
-          {replay && showReads && <span className="dock-legend-read" title="Files this thread read but didn't change"><i style={{ background: "var(--cool)", opacity: 0.5 }} />Read</span>}
-          {sel && <span title="What the selected file imports"><i className="line" style={{ background: style.imports }} />Imports</span>}
-        </div>
         <ReadsToggle />
+        <FileToggle />
         <LockToggle shown={!!replay || !!followId} />
       </Dock>
 

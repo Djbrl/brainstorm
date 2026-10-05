@@ -17,7 +17,7 @@ const RISK_LEVEL: Record<string, "high" | "mid"> = {
   "touches auth": "mid", "touches payment": "mid", "large deletion": "mid",
 };
 
-const diffStyles = {
+export const diffStyles = {
   variables: {
     light: {
       diffViewerBackground: "#ffffff",
@@ -51,7 +51,7 @@ function inputOf(s: Step): Record<string, unknown> {
 }
 
 /** Before/after for an edit, from the diff or from the raw tool input. */
-function editPair(s: Step): { before: string; after: string } | null {
+export function editPair(s: Step): { before: string; after: string } | null {
   if (s.diff) return s.diff;
   const i = inputOf(s);
   if (typeof i.old_string === "string" || typeof i.new_string === "string") return { before: String(i.old_string ?? ""), after: String(i.new_string ?? "") };

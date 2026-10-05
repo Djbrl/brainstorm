@@ -127,11 +127,12 @@
 .rp-m.current { background: var(--accent-soft); color: var(--ink); }
 .rp-detail-switch { align-self: flex-start; margin: 10px 10px 0; padding: 0; border: 0; background: none; color: var(--accent); font-size: 12.5px; }
 
-/* ---------- the floating footer: Replay and the legend, the player above on demand (Dock) ---------- */
+/* ---------- the floating footer: Replay, Share and the switches, the player above on demand (Dock) ---------- */
 .dock { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: calc(100% - 48px); }
 .dock-pill { display: flex; align-items: center; gap: 16px; padding: 6px 8px 6px 6px; border: 1px solid var(--line); border-radius: 999px;
   background: rgba(255,255,255,.92); backdrop-filter: blur(12px); box-shadow: 0 8px 24px rgba(0,0,0,.07); font-size: 13px; color: var(--ink-2); white-space: nowrap; }
 .dock-pill:not(:has(.dock-replay)) { padding-left: 16px; }
+.dock-pill:empty { display: none; } /* the project with no agent followed: nothing to switch */
 .dock-replay { display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 999px; background: var(--accent); color: #fff;
   font-size: 13.5px; font-weight: 600; padding: 8px 16px; }
 .dock-replay.on { background: var(--accent-soft); color: #3f3fb0; }
@@ -149,10 +150,6 @@
 .dock-share { border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink-2); font-size: 13.5px; font-weight: 600; padding: 7px 14px; margin-left: -8px; }
 .dock-share:hover, .dock-share[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 .dock .rp-share-menu { left: 0; right: auto; }
-.dock-legend { display: flex; align-items: center; gap: 16px; }
-.dock-legend span { display: inline-flex; align-items: center; gap: 7px; }
-.dock-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-.dock-legend i.line { width: 16px; height: 2px; border-radius: 1px; }
 .map-wrap:has(.map-panel.open) .dock { left: calc(50% - 220px); }
 
 .rp-player { display: flex; align-items: center; gap: 8px; width: min(640px, calc(100vw - 480px)); min-width: 420px; padding: 10px 12px; border: 1px solid var(--line);
@@ -189,21 +186,16 @@
   .dock { width: max-content; }
   .dock-pill { flex-wrap: wrap; justify-content: center; row-gap: 6px; max-width: 100%; border-radius: 26px; }
   .map-wrap:has(.map-panel.open) .dock:not(:has(.dock-replay)) { display: none; }
-  /* A side panel open: the footer keeps to the space left of it, the legend makes way (the panel says what's selected). */
+  /* A side panel open: the footer keeps to the space left of it. */
   .map-wrap:has(.map-panel.open) .dock { left: 16px; right: 456px; width: auto; transform: none; max-width: none; }
-  .map-wrap:has(.map-panel.open) .dock-legend { display: none; }
   .map-wrap:has(.map-panel.open) .rp-player { width: 100%; flex-wrap: wrap; }
   .map-wrap:has(.map-panel.open) .rp-player .rp-slider { order: 5; flex-basis: 100%; margin: 0; }
 }
-/* Phone: Replay, Share and Show reads stay; with a thread open the colour legend goes (the dots still read on the
-   map), without one it wraps. The share menu opens centred over the footer. */
+/* Phone: the footer wraps; the share menu opens centred over it. */
 @media (max-width: 600px) {
   .dock { bottom: 12px; max-width: calc(100% - 24px); }
   .map-wrap:has(.map-panel.open) .dock { left: 50%; right: auto; transform: translateX(-50%); max-width: calc(100% - 24px); }
   .dock-pill { gap: 10px; white-space: normal; }
-  .dock-pill:has(.dock-replay) .dock-legend { display: none; }
-  .dock-legend { flex-wrap: wrap; justify-content: center; gap: 4px 14px; }
-  .dock-legend span { white-space: nowrap; }
   .dock-share { margin-left: -4px; }
   .rp-share { position: static; }
   .dock .rp-share-menu { left: 50%; right: auto; transform: translateX(-50%); }

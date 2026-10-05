@@ -1,15 +1,15 @@
-// Owner: replay agent. The map's floating footer: Replay and the legend in one pill, and the player above it when you
-// ask for it. The player is only what playing needs: back, play, forward, a timeline cut by chapter (red where one
+// Owner: replay agent. The map's floating footer: Replay, Share and the map switches in one pill, and the player above
+// it when you ask for it. (The colour legend moved to the map's top-right corner, map/MapKey.tsx: the pill ran out of room.) The player is only what playing needs: back, play, forward, a timeline cut by chapter (red where one
 // failed), speed and hide. The rest moved: the step panel follows the cursor (no "Open step"), the camera recenters
 // itself, "Every step" is under the step list. With a thread open the pill leads with what you can do with it:
 // Live (a running thread), Replay and Share.
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useNav, type ReplaySpeed } from "../../lib/nav";
+import { useNav, useNavState, type ReplaySpeed } from "../../lib/nav";
 import { isReplay, useLive } from "../../lib/live";
 import { useThread, type Thread } from "../../lib/thread";
 import { chaptersOf } from "../../lib/chapters";
 import { togglePlay } from "./layer";
-import { setCameraLock, useCameraLock } from "../prefs";
+import { setCameraLock, setShowFile, useCameraLock, useShowFile } from "../prefs";
 import "./replay.css";
 
 const SPEEDS: ReplaySpeed[] = [1, 2, 4];
@@ -106,8 +106,8 @@ function Player() {
 }
 
 /**
- * The footer pill: with a thread open, Replay (Live for a running thread) and Share, then the legend, which the view
- * passes in. The player rises above it while replaying.
+ * The footer pill: with a thread open, Replay (Live for a running thread) and Share, then the switches the view passes
+ * in. The player rises above it while replaying. With nothing in it (the project, no agent followed) the pill hides.
  */
 export function Dock({ children }: { children: ReactNode }) {
   const { state } = useLive();
@@ -171,6 +171,22 @@ export function ReadsToggle() {
     <button className="dock-reads" role="switch" aria-checked={showReads} onClick={() => setShowReads(!showReads)}
       title="Lines to the files the agent reads, as it reads them (in a replay or while it works)">
       Show reads<i aria-hidden="true" />
+    </button>
+  );
+}
+
+/**
+ * Show file: a small window with what the agent is reading or writing (replay/Peek.tsx), while you follow the thread
+ * live or replay it. Shown with a thread open, like Show reads. Remembered per browser.
+ */
+export function FileToggle() {
+  const { replay } = useNavState();
+  const on = useShowFile();
+  if (!replay) return null;
+  return (
+    <button className="dock-reads" role="switch" aria-checked={on} onClick={() => setShowFile(!on)}
+      title="A small window with the file the agent is reading or writing, while you follow it live or replay it">
+      Show file<i aria-hidden="true" />
     </button>
   );
 }

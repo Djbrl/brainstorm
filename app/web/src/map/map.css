@@ -107,4 +107,32 @@
 /* A side panel open: the button rides beside it, just above the footer (which then fills the space left). */
 .map-wrap:has(.map-panel.open) .map-fit { right: 464px; bottom: 90px; }
 /* With a side panel open beside the sidebar, the footer lines up against the panel: it never slides under it. */
-.map-wrap:has(.map-sidebar):has(.map-panel.open) .dock { left: auto; right: 464px; transform: none; align-items: flex-end; }
+.map-wrap:has(.map-sidebar:not(.sidebar-overlay)):has(.map-panel.open) .dock { left: auto; right: 464px; transform: none; align-items: flex-end; }
+
+/* Narrow (tablet and phone). */
+.map-panel-close { display: none; }
+@media (max-width: 1100px) {
+  /* The legend keeps clear of the folded sidebar tab and of the right edge; a side panel open covers its corner, so it steps aside. */
+  .map-wrap:has(.sidebar-collapsed) .map-legend { max-width: calc(100% - 110px); }
+  .map-wrap:has(.map-panel.open) .map-legend { display: none; }
+  .map-panel { z-index: 7; } /* over the lens pill, which reaches into it on a narrow screen */
+}
+@media (max-width: 600px) {
+  /* Side panels fill the width, with a close button, and room at the bottom for the footer that floats over them. */
+  .map-panel { width: 100%; border-left: 0; box-shadow: none; }
+  .map-wrap .dock { z-index: 8; } /* the footer stays over a panel, so a replay can still be driven */
+  .map-panel-inner { padding: 30px 20px 120px; }
+  .map-panel h2 { font-size: 28px; padding-right: 36px; }
+  .map-panel-close { display: grid; place-items: center; position: absolute; top: 22px; right: 14px; z-index: 1; width: 36px; height: 36px;
+    border: 0; border-radius: 50%; background: transparent; color: var(--ink-3); padding: 0; }
+  .map-panel-close:hover { background: var(--hover, #f2f2f6); color: var(--ink); }
+  .map-panel-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .pl-panel-nav { padding: 12px 14px 0 20px; }
+  .pl-panel .sd-scroll { padding: 18px 18px 120px; }
+  /* Legend (Places): across the bottom, wrapping. */
+  .map-wrap .map-legend, .map-wrap:has(.sidebar-collapsed) .map-legend { left: 12px; right: 12px; bottom: 12px; max-width: none; gap: 6px 14px;
+    justify-content: center; border-radius: 16px; padding: 8px 12px; }
+  /* Fit sits above the footer, and away while a panel fills the screen. */
+  .map-fit { right: 12px; bottom: 84px; }
+  .map-wrap:has(.map-panel.open) .map-fit { display: none; }
+}

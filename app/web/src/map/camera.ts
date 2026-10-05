@@ -13,7 +13,7 @@ export type Box = { x0: number; y0: number; x1: number; y1: number };
 export type Graph = { centerAt(): { x: number; y: number }; centerAt(x: number, y: number, ms?: number): unknown; zoom(): number; zoom(k: number, ms?: number): unknown };
 
 const GAP = 12;                                         // breathing room off each covering element
-const LEFT = ".map-sidebar, .sidebar-collapsed";
+const LEFT = ".map-sidebar:not(.sidebar-overlay), .sidebar-collapsed"; // the narrow sheet opens over the map: no reframing
 const RIGHT = ".map-panel.open";
 const TOP = ".map-stats, .lens-switch";
 const BOTTOM = ".dock, .map-legend, .rp-bar";

@@ -2,7 +2,7 @@
 
 Where Brainstorm goes after the hackathon. A working document: we update it as we settle product decisions.
 
-Last updated: 28 Sep 2026.
+Last updated: 5 Oct 2026.
 
 ## Where we stand
 
@@ -150,6 +150,19 @@ Agents don't only write code. They edit videos with FFmpeg, write documents, res
 4. Research access to Cowork and other agents.
 5. Window capture in the desktop app.
 
+## Big directions (5 Oct 2026)
+
+Chosen: **record, share and live**, and the **experiments lab**. See [share-and-experiments.md](share-and-experiments.md): what each needs, the foundations they share, and the open questions.
+
+### Fridge
+
+Good ideas we're not building now:
+
+- **The project's memory.** Brainstorm keeps what every thread learned (decisions, failed approaches, gotchas, conventions) and hands the relevant parts to agents at the start of a session or through MCP. The value adds up with every thread and can be measured: fewer repeated failures and tokens.
+- **Keeping the human up to date.** An "understanding map" of the code you've looked at versus what only agents touched since, a daily "what you should know" briefing, optional quizzes. Answers the research on people losing their grip on agent-written code.
+- **Threads become recipes.** A thread that worked becomes a parameterized, installable Claude Code skill; a library of recipes made from real sessions.
+- **Smaller ones from the same discussion:** claim check (what the agent said vs what it did; also in `todo.md`), parallel agents with a conflict forecast across worktrees, spend per thread, a "what changed while you were away" recap, a risky-actions feed, search across history.
+
 ## Open product questions
 
 To settle before building. Record each decision here with the date.
@@ -169,3 +182,4 @@ To settle before building. Record each decision here with the date.
 | 28 Sep 2026 | License: FSL-1.1-ALv2 (Functional Source License). Free to use, change and self-host; no competing product or service; each release becomes Apache 2.0 after two years. The future cloud service stays in a separate, closed repo. |
 | 28 Sep 2026 | Results out: 3rd place, Senegal. `post-deadline` merged into `main`, which is the development branch again. The judged state stays tagged `hackathon-submission`, and the judged demo stays online unchanged. |
 | 28 Sep 2026 | Tasks (formerly the Cowork prototype): follow and replay agents' non-code work as a storyboard (goal, how, made, sources) with a filmstrip of the agent's screenshots. Developers first, non-coders once we can reach their tools. |
+| 5 Oct 2026 | Next big directions: record, share and live; and the experiments lab ([share-and-experiments.md](share-and-experiments.md)). Project memory, the comprehension layer and recipes go in the Fridge. |

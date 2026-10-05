@@ -10,6 +10,7 @@ How Brainstorm works, what's planned, and how it was built. Keep every file shor
 | [run-locally.md](run-locally.md) | Running the server and web app from a clone |
 | [todo.md](todo.md) | The to-do list: what to build next, in order |
 | [roadmap.md](roadmap.md) | Product direction, packaging, pricing, decisions |
+| [share-and-experiments.md](share-and-experiments.md) | The next big directions: sharing and live replays, and the experiments lab |
 | [next-steps.md](next-steps.md) | Features cut at the hackathon and smaller known improvements |
 | [build-log.md](build-log.md) | Milestones with times, and "Requests" between agents |
 | [tasks.md](tasks.md) | The Track: following agents' work beyond code |

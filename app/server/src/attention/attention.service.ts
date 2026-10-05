@@ -44,12 +44,12 @@ type Tracker = {
   hook?: HookSignal & { at: number };
 };
 
-type TailRow = { id: string; session_id: string; seq: number; ts: string; kind: Step["kind"]; text: string | null; tool: string | null; input: string | null; is_subagent: number; tool_use_id: string | null };
+type TailRow = { id: string; session_id: string; seq: number; ts: string; kind: Step["kind"]; text: string | null; tool: string | null; input: string | null; is_subagent: number; agent_id: string | null; tool_use_id: string | null };
 /** Only what tracking reads (no diffs, labels or file paths). */
 const tailStep = (r: TailRow): Step => ({
   id: r.id, sessionId: r.session_id, seq: r.seq, ts: r.ts, kind: r.kind,
   text: r.text ?? undefined, tool: r.tool ?? undefined, input: r.input ? JSON.parse(r.input) : undefined,
-  isSubagent: !!r.is_subagent, ...(r.tool_use_id ? { toolUseId: r.tool_use_id } : {}),
+  isSubagent: !!r.is_subagent, ...(r.agent_id ? { agentId: r.agent_id } : {}), ...(r.tool_use_id ? { toolUseId: r.tool_use_id } : {}),
 });
 
 const one = (s: string | undefined, max = 140) => {
@@ -81,7 +81,7 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
   private get q() {
     return this.stmts ??= {
       recent: this.dbs.db.prepare(`SELECT id FROM sessions WHERE last_event_at > ?`),
-      tail: this.dbs.db.prepare(`SELECT id, session_id, seq, ts, kind, text, tool, input, is_subagent, tool_use_id FROM steps WHERE session_id = ? ORDER BY seq DESC LIMIT ?`),
+      tail: this.dbs.db.prepare(`SELECT id, session_id, seq, ts, kind, text, tool, input, is_subagent, agent_id, tool_use_id FROM steps WHERE session_id = ? ORDER BY seq DESC LIMIT ?`),
     };
   }
 

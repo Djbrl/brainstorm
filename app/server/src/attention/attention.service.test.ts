@@ -17,7 +17,7 @@ function setup(visible = ["a", "b"]) {
   const dbs = new DbService();
   dbs.db.exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY, cwd TEXT NOT NULL, title TEXT NOT NULL, started_at TEXT NOT NULL, last_event_at TEXT NOT NULL)`);
   dbs.db.exec(`CREATE TABLE steps (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, seq INTEGER NOT NULL, ts TEXT NOT NULL, kind TEXT NOT NULL,
-    text TEXT, tool TEXT, input TEXT, file_path TEXT, diff TEXT, label TEXT, risk TEXT, is_subagent INTEGER NOT NULL DEFAULT 0, tool_use_id TEXT)`);
+    text TEXT, tool TEXT, input TEXT, file_path TEXT, diff TEXT, label TEXT, risk TEXT, is_subagent INTEGER NOT NULL DEFAULT 0, tool_use_id TEXT, agent_id TEXT)`);
   const sent: Attention[] = [];
   const bus = new BusService();
   const gateway = { broadcast: (m: WsMessage) => { if (m.type === "attention") sent.push(m.attention); } };
@@ -29,8 +29,8 @@ function setup(visible = ["a", "b"]) {
   let seq = 0;
   const store = (s: Partial<Step> & { sessionId: string; kind: Step["kind"]; ts: string }) => {
     const id = s.id ?? `st${seq}`;
-    dbs.db.prepare(`INSERT INTO steps (id, session_id, seq, ts, kind, text, tool, input, tool_use_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(id, s.sessionId, seq++, s.ts, s.kind, s.text ?? null, s.tool ?? null, s.input ? JSON.stringify(s.input) : null, s.toolUseId ?? null);
+    dbs.db.prepare(`INSERT INTO steps (id, session_id, seq, ts, kind, text, tool, input, tool_use_id, is_subagent, agent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, s.sessionId, seq++, s.ts, s.kind, s.text ?? null, s.tool ?? null, s.input ? JSON.stringify(s.input) : null, s.toolUseId ?? null, s.isSubagent ? 1 : 0, s.agentId ?? null);
     return { ...s, id, seq: seq - 1 } as Step;
   };
   return { att, sent, store, session, listed: () => listed, sweep: () => (att as any).sweep(), bus };
@@ -65,6 +65,15 @@ test("the sweep turns a quiet instant call into a guessed permission, and only r
   session("c", iso(1_000)); // a thread we haven't seen: the list is read again, once
   sweep(); sweep();
   assert.equal(listed(), 2);
+});
+
+test("catch-up from the store keeps which subagent is waiting", () => {
+  const { sent, store, session, sweep } = setup();
+  session("a", iso(10_000));
+  store({ sessionId: "a", kind: "prompt", text: "go", ts: iso(20_000) });
+  store({ sessionId: "a", kind: "tool_call", tool: "Read", toolUseId: "r1", isSubagent: true, agentId: "ag7", ts: iso(10_000) });
+  sweep();
+  assert.deepEqual(sent.map((a) => [a.state, a.agentId]), [["permission", "ag7"]]);
 });
 
 test("threads outside the workspace are left out of the sweep", () => {

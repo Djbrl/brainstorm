@@ -9,7 +9,7 @@ export type Step = {
   label?: string;       // short human label, filled by the reader (B)
   risk?: string[];      // e.g. ["deleted test", "touches auth"], filled by the reader (B)
   isSubagent?: boolean;
-  agentId?: string;     // subagent id (from its log); absent for the main session thread. Live only, not persisted.
+  agentId?: string;     // subagent id (from its log); absent for the main session thread. Stored since 5 Oct 2026; older steps filled from their logs once.
   toolUseId?: string;   // tool_call/edit: the call's tool_use id; tool_result: the id it answers. Absent on steps stored before 30 Sep 2026.
 };
 export type FileNode = { path: string; module: string; lines: number; lastChangedAt?: string; activeSessionId?: string; summary?: string };

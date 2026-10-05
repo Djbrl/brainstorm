@@ -12,7 +12,7 @@ function statements(db: DatabaseSync) {
   let s = prepared.get(db);
   if (!s) {
     s = {
-      steps: db.prepare(`SELECT id, session_id, seq, ts, kind, text, tool, input, file_path, is_subagent, tool_use_id FROM steps
+      steps: db.prepare(`SELECT id, session_id, seq, ts, kind, text, tool, input, file_path, is_subagent, agent_id, tool_use_id FROM steps
         WHERE session_id = ? AND kind IN ('tool_call', 'edit', 'tool_result') ORDER BY seq ASC`),
       version: db.prepare(`SELECT count(*) AS n, max(seq) AS last FROM steps WHERE session_id = ?`),
     };
@@ -22,7 +22,7 @@ function statements(db: DatabaseSync) {
 }
 
 type Row = { id: string; session_id: string; seq: number; ts: string; kind: Step["kind"]; text: string | null; tool: string | null;
-  input: string | null; file_path: string | null; is_subagent: number; tool_use_id: string | null };
+  input: string | null; file_path: string | null; is_subagent: number; agent_id: string | null; tool_use_id: string | null };
 
 export function workSteps(db: DatabaseSync, sessionId: string): Step[] {
   return (statements(db).steps.all(sessionId) as Row[]).map((r) => ({
@@ -32,6 +32,7 @@ export function workSteps(db: DatabaseSync, sessionId: string): Step[] {
     input: r.input ? JSON.parse(r.input) : undefined,
     filePath: r.file_path ?? undefined,
     isSubagent: !!r.is_subagent,
+    ...(r.agent_id ? { agentId: r.agent_id } : {}),
     ...(r.tool_use_id ? { toolUseId: r.tool_use_id } : {}),
   }));
 }

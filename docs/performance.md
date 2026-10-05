@@ -217,6 +217,7 @@ mapper, bus), `node app/web/scripts/perf-thread.mjs` (thread model equivalence).
    typechecks, a production build, the app on real logs: live following, Track, replay with Lock camera, focus).
 2. **"Ask about this thread"** only existed in the unmounted full-screen Track (`tasks/TrackView.tsx`). Move it into the
    sidebar's Track tab, or drop it? Then the old Track and its `/api/tasks` routes can go (the screenshot route stays).
+   *Decided 5 Oct: dropped, with the old Track and its routes (`refactor/drop-old-track`).*
 3. **Save the subagent id** with each step (a small schema change), so threads with parallel subagents group the same
    way after a reload as they do live.
 4. **The 800-file cap.** With the canvas work, 20k files render smoothly. Raise the default (2–5k), and show

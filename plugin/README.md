@@ -6,7 +6,7 @@ Preview release (0.4). The full release is planned for late October 2026.
 
 - **Map:** your project's files as a graph, with what changed since you last looked. Each agent is a marker that moves to the file it's working on. Open a thread to see what it touched first, then its steps or its replay; a running one can be followed live.
 - **Places:** where the thread went outside the code: websites, your local apps, services like GitHub and Vercel, and what it changed there (pushes, deploys, sent forms). Click a place to read its step.
-- **Track:** the same thread as a story, top to bottom, with Ask for the whole thread: each place the agent worked (a file, a website, a command-line tool), with a window showing the screenshot, the file it made, the code it wrote or the command explained. Works for non-code work too, like editing a video with FFmpeg.
+- **Track:** the open thread's steps in the sidebar, grouped by what you asked. Scrolling them moves the agent along the map; open a step for its diff, its output or the screenshots it took.
 - **Steps:** open any step for its diff or output, and ask about it. Every place has a link, and Back or Esc goes up one level.
 - **Errors:** a failed step turns the agent's marker red, and shows red in the steps, on the replay bar and in the Track.
 - **Share:** save a thread as one `.html` file anyone can open in a browser (the map and every step, nothing to install), plus a Markdown summary.

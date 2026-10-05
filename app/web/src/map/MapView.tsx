@@ -157,6 +157,27 @@ export function MapView() {
     });
   });
 
+  // ---- when the selected file lets go by itself ----
+  // A file is what you're looking at: it stays through tabs, zooms, steps and the Places lens, and lets go when your
+  // attention moves to something that also wants the map. Entering a thread: unless the thread touched the file (you
+  // likely came to see who changed it), as soon as the thread is loaded. Leaving a thread, pressing Play, changing
+  // project: always.
+  const sid = replay?.sessionId ?? null, playing = !!replay?.playing;
+  const was = useRef<{ sid: string | null; playing: boolean; root: string; check: string | null }>({ sid, playing, root: map?.root ?? "", check: sid });
+  useEffect(() => {
+    const w = was.current, root = map?.root ?? "";
+    if (sid !== w.sid) { if (!sid) setSelected(null); w.check = sid; }
+    if (playing && !w.playing) setSelected(null);
+    if (w.root && root && root !== w.root) setSelected(null);
+    // The thread just entered, once it's built: keep the file only if the thread touched it.
+    if (w.check && w.check === sid && replayLayer.active) {
+      w.check = null;
+      const f = selectedRef.current;
+      if (f && !replayLayer.touches(f)) setSelected(null);
+    }
+    w.sid = sid; w.playing = playing; w.root = root || w.root;
+  }, [sid, playing, map?.root, replayLayer.active, replayLayer.touches, setSelected]);
+
   // Import lines show only around the file under the pointer, or else the selected one (Metro keeps all its lines).
   const linkFocus = hover ?? selected;
   const linkFocusRef = useRef(linkFocus); linkFocusRef.current = linkFocus;

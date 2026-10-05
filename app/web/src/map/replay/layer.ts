@@ -35,6 +35,8 @@ export type ReplayLayerApi = {
   footprintMode: boolean;
   /** The files in focus (what a fit frames: the recent window, or the whole thread), or null with no thread open. */
   footprint: () => string[] | null;
+  /** Whether the open thread touched a file at all (read or changed), at any point. */
+  touches: (id: string) => boolean;
   /** The tracer's camera target (the marker, or between it and a file it reads), or null: what a locked camera centres. */
   subject: () => { x: number; y: number } | null;
   /** Draw the tracer, numbered stops, the current marker and read flashes. Called every frame after the agent layer. */
@@ -555,8 +557,9 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     return mi >= 0 ? [s.thread.moves[mi].file] : [];
   }, [focus]);
   const subject = useCallback(() => (st.current.active && st.current.mode !== "footprint" ? anim.current.cam : null), []);
+  const touches = useCallback((id: string) => !!st.current.thread?.touched.has(id), []);
 
-  return { active, tracing: active && mode !== "footprint", footprintMode: active && mode === "footprint", footprint, subject, nodeAlpha, look, draw, marks };
+  return { active, tracing: active && mode !== "footprint", footprintMode: active && mode === "footprint", footprint, touches, subject, nodeAlpha, look, draw, marks };
 }
 
 /** Play/pause; pressing play at the last beat starts over. Shared by the keyboard and the ReplayBar. */

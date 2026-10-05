@@ -118,6 +118,9 @@ const PULSE_MS = 700;
 export const ERROR_RED = "#d93025";
 const ERR_MS = 2600;        // how long the marker stays red
 const ERR_PULSE_MS = 1100;  // one red ring
+const WAIT_MS = 1800;       // the amber ring's breath while an agent waits on you
+const WAIT_AMBER = "#f59e0b";
+const WAIT_TEXT = "#9a5800";
 export const isWrite = (action?: string) => action === "edit" || action === "write";
 
 /** Where the marker stands: the last file written, or before any write, the first file touched. */
@@ -132,8 +135,10 @@ export function drawAgents(opts: {
   resolveId: (file: string) => string | undefined; showReads: boolean;
   /** The project overview: markers only (no trails, no lines of sight), until a thread or an agent is picked. */
   quiet?: boolean;
+  /** Agents waiting on you (attention), by agent id → the label to show. They stay lit and breathe amber. */
+  waiting?: ReadonlyMap<string, string>;
 }) {
-  const { ctx, scale, agents, anim, resolve, accent, font, hoverFile, followId, resolveId, showReads, quiet } = opts;
+  const { ctx, scale, agents, anim, resolve, accent, font, hoverFile, followId, resolveId, showReads, quiet, waiting } = opts;
   const t = performance.now();
   const now = clock();
   const style = mapStyle();
@@ -169,7 +174,7 @@ export function drawAgents(opts: {
       else { st.x = st.fromX + (tx - st.fromX) * e; st.y = st.fromY + (ty - st.fromY) * e; }
       if (style.route === "hop" && p >= 1 && st.t0 > 0 && st.landedT0 !== st.t0) { st.landedT0 = st.t0; landings.set(key, t); }
       const idle = now - Date.parse(a.ts);
-      const target = a.active ? 1 : Math.max(0, 0.35 * (1 - (idle - 2 * 60_000) / (8 * 60_000)));
+      const target = a.active || waiting?.has(a.id) ? 1 : Math.max(0, 0.35 * (1 - (idle - 2 * 60_000) / (8 * 60_000)));
       st.alpha += (target - st.alpha) * 0.08;
 
       // New trail entries: reads become lines of sight. Activity with no new file becomes a pulse.
@@ -260,6 +265,18 @@ export function drawAgents(opts: {
       // The trip under way: Dead Space's locator line ahead, PS2's afterimages behind.
       if (trip) drawTrip(ctx, style.route, trip, p, e, color, 9 / scale, st.alpha, scale);
 
+      // Waiting on you: an amber ring that breathes, as long as it waits.
+      const waitLabel = waiting?.get(a.id);
+      if (waitLabel) {
+        const b = (t % WAIT_MS) / WAIT_MS;
+        ctx.globalAlpha = st.alpha * (1 - b) * 0.9;
+        ctx.beginPath(); ctx.arc(st.x, st.y, (11 + b * 16) / scale, 0, Math.PI * 2);
+        ctx.strokeStyle = WAIT_AMBER; ctx.lineWidth = 2.6 / scale; ctx.stroke();
+        ctx.globalAlpha = st.alpha;
+        ctx.beginPath(); ctx.arc(st.x, st.y, 12 / scale, 0, Math.PI * 2);
+        ctx.strokeStyle = WAIT_AMBER; ctx.lineWidth = 2.2 / scale; ctx.stroke();
+      }
+
       // Marker
       ctx.globalAlpha = st.alpha;
       if (style.glow) { ctx.shadowColor = color; ctx.shadowBlur = 16; }
@@ -273,14 +290,14 @@ export function drawAgents(opts: {
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText(initial(a), st.x, st.y + 0.5 / scale);
 
-      if (scale > 1.6 || hoverFile === key || followId === a.id || erring) {
-        const label = erring && a.error ? `${shortName(a, 20)} · ${a.error.slice(0, 48)}` : `${shortName(a, 28)} · ${verbIng(a.action)}`;
+      if (scale > 1.6 || hoverFile === key || followId === a.id || erring || waitLabel) {
+        const label = waitLabel ? `${shortName(a, 20)} · ${waitLabel}` : erring && a.error ? `${shortName(a, 20)} · ${a.error.slice(0, 48)}` : `${shortName(a, 28)} · ${verbIng(a.action)}`;
         ctx.font = `600 ${12 / scale}px ${font}`;
         ctx.textAlign = "left";
         const lx = st.x + 13 / scale, ly = st.y;
         ctx.lineWidth = 3.5 / scale; ctx.strokeStyle = style.halo;
         ctx.strokeText(label, lx, ly);
-        ctx.fillStyle = color;
+        ctx.fillStyle = waitLabel ? WAIT_TEXT : color;
         ctx.fillText(label, lx, ly);
       }
       ctx.globalAlpha = 1;

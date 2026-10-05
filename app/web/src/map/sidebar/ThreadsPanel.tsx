@@ -10,6 +10,7 @@ import { END, useNav } from "../../lib/nav";
 import { agentColor, baseName, initial, shortName, verbIng } from "../agents";
 import { ReplaySteps } from "../replay/ReplaySteps";
 import { PlaceSteps } from "../../cowork/PlaceSteps";
+import { attentionText, needsYou, yourTurn } from "../../lib/attention";
 
 function useTick(ms: number) {
   const [, setTick] = useState(0);
@@ -124,13 +125,18 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
   const allHidden = ids.length > 0 && ids.every((id) => hiddenAgents.has(id));
   const toggleAll = () => setHiddenAgents(allHidden ? [...hiddenAgents].filter((id) => !ids.includes(id)) : [...hiddenAgents, ...ids]);
   const working = sorted.filter((a) => a.active).length;
+  const attention = useLive().state.attention[session.id];
+  const blocked = needsYou(attention), turn = yourTurn(attention);
+  const say = attention && (blocked || turn) ? attentionText(attention) : null;
   return (
-    <li className={`sidebar-thread ${selected ? "selected" : ""}`}>
+    <li className={`sidebar-thread ${selected ? "selected" : ""}${blocked ? " needs-you" : ""}`}>
       <div className="sidebar-thread-headrow">
         <button className="sidebar-thread-head" onClick={onSelect} aria-pressed={selected} title={selected ? "Close this thread" : running ? "Open this thread and follow it live" : "Open this thread: its steps"}>
-          <span className={`sidebar-thread-status ${session.status}`} aria-hidden="true" />
+          <span className={`sidebar-thread-status ${session.status}${blocked ? " waiting" : ""}`} aria-hidden="true" />
           <span className="sidebar-thread-title">{session.title || "Untitled thread"}</span>
-          {tree && <span className="sidebar-thread-tree" title={session.cwd}>{tree}</span>}
+          {say
+            ? <span className={`sidebar-thread-attn ${blocked ? "blocked" : "turn"}`} title={`${say.line}${attention?.detail ? `\n${attention.detail}` : ""}`}>{say.badge}</span>
+            : tree && <span className="sidebar-thread-tree" title={session.cwd}>{tree}</span>}
           <time>{running ? "live" : ago(session.lastEventAt, now)}</time>
         </button>
         {ids.length > 0 && (

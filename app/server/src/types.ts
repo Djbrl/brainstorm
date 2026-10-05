@@ -28,6 +28,7 @@ export type WsMessage =
   | { type: "file-removed"; path: string }
   | { type: "map"; map: ProjectMap }
   | { type: "agent"; agent: AgentPresence }
+  | { type: "attention"; attention: Attention }
   | { type: "setup"; status: SetupStatus };
 
 /** Workspace setup (local app). GET /api/workspace, GET /api/workspace/suggestions, POST /api/workspace {root}. */
@@ -161,4 +162,20 @@ export type TaskSourceFile = { path: string; name: string; kind: TaskFileKind; e
 export type TaskDetail = TaskListItem & {
   cwd: string; prompts: string[]; beats: TaskBeat[]; frames: TaskFrame[];
   made: TaskArtifact[]; outside: TaskOutside[]; web: TaskSourceSite[]; files: TaskSourceFile[];
+};
+
+/**
+ * Does a thread need you? (GET /api/attention, ws "attention"). Added 5 Oct 2026.
+ * permission: a tool call waits for your OK. question: the agent asked you something (AskUserQuestion, an MCP form).
+ * plan: a plan waits for approval. stuck: the same tool failed 3 times in a row. done: the agent finished and it's your turn.
+ * `sure` is false when it's inferred from the log alone (a call with no result and no activity for a while); the plugin's
+ * PermissionRequest and Notification hooks make it sure.
+ */
+export type AttentionState = "working" | "permission" | "question" | "plan" | "stuck" | "done" | "idle";
+export type Attention = {
+  sessionId: string; state: AttentionState; since: string; sure: boolean;
+  tool?: string;      // the tool waiting or failing
+  detail?: string;    // the command, file, question or error, one line
+  stepId?: string;    // the call it's about
+  agentId?: string;   // set when a subagent is the one waiting
 };

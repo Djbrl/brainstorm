@@ -168,7 +168,7 @@ const failedOf = (s: Step) => {
 };
 
 /** True when two versions of a step differ only by what the reader fills in later (label, risk). */
-function onlyRelabelled(a: Step, b: Step): boolean {
+export function onlyRelabelled(a: Step, b: Step): boolean {
   const x = a as Record<string, unknown>, y = b as Record<string, unknown>;
   for (const k in x) if (k !== "label" && k !== "risk" && x[k] !== y[k]) return false;
   for (const k in y) if (k !== "label" && k !== "risk" && x[k] !== y[k]) return false;

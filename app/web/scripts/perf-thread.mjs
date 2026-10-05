@@ -165,8 +165,9 @@ if (process.env.PROFILE) {
       // The previous thread is left as it was (React may still hold it).
       if (prev) sameThread(prev, ref.thread.buildThread("S", list.slice(0, -1), rRef, detail), `previous thread kept at ${list.length - 1}`);
       assert.deepStrictEqual(now.chapters.chaptersOf(b), ref.chapters.chaptersOf(a), `chapters prefix ${list.length}`);
+      if (detail === "light") assert.deepStrictEqual(now.words.threadNumbers(list, smallMap), ref.words.threadNumbers(list, smallMap), `numbers prefix ${list.length}`);
       prev = b;
-      checks += 3;
+      checks += 4;
     }
     // The reader labels steps after they arrive (a "step-update": one step replaced by a copy with a label). Every
     // step in turn, then two at once with a new step on top (React can batch both into one render).
@@ -174,6 +175,7 @@ if (process.env.PROFILE) {
       const label = pick(["Relabelled: the parser now handles empty input", "", "Done", undefined]);
       list = list.map((x, j) => (j === i ? { ...x, label, risk: ["touches auth"] } : x));
       sameThread(now.thread.buildThread("S", list, rNow, detail), ref.thread.buildThread("S", list, rRef, detail), `relabel ${i} ${detail}`);
+      if (detail === "light") assert.deepStrictEqual(now.words.threadNumbers(list, smallMap), ref.words.threadNumbers(list, smallMap), `numbers relabel ${i}`), checks++;
       checks++;
     }
     list = [...list.map((x, j) => (j === 3 || j === 1200 ? { ...x, label: "Both at once" } : x)), { ...small[10], id: "extra", toolUseId: undefined }];
@@ -193,7 +195,12 @@ if (process.env.PROFILE) {
     steps.slice(0, 9000),
     [...steps.slice(0, 9000), { ...steps[9000], id: "new" }],
   ];
-  for (const v of variants) { now.thread.buildThread("S", v, r); sameThread(now.thread.buildThread("S", v, r), ref.thread.buildThread("S", v, rr), "variant"); checks++; }
+  now.words.threadNumbers(list, map);
+  for (const v of variants) {
+    now.thread.buildThread("S", v, r); sameThread(now.thread.buildThread("S", v, r), ref.thread.buildThread("S", v, rr), "variant");
+    assert.deepStrictEqual(now.words.threadNumbers(v, map), ref.words.threadNumbers(v, map), "numbers variant");
+    checks += 2;
+  }
 }
 
 // ---- 3. Timings.
@@ -219,21 +226,45 @@ const row = (what, before, after) => console.log(`${what.padEnd(58)} ${fmt(befor
   checks += 3;
 }
 
-// One new step on a live thread: COMPONENTS useThread memos see new steps; each builds (before) or shares (after).
+// One new step on a live thread. Every useThread memo (COMPONENTS of them) sees new steps and builds (before) or shares
+// one build (after); the Track and the bar cut chapters, the stats line and the counts work out the thread's numbers.
 {
   const rRef = ref.paths.makeFileResolver(map), rNow = now.paths.makeFileResolver(map);
-  let i = STEPS - 200;
-  const before = ms(() => { const l = steps.slice(0, ++i); for (let c = 0; c < COMPONENTS; c++) ref.thread.buildThread("S", l, rRef, "light"); }, 20);
-  i = STEPS - 200; let list = steps.slice(0, i); now.thread.buildThread("S", list, rNow, "light");
-  const after = ms(() => { list = [...list, steps[i++]]; for (let c = 0; c < COMPONENTS; c++) now.thread.buildThread("S", list, rNow, "light"); }, 20);
-  row(`one new step: ${COMPONENTS} components get the thread`, before, after);
+  const app = (lib, r, l) => {
+    let t;
+    for (let c = 0; c < COMPONENTS; c++) t = lib.thread.buildThread("S", l, r, "light");
+    lib.chapters.chaptersOf(t); lib.chapters.chaptersOf(t);
+    lib.words.threadNumbers(l, map); lib.words.threadNumbers(l, map);
+  };
+  const piece = (lib, r, l, what) => {
+    const t0 = performance.now(); const t = lib.thread.buildThread("S", l, r, "light"); const t1 = performance.now();
+    lib.chapters.chaptersOf(t); const t2 = performance.now();
+    lib.words.threadNumbers(l, map); const t3 = performance.now();
+    what.build += t1 - t0; what.chapters += t2 - t1; what.numbers += t3 - t2;
+  };
+  const N = 50;
+  let i = STEPS - N - 1, list = steps.slice(0, i);
+  const before = ms(() => app(ref, rRef, (list = [...list, steps[i++]])), N);
+  i = STEPS - N - 1; list = steps.slice(0, i); app(now, rNow, list);
+  const after = ms(() => app(now, rNow, (list = [...list, steps[i++]])), N);
+  row(`one new step: ${COMPONENTS} views get the thread, chapters, numbers`, before, after);
+  const pb = { build: 0, chapters: 0, numbers: 0 }, pa = { build: 0, chapters: 0, numbers: 0 };
+  i = STEPS - N - 1; list = steps.slice(0, i);
+  for (let k = 0; k < N; k++) piece(ref, rRef, (list = [...list, steps[i++]]), pb);
+  i = STEPS - N - 1; list = steps.slice(0, i); piece(now, rNow, list, { build: 0, chapters: 0, numbers: 0 });
+  for (let k = 0; k < N; k++) piece(now, rNow, (list = [...list, steps[i++]]), pa);
+  for (const k of ["build", "chapters", "numbers"]) row(`${"".padEnd(4)}of which, once: ${k}`, pb[k] / N, pa[k] / N);
+  // The reader labels the newest step: same length, one step replaced.
+  list = steps.slice(); now.thread.buildThread("S", list, rNow);
+  let j = STEPS - N;
+  const relRef = ms(() => { const l = steps.map((x, q) => (q === j ? { ...x, label: "A label" } : x)); for (let c = 0; c < COMPONENTS; c++) ref.thread.buildThread("S", l, rRef, "light"); j++; }, 10);
+  j = STEPS - N;
+  const relNow = ms(() => { const l = list.map((x, q) => (q === j ? { ...x, label: "A label" } : x)); list = l; for (let c = 0; c < COMPONENTS; c++) now.thread.buildThread("S", l, rNow, "light"); j++; }, 10);
+  row(`a step relabelled: ${COMPONENTS} views get the thread`, relRef, relNow);
   // A thread opens: nothing to reuse (another session, so a builder of its own).
   let k = 0;
   const cold = ms(() => now.thread.buildThread(`cold${k++}`, steps.slice(), rNow, "light"), 5);
   const coldRef = ms(() => ref.thread.buildThread("S", steps.slice(), rRef, "light"), 5);
   row(`a thread opens: one full build, light`, coldRef, cold);
-  const t = now.thread.buildThread("S", steps, rNow), tr = ref.thread.buildThread("S", steps, rRef);
-  row(`chapters of the thread, asked twice (Track + bar)`, ms(() => { ref.chapters.chaptersOf(tr); ref.chapters.chaptersOf(tr); }, 10), ms(() => { now.chapters.chaptersOf(t); now.chapters.chaptersOf(t); }, 10));
-  row(`thread numbers, asked twice (stats + counts)`, ms(() => { ref.words.threadNumbers(steps, map); ref.words.threadNumbers(steps, map); }, 10), ms(() => { now.words.threadNumbers(steps, map); now.words.threadNumbers(steps, map); }, 10));
 }
 console.log(`\n${checks} checks passed: same threads, chapters, numbers and file matches as ${REF}.`);

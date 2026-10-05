@@ -1,6 +1,7 @@
-// Owner: map-focus. Two map choices remembered per browser, read on every frame by the canvas layers (like lib/theme):
+// Owner: map-focus. Map choices remembered per browser, read on every frame by the canvas layers (like lib/theme):
 // how much of an open thread the map lights up (its last 15 moments, its last 50, or all of it: see replay/layer.ts's
-// focus), and whether the camera locks onto what moves (the replay tracer, or an agent you follow).
+// focus), whether the camera locks onto what moves (the replay tracer, or an agent you follow), and whether the small
+// window with the file the agent is reading or writing shows while you follow or replay a thread (replay/Peek.tsx).
 import { useSyncExternalStore } from "react";
 
 /** How many moments up to the replay cursor the map lights up ("all": the whole thread). */
@@ -13,6 +14,7 @@ export const STEP_WINDOWS: { id: StepWindow; name: string }[] = [
 
 const WINDOW_KEY = "brainstorm-map-window";
 const LOCK_KEY = "brainstorm-camera-lock";
+const PEEK_KEY = "brainstorm-map-peek";
 
 function load<T>(key: string, parse: (v: string | null) => T): T {
   try { return parse(localStorage.getItem(key)); } catch { return parse(null); } // storage blocked: the default
@@ -20,6 +22,7 @@ function load<T>(key: string, parse: (v: string | null) => T): T {
 const prefs = {
   window: load<StepWindow>(WINDOW_KEY, (v) => (v === "50" ? 50 : v === "all" ? "all" : 15)),
   lock: load<boolean>(LOCK_KEY, (v) => v === "1"),
+  peek: load<boolean>(PEEK_KEY, (v) => v !== "0"), // on unless turned off
 };
 const listeners = new Set<() => void>();
 const subscribe = (f: () => void) => { listeners.add(f); return () => { listeners.delete(f); }; };
@@ -36,3 +39,8 @@ export const useStepWindow = () => useSyncExternalStore(subscribe, getStepWindow
 export const getCameraLock = () => prefs.lock;
 export function setCameraLock(on: boolean) { if (on !== prefs.lock) { prefs.lock = on; save(LOCK_KEY, on ? "1" : "0"); } }
 export const useCameraLock = () => useSyncExternalStore(subscribe, getCameraLock, getCameraLock);
+
+/** Show file: the small window with what the agent is reading or writing, while you follow or replay a thread. */
+export const getShowFile = () => prefs.peek;
+export function setShowFile(on: boolean) { if (on !== prefs.peek) { prefs.peek = on; save(PEEK_KEY, on ? "1" : "0"); } }
+export const useShowFile = () => useSyncExternalStore(subscribe, getShowFile, getShowFile);

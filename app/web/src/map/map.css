@@ -9,15 +9,28 @@
   mask-image: linear-gradient(to bottom, transparent, rgba(0,0,0,.4) calc(var(--fade-top) * .45), #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), rgba(0,0,0,.4) calc(100% - var(--fade-bottom) * .45), transparent);
 }
 @media (max-width: 600px) { .map-wrap { --fade-top: 104px; } }
-@media (max-width: 1100px) { .dock-legend-read { display: none !important; } } /* the footer keeps one row beside the fit button */
 /* Tablet: when the footer wraps (Lock camera on a second row), it keeps clear of the fit button in the corner. */
 @media (min-width: 601px) and (max-width: 1100px) { .map-wrap .dock { max-width: calc(100% - 150px); } }
-/* A side panel open beside the sidebar leaves the footer the gap between them: the legend steps out so the switches fit. */
-.map-wrap:has(.map-sidebar:not(.sidebar-overlay)):has(.map-panel.open) .dock-pill:has(.dock-reads) .dock-legend { display: none; } /* the pills and the stats line take two rows there */
 /* The stats line floats on the map: a frosted capsule in the backdrop's colour (no border, no shadow) keeps it
    readable over a busy map in every theme, like the lens pill beside it, without a bar. */
 .map-wrap .map-stats { padding: 3px 12px; margin-left: -12px; border-radius: 999px;
   background: color-mix(in srgb, var(--bg) 78%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+
+/* The colour key (MapKey): top right, on the stats line's level and in its frosted capsule. A side panel covers that
+   corner: the key steps out (the panel says what's selected). */
+.map-key { position: absolute; right: 28px; top: calc(var(--sb-top, 84px) - 34px); z-index: 3; display: flex; align-items: center; gap: 16px;
+  padding: 3px 12px; border-radius: 999px; font-size: 13px; color: var(--ink-2); white-space: nowrap; pointer-events: auto;
+  background: color-mix(in srgb, var(--bg) 78%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.map-key span { display: inline-flex; align-items: center; gap: 7px; }
+.map-key i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.map-key i.line { width: 16px; height: 2px; border-radius: 1px; }
+.map-wrap:has(.map-panel.open) .map-key { display: none; }
+@media (max-width: 1100px) { .map-key-read { display: none !important; } }
+/* Phone: under the stats line on the project; with a thread open the dots read on their own and the lens pill takes the corner. */
+@media (max-width: 600px) {
+  .map-key { top: 98px; left: 16px; right: auto; font-size: 12.5px; gap: 12px; }
+  .map-wrap:has(.lens-switch) .map-key { display: none; }
+}
 
 .map-empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 10px; color: var(--ink-3); }
 .map-empty h2 { font-size: 34px; font-weight: 700; color: var(--ink); }

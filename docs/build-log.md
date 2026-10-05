@@ -145,6 +145,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 15:05 (5 Oct) [map-quiet] Less ink on the map. Import lines show only around the file under the pointer or the selected one (they were a grey haze nobody read); Metro keeps its lines, they are the theme. The tracer draws only the recent window (the "On the map, show" setting, or the last 25 moments for the whole thread), each segment fading out over its last 3 moments in it; the faint path through the whole history is gone (the Track tab has it), along with its 16-layer cache.
 
+- 17:14 (5 Oct) [peek] While you follow a thread live or replay it, a small window in the map's bottom-right corner shows the file the agent is reading or writing: the change as a diff (a new file as numbered lines), or the lines it read, under "Editing", "Writing" or "Reading" and the file's name. It reuses the step panel's diff and code views, scrolls to the change, and between files keeps the last one, quieter and in the past tense. The camera keeps the tracer to its left; it steps aside while a side panel is open. "Show file" in the footer turns it off (remembered per browser). The colour legend left the footer for the map's top-right corner, across from the stats line; the footer hides when it has nothing in it.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

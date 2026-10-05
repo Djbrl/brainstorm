@@ -1,7 +1,7 @@
 // Owner: camera. The part of a map canvas that no panel covers (the "safe area"), and camera moves that land in it.
-// The sidebar on the left, a side panel on the right, the stats line and the lens pill at the top, the footer at the
-// bottom: all float over the canvas. Every framing (fit, a file, a followed agent, the replay tracer) centres its
-// content in what's left, measured from the DOM, not hard-coded.
+// The sidebar on the left, a side panel (or the file window) on the right, the stats line, the colour key and the lens
+// pill at the top, the footer at the bottom: all float over the canvas. Every framing (fit, a file, a followed agent,
+// the replay tracer) centres its content in what's left, measured from the DOM, not hard-coded.
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 /** Canvas size, and how much of each side is covered, in CSS pixels. */
@@ -15,9 +15,10 @@ export type Graph = { centerAt(): { x: number; y: number }; centerAt(x: number, 
 const GAP = 12;                                         // breathing room off each covering element
 const LEFT = ".map-sidebar:not(.sidebar-overlay), .sidebar-collapsed"; // the narrow sheet opens over the map: no reframing
 const RIGHT = ".map-panel.open";
-const TOP = ".map-stats, .lens-switch";
+const FLOAT_RIGHT = ".map-peek";                         // floats in from the right edge: covers from its left side on
+const TOP = ".map-stats, .lens-switch, .map-key";
 const BOTTOM = ".dock, .map-legend, .rp-bar";
-const WATCH = [LEFT, ".map-panel", TOP, BOTTOM].join(", ");
+const WATCH = [LEFT, ".map-panel", FLOAT_RIGHT, TOP, BOTTOM].join(", ");
 
 /** Measure the safe area of the canvas living in `host` (the covering elements are looked up in its .map-wrap). */
 export function measureSafe(host: HTMLElement): Safe {
@@ -29,6 +30,8 @@ export function measureSafe(host: HTMLElement): Safe {
   for (const el of scope.querySelectorAll(LEFT)) { const b = el.getBoundingClientRect(); if (shown(b)) left = Math.max(left, b.right - r.left + GAP); }
   // Side panels slide in with a transform: their layout width says how much they will cover once open.
   for (const el of scope.querySelectorAll<HTMLElement>(RIGHT)) if (el.offsetWidth) right = Math.max(right, el.offsetWidth + GAP);
+  // The file window (replay/Peek.tsx): the tracer and the thread's files keep to its left, never under it.
+  for (const el of scope.querySelectorAll(FLOAT_RIGHT)) { const b = el.getBoundingClientRect(); if (shown(b)) right = Math.max(right, r.right - b.left + GAP); }
   // Top and bottom bands count only where they reach into the space between the side panels.
   const x0 = r.left + left, x1 = r.right - right;
   const across = (b: DOMRect) => shown(b) && b.right > x0 && b.left < x1;

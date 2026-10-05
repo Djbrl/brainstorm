@@ -125,7 +125,8 @@ function Terminal({ input, result, title }: { input: Input; result?: Step; title
 
 // ---------- files and searches ----------
 
-function Code({ start, lines }: { start: number; lines: string[] }) {
+/** Numbered lines (a read, a new file), the first 80 with a button for the rest. */
+export function Code({ start, lines }: { start: number; lines: string[] }) {
   const [all, setAll] = useState(false);
   const max = 80;
   const shown = all ? lines : lines.slice(0, max);

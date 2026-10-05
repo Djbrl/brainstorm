@@ -340,12 +340,16 @@ export function MapView() {
   const onNodeHover = useCallback((n: NodeObject | null) => setHover(n ? (n as GNode).id : null), []);
   const onNodeClick = useCallback((n: NodeObject) => setSelected((n as GNode).id), [setSelected]);
   const onBackgroundClick = useCallback(() => setSelected(null), [setSelected]);
-  const onNodeDrag = useCallback(() => { heat.current = 1; }, []);   // a file dragged by hand: its neighbours answer in full
+  // A file dragged by hand: its neighbours answer in full, for as long as the drag lasts (a full run's stopping point).
+  const [dragged, setDragged] = useState<typeof graph | null>(null);
+  const onNodeDrag = useCallback(() => { heat.current = 1; setDragged(() => graphRef.current); }, []);
 
   const sel = selected ? nodeIndex.get(selected)?.file : undefined;
-  // A layout run stops once its push is spent (d3AlphaMin, in force-graph's alpha): a gentle reheat stops sooner. A big
-  // map also cools faster: fewer, bigger steps. A small map's full layout runs as it always did (cooldownTicks).
-  const alphaMin = big ? 0.002 / graph.heat : graph.heat < 1 ? 0.001 / graph.heat : 0;
+  // A layout run stops once its push is spent (d3AlphaMin, in force-graph's alpha). A big map cools faster: fewer, bigger
+  // steps. A small map's full layout runs as it always did (cooldownTicks). A gentle run is short: about 40 steps to make
+  // room for a few new files, 15 to settle positions put back from the last visit.
+  const alphaDecay = big ? 0.05 : 0.0228;
+  const alphaMin = graph.heat >= 1 || dragged === graph ? (big ? 0.002 : 0) : (1 - alphaDecay) ** (graph.heat <= 0.02 ? 15 : 40);
 
   return (
     <div className="map-wrap" ref={wrapRef}>
@@ -371,7 +375,7 @@ export function MapView() {
           onRenderFramePost={endFrame}
           cooldownTicks={400}
           d3AlphaMin={alphaMin}
-          d3AlphaDecay={big ? 0.05 : 0.0228}
+          d3AlphaDecay={alphaDecay}
           d3VelocityDecay={0.35}
           onEngineTick={onEngineTick}
           onEngineStop={onEngineStop}

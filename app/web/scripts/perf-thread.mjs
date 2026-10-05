@@ -121,16 +121,6 @@ const ms = (f, n = 1) => { const t0 = performance.now(); for (let i = 0; i < n; 
 const fmt = (x) => `${x.toFixed(2)} ms`;
 let checks = 0;
 
-if (process.env.PROFILE) {
-  const r = now.paths.makeFileResolver(map);
-  for (let k = 0; k < 3; k++) console.log("build", ms(() => now.thread.buildThread("S", steps.slice(), r), 5).toFixed(2));
-  const memo = new Map(); const rm = (a) => { if (!memo.has(a)) memo.set(a, r(a)); return memo.get(a); };
-  for (let k = 0; k < 3; k++) console.log("build memo-resolver", ms(() => now.thread.buildThread("S", steps.slice(), rm), 5).toFixed(2));
-  console.log("resolver build", ms(() => now.paths.makeFileResolver({ ...map, files: map.files.slice() }), 5).toFixed(2));
-  console.log("chapters", ms(() => now.chapters.chaptersOf(now.thread.buildThread("S", steps, r)), 5).toFixed(2));
-  console.log("numbers", ms(() => now.words.threadNumbers(steps, map), 5).toFixed(2));
-  process.exit(0);
-}
 // ---- 1. Identical results.
 {
   const rRef = ref.paths.makeFileResolver(map), rNow = now.paths.makeFileResolver(map);
@@ -254,6 +244,11 @@ const row = (what, before, after) => console.log(`${what.padEnd(58)} ${fmt(befor
   i = STEPS - N - 1; list = steps.slice(0, i); piece(now, rNow, list, { build: 0, chapters: 0, numbers: 0 });
   for (let k = 0; k < N; k++) piece(now, rNow, (list = [...list, steps[i++]]), pa);
   for (const k of ["build", "chapters", "numbers"]) row(`${"".padEnd(4)}of which, once: ${k}`, pb[k] / N, pa[k] / N);
+  {
+    const t1 = now.thread.buildThread("S", list, rNow), t2 = now.thread.buildThread("S", (list = [...list, steps[i++]]), rNow);
+    const same = t2.beats.filter((b, q) => t1.beats[q] === b).length;
+    console.log(`${"".padEnd(4)}beats kept as the same objects after one new step: ${same.toLocaleString()} of ${t2.beats.length.toLocaleString()} (before: none)`);
+  }
   // The reader labels the newest step: same length, one step replaced.
   list = steps.slice(); now.thread.buildThread("S", list, rNow);
   let j = STEPS - N;
@@ -263,8 +258,8 @@ const row = (what, before, after) => console.log(`${what.padEnd(58)} ${fmt(befor
   row(`a step relabelled: ${COMPONENTS} views get the thread`, relRef, relNow);
   // A thread opens: nothing to reuse (another session, so a builder of its own).
   let k = 0;
-  const cold = ms(() => now.thread.buildThread(`cold${k++}`, steps.slice(), rNow, "light"), 5);
-  const coldRef = ms(() => ref.thread.buildThread("S", steps.slice(), rRef, "light"), 5);
+  const cold = ms(() => now.thread.buildThread(`cold${k++}`, steps.slice(), rNow, "light"), 30);
+  const coldRef = ms(() => ref.thread.buildThread("S", steps.slice(), rRef, "light"), 30);
   row(`a thread opens: one full build, light`, coldRef, cold);
 }
 console.log(`\n${checks} checks passed: same threads, chapters, numbers and file matches as ${REF}.`);

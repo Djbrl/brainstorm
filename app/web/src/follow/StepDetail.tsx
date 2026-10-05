@@ -11,6 +11,12 @@ import { basename, displayLabel, stepFile, timeIn, toolName, unwrapPastes } from
 
 const BIG_DIFF = 400; // lines; above this the diff starts collapsed
 
+/** How worrying each risk flag from the reader is (server/src/reader computeRisk): red, amber, or quiet grey if unknown. */
+const RISK_LEVEL: Record<string, "high" | "mid"> = {
+  "possible secret": "high", "touches .env": "high", "deleted test": "high",
+  "touches auth": "mid", "touches payment": "mid", "large deletion": "mid",
+};
+
 const diffStyles = {
   variables: {
     light: {
@@ -101,7 +107,9 @@ export function StepDetail({ step, result }: { step: Step; result?: Step; onClos
           )}
         </div>
         {step.risk && step.risk.length > 0 && (
-          <div className="sd-risks">{step.risk.map((r) => <span key={r} className="risk"><RiskIcon />{r}</span>)}</div>
+          <div className="sd-risks">
+            {step.risk.map((r) => <span key={r} className={`sd-risk ${RISK_LEVEL[r] ?? ""}`}><RiskIcon />{r.charAt(0).toUpperCase() + r.slice(1)}</span>)}
+          </div>
         )}
 
         <div className="sd-body">

@@ -381,8 +381,10 @@ export function MapView() {
   // closing it puts the camera back where it was before (or frames the map, if it had never been framed).
   const panelFile = step ? null : selected;
   const before = useRef<{ view: View | null; intent: Intent } | null>(null);
+  useEffect(() => () => { replayCamera.pinned = false; }, []);
   useEffect(() => {
     const c = camRef.current;
+    replayCamera.pinned = !!panelFile; // the tracer's camera leaves the open file alone (it picks up again on close)
     if (panelFile) {
       if (!before.current) {
         const auto = c.userAt() <= intentAt.current ? intent.current : { kind: "free" as const };
@@ -491,7 +493,7 @@ export function MapView() {
       const fs = Math.max(11, Math.min(14, 11 + r * scale * 0.08)) / scale;
       const ringR = st.node === "dot" ? r : r * 1.35 + 2 / scale;   // under the selection ring, not on it
       labelQueue.current.push({
-        text: baseName(n.id), x, y: y + (isSel || isHover ? ringR : r) + 3 / scale, size: fs, scale, alpha,
+        text: baseName(n.id), x, y: y + (isSel || isHover ? ringR : r) + 3 / scale, size: fs, scale, alpha: isSel || isHover ? 1 : alpha,
         font: `${isSel || active ? 600 : 500} ${fs}px ${st.labelFont ?? tokens.body}`,
         ink: isSel || active || isHover ? st.fileInk : st.fileInkQuiet, halo: st.halo,
         // The one you point at wins, then the selected one, then where an agent works, then the biggest.

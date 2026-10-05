@@ -200,7 +200,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
         const inSight = sx > s.left + m && sx < s.w - s.right - m && sy > s.top + m && sy < s.h - s.bottom - m;
         if (!inSight || Math.max(replayCamera.userAt, cam.userAt()) > replayCamera.heldAt) replayCamera.heldAt = null;
       }
-      if (g && a.cam && replayCamera.heldAt === null && performance.now() - Math.max(replayCamera.userAt, cam.userAt()) > USER_CAMERA_MS) {
+      if (g && a.cam && replayCamera.heldAt === null && !replayCamera.pinned && performance.now() - Math.max(replayCamera.userAt, cam.userAt()) > USER_CAMERA_MS) {
         // The marker goes to the middle of the part of the map no panel covers, not under the sidebar.
         cam.easeToward(a.cam.x, a.cam.y, 0.08);
         const z = g.zoom();

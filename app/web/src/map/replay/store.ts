@@ -19,6 +19,8 @@ export const replayCamera = {
   targetZoom: REPLAY_ZOOM as number | null,
   /** When the follow was put on hold (the fit button): it resumes once the marker leaves the view or the user moves the camera. */
   heldAt: null as number | null,
+  /** A file's panel is open: the camera stays on that file instead of following the tracer. */
+  pinned: false,
 
   userMoved() { this.userAt = performance.now(); },
   recenter() { this.userAt = 0; this.targetZoom = REPLAY_ZOOM; this.heldAt = null; },

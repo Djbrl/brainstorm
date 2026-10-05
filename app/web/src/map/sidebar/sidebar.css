@@ -143,3 +143,5 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) .sidebar-thread-note.blocked { color: #f5b544; }
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) .sidebar-thread-attn.turn { background: var(--hover); color: var(--ink-2); }
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) .sidebar-thread-attn.blocked { background: rgba(245,158,11,.18); color: #f5c06a; }
+/* The open thread's places on the Places lens (PlaceSteps): the one list that stays in the sidebar. */
+.sidebar-thread-steps { flex: 1; min-height: 0; margin: 10px -2px 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); }

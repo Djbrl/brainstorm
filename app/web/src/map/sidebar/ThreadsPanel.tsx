@@ -11,6 +11,7 @@ import { END, threadLens, useNav } from "../../lib/nav";
 import { relTime } from "../../follow/format";
 import { agentColor, baseName, initial, shortName, verbIng } from "../agents";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
+import { PlaceSteps } from "../../cowork/PlaceSteps";
 
 function useTick(ms: number) {
   const [, setTick] = useState(0);
@@ -108,6 +109,7 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
   // Which git worktree the thread ran in ("hackathon-landing-page", without Claude Code's random suffix).
   const tree = /\/\.claude\/worktrees\/([^/]+)/.exec(session.cwd ?? "")?.[1]?.replace(/-[0-9a-f]{6}$/, "");
   const [agentsOpen, setAgentsOpen] = useState(false);
+  const { lens } = useNav();
   useEffect(() => { if (!selected) setAgentsOpen(false); }, [selected]);
   const ids = sorted.map((a) => a.id);
   const allHidden = ids.length > 0 && ids.every((id) => hiddenAgents.has(id));
@@ -174,6 +176,8 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
           })}
         </ul>
       )}
+      {/* Places has no view of its own for the list: its places stay here, a short list (not every step). */}
+      {selected && lens === "places" && !agentsOpen && <div className="sidebar-thread-steps"><PlaceSteps /></div>}
     </li>
   );
 }

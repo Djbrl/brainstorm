@@ -21,7 +21,10 @@ import { TalkCard } from "./replay/TalkCard";
 import { StepPanel } from "./StepPanel";
 import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
 import { makeFileResolver } from "../lib/paths";
-import { drawModuleLabels, LabelSpace } from "./labels";
+import { drawModuleLabels, drawQueuedLabels, LabelSpace, type QueuedLabel } from "./labels";
+import { boxOf, isFitKey, useCamera, type Camera, type View } from "./camera";
+import { FitButton } from "./FitButton";
+import { replayCamera } from "./replay/store";
 import { useTheme } from "../lib/theme";
 import { drawCube, drawPlate, drawStation, LAND_MS, landings, mapStyle, metroPath, moduleColor, type RGB } from "./themes";
 import "./map.css";
@@ -189,9 +192,11 @@ export function MapView() {
   const style = mapStyle();
   const [selected, setSelected] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
-  const fitted = useRef(false);
   const settledFit = useRef(false);
   const root = map?.root ?? "";
+  // The camera works in the part of the canvas the sidebar, the side panels, the stats line and the footer leave free.
+  const cam = useCamera(fg as never, wrapRef);
+  const camRef = useRef<Camera>(cam); camRef.current = cam;
 
   // ---- live agents ----
   const [mockTick, setMockTick] = useState(0);
@@ -218,6 +223,7 @@ export function MapView() {
   const selectedRef = useRef(selected); selectedRef.current = selected;
   const moduleSpace = useRef(new LabelSpace());   // folder names taken this frame
   const fileSpace = useRef(new LabelSpace());     // file names taken this frame
+  const labelQueue = useRef<QueuedLabel[]>([]);   // file names to draw this frame, after the files
   const nodeIndex = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n])), [graph.nodes]);
   const nodeIndexRef = useRef(nodeIndex); nodeIndexRef.current = nodeIndex;
   /** Map an agent's file (or a searched directory) to a node id on the map. */
@@ -232,10 +238,13 @@ export function MapView() {
     for (const id of idx.keys()) if (id.startsWith(dir)) return id;
     return undefined;
   }, []);
-  const replayLayer = useReplayLayer({ fg: fg as never, wrapRef, nodeIndexRef, accent: tokens.accent, font: tokens.body });
+  const replayLayer = useReplayLayer({ fg: fg as never, wrapRef, nodeIndexRef, accent: tokens.accent, font: tokens.body, camera: camRef });
   const replayRef = useRef<ReplayLayerApi>(replayLayer); replayRef.current = replayLayer;
   const openRef = useRef(!!replay); openRef.current = !!replay;
   const drawAgentLayer = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
+    // File names go on after every file is drawn, so no circle covers a name (the selected one's last, on top).
+    drawQueuedLabels(ctx, labelQueue.current, fileSpace.current);
+    labelQueue.current = [];
     replayRef.current.draw(ctx, scale);
     drawAgents({
       ctx, scale, agents: agentsRef.current, anim: anim.current, accent: tokens.accent, font: tokens.body,
@@ -244,34 +253,80 @@ export function MapView() {
     });
   }, [tokens, resolveId]);
 
+  // ---- camera intent: what the camera is framing, so it can frame it again when a panel opens or the window resizes ----
+  // "fit": the whole project (or the open thread's footprint); "file": the open file; "free": the user's own view.
+  type Intent = { kind: "fit" } | { kind: "file"; id: string; zoom: boolean } | { kind: "free" };
+  const intent = useRef<Intent>({ kind: "fit" });
+  const intentAt = useRef(0);
+  const setIntent = useCallback((i: Intent) => { intent.current = i; intentAt.current = performance.now(); }, []);
+  const framed = useRef(false);   // the camera has framed the map at least once
+  /** Frame the open thread's footprint (its files), or the whole project. */
+  const fitAll = useCallback((ms = 800) => {
+    const idx = nodeIndexRef.current;
+    const fp = replayRef.current.footprint();
+    const touched = fp?.map((id) => idx.get(id)).filter((n): n is GNode => !!n && n.x !== undefined) ?? [];
+    const box = boxOf(touched.length ? touched : idx.values());
+    if (!box) return;
+    // Folder names sit above each group: leave them room at the top. A footprint of one or two files doesn't fill the screen.
+    box.y0 -= 24;
+    camRef.current.frame(box, { pad: 44, maxZoom: touched.length ? 2.4 : 4 }, ms);
+    framed.current = true;
+  }, []);
+  /** Frame what the intent says, unless the user has moved the camera since. */
+  const applyIntent = useCallback((ms = 600) => {
+    const i = intent.current, c = camRef.current;
+    if (i.kind === "free" || c.userAt() > intentAt.current) return;
+    if (i.kind === "fit") { if (!replayRef.current.tracing) fitAll(ms); return; }
+    const n = nodeIndexRef.current.get(i.id);
+    if (!n || n.x === undefined || n.y === undefined) return;
+    if (i.zoom) c.lookAt(n.x, n.y, 3, ms);
+    else c.reveal(n.x, n.y, n.r + 14, ms);   // room for its name under it
+    framed.current = true;
+  }, [fitAll]);
+  // The safe area changed (a panel opened, the sidebar collapsed, the window resized): frame the same thing in it.
+  useEffect(() => {
+    const t = setTimeout(() => applyIntent(450), 60);
+    return () => clearTimeout(t);
+  }, [cam.version, applyIntent]);
+  /** The fit button and F / 0. */
+  const fitNow = useCallback(() => {
+    setFollowId(null);
+    setIntent({ kind: "fit" });
+    if (replayRef.current.tracing) replayCamera.hold(); // the tracer's camera stays on the fit while its marker is in sight
+    fitAll(700);
+  }, [fitAll, setIntent]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (isFitKey(e)) { e.preventDefault(); fitNow(); } };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, [fitNow]);
+
   // Follow an agent: keep the camera on its marker until the user drags, zooms or clicks the map.
   useEffect(() => {
     if (!followId) return;
+    setIntent({ kind: "free" });
     fg.current?.zoom(Math.max(2.2, fg.current?.zoom() ?? 0), 700);
-    // Ease the camera toward the marker every frame (no stacked tweens).
+    // Ease the camera toward the marker every frame (no stacked tweens), into the middle of the uncovered map.
     let raf = 0;
     const tick = () => {
       const st = anim.current.get(followId);
-      const g = fg.current;
-      if (st && g) {
-        const c = g.centerAt() as unknown as { x: number; y: number };
-        const dx = st.x - c.x, dy = st.y - c.y;
-        if (Math.hypot(dx, dy) * g.zoom() > 1.5) g.centerAt(c.x + dx * 0.09, c.y + dy * 0.09);
-      }
+      if (st) camRef.current.easeToward(st.x, st.y, 0.09);
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [followId]);
+  }, [followId, setIntent]);
+  /** A file to zoom to once its panel is open (the panel's own effect below does the move). */
+  const zoomTo = useRef<string | null>(null);
   const focusOnFile = useCallback((file: string) => {
     setFollowId(null);
     const id = resolveId(file);
     const n = id ? nodeIndexRef.current.get(id) : undefined;
     if (!n) return;
+    zoomTo.current = n.id;
+    if (selectedRef.current === n.id) { setIntent({ kind: "file", id: n.id, zoom: true }); applyIntent(800); }
     setSelected(n.id);
-    fg.current?.centerAt((n.x ?? 0) + 220 / 3, n.y ?? 0, 800);
-    fg.current?.zoom(3, 800);
-  }, [resolveId]);
+  }, [resolveId, setIntent, applyIntent]);
 
   // Forces
   useEffect(() => {
@@ -287,22 +342,67 @@ export function MapView() {
     g.d3ReheatSimulation();
   }, [graph]);
 
-  // Zoom to fit once, after the first layout settles a bit.
+  // Frame the map once, after the first layout settles a bit (and again when it stops: see onEngineStop).
+  const hasNodes = graph.nodes.length > 0;
   useEffect(() => {
-    if (fitted.current || graph.nodes.length === 0) return;
-    const t = setTimeout(() => { fg.current?.zoomToFit(900, 130); fitted.current = true; }, 1600);
+    if (!hasNodes) return;
+    const t = setTimeout(() => applyIntent(900), 1600);
     return () => clearTimeout(t);
-  }, [graph.nodes.length]);
+  }, [hasNodes, applyIntent]);
 
-  // Focus from Follow
+  // A thread opens on its footprint: frame its files now, and again as the layout settles (a link opened straight
+  // onto a thread loads the map at the same time). Closing the thread frames the whole project again.
+  const footprintMode = replayLayer.footprintMode;
+  const openThread = replayLayer.active ? replay?.sessionId : undefined;
+  const hadThread = useRef(false);
+  useEffect(() => {
+    if (openThread) hadThread.current = true;
+    else if (!hadThread.current) return;
+    if (openThread && !footprintMode) return;
+    if (!openThread) hadThread.current = false;
+    setIntent({ kind: "fit" });
+    applyIntent(700);
+    const ts = openThread ? [600, 1800].map((ms) => setTimeout(() => applyIntent(700), ms)) : [];
+    return () => ts.forEach(clearTimeout);
+  }, [openThread, footprintMode, setIntent, applyIntent]);
+
+  // Focus from Follow (and file links)
   useEffect(() => {
     if (!focusFile) return;
     const n = graph.nodes.find((x) => x.id === focusFile);
     if (!n) return;
+    zoomTo.current = n.id;
     setSelected(n.id);
-    const go = () => { fg.current?.centerAt((n.x ?? 0) + 220 / 3, n.y ?? 0, 900); fg.current?.zoom(3, 900); fitted.current = true; setFocusFile(null); };
-    if (n.x === undefined) setTimeout(go, 800); else go();
-  }, [focusFile, graph.nodes, setFocusFile]);
+    setFocusFile(null);
+    if (selectedRef.current === n.id) { setIntent({ kind: "file", id: n.id, zoom: true }); applyIntent(900); }
+  }, [focusFile, graph.nodes, setFocusFile, setIntent, applyIntent]);
+
+  // The file panel: opening it brings the file into the uncovered map (zoomed in when it came from a list or a link);
+  // closing it puts the camera back where it was before (or frames the map, if it had never been framed).
+  const panelFile = step ? null : selected;
+  const before = useRef<{ view: View | null; intent: Intent } | null>(null);
+  useEffect(() => {
+    const c = camRef.current;
+    if (panelFile) {
+      if (!before.current) {
+        const auto = c.userAt() <= intentAt.current ? intent.current : { kind: "free" as const };
+        before.current = { view: framed.current ? c.view() : null, intent: auto.kind === "file" ? { kind: "fit" } : auto };
+      }
+      setIntent({ kind: "file", id: panelFile, zoom: zoomTo.current === panelFile });
+      zoomTo.current = null;
+      // A file with no position yet (a link that opened with the map): the intent frames it once the layout runs.
+      const n = nodeIndexRef.current.get(panelFile);
+      if (n?.x === undefined) { const t = setTimeout(() => applyIntent(900), 800); return () => clearTimeout(t); }
+      applyIntent(800);
+      return;
+    }
+    const b = before.current;
+    before.current = null;
+    if (!b) return;
+    if (replayRef.current.tracing) { setIntent({ kind: "free" }); return; } // the replay's camera is on the tracer
+    if (b.view && b.intent.kind !== "fit") { setIntent(b.intent); c.moveTo(b.view, 700); }
+    else { setIntent({ kind: "fit" }); applyIntent(700); }
+  }, [panelFile, setIntent, applyIntent]);
 
   // Import links show only around the selected file.
   const linkFocus = selected; // on click, not hover: moving the mouse across the map shouldn't flash lines everywhere
@@ -386,24 +486,17 @@ export function MapView() {
 
     const forced = isSel || isHover || active;
     // With a thread open, only the files it touched are named: the rest of the project stays in the background.
-    let showLabel = forced || (alpha >= 1 && (r * scale > 9 || scale > 3.2));
-    const fs = Math.max(11, Math.min(14, 11 + r * scale * 0.08)) / scale;
-    const label = baseName(n.id);
-    const ty = y + r + 3 / scale;
-    if (showLabel) {
-      // Skip a file name that would print over one already drawn this frame (the ones you point at always win).
-      ctx.font = `${isSel || active ? 600 : 500} ${fs}px ${st.labelFont ?? tokens.body}`;
-      const w = ctx.measureText(label).width, pad = 3 / scale;
-      showLabel = fileSpace.current.claim({ x0: x - w / 2 - pad, x1: x + w / 2 + pad, y0: ty - pad, y1: ty + fs + pad }, forced);
-    }
-    if (showLabel) {
-      ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-      ctx.lineWidth = 3 / scale;
-      ctx.strokeStyle = st.halo;
-      ctx.strokeText(label, x, ty);
-      ctx.fillStyle = isSel || active || isHover ? st.fileInk : st.fileInkQuiet;
-      ctx.fillText(label, x, ty);
+    if (forced || (alpha >= 1 && (r * scale > 9 || scale > 3.2))) {
+      // Queued, drawn after every file (see drawAgentLayer): a neighbour's circle never covers a name.
+      const fs = Math.max(11, Math.min(14, 11 + r * scale * 0.08)) / scale;
+      const ringR = st.node === "dot" ? r : r * 1.35 + 2 / scale;   // under the selection ring, not on it
+      labelQueue.current.push({
+        text: baseName(n.id), x, y: y + (isSel || isHover ? ringR : r) + 3 / scale, size: fs, scale, alpha,
+        font: `${isSel || active ? 600 : 500} ${fs}px ${st.labelFont ?? tokens.body}`,
+        ink: isSel || active || isHover ? st.fileInk : st.fileInkQuiet, halo: st.halo,
+        // The one you point at wins, then the selected one, then where an agent works, then the biggest.
+        prio: (isHover ? 4e6 : 0) + (isSel ? 2e6 : 0) + (active ? 1e6 : 0) + r, forced,
+      });
     }
     ctx.restore();
   }, [tokens, selected, hover]);
@@ -426,7 +519,7 @@ export function MapView() {
   }, [style]);
 
   const drawModules = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
-    moduleSpace.current.reset(); fileSpace.current.reset();
+    moduleSpace.current.reset(); fileSpace.current.reset(); labelQueue.current = [];
     const idx = nodeIndexRef.current;
     const focus = new Set<string>();
     for (const id of [hoverRef.current, selectedRef.current]) { const n = id ? idx.get(id) : undefined; if (n) focus.add(n.file.module); }
@@ -475,7 +568,7 @@ export function MapView() {
           autoPauseRedraw={false}
           cooldownTicks={400}
           d3VelocityDecay={0.35}
-          onEngineStop={() => { if (!settledFit.current && !selected && !openRef.current) { settledFit.current = true; fg.current?.zoomToFit(900, 130); } }}
+          onEngineStop={() => { if (!settledFit.current) { settledFit.current = true; applyIntent(900); } }}
           onNodeHover={(n) => setHover(n ? (n as GNode).id : null)}
           onNodeClick={(n) => setSelected((n as GNode).id)}
           onBackgroundClick={() => setSelected(null)}
@@ -488,6 +581,7 @@ export function MapView() {
       <MapStats />
       <TalkCard />
       <LensSwitch />
+      {graph.nodes.length > 0 && <FitButton onFit={fitNow} label={replay ? "Fit the thread's files" : "Fit the whole project"} />}
 
       <Dock>
         <div className="dock-legend" aria-label="Legend">

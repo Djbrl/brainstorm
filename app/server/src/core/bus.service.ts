@@ -1,5 +1,4 @@
-import { Injectable } from "@nestjs/common";
-import { EventEmitter } from "node:events";
+import { Injectable, Logger } from "@nestjs/common";
 import type { Session, Step } from "../types";
 
 /** In-process events between modules. Listener emits, reader/mapper react. */
@@ -10,9 +9,32 @@ export type BusEvents = {
   "workspace": [{ root: string }];               // the active workspace changed (workspace → listener, mapper, reader)
 };
 
+type Fn = (...args: any[]) => unknown;
+
+/** Listeners run one after another, each on its own: one that throws (or rejects) is logged and the rest still get
+ * the event, and the error never reaches the emitter (the listener's per-line loop would skip the line's other blocks). */
 @Injectable()
 export class BusService {
-  private ee = new EventEmitter().setMaxListeners(50);
-  emit<K extends keyof BusEvents>(event: K, ...args: BusEvents[K]) { this.ee.emit(event, ...args); }
-  on<K extends keyof BusEvents>(event: K, fn: (...args: BusEvents[K]) => void) { this.ee.on(event, fn as (...a: unknown[]) => void); }
+  private log = new Logger("Bus");
+  private listeners = new Map<keyof BusEvents, Fn[]>();
+
+  emit<K extends keyof BusEvents>(event: K, ...args: BusEvents[K]) {
+    const fns = this.listeners.get(event);
+    if (!fns) return;
+    for (const fn of [...fns]) { // a copy: a listener may add another
+      try {
+        const r = fn(...args);
+        if (r instanceof Promise) r.catch((e) => this.fail(event, e));
+      } catch (e) { this.fail(event, e); }
+    }
+  }
+
+  on<K extends keyof BusEvents>(event: K, fn: (...args: BusEvents[K]) => unknown) {
+    const fns = this.listeners.get(event) ?? this.listeners.set(event, []).get(event)!;
+    fns.push(fn as Fn);
+  }
+
+  private fail(event: string, e: unknown) {
+    this.log.warn(`a "${event}" listener failed: ${e instanceof Error ? e.message : String(e)}`);
+  }
 }

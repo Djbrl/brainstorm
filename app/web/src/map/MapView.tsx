@@ -1,5 +1,6 @@
 // Owner: D. Force graph of files/modules, glow by recency, a ripple per agent edit + outline while active, side panel + AskBox.
-// The nodes, layout and forces are in graph.ts, the recency colours in color.ts, drawing a frame in drawNode.ts.
+// The pieces: graph.ts (nodes, layout, forces), drawNode.ts (drawing a frame), color.ts (recency colours), labels.ts
+// (names), useMapCamera.ts (what the camera frames), useLiveAgents.ts (agents on the map), redraw.ts (when to redraw).
 import { LensSwitch } from "./LensSwitch";
 import { MapStats } from "./MapStats";
 import "../tasks/track.css";
@@ -7,38 +8,37 @@ import { clock, isReplay } from "../lib/live";
 import { lastSeen, sinceMs } from "../lib/visit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-force-graph-2d";
-import type { AgentPresence, FileNode } from "@contract";
+import type { FileNode } from "@contract";
 import { useLive } from "../lib/live";
 import { mapPrefs, useNav } from "../lib/nav";
-import { attentionText, needsYou } from "../lib/attention";
-import { mockAgents, mockMap } from "./mock";
-import { drawAgents, visibleAgents, type AgentAnim } from "./agents";
+import { mockMap } from "./mock";
+import { drawAgents } from "./agents";
 import { MapSidebar } from "./sidebar/MapSidebar";
 import { Dock, LockToggle, ReadsToggle } from "./replay/ReplayBar";
-import { getCameraLock, useStepWindow } from "./prefs";
+import { useStepWindow } from "./prefs";
 import { TalkCard } from "./replay/TalkCard";
 import { StepPanel } from "./StepPanel";
 import { FilePanel, useSelectedFile } from "./FilePanel";
 import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
 import { makeFileResolver } from "../lib/paths";
 import { aggregateFolders, clearTextWidths, drawModuleLabels, drawQueuedLabels, LabelSpace, type Folders, type QueuedLabel } from "./labels";
-import { boxOf, isFitKey, useCamera, type Camera, type View } from "./camera";
-import { replayCamera } from "./replay/store";
+import { useCamera, type Camera } from "./camera";
 import { FitButton } from "./FitButton";
 import { useTheme } from "../lib/theme";
-import { mapStyle, reachOf, settleLandings, tripMs } from "./themes";
+import { mapStyle, reachOf, settleLandings } from "./themes";
 import { clearSprites, spriteFrame } from "./sprites";
 import { createRedraw, Motion } from "./redraw";
 import { savePositions, useSavedPositions } from "./positions";
 import { css, readTokens } from "./color";
 import { useForces, useGraph, type GNode } from "./graph";
 import { drawFile, drawLinks, FILE_LABELS_MAX, flushDots, labelFor, lookOf, moreMotion, newCaches, paintHit, RIPPLE_MS, type Frame } from "./drawNode";
+import { useMapCamera } from "./useMapCamera";
+import { useLiveAgents } from "./useLiveAgents";
 import "./map.css";
 
 /** A recording (the hosted demo) or a shared replay: fixed for the page's life, read once (it parses the URL). */
 let replayed: boolean | undefined;
 const recorded = () => (replayed ??= isReplay());
-const MIN = 60_000;
 
 export function relTime(iso: string | undefined, now = clock()): string {
   if (!iso) return "not changed recently";
@@ -94,25 +94,9 @@ export function MapView() {
   useEffect(() => () => redraw.stop(), [redraw]);
 
   // ---- live agents ----
-  const [mockTick, setMockTick] = useState(0);
-  useEffect(() => { if (!mock) return; const t = setInterval(() => setMockTick((x) => x + 1), 2600); return () => clearInterval(t); }, [mock]);
-  // An agent waiting on you stays on the map however long it waits.
-  const waitingIds = useMemo(() => new Set(Object.values(state.attention).filter(needsYou).map((a) => a.agentId ?? a.sessionId)), [state.attention]);
-  const agents: AgentPresence[] = useMemo(() => {
-    const all = mock && map ? mockAgents(map, mockTick) : Object.values(state.agents ?? {});
-    const shown = new Set(visibleAgents(all));
-    return all.filter((a) => shown.has(a) || waitingIds.has(a.id));
-  }, [mock, map, mockTick, state.agents, waitingIds]);
-  // Hidden agents (sidebar toggles) are not drawn. With a thread open: its own agents (main and subagents, each in its
-  // colour) while it's followed live; none while you move through its past (the replay's cursor is the marker then).
-  const threadId = replay?.sessionId ?? null, liveThread = !!replay?.live;
-  const drawnAgents = useMemo(() => agents.filter((a) => !hiddenAgents.has(a.id) && (!threadId || (liveThread && a.sessionId === threadId))),
-    [agents, hiddenAgents, threadId, liveThread]);
-  // Agents waiting on you (attention): agent id → label. A subagent waits under its own id, a main thread under the session's.
-  const waiting = useMemo(() => new Map(Object.values(state.attention).filter(needsYou).map((a) => [a.agentId ?? a.sessionId, attentionText(a).badge === "Stuck" ? "Stuck" : `Needs you · ${attentionText(a).title.toLowerCase()}`])), [state.attention]);
-  const waitingRef = useRef(waiting); waitingRef.current = waiting;
-  const agentsRef = useRef(drawnAgents); agentsRef.current = drawnAgents;
-  const anim = useRef(new Map<string, AgentAnim>());
+  const { agents, drawnAgents, waiting, waitingRef, agentsRef, anim, moving: agentsMoving } = useLiveAgents({
+    mock, map, agents: state.agents, attention: state.attention, hiddenAgents, threadId: replay?.sessionId ?? null, liveThread: !!replay?.live,
+  });
   const hoverRef = useRef(hover); hoverRef.current = hover;
   const selectedRef = useRef(selected); selectedRef.current = selected;
   const space = useRef(new LabelSpace());         // taken this frame: files, replay badges, folder names, file names
@@ -147,156 +131,12 @@ export function MapView() {
   const openRef = useRef(!!replay); openRef.current = !!replay;
   const playingRef = useRef(false); playingRef.current = !!replay?.playing;
 
+  // ---- the camera (useMapCamera.ts) ----
   const hasNodes = graph.nodes.length > 0;
-  const [followId, setFollowId] = useState<string | null>(null);
-  // A thread replay takes over the camera: stop following a live agent when one starts.
-  useEffect(() => { if (replay) setFollowId(null); }, [replay?.sessionId]);
-  const followRef = useRef(followId); followRef.current = followId;
-  // ---- camera intent: what the camera is framing, so it can frame it again when a panel opens or the window resizes ----
-  // "fit": the whole project (or the open thread's footprint); "file": the open file; "free": the user's own view.
-  type Intent = { kind: "fit" } | { kind: "file"; id: string; zoom: boolean } | { kind: "free" };
-  const intent = useRef<Intent>({ kind: "fit" });
-  const intentAt = useRef(0);
-  const setIntent = useCallback((i: Intent) => { intent.current = i; intentAt.current = performance.now(); }, []);
-  const framed = useRef(false);   // the camera has framed the map at least once
-  /** Locked onto something that moves (the tracer, a followed agent): the follow owns the centre, so no automatic re-frame. */
-  const lockedOn = useCallback(() => getCameraLock() && (replayRef.current.tracing || !!followRef.current), []);
-  /** Frame the open thread's focus (its recent window, or all its files), or the whole project. */
-  const fitAll = useCallback((ms = 800) => {
-    const idx = nodeIndexRef.current;
-    const fp = replayRef.current.footprint();
-    const touched = fp?.map((id) => idx.get(id)).filter((n): n is GNode => !!n && n.x !== undefined) ?? [];
-    const box = boxOf(touched.length ? touched : idx.values());
-    if (!box) return;
-    // Folder names sit above each group: leave them room at the top. A footprint of one or two files doesn't fill the screen.
-    box.y0 -= 24;
-    camRef.current.frame(box, { pad: 44, maxZoom: touched.length ? 2.4 : 4 }, ms);
-    framed.current = true;
-  }, []);
-  /** Frame what the intent says, unless the user has moved the camera since. */
-  const applyIntent = useCallback((ms = 600) => {
-    const i = intent.current, c = camRef.current;
-    if (i.kind === "free" || c.userAt() > intentAt.current) return;
-    if (i.kind === "fit") { if (!lockedOn()) fitAll(ms); return; }
-    const n = nodeIndexRef.current.get(i.id);
-    if (!n || n.x === undefined || n.y === undefined) return;
-    if (i.zoom) c.lookAt(n.x, n.y, 3, ms);
-    else c.reveal(n.x, n.y, n.r + 14, ms);   // room for its name under it
-    framed.current = true;
-  }, [fitAll, lockedOn]);
-  // Unlocked, the tracer left the view: frame the recent window again (applyIntent: unless you moved the camera since).
-  useEffect(() => { replayCamera.lost = () => applyIntent(700); return () => { replayCamera.lost = null; }; }, [applyIntent]);
-  // The safe area changed (a panel opened, the sidebar collapsed, the window resized): frame the same thing in it.
-  useEffect(() => {
-    const t = setTimeout(() => applyIntent(450), 60);
-    return () => clearTimeout(t);
-  }, [cam.version, applyIntent]);
-  /** The fit button and F / 0: the open thread's recent window, or the whole project (and stop following an agent). */
-  const fitNow = useCallback(() => {
-    setFollowId(null);
-    setIntent({ kind: "fit" });
-    fitAll(700);
-  }, [fitAll, setIntent]);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (isFitKey(e)) { e.preventDefault(); fitNow(); } };
-    addEventListener("keydown", onKey);
-    return () => removeEventListener("keydown", onKey);
-  }, [fitNow]);
-
-  // Follow an agent (from the sidebar), like the tracer: the camera frames it once; locked, it keeps it centred (easing,
-  // every frame, no stacked tweens) at whatever zoom you pick; unlocked, it stays where you put it, and frames the agent
-  // again when it leaves the view only if you haven't moved the camera since following began.
-  useEffect(() => {
-    if (!followId) return;
-    setIntent({ kind: "free" });
-    const t0 = performance.now();
-    let raf = 0, framedAt = 0;
-    const tick = () => {
-      const st = anim.current.get(followId), c = camRef.current, now = performance.now();
-      if (st) {
-        if (!framedAt) { framedAt = now; c.lookAt(st.x, st.y, Math.max(2.2, c.view()?.k ?? 0), 700); }
-        else if (getCameraLock()) { if (now - framedAt > 700) c.easeToward(st.x, st.y, 0.09); }
-        else if (c.userAt() < t0 && now - framedAt > 1200 && !c.sees(st.x, st.y)) { framedAt = now; c.lookAt(st.x, st.y, undefined, 700); }
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [followId, setIntent]);
-  /** A file to zoom to once its panel is open (the panel's own effect below does the move). */
-  const zoomTo = useRef<string | null>(null);
-  const focusOnFile = useCallback((file: string) => {
-    setFollowId(null);
-    const id = resolveId(file);
-    const n = id ? nodeIndexRef.current.get(id) : undefined;
-    if (!n) return;
-    zoomTo.current = n.id;
-    if (selectedRef.current === n.id) { setIntent({ kind: "file", id: n.id, zoom: true }); applyIntent(800); }
-    setSelected(n.id);
-  }, [resolveId, setIntent, applyIntent]);
-
-  // Frame the map once, after the first layout settles a bit (and again when it stops: see onEngineStop).
-  useEffect(() => {
-    if (!hasNodes) return;
-    const t = setTimeout(() => applyIntent(900), 1600);
-    return () => clearTimeout(t);
-  }, [hasNodes, applyIntent]);
-
-  // Opening a thread or starting its replay frames its recent window once, locked or not (and again as the layout settles,
-  // unlocked and untouched: a link opened straight onto a thread loads the map at the same time). Closing the thread
-  // frames the whole project again.
-  const openThread = replayLayer.active ? replay?.sessionId : undefined;
-  const playing = replay?.mode === "play";
-  const hadThread = useRef(false);
-  useEffect(() => {
-    if (openThread) hadThread.current = true;
-    else if (!hadThread.current) return;
-    if (!openThread) hadThread.current = false;
-    setIntent({ kind: "fit" });
-    if (replayCamera.pinned) return; // a file's panel is open: the camera stays on the file
-    fitAll(700);
-    const ts = openThread ? [600, 1800].map((ms) => setTimeout(() => applyIntent(700), ms)) : [];
-    return () => ts.forEach(clearTimeout);
-  }, [openThread, playing, setIntent, applyIntent, fitAll]);
-
-  // Focus from Follow (and file links)
-  useEffect(() => {
-    if (!focusFile) return;
-    const n = nodeIndex.get(focusFile);
-    if (!n) return;
-    zoomTo.current = n.id;
-    setSelected(n.id);
-    setFocusFile(null);
-    if (selectedRef.current === n.id) { setIntent({ kind: "file", id: n.id, zoom: true }); applyIntent(900); }
-  }, [focusFile, nodeIndex, setFocusFile, setIntent, applyIntent]);
-
-  // The file panel: opening it brings the file into the uncovered map (zoomed in when it came from a list or a link);
-  // closing it puts the camera back where it was before (or frames the map, if it had never been framed).
-  const panelFile = step ? null : selected;
-  const before = useRef<{ view: View | null; intent: Intent } | null>(null);
-  useEffect(() => () => { replayCamera.pinned = false; }, []);
-  useEffect(() => {
-    const c = camRef.current;
-    replayCamera.pinned = !!panelFile; // the tracer's camera leaves the open file alone (it picks up again on close)
-    if (panelFile) {
-      if (!before.current) {
-        const auto = c.userAt() <= intentAt.current ? intent.current : { kind: "free" as const };
-        before.current = { view: framed.current ? c.view() : null, intent: auto.kind === "file" ? { kind: "fit" } : auto };
-      }
-      setIntent({ kind: "file", id: panelFile, zoom: zoomTo.current === panelFile });
-      zoomTo.current = null;
-      // A file with no position yet (a link that opened with the map): the intent frames it once the layout runs.
-      const n = nodeIndexRef.current.get(panelFile);
-      if (n?.x === undefined) { const t = setTimeout(() => applyIntent(900), 800); return () => clearTimeout(t); }
-      applyIntent(800);
-      return;
-    }
-    const b = before.current;
-    before.current = null;
-    if (!b) return;
-    if (b.view && b.intent.kind !== "fit") { setIntent(b.intent); c.moveTo(b.view, 700); }
-    else { setIntent({ kind: "fit" }); applyIntent(700); }
-  }, [panelFile, setIntent, applyIntent]);
+  const { followId, setFollowId, followRef, fitNow, focusOnFile, applyIntent } = useMapCamera({
+    cam, camRef, nodeIndex, nodeIndexRef, replayRef, replayActive: replayLayer.active, replay, step, selected, selectedRef, setSelected,
+    resolveId, anim, hasNodes, focusFile, setFocusFile,
+  });
 
   // Import links show only around the selected file.
   const linkFocus = selected; // on click, not hover: moving the mouse across the map shouldn't flash lines everywhere
@@ -457,19 +297,6 @@ export function MapView() {
       resolve: (id) => { const n = nodeIndexRef.current.get(id); return n && n.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y, r: n.r } : undefined; },
     });
   }, [resolveId]);
-
-  /** Whether the live agents are still moving: a glide, a fade, a read's line, a pulse, a red flash, a wait's breath. */
-  const agentsMoving = (t: number) => {
-    const now = clock(), route = mapStyle().route;
-    for (const a of agentsRef.current) {
-      const st = anim.current.get(a.id);
-      if (!st) continue;   // not on the map (its file isn't a node)
-      if (t - st.t0 < tripMs(route, 650) + 50 || st.flashes.length || t - st.pulseT0 < 700 || t - st.errT0 < 2600 || waitingRef.current.has(a.id)) return true;
-      const target = a.active || waitingRef.current.has(a.id) ? 1 : Math.max(0, 0.35 * (1 - (now - Date.parse(a.ts) - 2 * MIN) / (8 * MIN)));
-      if (Math.abs(target - st.alpha) > 0.01) return true;
-    }
-    return false;
-  };
 
   const endFrame = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
     const F = frame.current;

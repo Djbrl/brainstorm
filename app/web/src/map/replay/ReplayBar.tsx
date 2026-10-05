@@ -2,7 +2,7 @@
 // ask for it. The player is only what playing needs: back, play, forward, a timeline cut by chapter (red where one
 // failed), speed and hide. The rest moved: the step panel follows the cursor (no "Open step"), the camera recenters
 // itself, "Every step" is under the step list. With a thread open the pill leads with what you can do with it:
-// Replay (or Live, for a running thread) and Share.
+// Live (a running thread), Replay and Share.
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNav, type ReplaySpeed } from "../../lib/nav";
 import { isReplay, useLive } from "../../lib/live";
@@ -123,15 +123,18 @@ export function Dock({ children }: { children: ReactNode }) {
     <div className="dock">
       {on && <Player />}
       <div className="dock-pill">
-        {replay && (running && !on
-          ? <button className={`dock-replay live${replay.live ? " on" : ""}`} onClick={() => setReplayLive(!replay.live)} aria-pressed={!!replay.live}
-              title={replay.live ? "Following its newest step. Click to stop" : "Jump to its newest step and follow it"}>
-              <i className="dock-live-dot" aria-hidden="true" />{replay.live ? "Live" : "Follow live"}
-            </button>
-          : <button className={`dock-replay${on ? " on" : ""}`} onClick={toggle} disabled={!thread?.beats.length} aria-pressed={on}
-              title={on ? "Hide the player (Esc)" : "Play this thread from the start"}>
-              {Icon.small}{on ? "Hide replay" : "Replay"}
-            </button>)}
+        {replay && running && !on && (
+          <button className={`dock-replay live${replay.live ? " on" : ""}`} onClick={() => setReplayLive(!replay.live)} aria-pressed={!!replay.live}
+            title={replay.live ? "Following its newest step. Click to stop" : "Jump to its newest step and follow it"}>
+            <i className="dock-live-dot" aria-hidden="true" />{replay.live ? "Live" : "Follow live"}
+          </button>
+        )}
+        {replay && (
+          <button className={`dock-replay${on ? " on" : ""}`} onClick={toggle} disabled={!thread?.beats.length} aria-pressed={on}
+            title={on ? "Hide the player (Esc)" : "Play this thread from the start"}>
+            {Icon.small}{on ? "Hide replay" : "Replay"}
+          </button>
+        )}
         {replay && !isReplay() && <ShareMenu sessionId={replay.sessionId} className="dock-share" />}
         {children}
       </div>

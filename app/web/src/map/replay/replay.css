@@ -203,6 +203,9 @@
   font-size: 13.5px; font-weight: 600; padding: 8px 16px; }
 .dock-replay.on { background: var(--accent-soft); color: #3f3fb0; }
 .dock-replay:disabled { opacity: .45; cursor: default; }
+/* Next to Live (a running thread), Replay steps back to an outline: one filled button per pill. */
+.dock-replay.live ~ .dock-replay:not(.on) { background: var(--surface); color: var(--accent); box-shadow: inset 0 0 0 1px var(--line); }
+.dock-replay.live ~ .dock-replay:not(.on):hover { box-shadow: inset 0 0 0 1px var(--accent); }
 .dock-replay:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* A running thread: Follow live, then Live (a pulsing dot) while it follows the newest step. */
 .dock-live-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }

@@ -1,17 +1,15 @@
-// Owner: sidebar agent. Threads tab: the list of threads, nothing more. Clicking one opens its Track (the thread as a
-// line of steps with a window on what the agent saw; a running one follows live); Map and Places are one click away on
-// the lens switch. Clicking the open thread again closes it. The thread's summary is the line above the sidebar
-// (MapStats); Replay, Live and Share are in the Map's footer (ReplayBar's Dock).
+// Owner: sidebar agent. Threads tab: the list of threads, nothing more. Clicking one opens it on the map, and the sidebar
+// turns to its Track tab (its steps; a running one follows live). Clicking the open thread again closes it. The thread's
+// summary is the line above the sidebar (MapStats); Replay, Live and Share are in the Map's footer (ReplayBar's Dock).
 // Under the open thread: what it waits on you for, if it's blocked, and its agents folded into one row (follow, show/hide).
 // The eye in the title row shows or hides all its agents.
 import { useEffect, useState } from "react";
 import type { AgentPresence, Session } from "@contract";
 import { clock, useLive } from "../../lib/live";
-import { END, threadLens, useNav } from "../../lib/nav";
+import { END, useNav } from "../../lib/nav";
 import { relTime } from "../../follow/format";
 import { agentColor, baseName, initial, shortName, verbIng } from "../agents";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
-import { PlaceSteps } from "../../cowork/PlaceSteps";
 
 function useTick(ms: number) {
   const [, setTick] = useState(0);
@@ -53,11 +51,11 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }
     return <p className="sidebar-empty">No agent threads yet. Start Claude Code in this project.</p>;
   }
 
-  // Clicking a thread opens its Track at the end, and a running one keeps following its newest step.
+  // Clicking a thread opens it at the end, on the lens you're on, and a running one keeps following its newest step.
   const select = (s: Session) => {
     if (replay?.sessionId === s.id) { stopReplay(); return; } // clicking the open thread closes it
     const running = s.status === "running";
-    startReplay(s.id, running ? 0 : END, { live: running, lens: threadLens() });
+    startReplay(s.id, running ? 0 : END, { live: running });
   };
   // The most recent few; the rest behind "Show all" (the open thread always shows).
   const SHORT = 5;
@@ -109,7 +107,6 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
   // Which git worktree the thread ran in ("hackathon-landing-page", without Claude Code's random suffix).
   const tree = /\/\.claude\/worktrees\/([^/]+)/.exec(session.cwd ?? "")?.[1]?.replace(/-[0-9a-f]{6}$/, "");
   const [agentsOpen, setAgentsOpen] = useState(false);
-  const { lens } = useNav();
   useEffect(() => { if (!selected) setAgentsOpen(false); }, [selected]);
   const ids = sorted.map((a) => a.id);
   const allHidden = ids.length > 0 && ids.every((id) => hiddenAgents.has(id));
@@ -176,8 +173,6 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
           })}
         </ul>
       )}
-      {/* Places has no view of its own for the list: its places stay here, a short list (not every step). */}
-      {selected && lens === "places" && !agentsOpen && <div className="sidebar-thread-steps"><PlaceSteps /></div>}
     </li>
   );
 }

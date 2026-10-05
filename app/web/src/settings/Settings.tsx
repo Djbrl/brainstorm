@@ -22,9 +22,7 @@ export function SettingsButton() {
 
   return (
     <div className="settings" ref={box}>
-      <button className="settings-btn" aria-label="Settings" aria-expanded={open} aria-haspopup="dialog" title="Settings" onClick={() => setOpen((o) => !o)}>
-        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 6.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8Z" /><path d="M8.6 2h2.8l.5 2.2 1.6.9 2.1-.8 1.4 2.4-1.7 1.5v1.6l1.7 1.5-1.4 2.4-2.1-.8-1.6.9-.5 2.2H8.6l-.5-2.2-1.6-.9-2.1.8L3 13.4l1.7-1.5v-1.8L3 8.6l1.4-2.4 2.1.8 1.6-.9z" /></svg>
-      </button>
+      <button className="ws-chip settings-btn" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen((o) => !o)}>Settings</button>
       {open && (
         <div className="settings-pop" role="dialog" aria-label="Settings">
           <h3>Map theme</h3>

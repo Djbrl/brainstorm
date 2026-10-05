@@ -2,21 +2,19 @@
 //
 // Three levels, one at a time:
 //   /                                   the project: the map at rest, live agents as dots, what changed since you last looked
-//   /thread/<id>                        one thread: its steps, at the end (a running one follows live); its replay from the footer
+//   /thread/<id>                        one thread on the map, its steps in the sidebar's Track tab, at the end (a running one
+//                                       follows live); its replay from the footer
 //   /thread/<id>/step/<stepId>          one step, in a side panel (its diff, its output, Ask)
 //   …/file/<path>                       a file open in the side panel (its path from the project root), on the project or a thread's map
-// A thread can be seen three ways, the lens: /thread/<id> (its Track, what opening a thread shows), /thread/<id>/map,
-// /thread/<id>/places. The hosted demos have no Track: there /thread/<id> is the map (see threadLens).
+// A thread can be seen two ways, the lens: /thread/<id> (the map) and /thread/<id>/places. Links from when Track was a
+// view of its own (/thread/<id>/track) open the map.
 // Opening or closing a thread, a step or a lens adds a browser history entry, so Back and Esc go up one level. Moving
 // through a replay doesn't. A file opened from disk (a shared replay) keeps the same paths after a `#`.
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { ReplayDetail } from "./thread";
-import { isReplay } from "./live";
 
-/** How a thread is shown: where it happened in the code, the story as a vertical track, or the places it went outside the code. */
-export type Lens = "map" | "track" | "places";
-/** The lens a thread opens on: its Track; the map in the hosted demos and shared files, which carry no Track. */
-export const threadLens = (): Lens => (isReplay() ? "map" : "track");
+/** How a thread is shown: where it happened in the code, or the places it went outside the code. */
+export type Lens = "map" | "places";
 export type ReplaySpeed = 1 | 2 | 4;
 /**
  * How much of an open thread is out: its steps as a list (what opening a thread shows), or the replay with its player
@@ -119,7 +117,7 @@ export function pathFor(p: Place): string {
   // A file is on the map: it shows in the link on the Map lens, when no step covers it.
   const file = p.file && !p.step && (!p.thread || p.lens === "map") ? filePart(p.file) : "";
   if (!p.thread) return file || "/";
-  let path = `/thread/${encodeURIComponent(p.thread)}${p.lens === threadLens() ? "" : `/${p.lens}`}`;
+  let path = `/thread/${encodeURIComponent(p.thread)}${p.lens === "map" ? "" : `/${p.lens}`}`;
   if (p.step) path += `/step/${encodeURIComponent(p.step)}`;
   return path + file;
 }
@@ -129,11 +127,11 @@ function readPlace(): Place {
   const m = /^(?:\/thread\/([^/]+)(?:\/(map|track|places))?(?:\/step\/([^/]+))?)?(?:\/file\/(.+?))?\/?$/.exec(raw);
   if (m && (m[1] || m[4])) {
     const file = m[4] ? m[4].split("/").map(decodeURIComponent).join("/") : null;
-    return { thread: m[1] ? decodeURIComponent(m[1]) : null, lens: (m[2] as Lens) ?? (m[1] ? threadLens() : "map"), step: m[3] ? decodeURIComponent(m[3]) : null, file };
+    return { thread: m[1] ? decodeURIComponent(m[1]) : null, lens: m[2] === "places" ? "places" : "map", step: m[3] ? decodeURIComponent(m[3]) : null, file };
   }
   // Links from before the paths: ?view=map&lens=places&thread=<id>&step=<id> (and ?view=cowork for Places).
   const q = new URLSearchParams(location.search), thread = q.get("thread");
-  const lens: Lens = q.get("lens") === "track" || q.get("lens") === "places" ? (q.get("lens") as Lens) : q.get("view") === "cowork" ? "places" : "map";
+  const lens: Lens = q.get("lens") === "places" || q.get("view") === "cowork" ? "places" : "map";
   return { thread, step: thread ? q.get("step") : null, lens: thread ? lens : "map" };
 }
 

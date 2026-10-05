@@ -1,4 +1,4 @@
-// Owner: C. Tiny inline SVG glyphs per step kind.
+// Tiny inline SVG glyphs per step kind.
 import type { StepKind } from "@contract";
 
 const P = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };

@@ -1,4 +1,4 @@
-/* Owner: replay agent. Thread replay on the map: playback bar, step list, Follow button. */
+/* Thread replay on the map: the player and the footer around it (dock), the step list, the share menu, the talk card. */
 
 /* ---------- player controls ---------- */
 .rp-empty { margin: 0; color: var(--ink-2); font-size: 14.5px; }

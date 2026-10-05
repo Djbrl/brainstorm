@@ -1,4 +1,4 @@
-/* Owned by the lead. Map themes (lib/theme.ts sets <html data-theme>). Each theme sets the design tokens, the map's
+/* Map themes (lib/theme.ts sets <html data-theme>). Each theme sets the design tokens, the map's
    backdrop, and, for the dark ones, the frosted surfaces that are hard-coded light elsewhere. The canvas side is
    in map/themes.ts. */
 

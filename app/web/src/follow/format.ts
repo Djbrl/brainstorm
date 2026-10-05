@@ -1,4 +1,4 @@
-// Owner: C. Display helpers for steps and sessions.
+// Display helpers for steps and sessions.
 import { clock } from "../lib/live";
 import type { Step } from "@contract";
 import { CallPairer } from "../lib/pairing";

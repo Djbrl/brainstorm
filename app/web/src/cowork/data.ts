@@ -1,4 +1,4 @@
-// Owner: cowork. Loads GET /api/cowork?sessionId= for one thread and shapes it for the view: change groups, verb names, area names.
+// Loads GET /api/cowork?sessionId= for one thread and shapes it for the view: change groups, verb names, area names.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { CoworkArea, CoworkEvent, CoworkSummary, CoworkVerb } from "@contract";
 import { isReplay, replayCowork } from "../lib/live";

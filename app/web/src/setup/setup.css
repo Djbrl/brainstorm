@@ -1,4 +1,4 @@
-/* Owner: C. Setup screen: one calm column, big type. */
+/* Setup screen: one calm column, big type. */
 .su-root { height: 100%; overflow-y: auto; background: var(--bg); position: relative; }
 .su-wordmark { position: absolute; top: 20px; left: 28px; font-family: var(--font-display); font-weight: 800; font-size: 20px; letter-spacing: -0.03em; }
 .su-col { max-width: 720px; margin: 0 auto; padding: 14vh 32px 96px; animation: su-in .5s cubic-bezier(.2,.7,.2,1) both; }

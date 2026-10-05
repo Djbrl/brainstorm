@@ -1,4 +1,4 @@
-// Owner: C. Pure helpers that turn raw tool inputs and results into something readable in the step panel.
+// Pure helpers that turn raw tool inputs and results into something readable in the step panel.
 import { stripInjected } from "../format";
 
 export const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "").replace(/\x1b\][^\x07]*\x07/g, "");

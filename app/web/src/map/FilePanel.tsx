@@ -1,7 +1,7 @@
-// Owner: D. A file of the map in the side panel: what it does, its imports, the agent steps that touched it, and Ask.
-// Same rules as the step panel (map/panel.ts): Esc, Back or a click outside closes it, no close button. Its link is
-// /file/<path from the project root> (after /thread/<id> when a thread is open), so a reload or a shared link opens it
-// with the camera on it.
+// A file of the map in the side panel: what it does, its imports, the agent steps that touched it, and Ask.
+// Same rules as the step panel (map/panel.ts): Esc, Back or a click outside closes it, and only a phone gets a close
+// button. Its link is /file/<path from the project root> (after /thread/<id> when a thread is open), so a reload or a
+// shared link opens it with the camera on it.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Edge, FileNode, Step } from "@contract";
 import { AskBox } from "../ask/AskBox";

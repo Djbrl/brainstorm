@@ -86,3 +86,6 @@ export function duration(ms: number): string {
   if (!Number.isFinite(min) || min < 1) return "under a minute";
   return min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ""}`;
 }
+
+/** "worked 4 min": active time (activeMs), the one duration the app shows for a thread or a chapter. */
+export const worked = (ms: number) => `worked ${duration(ms)}`;

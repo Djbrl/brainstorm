@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import type { AgentPresence } from "@contract";
 import { clock } from "../lib/live";
+import { relTime } from "../follow/format";
 import { along, casing, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs } from "./themes";
 
 // Colors that do not clash with the recency scale (orange/amber/grey). Main threads get the accent (Metro: their own ink line).
@@ -37,14 +38,6 @@ export function visibleAgents(agents: AgentPresence[], now = clock()): AgentPres
   return agents.filter((a) => a.active || now - Date.parse(a.ts) < 10 * 60_000);
 }
 
-function ago(iso: string, now: number) {
-  const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
-  if (s < 10) return "now";
-  if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.round(s / 60)} min ago`;
-  return `${Math.round(s / 3600)} h ago`;
-}
-
 function useTick(ms: number) {
   const [, set] = useState(0);
   useEffect(() => { const t = setInterval(() => set((x) => x + 1), ms); return () => clearInterval(t); }, [ms]);
@@ -73,7 +66,7 @@ export function AgentTracker({ agents, accent, followId, onFollow, onFocusFile }
                 <button className="map-agent-head" onClick={() => onFollow(following ? null : a.id)} title={following ? "Stop following" : "Follow this agent"}>
                   <i style={{ background: agentColor(a, accent) }} />
                   <span className="map-agent-name">{shortName(a, 40)}</span>
-                  <time>{ago(a.ts, now)}</time>
+                  <time>{relTime(a.ts, now)}</time>
                 </button>
                 <p className="map-agent-now">
                   {verbIng(a.action)}{a.file ? <> <b>{baseName(a.file)}</b></> : null}

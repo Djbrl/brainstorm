@@ -12,6 +12,7 @@ import { ConfigService } from "../core/config.service";
 import { ListenerService } from "../listener/listener.service";
 import { MapperService } from "../mapper/mapper.service";
 import { ReaderService } from "../reader/reader.service";
+import { isIdleTranscript } from "./threads";
 
 const execFileP = promisify(execFile);
 const encodeRoot = (root: string) => root.replace(/[^A-Za-z0-9-]/g, "-");
@@ -136,13 +137,15 @@ export class WorkspaceService implements OnModuleInit {
       try { dirStat = statSync(dirPath); } catch { continue; }
       if (!dirStat.isDirectory()) continue;
 
-      let jsonlFiles: { path: string; mtimeMs: number }[];
+      // Threads only (see threads.ts): a folder whose sessions were all slash commands still names a project.
+      let jsonlFiles: { path: string; mtimeMs: number; idle: boolean }[];
       try {
         jsonlFiles = readdirSync(dirPath)
           .filter((f) => f.endsWith(".jsonl"))
           .map((f) => {
             const p = join(dirPath, f);
-            return { path: p, mtimeMs: statSync(p).mtimeMs };
+            const st = statSync(p);
+            return { path: p, mtimeMs: st.mtimeMs, idle: isIdleTranscript(p, st.size) };
           });
       } catch { continue; }
       if (!jsonlFiles.length) continue;
@@ -161,7 +164,8 @@ export class WorkspaceService implements OnModuleInit {
       }
       if (/\/Library\/Application Support\//.test(root)) continue; // Claude Desktop's own scratch folders
       // A worktree (or a folder inside one) belongs to its repo; a folder reached through a symlink, to the real one.
-      add(real(real(root).replace(/\/\.claude\/worktrees\/[^/]+(?:\/.*)?$/, "")), jsonlFiles.map((f) => basename(f.path, ".jsonl")), new Date(jsonlFiles[0].mtimeMs).toISOString());
+      const threads = jsonlFiles.filter((f) => !f.idle);
+      add(real(real(root).replace(/\/\.claude\/worktrees\/[^/]+(?:\/.*)?$/, "")), threads.map((f) => basename(f.path, ".jsonl")), new Date((threads[0] ?? jsonlFiles[0]).mtimeMs).toISOString());
     }
 
     // A repo that moved: its old folder is gone, and one of the same name has threads. Count them together.
@@ -278,38 +282,39 @@ export class WorkspaceService implements OnModuleInit {
     }
     if (!versionRaw) {
       const found = this.countRecentSessions(root);
-      if (found > 0) return { id: "claude", label, state: "done", detail: `Claude Code logs found · ${found} session${found === 1 ? "" : "s"} in the last day` };
+      if (found > 0) return { id: "claude", label, state: "done", detail: `Claude Code logs found · ${found} thread${found === 1 ? "" : "s"} in the last day` };
       return { id: "claude", label, state: "warn", detail: "Claude Code CLI not found, install it to follow agents live" };
     }
     const version = versionRaw.match(/\d+\.\d+(\.\d+)?/)?.[0] ?? (versionRaw || "?");
     const sessions = this.countRecentSessions(root);
     if (sessions === 0) {
-      return { id: "claude", label, state: "warn", detail: "No sessions yet. Start `claude` in this folder and they will appear live" };
+      return { id: "claude", label, state: "warn", detail: "No threads in the last day. Start `claude` in this folder and they will appear live" };
     }
-    return { id: "claude", label, state: "done", detail: `Claude Code ${version} · ${sessions} session${sessions === 1 ? "" : "s"} in the last day` };
+    return { id: "claude", label, state: "done", detail: `Claude Code ${version} · ${sessions} thread${sessions === 1 ? "" : "s"} in the last day` };
   }
 
-  /** Count *.jsonl files modified in the last 24h across every Claude Code project folder for `root`. */
+  /** Threads (see threads.ts) active in the last 24h across the Claude Code project folders for `root` and its worktrees. */
   private countRecentSessions(root: string): number {
     const encoded = resolve(root).replace(/[^A-Za-z0-9-]/g, "-");
     let dirs: string[];
     try { dirs = readdirSync(this.cfg.claudeProjectsDir); } catch { return 0; }
-    let count = 0;
+    const ids = new Set<string>();
     const now = Date.now();
     for (const d of dirs) {
-      if (!d.startsWith(encoded)) continue;
+      if (d !== encoded && !d.startsWith(encoded + "-")) continue;
       const dirPath = join(this.cfg.claudeProjectsDir, d);
       let entries: string[];
       try { entries = readdirSync(dirPath); } catch { continue; }
       for (const name of entries) {
         if (!name.endsWith(".jsonl")) continue;
         try {
-          const st = statSync(join(dirPath, name));
-          if (now - st.mtimeMs <= ONE_DAY_MS) count++;
+          const p = join(dirPath, name);
+          const st = statSync(p);
+          if (now - st.mtimeMs <= ONE_DAY_MS && !isIdleTranscript(p, st.size)) ids.add(basename(name, ".jsonl"));
         } catch { /* ignore */ }
       }
     }
-    return count;
+    return ids.size;
   }
 
   // ---- step: nemotron ----

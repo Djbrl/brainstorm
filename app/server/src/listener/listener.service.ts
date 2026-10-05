@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import chokidar, { type FSWatcher } from "chokidar";
-import { closeSync, openSync, readdirSync, readSync, statSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { closeSync, existsSync, openSync, readdirSync, readSync, statSync } from "node:fs";
+import { basename, join, relative, resolve, sep } from "node:path";
 import type { Session, Step, StepKind } from "../types";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
@@ -487,7 +487,17 @@ export class ListenerService implements OnModuleInit {
     // A thread where no agent did anything but answer a slash command (opening this app, /compact) isn't work to show.
     const worked = new Set((this.dbs.db.prepare(`SELECT DISTINCT session_id FROM steps WHERE kind IN ('tool_call', 'edit')`).all() as { session_id: string }[]).map((r) => r.session_id));
     const idle = (s: Session) => !worked.has(s.id) && (s.title.startsWith("/") || s.title === "(untitled session)");
-    const shown = sessions.filter((s) => !idle(s));
+    // A thread whose transcript is gone (deleted in Claude Code, or cleaned up) isn't one any more: the workspace
+    // picker can't count it and Claude Code can't resume it (see workspace/threads.ts for the whole definition).
+    const transcripts = new Map<string, string[]>();
+    for (const file of this.offsets.keys()) {
+      const parts = relative(this.cfg.claudeProjectsDir, file).split(sep);
+      if (parts.length !== 2 || !file.endsWith(".jsonl")) continue; // <project>/<sessionId>.jsonl, not a subagent's
+      const id = basename(file, ".jsonl");
+      transcripts.set(id, [...(transcripts.get(id) ?? []), file]);
+    }
+    const gone = (s: Session) => { const files = transcripts.get(s.id); return !!files && !files.some((f) => existsSync(f)); };
+    const shown = sessions.filter((s) => !idle(s) && !gone(s));
     if (!this.activeRoot) return shown;
     return shown.filter((s) => this.isWithinRoot(s.cwd));
   }

@@ -21,8 +21,9 @@ const baseName = (p: string) => p.split("/").pop() || p;
 
 // ---------- import links ----------
 // Their colours (imports, used by) belong to the map theme: see themes.ts.
+// Outside Metro only the hovered or selected file's lines are drawn. Metro's lines are the theme itself: there,
 const HIDE_LINKS_FROM = 4000;   // a map with more import lines than this...
-const HIDE_LINKS_BELOW = 0.4;   // ...hides the idle ones below this zoom (a grey haze over the files); the selected file's stay
+const HIDE_LINKS_BELOW = 0.4;   // ...hides the idle ones below this zoom (a haze over the stations); the focused file's stay
 const ARROW = 3.5, ARROW_AT = 0.92;
 const METRO_ONE_BY_ONE = 2500;  // Metro lines on screen up to which each is its own stroke (crossings darken); beyond, batched
 function linkRole(l: GLink, focus: string | null): "imports" | "usedBy" | null {
@@ -57,7 +58,7 @@ export type Frame = {
   labN: GNode[]; labP: number[];
   /** The theme's colours, the colour epoch (bumped every few seconds: recency fades), and what recencyRGB needs. */
   tokens: Tokens; epoch: number; recorded: boolean; since: number;
-  /** The replay layer's look for a file; the selected file (its import lines show); a thread is being traced. */
+  /** The replay layer's look for a file; the hovered or selected file (its import lines show); a thread is being traced. */
   look: (id: string) => Look | null; linkFocus: string | null; tracing: boolean;
 };
 export type Dots = Map<string, { css: string; a: number; xyr: number[] }>;
@@ -100,7 +101,7 @@ const focusColour = (edited: string | undefined, F: Frame, m: Caches["focusColou
   return c;
 };
 
-/** Import lines, under the files: idle ones batched in one path per colour (and per strength in Metro). */
+/** Import lines, under the files: the hovered or selected file's; in Metro all of them, idle ones batched per colour and strength. */
 export function drawLinks(ctx: CanvasRenderingContext2D, scale: number, links: GLink[], F: Frame, c: Caches) {
   const st = F.st;
   if (!links.length) return;
@@ -163,19 +164,8 @@ export function drawLinks(ctx: CanvasRenderingContext2D, scale: number, links: G
     }
     ctx.lineCap = "butt"; ctx.lineJoin = "miter";
   } else {
+    // Only the hovered or selected file's lines: the rest were a haze over the map that nobody read.
     ctx.globalAlpha = 1;
-    if (!hideIdle) {
-      ctx.beginPath();
-      for (const l of links) {
-        const s = l.source, t = l.target;
-        if (s.x === undefined || t.x === undefined || off(s, t)) continue;
-        if (focus && (s.id === focus || t.id === focus)) continue;
-        ctx.moveTo(s.x, s.y!); ctx.lineTo(t.x, t.y!);
-      }
-      ctx.strokeStyle = focus || tracing ? st.linkDim : st.linkIdle;
-      ctx.lineWidth = 0.6 / scale;
-      ctx.stroke();
-    }
     if (focus) for (const l of links) if (l.source.id === focus || l.target.id === focus) roles.push(l);
     for (const role of ["imports", "usedBy"] as const) {
       const ls = roles.filter((l) => linkRole(l, focus) === role && l.source.x !== undefined && l.target.x !== undefined);

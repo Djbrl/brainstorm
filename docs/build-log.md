@@ -143,6 +143,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 14:30 (5 Oct) [system-fonts] The app uses the computer's own fonts (San Francisco, Segoe UI): no Fontshare request, nothing leaves the machine, no blocked first paint; the landing page keeps its fonts. `?mockmap` and `map/mock.ts` deleted.
 
+- 15:05 (5 Oct) [map-quiet] Less ink on the map. Import lines show only around the file under the pointer or the selected one (they were a grey haze nobody read); Metro keeps its lines, they are the theme. The tracer draws only the recent window (the "On the map, show" setting, or the last 25 moments for the whole thread), each segment fading out over its last 3 moments in it; the faint path through the whole history is gone (the Track tab has it), along with its 16-layer cache.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

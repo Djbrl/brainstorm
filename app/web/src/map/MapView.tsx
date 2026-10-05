@@ -135,8 +135,8 @@ export function MapView() {
     resolveId, anim, hasNodes, focusFile, setFocusFile,
   });
 
-  // Import links show only around the selected file.
-  const linkFocus = selected; // on click, not hover: moving the mouse across the map shouldn't flash lines everywhere
+  // Import lines show only around the file under the pointer, or else the selected one (Metro keeps all its lines).
+  const linkFocus = hover ?? selected;
   const linkFocusRef = useRef(linkFocus); linkFocusRef.current = linkFocus;
 
   // ---- what drawing keeps between frames (drawNode.ts) ----

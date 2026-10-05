@@ -15,7 +15,7 @@ export type MapStyle = {
   moduleInk: string; moduleInkLively: string; moduleFont?: string; labelFont?: string;
   /** Metro: folder names in their line's colour. */
   moduleColored?: boolean;
-  linkIdle: string; linkDim: string; imports: string; usedBy: string;
+  linkIdle: string; imports: string; usedBy: string;
   markerStroke: string; markerText: string; glow: boolean;
   /** How an agent travels between files, and the shape of the trail it leaves (see routePoints):
    *  a straight glide (trails curve softly), metro track, a locator line with one right angle, or a hop in an arc. */
@@ -33,7 +33,7 @@ const BASE: MapStyle = {
   node: "dot", link: "line",
   halo: "rgba(251,251,253,0.9)", fileInk: "#1d1d1f", fileInkQuiet: "rgba(29,29,31,0.62)",
   moduleInk: "rgba(29,29,31,0.2)", moduleInkLively: "rgba(29,29,31,0.34)",
-  linkIdle: "rgba(29,29,31,0.08)", linkDim: "rgba(29,29,31,0.04)",
+  linkIdle: "rgba(29,29,31,0.08)",
   imports: "rgba(91,91,214,0.7)", usedBy: "rgba(15,157,138,0.7)",
   markerStroke: "#fff", markerText: "#fff", glow: false, route: "glide",
   palette: ["#2f7ae5", "#0f9d8a", "#c2409a", "#7c4dde", "#2e9e4f", "#0b8fb3", "#b5487a", "#4a6fa5"],
@@ -52,7 +52,7 @@ const STYLES: Record<ThemeId, MapStyle> = {
     halo: "rgba(22,22,52,0.85)", fileInk: "#f0f2ff", fileInkQuiet: "rgba(215,222,255,0.62)",
     moduleInk: "rgba(205,210,255,0.26)", moduleInkLively: "rgba(242,227,106,0.75)",
     moduleFont: `"Arial Rounded MT Bold", "Nunito", system-ui, sans-serif`, labelFont: `"Arial Rounded MT Bold", "Nunito", system-ui, sans-serif`,
-    linkIdle: "rgba(120,160,255,0.16)", linkDim: "rgba(120,160,255,0.05)",
+    linkIdle: "rgba(120,160,255,0.16)",
     imports: "rgba(242,227,106,0.9)", usedBy: "rgba(140,200,255,0.9)",
     markerStroke: "rgba(255,255,255,0.95)", markerText: "#1b1b40", glow: true,
     palette: ["#8fb4ff", "#7ee0ff", "#ff9ff3", "#c7a6ff", "#9dffb0", "#ffe08a", "#ffb38a", "#a6f0ff"],
@@ -63,7 +63,7 @@ const STYLES: Record<ThemeId, MapStyle> = {
     halo: "rgba(8,14,16,0.9)", fileInk: "#dcf6f8", fileInkQuiet: "rgba(160,205,215,0.6)",
     moduleInk: "rgba(143,233,240,0.28)", moduleInkLively: "rgba(143,233,240,0.7)",
     moduleFont: `"Arial Narrow", "Helvetica Neue", sans-serif`, labelFont: `"Arial Narrow", "Helvetica Neue", sans-serif`,
-    linkIdle: "rgba(120,170,180,0.16)", linkDim: "rgba(120,170,180,0.05)",
+    linkIdle: "rgba(120,170,180,0.16)",
     imports: "rgba(95,227,224,0.9)", usedBy: "rgba(57,231,95,0.85)",
     markerStroke: "#0b1214", markerText: "#0b1214", glow: true,
     palette: ["#5fe3e0", "#7cc8ff", "#b6f0ff", "#9ef7c8", "#3fc1c9", "#8fe9f0", "#6fd3a8", "#a3d8ff"],

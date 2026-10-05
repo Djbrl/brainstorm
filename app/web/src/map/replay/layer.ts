@@ -54,9 +54,9 @@ const DIM = 0.15;           // files out of focus: the thread never touched them
 const PAST = 0.42;          // whole-thread replay: files it touched earlier than the fog window below
 const READ = 0.5;           // files it only read ("Show reads" on): there, quieter than what it changed
 const FADE_MS = 120;        // a file easing into or out of the focus (time constant: settled in about 400 ms)
-/** Fog of war (the whole-thread replay): only the last few moments are drawn in full (path, numbers, files). */
+/** Fog of war (the whole-thread replay): only the last few moments are drawn (path, numbers) and lit in full. */
 const WINDOW = 25;
-const TRAIL_LAYERS = 16;    // strokes for the faint trail before the window (see fogTrail)
+const TAPER = 3;            // a tracer segment fades out over its last few moments in the window, so the trail doesn't end in a cut
 const OTHER_MS = 120;       // playback pace for single "other" steps (every-step detail)
 const SUMMARY_MS = 380;     // playback pace for summary beats (light detail)
 const READ_MS = 520;        // playback pace for reads
@@ -244,7 +244,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
 
   // ---- the focus ----
   // Per moment: the files it touched, the ones it changed and when. Per file: when it was touched and changed (the fog),
-  // as sorted beat indexes (binary search). Per tracer move: each file's first visit (the stops' order, the trail's files).
+  // as sorted beat indexes (binary search). Per tracer move: each file's first visit (the stops' order).
   const data = useMemo(() => {
     const touchedAt = new Map<string, number[]>(), editsAt = new Map<string, Edits>();
     const beatFiles = (thread?.beats ?? []).map((b) => {
@@ -260,9 +260,9 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
       }
       return { touched, edited: new Set(b.files), ts };
     });
-    const firstVisit = new Map<string, number>(), firstFiles: string[] = [], firstK: number[] = [];
-    (thread?.moves ?? []).forEach((m, k) => { if (!firstVisit.has(m.file)) { firstVisit.set(m.file, k); firstFiles.push(m.file); firstK.push(k); } });
-    return { beatFiles, touchedAt, editsAt, firstVisit, firstFiles, firstK };
+    const firstVisit = new Map<string, number>();
+    (thread?.moves ?? []).forEach((m, k) => { if (!firstVisit.has(m.file)) firstVisit.set(m.file, k); });
+    return { beatFiles, touchedAt, editsAt, firstVisit };
   }, [thread]);
   const dataRef = useRef(data); dataRef.current = data;
 
@@ -351,45 +351,6 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     return stops;
   }, []);
 
-  /**
-   * The tracer before the fog window (segments 1..cut-1), faint. Each segment used to be its own stroke, so where they
-   * cross or a route is taken again the haze darkens; here they are dealt in turn into TRAIL_LAYERS paths, each stroked
-   * once: neighbouring and repeated segments still land in different strokes and still add up. Built again only when
-   * the window moves, the files move (the layout settling), the nodes are rebuilt, the theme's route changes, or, on
-   * routed themes (the track runs between the marker's stops, set off the files in screen pixels), the zoom changes.
-   */
-  const trail = useRef<{ thread: Thread | null; cut: number; route: string; scale: number; nodes: unknown; sig: number; paths: Path2D[] | null }>(
-    { thread: null, cut: 0, route: "", scale: 0, nodes: null, sig: 0, paths: null });
-  const fogTrail = useCallback((thread: Thread, cut: number, route: ReturnType<typeof mapStyle>["route"], scale: number,
-    stop: (id: string) => { x: number; y: number } | undefined): Path2D[] | null => {
-    if (cut <= 1) return null;
-    const nodes = nodeIndexRef.current, { firstFiles, firstK } = dataRef.current, moves = thread.moves;
-    // Where the trail's files are now: the files first visited before move `cut`, each weighted by its place in that list.
-    let sig = 0;
-    for (let i = 0, u = upperBound(firstK, cut - 1); i < u; i++) {
-      const n = nodes?.get(firstFiles[i]);
-      if (n?.x !== undefined && n.y !== undefined) sig += (i + 1) * (n.x * 3.1 + n.y * 1.7 + n.r);
-    }
-    const c = trail.current, sc = route === "glide" ? 0 : scale;
-    if (c.paths && c.thread === thread && c.cut === cut && c.route === route && c.scale === sc && c.nodes === nodes && c.sig === sig) return c.paths;
-    const paths = Array.from({ length: Math.min(TRAIL_LAYERS, cut - 1) }, () => new Path2D());
-    for (let k = 1; k < cut; k++) {
-      const p0 = stop(moves[k - 1].file), p1 = stop(moves[k].file);
-      if (!p0 || !p1) continue;
-      const path = paths[k % paths.length];
-      if (route !== "glide") {
-        const pts = routePoints(route, p0.x, p0.y, p1.x, p1.y);
-        path.moveTo(pts[0][0], pts[0][1]);
-        for (let i = 1; i < pts.length; i++) path.lineTo(pts[i][0], pts[i][1]);
-      } else {
-        const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2, dx = p1.x - p0.x, dy = p1.y - p0.y;
-        path.moveTo(p0.x, p0.y); path.quadraticCurveTo(mx - dy * 0.15, my + dx * 0.15, p1.x, p1.y);
-      }
-    }
-    trail.current = { thread, cut, route, scale: sc, nodes, sig, paths };
-    return paths;
-  }, [nodeIndexRef]);
-
   const draw = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
     const s = st.current;
     if (!s.active || !s.thread || s.len === 0 || s.mode === "footprint") return;
@@ -430,26 +391,22 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     a.cam = target && readPos ? { x: (a.x + readPos.x) / 2, y: (a.y + readPos.y) / 2 } : target ? { x: a.x, y: a.y } : readPos ? { x: readPos.x, y: readPos.y } : null;
     kickCamera(ctx);
 
-    // Tracer path through moves[0..mi], newest segments strongest; segments older than the window are a faint thread.
+    // Tracer path through the moves of the recent window only (the "On the map, show" setting; the whole thread: its last
+    // few moments), newest segments strongest, each fading out as it leaves. What came before isn't drawn: the Track tab has it.
     // Routed themes: the track runs between the marker's stops, not the files' centres, so a trip back retraces the same track.
     const win = getStepWindow(), fogBefore = s.index - (win === "all" ? WINDOW : win); // the path fades with the focus
     const stop = routed ? markerAt : pos;
-    // Everything before the window is one faint path, built again only when it changes (see fogTrail); the segment
-    // into the marker is always drawn here, as it rides the marker.
-    const cut = mi >= 1 ? Math.min(firstMoveFrom(moves, fogBefore, mi + 1), mi) : 0;   // segments 1..cut-1 are old
-    const faint = fogTrail(s.thread, cut, style.route, scale, stop);
-    if (faint) { ctx.globalAlpha = 0.07; ctx.strokeStyle = line; ctx.lineWidth = 1 / scale; for (const p of faint) ctx.stroke(p); }
-    for (let k = Math.max(1, cut); k <= mi; k++) {
+    const first = Math.max(1, firstMoveFrom(moves, fogBefore, mi + 1));   // the first segment that ends inside the window
+    for (let k = first; k <= mi; k++) {
       const p0 = stop(moves[k - 1].file);
       const p1 = k === mi && target ? { x: a.x, y: a.y } : stop(moves[k].file);
       if (!p0 || !p1) continue;
-      const old = moves[k].beatIndex < fogBefore;
-      const w = old ? 0 : Math.pow(0.9, mi - k);
-      ctx.globalAlpha = old ? 0.07 : 0.12 + 0.63 * w;
+      const w = Math.pow(0.9, mi - k), tail = Math.min(1, (moves[k].beatIndex - fogBefore + 1) / TAPER);
+      ctx.globalAlpha = (0.12 + 0.63 * w) * tail;
       ctx.strokeStyle = line;
-      ctx.lineWidth = (old ? 1 : 1.1 + 2 * w) / scale;
+      ctx.lineWidth = (1.1 + 2 * w) / scale;
       const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2, dx = p1.x - p0.x, dy = p1.y - p0.y;
-      if (routed) { polyPath(ctx, routePoints(style.route, p0.x, p0.y, p1.x, p1.y)); if (metro && !old) casing(ctx, scale); }  // the way it went
+      if (routed) { polyPath(ctx, routePoints(style.route, p0.x, p0.y, p1.x, p1.y)); if (metro) casing(ctx, scale); }  // the way it went
       else { ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.quadraticCurveTo(mx - dy * 0.15, my + dx * 0.15, p1.x, p1.y); }
       ctx.stroke();
     }
@@ -557,7 +514,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
       }
     }
     ctx.restore();
-  }, [accent, font, nodeIndexRef, fogTrail, stopsAt, kickCamera]);
+  }, [accent, font, nodeIndexRef, stopsAt, kickCamera]);
 
   const marks = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
     const s = st.current, boxes: Box[] = [];

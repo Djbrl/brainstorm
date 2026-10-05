@@ -10,12 +10,12 @@ Sizes are estimates for one developer who knows the codebase.
 
 Today the plugin has one hook, SessionStart (`plugin/hooks/hooks.json`), and the server reads Claude Code's log files (`app/server/src/listener/`). Every hook receives the session id, so more hooks give exact signals.
 
-- [ ] Add an endpoint on the local server that receives hook events (session id, event name, project folder).
-- [ ] `UserPromptSubmit` hook: marks this thread as the one the user is on.
+- [x] Add an endpoint on the local server that receives hook events (session id, event name, project folder). Done 5 Oct: `POST /api/hooks`, see [attention.md](attention.md).
+- [ ] `UserPromptSubmit` hook: marks this thread as the one the user is on. The hook exists since 5 Oct (it clears a thread's waiting state); marking the thread you're on isn't built.
 - [ ] `PostToolUse` hook: a step happened, in real time (the log reader stays as the fallback and for history).
-- [ ] `Notification` hook: this thread is waiting on the user (permission, idle).
-- [ ] `Stop` hook: this thread finished its turn.
-- [ ] Each hook is one small POST from a script and must never slow or block the session: short timeout, silent when the server is down.
+- [x] `Notification` hook: this thread is waiting on the user (permission, idle). Done 5 Oct, with `PermissionRequest` for the tool and its input.
+- [x] `Stop` hook: this thread finished its turn. Done 5 Oct.
+- [x] Each hook is one small POST from a script and must never slow or block the session: short timeout, silent when the server is down. Done 5 Oct: `plugin/scripts/signal.mjs`, async hooks.
 - [ ] Parser and hook tests, since the log format isn't documented.
 
 Size: ½ day.

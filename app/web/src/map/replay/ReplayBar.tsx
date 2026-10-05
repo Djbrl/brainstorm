@@ -9,6 +9,7 @@ import { isReplay, useLive } from "../../lib/live";
 import { useThread, type Thread } from "../../lib/thread";
 import { chaptersOf } from "../../lib/chapters";
 import { togglePlay } from "./layer";
+import { setCameraLock, useCameraLock } from "../prefs";
 import "./replay.css";
 
 const SPEEDS: ReplaySpeed[] = [1, 2, 4];
@@ -139,6 +140,21 @@ export function Dock({ children }: { children: ReactNode }) {
         {children}
       </div>
     </div>
+  );
+}
+
+/**
+ * Lock camera: the camera keeps the tracer (or the agent you follow) centred while you zoom; off, it frames it once and
+ * stays where you put it. Shown while something moves on the map: a thread open, or an agent followed.
+ */
+export function LockToggle({ shown }: { shown: boolean }) {
+  const lock = useCameraLock();
+  if (!shown) return null;
+  return (
+    <button className="dock-reads" role="switch" aria-checked={lock} onClick={() => setCameraLock(!lock)}
+      title={lock ? "The camera keeps the agent centred (you can still zoom). Click to move the map freely" : "Keep the agent centred as it moves"}>
+      Lock camera<i aria-hidden="true" />
+    </button>
   );
 }
 

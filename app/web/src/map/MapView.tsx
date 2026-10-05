@@ -15,7 +15,8 @@ import { mapPrefs, useNav } from "../lib/nav";
 import { mockAgents, mockMap } from "./mock";
 import { drawAgents, visibleAgents, type AgentAnim } from "./agents";
 import { MapSidebar } from "./sidebar/MapSidebar";
-import { Dock, ReadsToggle } from "./replay/ReplayBar";
+import { Dock, LockToggle, ReadsToggle } from "./replay/ReplayBar";
+import { getCameraLock } from "./prefs";
 import { TalkCard } from "./replay/TalkCard";
 import { StepPanel } from "./StepPanel";
 import { FilePanel, useSelectedFile } from "./FilePanel";
@@ -173,7 +174,7 @@ function linkRole(l: GLink, focus: string | null): "imports" | "usedBy" | null {
 // ---------- view ----------
 export function MapView() {
   const { state } = useLive();
-  const { focusFile, setFocusFile, hiddenAgents, replay, step } = useNav();
+  const { focusFile, setFocusFile, hiddenAgents, replay, step, showReads } = useNav();
   const mock = useMemo(() => new URLSearchParams(location.search).has("mockmap"), []);
   const map = useMemo(() => (mock ? mockMap() : state.map), [mock, state.map]);
   const graph = useGraph(map);
@@ -255,7 +256,9 @@ export function MapView() {
   const intentAt = useRef(0);
   const setIntent = useCallback((i: Intent) => { intent.current = i; intentAt.current = performance.now(); }, []);
   const framed = useRef(false);   // the camera has framed the map at least once
-  /** Frame the open thread's footprint (its files), or the whole project. */
+  /** Locked onto something that moves (the tracer, a followed agent): the follow owns the centre, so no automatic re-frame. */
+  const lockedOn = useCallback(() => getCameraLock() && (replayRef.current.tracing || !!followRef.current), []);
+  /** Frame the open thread's focus (its recent window, or all its files), or the whole project. */
   const fitAll = useCallback((ms = 800) => {
     const idx = nodeIndexRef.current;
     const fp = replayRef.current.footprint();
@@ -271,23 +274,24 @@ export function MapView() {
   const applyIntent = useCallback((ms = 600) => {
     const i = intent.current, c = camRef.current;
     if (i.kind === "free" || c.userAt() > intentAt.current) return;
-    if (i.kind === "fit") { if (!replayRef.current.tracing) fitAll(ms); return; }
+    if (i.kind === "fit") { if (!lockedOn()) fitAll(ms); return; }
     const n = nodeIndexRef.current.get(i.id);
     if (!n || n.x === undefined || n.y === undefined) return;
     if (i.zoom) c.lookAt(n.x, n.y, 3, ms);
     else c.reveal(n.x, n.y, n.r + 14, ms);   // room for its name under it
     framed.current = true;
-  }, [fitAll]);
+  }, [fitAll, lockedOn]);
+  // Unlocked, the tracer left the view: frame the recent window again (applyIntent: unless you moved the camera since).
+  useEffect(() => { replayCamera.lost = () => applyIntent(700); return () => { replayCamera.lost = null; }; }, [applyIntent]);
   // The safe area changed (a panel opened, the sidebar collapsed, the window resized): frame the same thing in it.
   useEffect(() => {
     const t = setTimeout(() => applyIntent(450), 60);
     return () => clearTimeout(t);
   }, [cam.version, applyIntent]);
-  /** The fit button and F / 0. */
+  /** The fit button and F / 0: the open thread's recent window, or the whole project (and stop following an agent). */
   const fitNow = useCallback(() => {
     setFollowId(null);
     setIntent({ kind: "fit" });
-    if (replayRef.current.tracing) replayCamera.hold(); // the tracer's camera stays on the fit while its marker is in sight
     fitAll(700);
   }, [fitAll, setIntent]);
   useEffect(() => {
@@ -296,16 +300,21 @@ export function MapView() {
     return () => removeEventListener("keydown", onKey);
   }, [fitNow]);
 
-  // Follow an agent: keep the camera on its marker until the user drags, zooms or clicks the map.
+  // Follow an agent (from the sidebar), like the tracer: the camera frames it once; locked, it keeps it centred (easing,
+  // every frame, no stacked tweens) at whatever zoom you pick; unlocked, it stays where you put it, and frames the agent
+  // again when it leaves the view only if you haven't moved the camera since following began.
   useEffect(() => {
     if (!followId) return;
     setIntent({ kind: "free" });
-    fg.current?.zoom(Math.max(2.2, fg.current?.zoom() ?? 0), 700);
-    // Ease the camera toward the marker every frame (no stacked tweens), into the middle of the uncovered map.
-    let raf = 0;
+    const t0 = performance.now();
+    let raf = 0, framedAt = 0;
     const tick = () => {
-      const st = anim.current.get(followId);
-      if (st) camRef.current.easeToward(st.x, st.y, 0.09);
+      const st = anim.current.get(followId), c = camRef.current, now = performance.now();
+      if (st) {
+        if (!framedAt) { framedAt = now; c.lookAt(st.x, st.y, Math.max(2.2, c.view()?.k ?? 0), 700); }
+        else if (getCameraLock()) { if (now - framedAt > 700) c.easeToward(st.x, st.y, 0.09); }
+        else if (c.userAt() < t0 && now - framedAt > 1200 && !c.sees(st.x, st.y)) { framedAt = now; c.lookAt(st.x, st.y, undefined, 700); }
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -345,21 +354,22 @@ export function MapView() {
     return () => clearTimeout(t);
   }, [hasNodes, applyIntent]);
 
-  // A thread opens on its footprint: frame its files now, and again as the layout settles (a link opened straight
-  // onto a thread loads the map at the same time). Closing the thread frames the whole project again.
-  const footprintMode = replayLayer.footprintMode;
+  // Opening a thread or starting its replay frames its recent window once, locked or not (and again as the layout settles,
+  // unlocked and untouched: a link opened straight onto a thread loads the map at the same time). Closing the thread
+  // frames the whole project again.
   const openThread = replayLayer.active ? replay?.sessionId : undefined;
+  const playing = replay?.mode === "play";
   const hadThread = useRef(false);
   useEffect(() => {
     if (openThread) hadThread.current = true;
     else if (!hadThread.current) return;
-    if (openThread && !footprintMode) return;
     if (!openThread) hadThread.current = false;
     setIntent({ kind: "fit" });
-    applyIntent(700);
+    if (replayCamera.pinned) return; // a file's panel is open: the camera stays on the file
+    fitAll(700);
     const ts = openThread ? [600, 1800].map((ms) => setTimeout(() => applyIntent(700), ms)) : [];
     return () => ts.forEach(clearTimeout);
-  }, [openThread, footprintMode, setIntent, applyIntent]);
+  }, [openThread, playing, setIntent, applyIntent, fitAll]);
 
   // Focus from Follow (and file links)
   useEffect(() => {
@@ -396,7 +406,6 @@ export function MapView() {
     const b = before.current;
     before.current = null;
     if (!b) return;
-    if (replayRef.current.tracing) { setIntent({ kind: "free" }); return; } // the replay's camera is on the tracer
     if (b.view && b.intent.kind !== "fit") { setIntent(b.intent); c.moveTo(b.view, 700); }
     else { setIntent({ kind: "fit" }); applyIntent(700); }
   }, [panelFile, setIntent, applyIntent]);
@@ -428,7 +437,8 @@ export function MapView() {
     const now = clock();
     const active = !!n.file.activeSessionId;
     const isSel = n.id === selected, isHover = n.id === hover;
-    const alpha = replayRef.current.nodeAlpha(n.id);
+    const look = replayRef.current.look(n.id);   // an open thread: its own footprint, the rest dimmed back
+    const alpha = look?.alpha ?? 1;
     ctx.save();
     ctx.globalAlpha = alpha;
     const st = mapStyle();
@@ -461,7 +471,9 @@ export function MapView() {
       ctx.globalAlpha = alpha;
     }
 
-    const rgb = recencyRGB(tokens, n.file.lastChangedAt, now), lit = active || !same(rgb, tokens.cool);
+    // In a focus, a file takes the focus's colour (when the thread changed it, or the quiet one), not the project's.
+    const own = recencyRGB(tokens, n.file.lastChangedAt, now);
+    const rgb = look ? mixRGB(own, recencyRGB(tokens, look.edited, now), look.tone) : own, lit = active || !same(rgb, tokens.cool);
     if (st.node === "cube") {
       // An agent lands: the cube spins up and flashes gold for a moment.
       const landed = landings.get(n.id), k = landed === undefined ? 1 : (performance.now() - landed) / LAND_MS;
@@ -481,18 +493,20 @@ export function MapView() {
       ctx.stroke();
     }
 
-    const forced = isSel || isHover || active;
-    // With a thread open, only the files it touched are named: the rest of the project stays in the background.
-    if (forced || (alpha >= 1 && (r * scale > 9 || scale > 3.2))) {
+    // THE LABEL HOOK for the focus: the files in an open thread's recent window are named whatever their size (edits
+    // first), every other file only when selected or pointed at; another thread's edit doesn't pull a dimmed file forward.
+    const focusing = !!look && look.tone > 0.5, inFocus = focusing && !!look.named && look.alpha > 0.3;
+    const forced = isSel || isHover || (active && !focusing);
+    if (forced || inFocus || (alpha >= 1 && (r * scale > 9 || scale > 3.2))) {
       // Queued, drawn after every file (see drawAgentLayer): a neighbour's circle never covers a name.
       const fs = Math.max(11, Math.min(14, 11 + r * scale * 0.08)) / scale;
       const ringR = st.node === "dot" ? r : r * 1.35 + 2 / scale;   // under the selection ring, not on it
       labelQueue.current.push({
-        text: baseName(n.id), x, y: y + (isSel || isHover ? ringR : r) + 3 / scale, size: fs, scale, alpha: isSel || isHover ? 1 : alpha,
-        font: `${isSel || active ? 600 : 500} ${fs}px ${st.labelFont ?? tokens.body}`,
-        ink: isSel || active || isHover ? st.fileInk : st.fileInkQuiet, halo: st.halo,
-        // The one you point at wins, then the selected one, then where an agent works, then the biggest.
-        prio: (isHover ? 4e6 : 0) + (isSel ? 2e6 : 0) + (active ? 1e6 : 0) + r, forced,
+        text: baseName(n.id), x, y: y + (isSel || isHover ? ringR : r) + 3 / scale, size: fs, scale, alpha: isSel || isHover ? 1 : inFocus ? Math.max(alpha, 0.8) : alpha,
+        font: `${isSel || (active && !focusing) ? 600 : 500} ${fs}px ${st.labelFont ?? tokens.body}`,
+        ink: isSel || (active && !focusing) || isHover || (inFocus && look.edited) ? st.fileInk : st.fileInkQuiet, halo: st.halo,
+        // The one you point at wins, then the selected one, then where an agent works, then the focus (its edits first), then the biggest.
+        prio: (isHover ? 4e6 : 0) + (isSel ? 2e6 : 0) + (active && !focusing ? 1e6 : 0) + (inFocus ? (look.edited ? 6e5 : 5e5) : 0) + r, forced,
       });
     }
     ctx.restore();
@@ -526,7 +540,10 @@ export function MapView() {
       const id = resolveId(a.file), n = id ? idx.get(id) : undefined;
       if (n) busy.add(n.file.module);
     }
-    drawModuleLabels(ctx, scale, graph.nodes.map((n) => ({ x: n.x, y: n.y, r: n.r, module: n.file.module, lastChangedAt: n.file.lastChangedAt, active: !!n.file.activeSessionId })),
+    // In a focus, folder names rank by what the thread changed, not by what the rest of the project did.
+    const looks = graph.nodes.map((n) => { const l = replayRef.current.look(n.id); return l && l.tone > 0.5 ? l : null; });
+    drawModuleLabels(ctx, scale, graph.nodes.map((n, i) => ({ x: n.x, y: n.y, r: n.r, module: n.file.module,
+      lastChangedAt: looks[i] ? looks[i].edited : n.file.lastChangedAt, active: !looks[i] && !!n.file.activeSessionId })),
       { font: tokens.display, now: clock(), focus, busy, space: moduleSpace.current });
   }, [graph.nodes, tokens, resolveId]);
   // Labels go on after the files (folder names, then file names), so no circle covers a name; then the agents.
@@ -539,9 +556,7 @@ export function MapView() {
   const sel = selected ? graph.nodes.find((n) => n.id === selected)?.file : undefined;
 
   return (
-    <div className="map-wrap" ref={wrapRef}
-      onPointerDown={(e) => { if ((e.target as HTMLElement).tagName === "CANVAS") setFollowId(null); }}
-      onWheel={(e) => { if ((e.target as HTMLElement).tagName === "CANVAS") setFollowId(null); }}>
+    <div className="map-wrap" ref={wrapRef}>
       {graph.nodes.length === 0 ? (
         <div className="map-empty">
           <h2>Mapping the codebase…</h2>
@@ -591,9 +606,12 @@ export function MapView() {
           <span><i style={{ background: "var(--hot)" }} />Just now</span>
           <span><i style={{ background: "var(--warm)" }} />{isReplay() ? "This hour" : lastSeen ? "Since you last looked" : "In the last day"}</span>
           <span><i style={{ background: "var(--cool)" }} />Earlier</span>
+          {/* With a thread open the colours are its own changes; what it only read is the faint dot. */}
+          {replay && showReads && <span className="dock-legend-read" title="Files this thread read but didn't change"><i style={{ background: "var(--cool)", opacity: 0.5 }} />Read</span>}
           {sel && <span title="What the selected file imports"><i className="line" style={{ background: style.imports }} />Imports</span>}
         </div>
         <ReadsToggle />
+        <LockToggle shown={!!replay || !!followId} />
       </Dock>
 
       <StepPanel />

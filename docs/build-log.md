@@ -124,9 +124,13 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 03:40 (5 Oct) [track-tab] At the human's request: Track moves into the sidebar, next to the map. Tabs are Threads | Track | Files; opening a thread stays on the map and turns the sidebar to its Track (the chapter list that moves the tracer as you scroll, brought back); on Places the tab lists the places. The full-screen Track lens is unmounted (old `/track` links open the map). The dock offers Replay for every thread, beside Live for a running one. Settings is a word in the header instead of a gear. Also on main: the server accepts `*.localhost` names, so the Multiprise URL gets the live feed (it sat on "Connecting…").
 
+- 04:40 (5 Oct) [perf-ingest] Server ingest (`perf/server-ingest`): the server listens before it reads history (13 s → 1 s to listen on 450 MB of this repo's logs), then reads it newest first in 4 MB chunks and ~1 MB transactions while answering requests and passing live steps through (full import 13 s → 6 s, peak memory 630 → 300 MB). A 600 MB log now imports (26 s, 220 MB); a line over 16 MB is skipped with a warning. `listSessions` no longer scans every step (a `worked` flag on sessions, the list cached): 10 → 1 ms. `/sessions/:id/steps` is built by SQLite from the stored JSON, same bytes, and takes `?afterSeq=`. `updateStep(id, patch, { broadcast: false })`. Masking runs on what is kept of a long text. `npm test` in `app/server` (node:test). `BRAINSTORM_CLAUDE_DIR` reads logs from another folder.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.
 - 13:57 [site → docs] Add the landing page URL to `submission-checklist.md` once deployed; send final numbers so `site/index.html` SITE block can be filled.
 - 13:57 [site → C / human] Real screenshots of Follow, Map, History as `site/img/{follow,map,history}.png` after 15:10.
 - 15:25 [lead → site] Demo link: https://brainstorm-demo-black.vercel.app, repo: https://github.com/Djbrl/brainstorm. Screenshots (1920×1200, from the demo): `docs/screenshots/follow.png`, `docs/screenshots/map.png`. History view was cut, so no history.png. Numbers in `docs/numbers.md`.
+- 04:40 (5 Oct) [perf-ingest → reader] `listener.updateStep(id, patch, { broadcast: false })` stores a label without a second `step-update` when the label already rides on the `step` message. On a first install history is now read after startup, so the 5 s label backfill may see fewer steps.
+- 04:40 (5 Oct) [perf-ingest → attention] `listener.listSteps(sessionId, afterSeq)` returns only the steps after a seq: the `listSteps(sid).slice(-600)` rebuild can ask for the tail instead of the whole thread.

@@ -2,6 +2,7 @@
 // Colours that also style the chrome (recency, accent) come from CSS variables set per theme in themes.css;
 // this file holds what CSS can't reach. The current theme is read on every frame (getTheme()).
 import { getTheme, type ThemeId } from "../lib/theme";
+import { bucket, sprite, stamp, type Sprite, type StampMemo } from "./sprites";
 
 export type RGB = [number, number, number];
 
@@ -75,19 +76,64 @@ export const mapStyle = (): MapStyle => STYLES[getTheme()];
 /** How far a file of radius r reaches on the canvas in this theme (graph units, never under 4: the smallest station). */
 export const reachOf = (r: number, active = false, st = mapStyle()) => Math.max(4, r * st.reach[active ? 1 : 0]);
 
-/** A folder's line colour (Metro): stable per folder name. */
+/** A folder's line colour (Metro): stable per folder name (memoized: it's asked for by every import line, every frame). */
+const moduleColors = new Map<string, string>();
 export function moduleColor(m: string): string {
+  let c = moduleColors.get(m);
+  if (c) return c;
   let h = 0;
   for (let i = 0; i < m.length; i++) h = (h * 31 + m.charCodeAt(i)) >>> 0;
-  return `hsl(${(h * 137.508) % 360}, 68%, 46%)`;
+  c = `hsl(${(h * 137.508) % 360}, 68%, 46%)`;
+  moduleColors.set(m, c);
+  return c;
 }
 
 const TAU = Math.PI * 2;
 const rgba = ([r, g, b]: RGB, a: number) => `rgba(${r},${g},${b},${a})`;
+/** Colour strings built once: the same few colours are asked for by thousands of files a frame. */
+const rgbaCache = new Map<string, string>();
+const rgbaOf = (r: number, g: number, b: number, a: number) => {
+  const k = r + "," + g + "," + b + "," + a;
+  let v = rgbaCache.get(k);
+  if (v === undefined) { v = `rgba(${k})`; if (rgbaCache.size > 4000) rgbaCache.clear(); rgbaCache.set(k, v); }
+  return v;
+};
+const q = (v: number) => Math.round(v * 100) / 100;   // alphas to 1/100: fewer distinct strings, the same picture
 
 // ---------- PS2: a glass cube, turning slowly ----------
-const CUBE_V: RGB[] = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]];
-const CUBE_F = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [2, 3, 7, 6], [1, 2, 6, 5], [0, 3, 7, 4]];
+const CUBE_V = [-1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1, -1, -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1];
+const CUBE_F = [0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 5, 4, 2, 3, 7, 6, 1, 2, 6, 5, 0, 3, 7, 4];
+const TILT_C = Math.cos(0.55), TILT_S = Math.sin(0.55);
+const PV = new Float64Array(24), FZ = new Float64Array(6), ORDER = [0, 1, 2, 3, 4, 5];
+/** The cube's six glass faces at `angle`, far to near (one set of buffers: nothing allocated per cube). */
+function cubeBody(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, angle: number, c: RGB, lineWidth: number) {
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  for (let v = 0; v < 8; v++) {
+    const a = CUBE_V[v * 3], b = CUBE_V[v * 3 + 1], d = CUBE_V[v * 3 + 2];
+    const x1 = a * ca - d * sa, z1 = a * sa + d * ca;
+    PV[v * 3] = x + x1 * s; PV[v * 3 + 1] = y + (b * TILT_C - z1 * TILT_S) * s; PV[v * 3 + 2] = b * TILT_S + z1 * TILT_C;
+  }
+  for (let f = 0; f < 6; f++) {
+    FZ[f] = (PV[CUBE_F[f * 4] * 3 + 2] + PV[CUBE_F[f * 4 + 1] * 3 + 2] + PV[CUBE_F[f * 4 + 2] * 3 + 2] + PV[CUBE_F[f * 4 + 3] * 3 + 2]) / 4;
+    ORDER[f] = f;
+  }
+  // Far (bigger z) first; stable, like the sort it replaces.
+  for (let i = 1; i < 6; i++) { const f = ORDER[i]; let j = i - 1; while (j >= 0 && FZ[ORDER[j]] < FZ[f]) { ORDER[j + 1] = ORDER[j]; j--; } ORDER[j + 1] = f; }
+  ctx.lineWidth = lineWidth;
+  for (let i = 0; i < 6; i++) {
+    const f = ORDER[i], z = FZ[f];
+    ctx.beginPath();
+    for (let n = 0; n < 4; n++) { const v = CUBE_F[f * 4 + n] * 3; if (n) ctx.lineTo(PV[v], PV[v + 1]); else ctx.moveTo(PV[v], PV[v + 1]); }
+    ctx.closePath();
+    ctx.fillStyle = rgbaOf(c[0], c[1], c[2], q(0.2 + (1 - z) * 0.12)); ctx.fill();
+    ctx.strokeStyle = rgbaOf(232, 240, 255, q(0.38 + (1 - z) * 0.25)); ctx.stroke();
+  }
+}
+function cubeGlow(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, c: RGB) {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, s * 3.6);
+  g.addColorStop(0, rgba(c, 0.45)); g.addColorStop(1, rgba(c, 0));
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, s * 3.6, 0, TAU); ctx.fill();
+}
 export function drawCube(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, angle: number, c: RGB, glow: boolean, scale: number, here: string | null = null) {
   if (here) { // where an agent is: one glowing ring on the floor under the cube
     ctx.save();
@@ -95,36 +141,45 @@ export function drawCube(ctx: CanvasRenderingContext2D, x: number, y: number, s:
     ctx.strokeStyle = here; ctx.lineWidth = 1.8 / scale; ctx.shadowColor = here; ctx.shadowBlur = 12; ctx.stroke();
     ctx.restore();
   }
+  if (glow) cubeGlow(ctx, x, y, s, c);
+  cubeBody(ctx, x, y, s, angle, c, 0.9 / scale);
+}
+
+/** Below this size on screen (half a cube's width, in pixels) a cube stands still: its turn wouldn't show. */
+export const CUBE_STILL_PX = 2;
+const CUBE_STAMP_PX = 12;    // up to here a cube is stamped at one of ANGLES angles; bigger ones are drawn as they turn
+const ANGLES = 32;           // per quarter turn (a cube looks the same a quarter turn on): 2.8° apart
+const QUARTER = Math.PI / 2;
+/**
+ * A PS2 cube, the quick way: a stamp of its glow and one of its body at the nearest of 32 angles, for every cube up to
+ * CUBE_STAMP_PX on screen (all of them on a big map); false when it's bigger (drawCube draws it then). Looks like drawCube.
+ * `css`: its colour as a string, the stamp's key.
+ */
+export function stampCube(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, angle: number, c: RGB, css: string, glow: boolean, scale: number, memo: StampMemo = {}): boolean {
+  const S = s * scale;
+  if (S > CUBE_STAMP_PX) return false;
+  const b = bucket(S), k = (1 / scale) * (S / b);
   if (glow) {
-    const g = ctx.createRadialGradient(x, y, 0, x, y, s * 3.6);
-    g.addColorStop(0, rgba(c, 0.45)); g.addColorStop(1, rgba(c, 0));
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, s * 3.6, 0, TAU); ctx.fill();
+    let g: Sprite | null | undefined = memo.g;
+    if (!g || memo.gk !== css || memo.c !== b) g = memo.g = sprite("cg|" + css + "|" + b, b * 7.2, b * 7.2, b * 3.6, b * 3.6, (cx) => cubeGlow(cx, b * 3.6, b * 3.6, b, c));
+    memo.gk = css;
+    if (g) stamp(ctx, g, x, y, k);
   }
-  const ca = Math.cos(angle), sa = Math.sin(angle), cb = Math.cos(0.55), sb = Math.sin(0.55);
-  const pv = CUBE_V.map(([a, b, d]) => {
-    const x1 = a * ca - d * sa, z1 = a * sa + d * ca, y1 = b * cb - z1 * sb, z2 = b * sb + z1 * cb;
-    return [x + x1 * s, y + y1 * s, z2] as RGB;
-  });
-  ctx.lineWidth = 0.9 / scale;
-  CUBE_F.map((f) => ({ f, z: f.reduce((m, i) => m + pv[i][2], 0) / 4 })).sort((a, b) => b.z - a.z).forEach(({ f, z }) => {
-    ctx.beginPath();
-    f.forEach((i, n) => (n ? ctx.lineTo(pv[i][0], pv[i][1]) : ctx.moveTo(pv[i][0], pv[i][1])));
-    ctx.closePath();
-    ctx.fillStyle = rgba(c, 0.2 + (1 - z) * 0.12); ctx.fill();
-    ctx.strokeStyle = `rgba(232,240,255,${0.38 + (1 - z) * 0.25})`; ctx.stroke();
-  });
+  let a = angle % QUARTER; if (a < 0) a += QUARTER;
+  const step = Math.round((a / QUARTER) * ANGLES) % ANGLES, half = b * 1.8 + 1;
+  let body: Sprite | null | undefined = memo.s;
+  if (!body || memo.a !== css || memo.c !== b || memo.d !== step) {
+    body = memo.s = sprite("cb|" + css + "|" + b + "|" + step, half * 2, half * 2, half, half, (cx) => cubeBody(cx, half, half, b, (step / ANGLES) * QUARTER, c, 0.9));
+    memo.a = css; memo.c = b; memo.d = step;
+  }
+  if (!body) { cubeBody(ctx, x, y, s, angle, c, 0.9 / scale); return true; }
+  stamp(ctx, body, x, y, k);
+  return true;
 }
 
 // ---------- Dead Space: a floor plate, seen from above at an angle ----------
-export function drawPlate(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: RGB, lit: boolean, scale: number, here: string | null = null) {
+function plateBody(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: RGB, lit: boolean, scale: number) {
   const rx = r * 1.3, ry = r * 0.72, depth = Math.max(r * 0.35, 2.5 / scale);
-  if (here) { // where an agent is: one holographic square projected on the floor around the plate
-    const qx = rx * 1.75 + 5 / scale, qy = ry * 1.75 + 3 / scale;
-    ctx.save();
-    ctx.beginPath(); ctx.moveTo(x - qx, y); ctx.lineTo(x, y - qy); ctx.lineTo(x + qx, y); ctx.lineTo(x, y + qy); ctx.closePath();
-    ctx.strokeStyle = here; ctx.lineWidth = 1.5 / scale; ctx.shadowColor = here; ctx.shadowBlur = 10; ctx.stroke();
-    ctx.restore();
-  }
   ctx.fillStyle = "rgba(16,24,26,0.95)";
   ctx.beginPath(); ctx.ellipse(x, y + depth, rx, ry, 0, 0, TAU); ctx.fill();
   ctx.fillRect(x - rx, y, rx * 2, depth);
@@ -136,6 +191,33 @@ export function drawPlate(ctx: CanvasRenderingContext2D, x: number, y: number, r
     g.addColorStop(0, rgba(c, 0.28)); g.addColorStop(1, rgba(c, 0));
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rx * 2.2, 0, TAU); ctx.fill();
   }
+}
+export function drawPlate(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: RGB, lit: boolean, scale: number, here: string | null = null) {
+  if (here) { // where an agent is: one holographic square projected on the floor around the plate
+    const qx = r * 1.3 * 1.75 + 5 / scale, qy = r * 0.72 * 1.75 + 3 / scale;
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(x - qx, y); ctx.lineTo(x, y - qy); ctx.lineTo(x + qx, y); ctx.lineTo(x, y + qy); ctx.closePath();
+    ctx.strokeStyle = here; ctx.lineWidth = 1.5 / scale; ctx.shadowColor = here; ctx.shadowBlur = 10; ctx.stroke();
+    ctx.restore();
+  }
+  plateBody(ctx, x, y, r, c, lit, scale);
+}
+const PLATE_STAMP_PX = 40;
+/** A Dead Space plate as a stamp (up to PLATE_STAMP_PX on screen, no agent square); false when drawPlate must draw it. */
+export function stampPlate(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: RGB, css: string, lit: boolean, scale: number, memo: StampMemo = {}): boolean {
+  const R = r * scale;
+  if (R > PLATE_STAMP_PX) return false;
+  const b = bucket(R), key = lit ? css : "";
+  let sp: Sprite | null | undefined = memo.s;
+  if (!sp || memo.a !== key || memo.c !== b) {
+    const rx = b * 1.3, ry = b * 0.72, depth = Math.max(b * 0.35, 2.5);
+    const half = lit ? rx * 2.2 : rx + 1, top = lit ? rx * 2.2 : ry + 1, h = top + Math.max(lit ? rx * 2.2 : 0, depth + ry + 1);
+    sp = memo.s = sprite("p|" + key + "|" + b, half * 2, h, half, top, (cx) => plateBody(cx, half, top, b, c, lit, 1));
+    memo.a = key; memo.c = b;
+  }
+  if (!sp) return false;
+  stamp(ctx, sp, x, y, (1 / scale) * (R / b));
+  return true;
 }
 
 // ---------- Metro: a station, and imports as transit lines ----------
@@ -151,6 +233,27 @@ export function drawStation(ctx: CanvasRenderingContext2D, x: number, y: number,
     ctx.beginPath(); ctx.arc(x, y, rr + 4.5 / scale + rr * 0.18, 0, TAU);
     ctx.lineWidth = 2.2 / scale; ctx.strokeStyle = here; ctx.stroke();
   }
+}
+const STATION_STAMP_PX = 40;
+/** A Metro station as a stamp (up to STATION_STAMP_PX on screen, no agent ring); false when drawStation must draw it. */
+export function stampStation(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, fill: string, ring: string, bold: boolean, scale: number, memo: StampMemo = {}): boolean {
+  const rr = Math.max(2.6, r * 0.6), R = rr * scale;
+  if (R > STATION_STAMP_PX) return false;
+  const b = bucket(R);
+  let sp: Sprite | null | undefined = memo.s;
+  if (!sp || memo.a !== fill || memo.b !== ring || memo.c !== b || memo.d !== bold) {
+    // The ring's width is in pixels plus a share of the station (drawStation): the same, measured on screen.
+    const lw = (bold ? 2.4 : 1.6) + b * 0.18, half = b + lw / 2 + 1;
+    sp = memo.s = sprite("s|" + fill + "|" + ring + "|" + (bold ? 1 : 0) + "|" + b, half * 2, half * 2, half, half, (cx) => {
+      cx.beginPath(); cx.arc(half, half, b, 0, TAU);
+      cx.fillStyle = fill; cx.fill();
+      cx.lineWidth = lw; cx.strokeStyle = ring; cx.stroke();
+    });
+    memo.a = fill; memo.b = ring; memo.c = b; memo.d = bold;
+  }
+  if (!sp) return false;
+  stamp(ctx, sp, x, y, (1 / scale) * (R / b));
+  return true;
 }
 
 /** Where a marker stands by its file: just off the top-right (or around it, when several agents share it). Metro tracks run between these points. */
@@ -175,7 +278,17 @@ export type Pt2 = [number, number];
 
 /** Starts a path along a metro track (the caller strokes it). */
 export function metroPath(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
-  polyPath(ctx, metroPoints(x1, y1, x2, y2));
+  ctx.beginPath();
+  metroSegment(ctx, x1, y1, x2, y2);
+}
+
+/** Adds a metro track to the current path, the corners of metroPoints without building them: many tracks share one stroke. */
+export function metroSegment(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
+  const dx = x2 - x1, dy = y2 - y1, ax = Math.abs(dx), ay = Math.abs(dy);
+  ctx.moveTo(x1, y1);
+  if (ax >= ay) { const h = ((ax - ay) / 2) * Math.sign(dx); ctx.lineTo(x1 + h, y1); ctx.lineTo(x2 - h, y2); }
+  else { const v = ((ay - ax) / 2) * Math.sign(dy); ctx.lineTo(x1, y1 + v); ctx.lineTo(x2, y2 - v); }
+  ctx.lineTo(x2, y2);
 }
 
 /** The point a fraction k (0..1) of the way along a polyline, by length: an agent riding the track. */
@@ -226,6 +339,10 @@ function upTo(pts: Pt2[], k: number): Pt2[] {
 /** Files a marker just landed on (PS2: the cube spins up and flashes). Set by the agent and replay layers, read by the map. */
 export const landings = new Map<string, number>();
 export const LAND_MS = 520;
+/** Forget landings that are over (the map only clears the ones it draws, and it doesn't draw files off screen). */
+export function settleLandings(now = performance.now()) {
+  for (const [id, t] of landings) if (now - t >= LAND_MS) landings.delete(id);
+}
 
 /**
  * The trip itself, drawn under the marker while it travels (p: 0..1 of the trip, e: the eased position on it).

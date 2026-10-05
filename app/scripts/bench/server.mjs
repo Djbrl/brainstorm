@@ -90,6 +90,8 @@ export async function startServer({ port, dataDir, claudeDir, root, timeoutMs = 
   const base = `http://127.0.0.1:${port}`;
   const ok = await waitFor(async () => { if (exited) throw new Error("exited"); return (await fetch(`${base}/api/health`)).ok; }, { timeoutMs, everyMs: 50 });
   events.healthMs = ok ? Date.now() - t0 : null;
+  // CPU seconds the server used to get there: steadier than wall time when other work shares the machine.
+  if (ok) events.healthCpuSec = procStats(child.pid)?.cpuSec ?? null;
   if (!ok) log(`server did not answer /api/health in ${timeoutMs} ms`, exited ? `(exited ${JSON.stringify(exited)})` : "", "\n" + logLines.slice(-20).join("\n"));
   return {
     child, pid: child.pid, base, events, logLines, get exited() { return exited; },
@@ -178,6 +180,26 @@ export async function waitForThread(base, sessionId, lastTs, timeoutMs) {
     return s && s.lastEventAt >= lastTs ? s : null;
   }, { timeoutMs, everyMs: 200 });
   return hit ? Date.now() - t0 : null;
+}
+
+/**
+ * After boot: how long until the server goes quiet (CPU under `pct`% for `quiet` samples in a row), and its peak RSS
+ * meanwhile. Work the server does after it answers (watching the repo, reading history) shows up here, not in "boot".
+ */
+export async function untilQuiet(pid, sinceMs, { pct = 5, quiet = 4, everyMs = 500, timeoutMs = 180_000 } = {}) {
+  let last = procStats(pid), lastT = Date.now(), calm = 0, peak = last?.rssMb ?? 0;
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs) {
+    await sleep(everyMs);
+    const s = procStats(pid), t = Date.now();
+    if (!s || !last) return { quietAtMs: null, peakRssMb: peak };
+    const cpu = (100 * (s.cpuSec - last.cpuSec)) / ((t - lastT) / 1000);
+    peak = Math.max(peak, s.rssMb);
+    calm = cpu < pct ? calm + 1 : 0;
+    last = s; lastT = t;
+    if (calm >= quiet) return { quietAtMs: t - quiet * everyMs - sinceMs, peakRssMb: peak, cpuSec: s.cpuSec };
+  }
+  return { quietAtMs: null, peakRssMb: peak, timeout: true };
 }
 
 export const dbSizeMb = (dataDir) => { try { return mb(statSync(join(dataDir, "brainstorm.db")).size + (existsSync(join(dataDir, "brainstorm.db-wal")) ? statSync(join(dataDir, "brainstorm.db-wal")).size : 0)); } catch { return null; } };

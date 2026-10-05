@@ -41,12 +41,20 @@ const heapMb = async (page) => { try { const h = await page.send("Runtime.getHea
 
 /** Measure `fn` running for `ms` in the page: frame/long-task stats over exactly that window. */
 async function measure(page, ms, during) {
+  const m0 = await metrics(page);
   const a = await now(page);
   const done = during ? during(ms) : sleep(ms);
   await done;
   const b = await now(page);
-  return { ...(await windowStats(page, a, b)), heapMb: await heapMb(page) };
+  const m1 = await metrics(page);
+  // CPU time of the page main thread (thread ticks: scripts, style, layout, paint) as a share of the window: the work itself, steadier than frame times on a busy machine (CPU throttling raises it too).
+  const busy = m0.TaskDuration != null && m1.TaskDuration != null ? round((100 * (m1.TaskDuration - m0.TaskDuration)) / ((b - a) / 1000)) : null;
+  const script = m0.ScriptDuration != null ? round((100 * (m1.ScriptDuration - m0.ScriptDuration)) / ((b - a) / 1000)) : null;
+  return { ...(await windowStats(page, a, b)), mainThreadCpuPct: busy, scriptCpuPct: script, heapMb: await heapMb(page) };
 }
+const metrics = async (page) => {
+  try { const { metrics: m } = await page.send("Performance.getMetrics"); return Object.fromEntries(m.map((x) => [x.name, x.value])); } catch { return {}; }
+};
 
 /** A point on the map canvas with nothing drawn around it, so a drag pans the map instead of dragging a file. */
 async function emptySpot(page) {
@@ -101,6 +109,7 @@ export async function frontRun({ chrome, base, cpu, expectedNodes, threadId, liv
   try {
     await page.send("Page.enable");
     await page.send("Runtime.enable");
+    await page.send("Performance.enable", { timeDomain: "threadTicks" }).catch(() => page.send("Performance.enable"));
     await page.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: dpr, mobile: false });
     await page.send("Emulation.setCPUThrottlingRate", { rate: cpu });
     await page.send("Page.addScriptToEvaluateOnNewDocument", { source: probe(Math.max(10, Math.floor(expectedNodes * 0.5))) });

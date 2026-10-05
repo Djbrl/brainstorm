@@ -17,7 +17,7 @@ import { frontRun } from "./front.mjs";
 import { generateRepo } from "./gen-repo.mjs";
 import { startLiveWriter, writeLongThread } from "./gen-thread.mjs";
 import { freePort, list, log, parseArgs, REPO_DIR, round, scratchDir, sleep } from "./lib.mjs";
-import { apiTimings, build, bundleSizes, dbSizeMb, procStats, sampler, startServer, waitForThread, wsMonitor } from "./server.mjs";
+import { apiTimings, build, bundleSizes, dbSizeMb, procStats, sampler, startServer, untilQuiet, waitForThread, wsMonitor } from "./server.mjs";
 
 const args = parseArgs();
 const sizes = list(args.files, "1000");
@@ -44,7 +44,7 @@ function machine() {
 }
 
 async function benchSize(files, ports) {
-  const r = { files, steps, errors: [] };
+  const r = { files, steps, errors: [], loadAvg: loadavg().map((x) => round(x, 1)) };
   const runDir = join(scratch, `run-${files}`);
   rmSync(runDir, { recursive: true, force: true });
   const claudeDir = join(runDir, "claude", "projects");
@@ -63,8 +63,7 @@ async function benchSize(files, ports) {
 
   // A. Empty logs: the map alone.
   let server = await boot("empty", join(runDir, "data-empty"));
-  r.bootEmpty = { ...server.events };
-  await sleep(3000);
+  r.bootEmpty = { ...server.events, ...(await untilQuiet(server.pid, server.events.spawnAt)) };
   let s = sampler(server.pid); await sleep(5000);
   r.bootEmpty.rest = { ...s.stop(), ...procStats(server.pid) };
   await server.stop(); cleanups.delete(server.stop);
@@ -79,7 +78,7 @@ async function benchSize(files, ports) {
   const coldWait = await waitForThread(server.base, long.sessionId, long.lastTs, 600_000);
   r.bootCold.threadReadyMs = coldWait == null ? null : Date.now() - server.events.spawnAt;
   if (coldWait == null) r.errors.push("cold boot: the long thread never showed up in /api/sessions within 600 s");
-  await sleep(3000);
+  Object.assign(r.bootCold, await untilQuiet(server.pid, server.events.spawnAt));
   s = sampler(server.pid); await sleep(5000);
   r.bootCold.rest = { ...s.stop(), ...procStats(server.pid) };
   r.bootCold.dbMb = dbSizeMb(dataDir);
@@ -90,7 +89,7 @@ async function benchSize(files, ports) {
   r.bootWarm = { ...server.events };
   const warmWait = await waitForThread(server.base, long.sessionId, long.lastTs, 300_000);
   r.bootWarm.threadReadyMs = warmWait == null ? null : Date.now() - server.events.spawnAt;
-  await sleep(3000);
+  Object.assign(r.bootWarm, await untilQuiet(server.pid, server.events.spawnAt));
   s = sampler(server.pid); await sleep(5000);
   r.bootWarm.rest = { ...s.stop(), ...procStats(server.pid) };
 
@@ -127,8 +126,11 @@ async function benchSize(files, ports) {
     } finally { await chrome.close(); cleanups.delete(chrome.close); }
   }
   r.end = procStats(server.pid);
+  r.loadAvgEnd = loadavg().map((x) => round(x, 1));
   if (server.exited) r.errors.push(`server exited: ${JSON.stringify(server.exited)}`);
-  r.serverLogTail = server.logLines.filter((l) => /warn|error|fail/i.test(l)).slice(-15);
+  r.serverLogTail = server.logLines.filter((l) => /\b(WARN|ERROR)\b/.test(l)).slice(-15);
+  r.peakRssMb = Math.max(...[r.bootEmpty, r.bootCold, r.bootWarm].map((b) => b?.peakRssMb ?? 0), r.afterApi?.rssMb ?? 0,
+    r.live?.server?.rssMaxMb ?? 0, ...r.front.map((x) => x.live?.serverDuringFront?.rssMaxMb ?? 0));
   await server.stop(); cleanups.delete(server.stop);
   return r;
 }
@@ -144,21 +146,21 @@ function table(headers, rows) {
 
 function report(results) {
   const serverRows = results.map((r) => [
-    r.files, v(r.bootEmpty?.mapBuilt?.files), v(r.bootEmpty?.mapBuilt?.buildMs), v(r.bootEmpty?.healthMs), v(r.bootCold?.healthMs), v(r.bootCold?.threadReadyMs), v(r.bootWarm?.threadReadyMs),
+    r.files, v(r.bootEmpty?.mapBuilt?.files), v(r.bootEmpty?.mapBuilt?.buildMs), `${v(r.bootEmpty?.healthMs)}/${v(r.bootEmpty?.quietAtMs)}`, `${v(r.bootEmpty?.healthCpuSec)}/${v(r.bootEmpty?.cpuSec)}`, v(r.bootCold?.healthMs), `${v(r.bootCold?.healthCpuSec)}/${v(r.bootCold?.cpuSec)}`, v(r.bootCold?.threadReadyMs), v(r.bootWarm?.threadReadyMs),
     `${v(r.api?.map?.coldMs)}/${v(r.api?.map?.kb)}`, v(r.api?.sessions?.coldMs), `${v(r.api?.failures?.coldMs)}/${v(r.api?.failures?.warmMs)}`,
     `${v(r.api?.["sessions/:id/steps"]?.coldMs)}/${v(r.api?.["sessions/:id/steps"] ? round(r.api["sessions/:id/steps"].kb / 1024) : null)}`,
-    `${v(r.bootEmpty?.rest?.rssMb)}/${v(r.bootWarm?.rest?.rssMb)}/${v(r.afterApi?.rssMb)}/${v(r.end?.rssMb)}`,
+    `${v(r.bootEmpty?.peakRssMb)}/${v(r.bootWarm?.peakRssMb)}/${v(r.afterApi?.rssMb)}/${v(r.peakRssMb)}`,
     `${v(r.bootWarm?.rest?.cpuAvg)}/${v(r.live?.server?.cpuAvg)}/${v(r.live?.server?.cpuMax)}`,
     `${v(r.live?.ws?.perSec)}/${v(r.live?.ws?.avgBytes)}`, `${v(r.live?.ws?.stepLatencyMs?.p50)}/${v(r.live?.ws?.stepLatencyMs?.p95)}`,
   ]);
-  const serverTable = table(["files", "mapped", "build ms", "boot empty", "boot cold", "thread cold", "thread warm", "map ms/KB", "sessions ms", "failures cold/warm", "steps ms/MB", "RSS empty/warm/api/end MB", "CPU% rest/live/max", "ws msg/s / B", "latency p50/p95"], serverRows);
-  const f = (w) => (w ? `${v(w.fps)}fps ${v(w.frameP50)}/${v(w.frameP95)}ms LT${v(w.longTaskMs)}` : "–");
+  const serverTable = table(["files", "mapped", "build ms", "boot empty/quiet", "CPU s empty", "boot cold", "CPU s cold", "thread cold", "thread warm", "map ms/KB", "sessions ms", "failures cold/warm", "steps ms/MB", "RSS empty/warm/api/peak MB", "CPU% rest/live/max", "ws msg/s / B", "latency p50/p95"], serverRows);
+  const f = (w) => (w ? `${v(w.fps)}fps ${v(w.frameP50)}/${v(w.frameP95)}ms LT${v(w.longTaskMs)} cpu${v(w.mainThreadCpuPct)}%` : "–");
   const frontRows = results.flatMap((r) => (r.front ?? []).map((x) => [
     r.files, `${x.cpu}x`, `${v(x.loadCold?.firstRenderMs)}/${v(x.load?.firstRenderMs)}`, f(x.settle), f(x.rest), f(x.panZoom), f(x.live), f(x.replay),
     `${v(x.threadOpen?.readyMs)}/${v(x.threadOpen?.longestTaskMs)}/${v(x.threadOpen?.stepsFetches)}x`, `${v(x.rest?.heapMb)}/${v(x.replay?.heapMb)}`, x.errors.length ? x.errors.join("; ").slice(0, 60) : "",
   ]));
   const frontTable = table(["files", "cpu", "1st render cold/warm ms", "settle (10s)", "rest", "pan/zoom", "live", "replay 4x", "thread open ms/longest/fetches", "heap rest/replay MB", "errors"], frontRows);
-  return `Server (times in ms; "boot" = spawn to /api/health; "thread" = spawn until /api/sessions lists the long thread complete)\n${serverTable}\n\nFront-end (fps, frame p50/p95 ms, LT = long-task ms in the window)\n${frontTable}`;
+  return `Server (times in ms; "boot" = spawn to /api/health; "quiet" = spawn until its CPU stays under 5%; "CPU s" = server CPU seconds at health/at quiet; "thread" = spawn until /api/sessions lists the long thread complete)\n${serverTable}\n\nFront-end (fps, frame p50/p95 ms, LT = long-task ms in the window, cpu = page main-thread CPU % of the window)\n${frontTable}`;
 }
 
 // ---- main ----
@@ -185,5 +187,6 @@ try {
   if (result.bundle) console.log(`Bundle: ${result.bundle.jsKb} KB JS (${result.bundle.jsGzipKb} KB gzip), first load ${result.bundle.initialKb} KB (${result.bundle.initialGzipKb} KB gzip); biggest: ${result.bundle.files.slice(0, 4).map((x) => `${x.name} ${x.kb} KB`).join(", ")}\n`);
   console.log(report(result.results));
   for (const r of result.results) if (r.errors?.length) console.log(`\n${r.files} files: ${r.errors.join("; ")}`);
+  console.log(`\nLoad average (1/5/15 min) at each size's start: ${result.results.map((r) => `${r.files}: ${r.loadAvg?.join("/")}`).join(", ")} on ${result.machine.cores} cores`);
   console.log(`\nJSON: ${file}`);
 }

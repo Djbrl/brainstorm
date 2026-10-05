@@ -172,4 +172,6 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 /* The stats line: Track's head already says the same thing, so narrow Track drops it; on a phone it sits under the
    row of pills, full width. */
 @media (max-width: 1100px) { .trk-wrap .map-stats { display: none; } }
+/* Desktop with the sidebar folded: the stats line would sit over Track's first rows, and Track's header has the same numbers. */
+.trk-wrap:has(.sidebar-collapsed) .map-stats { display: none; }
 @media (max-width: 600px) { .map-stats { top: 66px; left: 16px; max-width: calc(100% - 32px); font-size: 13.5px; } }

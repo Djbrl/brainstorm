@@ -1,54 +1,73 @@
 import { Injectable } from "@nestjs/common";
+import { DbService } from "../core/db.service";
+import { stepsVersion, workSteps } from "../core/work-steps";
 import { ListenerService } from "../listener/listener.service";
 import { CallPairer } from "../listener/pairing";
 import type { CoworkArea, CoworkEvent, CoworkPage, CoworkSite, CoworkSummary, Step } from "../types";
 import { CODE_TOOLS, CoworkTracker } from "./classify";
 
-// Owner: cowork. Walks every session's steps, pairs calls with results, and aggregates places.
+// Walks threads' steps, pairs calls with results, and aggregates places. Each thread's events are kept until its
+// steps change (a cheap version stamp), so the page's poll of a running thread only re-reads that thread, and only
+// when it moved; threads that are done cost nothing.
+
+type Part = { events: CoworkEvent[]; codeSteps: number };
+const KEEP = 64; // threads whose events stay cached
 
 @Injectable()
 export class CoworkService {
-  private cache: { at: number; key: string; summary: CoworkSummary } | null = null;
+  private parts = new Map<string, { version: string; part: Part }>();
 
-  constructor(private listener: ListenerService) {}
+  constructor(private dbs: DbService, private listener: ListenerService) {}
 
   summary(sessionId?: string): CoworkSummary {
-    const key = sessionId ?? "*";
-    if (this.cache && this.cache.key === key && Date.now() - this.cache.at < 10_000) return this.cache.summary;
-    const summary = this.compute(sessionId);
-    this.cache = { at: Date.now(), key, summary };
-    return summary;
+    const sessions = sessionId ? sessionId.split(",") : this.listener.listSessions().map((s) => s.id);
+    return aggregatePlaces(sessions.map((sid) => this.part(sid)));
   }
 
-  private compute(sessionId?: string): CoworkSummary {
-    const sessions = sessionId ? sessionId.split(",") : this.listener.listSessions().map((s) => s.id);
-    return summarizePlaces(sessions, (sid) => this.listener.listSteps(sid));
+  private part(sid: string): Part {
+    const version = stepsVersion(this.dbs.db, sid);
+    const hit = this.parts.get(sid);
+    if (hit && hit.version === version) { this.parts.delete(sid); this.parts.set(sid, hit); return hit.part; } // most recent last
+    const part = placeEvents(sid, workSteps(this.dbs.db, sid));
+    this.parts.delete(sid);
+    this.parts.set(sid, { version, part });
+    if (this.parts.size > KEEP) this.parts.delete(this.parts.keys().next().value!);
+    return part;
   }
 }
 
 /** The places of some threads, from their steps. Shared by the live API and the replay export (hosted demos have no server). */
 export function summarizePlaces(sessions: string[], stepsOf: (sessionId: string) => Step[]): CoworkSummary {
+  return aggregatePlaces(sessions.map((sid) => placeEvents(sid, stepsOf(sid))));
+}
+
+/** One thread's place events, in step order, and how many of its steps were plain code work. */
+export function placeEvents(sid: string, steps: Step[]): Part {
   const events: CoworkEvent[] = [];
   let codeSteps = 0;
-
-  for (const sid of sessions) {
-    const tracker = new CoworkTracker(sid);
-    const pairer = new CallPairer();                   // results pair with their call by tool_use id (order as the fallback)
-    for (const st of stepsOf(sid)) {
-      if (st.kind === "tool_call" || st.kind === "edit") {
-        if (CODE_TOOLS.has(st.tool ?? "") && st.tool !== "Bash") codeSteps++;
-        pairer.call(st);
-        continue;
-      }
-      if (st.kind !== "tool_result") continue;
-      const call = pairer.result(st);
-      if (!call) continue;
-      const found = tracker.handle(call, st);
-      if (call.tool === "Bash" && !found.length) codeSteps++;
-      events.push(...found);
+  const tracker = new CoworkTracker(sid);
+  const pairer = new CallPairer();                   // results pair with their call by tool_use id (order as the fallback)
+  for (const st of steps) {
+    if (st.kind === "tool_call" || st.kind === "edit") {
+      if (CODE_TOOLS.has(st.tool ?? "") && st.tool !== "Bash") codeSteps++;
+      pairer.call(st);
+      continue;
     }
-    for (const call of pairer.pending()) events.push(...tracker.handle(call, undefined)); // still running
+    if (st.kind !== "tool_result") continue;
+    const call = pairer.result(st);
+    if (!call) continue;
+    const found = tracker.handle(call, st);
+    if (call.tool === "Bash" && !found.length) codeSteps++;
+    events.push(...found);
   }
+  for (const call of pairer.pending()) events.push(...tracker.handle(call, undefined)); // still running
+  return { events, codeSteps };
+}
+
+/** Sites and pages from threads' events (thread order, then time: the sort is stable). */
+export function aggregatePlaces(parts: Part[]): CoworkSummary {
+  const events: CoworkEvent[] = parts.flatMap((p) => p.events);
+  const codeSteps = parts.reduce((n, p) => n + p.codeSteps, 0);
   events.sort((a, b) => a.ts.localeCompare(b.ts));
 
   const areas: Record<CoworkArea, number> = { web: 0, local: 0, services: 0, apps: 0 };

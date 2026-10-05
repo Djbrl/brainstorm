@@ -1,12 +1,14 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { DbService } from "../core/db.service";
+import { stepsVersion, workSteps } from "../core/work-steps";
 import { ListenerService } from "../listener/listener.service";
 import { CallPairer } from "../listener/pairing";
 import { NemotronService, looksLikeEchoedInstructions } from "../llm/nemotron.service";
 import type { FailureEvidence, FailureGroup, Step } from "../types";
 
-// Owned by the lead. Finds failing tool calls in agent sessions, groups them deterministically,
-// ranks them, and lets Nemotron name each group (cached by group key).
+// Finds failing tool calls in agent sessions, groups them deterministically, ranks them, and lets Nemotron name each
+// group (cached by group key). Each thread's failures are kept until its steps change (a cheap version stamp), and
+// the whole answer until a thread changes, a name lands, or a minute passes (priorities fade with age).
 
 const ERROR_PATTERNS: RegExp[] = [
   /^\s*<tool_use_error>/i,
@@ -18,6 +20,7 @@ const ERROR_PATTERNS: RegExp[] = [
 ];
 const EDIT_TOOLS = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
 const MAX_EVIDENCE = 12;
+const KEEP = 64; // threads whose failures stay cached
 
 type Row = { ev: FailureEvidence; normalized: string };
 
@@ -58,7 +61,8 @@ function summarizeInput(call?: Step): string | undefined {
 @Injectable()
 export class FailuresService implements OnModuleInit {
   private log = new Logger("Failures");
-  private cache: { at: number; sessionId?: string; groups: FailureGroup[] } | null = null;
+  private cache: { key: string; groups: FailureGroup[] } | null = null;
+  private rowsBySession = new Map<string, { version: string; rows: Row[] }>();
   private naming = new Set<string>();
 
   constructor(private dbs: DbService, private listener: ListenerService, private nemotron: NemotronService) {}
@@ -69,19 +73,31 @@ export class FailuresService implements OnModuleInit {
 
   /** `until` (ISO time) ignores everything after it, e.g. to replay a recording that stops at a deadline. */
   list(sessionId?: string, until?: string): FailureGroup[] {
-    if (until) return this.compute(sessionId, until);
-    if (this.cache && this.cache.sessionId === sessionId && Date.now() - this.cache.at < 10_000) return this.cache.groups;
-    const groups = this.compute(sessionId);
-    this.cache = { at: Date.now(), sessionId, groups };
+    const sessions = sessionId ? sessionId.split(",") : this.listener.listSessions().map((s) => s.id);
+    if (until) return this.group(sessions.flatMap((sid) => this.failuresIn(sid, until)), until);
+    const versions = sessions.map((sid) => `${sid}@${stepsVersion(this.dbs.db, sid)}`);
+    const key = `${Math.floor(Date.now() / 60_000)}|${versions.join(",")}`;
+    if (this.cache?.key === key) return this.cache.groups;
+    const groups = this.group(sessions.flatMap((sid, i) => this.cachedFailures(sid, versions[i])));
+    this.cache = { key, groups };
     return groups;
   }
 
-  private compute(sessionId?: string, until?: string): FailureGroup[] {
-    const sessions = sessionId ? sessionId.split(",") : this.listener.listSessions().map((s) => s.id);
+  private cachedFailures(sid: string, version: string): Row[] {
+    const hit = this.rowsBySession.get(sid);
+    this.rowsBySession.delete(sid); // most recent last
+    const rows = hit && hit.version === version ? hit.rows : this.failuresIn(sid);
+    this.rowsBySession.set(sid, { version, rows });
+    if (this.rowsBySession.size > KEEP) this.rowsBySession.delete(this.rowsBySession.keys().next().value!);
+    return rows;
+  }
+
+  /** One thread's failed tool results, each with the call it answered, in step order. */
+  private failuresIn(sid: string, until?: string): Row[] {
     const rows: Row[] = [];
-    for (const sid of sessions) {
+    {
       const pairer = new CallPairer();
-      for (const st of this.listener.listSteps(sid)) {
+      for (const st of workSteps(this.dbs.db, sid)) {
         if (until && st.ts > until) continue;
         if (st.kind === "tool_call" || st.kind === "edit") { pairer.call(st); continue; }
         if (st.kind !== "tool_result") continue;
@@ -98,7 +114,10 @@ export class FailuresService implements OnModuleInit {
         });
       }
     }
+    return rows;
+  }
 
+  private group(rows: Row[], until?: string): FailureGroup[] {
     const byKey = new Map<string, Row[]>();
     for (const r of rows) {
       const key = `${r.ev.tool} · ${r.normalized}`;

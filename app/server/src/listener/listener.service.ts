@@ -260,6 +260,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       saveOffset: db.prepare(`INSERT INTO listener_offsets (file, offset) VALUES (?, ?) ON CONFLICT(file) DO UPDATE SET offset = excluded.offset`),
       stepById: db.prepare(`SELECT * FROM steps WHERE id = ?`),
       stepsOf: db.prepare(`SELECT * FROM steps WHERE session_id = ? ORDER BY seq ASC`),
+      stepsAfter: db.prepare(`SELECT * FROM steps WHERE session_id = ? AND seq > ? ORDER BY seq ASC`),
       stepPos: db.prepare(`SELECT session_id, seq FROM steps WHERE id = ?`),
       stepsBefore: db.prepare(`SELECT * FROM steps WHERE session_id = ? AND seq < ? ORDER BY seq DESC LIMIT ?`),
       stepLabel: db.prepare(`SELECT label, risk FROM steps WHERE id = ?`),
@@ -853,8 +854,19 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     return row ? this.rowToStep(row) : undefined;
   }
 
-  listSteps(sessionId: string): Step[] {
-    return this.st.stepsOf.all(sessionId).map((r) => this.rowToStep(r));
+  /** A session's steps in order; with `afterSeq`, only the ones after it. */
+  listSteps(sessionId: string, afterSeq?: number): Step[] {
+    const rows = afterSeq === undefined ? this.st.stepsOf.all(sessionId) : this.st.stepsAfter.all(sessionId, afterSeq);
+    return rows.map((r) => this.rowToStep(r));
+  }
+
+  /** `JSON.stringify(listSteps(sessionId, afterSeq))`, byte for byte, built from the stored JSON text without parsing
+   * it (GET /sessions/:id/steps: a long thread is thousands of steps). */
+  listStepsJson(sessionId: string, afterSeq?: number): string {
+    const rows = afterSeq === undefined ? this.st.stepsOf.iterate(sessionId) : this.st.stepsAfter.iterate(sessionId, afterSeq);
+    const parts: string[] = [];
+    for (const r of rows) parts.push(stepJson(r));
+    return `[${parts.join(",")}]`;
   }
 
   /** The n steps immediately before `stepId` in the same session, chronological order. */
@@ -864,19 +876,37 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     return this.st.stepsBefore.all(target.session_id, target.seq, n).map((r) => this.rowToStep(r)).reverse();
   }
 
-  updateStep(id: string, patch: { label?: string; risk?: string[] }) {
+  /** Store a step's label and risk, and tell the pages (`broadcast: false` when the step hasn't gone out yet, so the
+   * label rides on it). */
+  updateStep(id: string, patch: { label?: string; risk?: string[] }, opts: { broadcast?: boolean } = {}) {
     const row = this.st.stepLabel.get(id) as { label: string | null; risk: string | null } | undefined;
     if (!row) return;
     const label = patch.label !== undefined ? patch.label : row.label;
     const risk = patch.risk !== undefined ? JSON.stringify(patch.risk) : row.risk;
     this.st.updateLabel.run(label ?? null, risk ?? null, id);
-    this.gateway.broadcast({ type: "step-update", id, label: patch.label, risk: patch.risk });
+    if (opts.broadcast !== false) this.gateway.broadcast({ type: "step-update", id, label: patch.label, risk: patch.risk });
   }
 
   /** Most recent steps of kind edit/tool_call/prompt with no label yet — for the reader's (B) backfill. */
   unlabeledSteps(limit: number): Step[] {
     return this.st.unlabeled.all(limit).map((r) => this.rowToStep(r));
   }
+}
+
+const q = JSON.stringify;
+/** A steps row as the JSON of rowToStep(row): same keys, same order; input, diff and risk are stored as JSON already. */
+function stepJson(r: any): string {
+  let s = `{"id":${q(r.id)},"sessionId":${q(r.session_id)},"seq":${q(r.seq)},"ts":${q(r.ts)},"kind":${q(r.kind)}`;
+  if (r.text != null) s += `,"text":${q(r.text)}`;
+  if (r.tool != null) s += `,"tool":${q(r.tool)}`;
+  if (r.input) s += `,"input":${r.input}`;
+  if (r.file_path != null) s += `,"filePath":${q(r.file_path)}`;
+  if (r.diff) s += `,"diff":${r.diff}`;
+  if (r.label != null) s += `,"label":${q(r.label)}`;
+  if (r.risk) s += `,"risk":${r.risk}`;
+  s += `,"isSubagent":${r.is_subagent ? "true" : "false"}`;
+  if (r.tool_use_id) s += `,"toolUseId":${q(r.tool_use_id)}`;
+  return s + "}";
 }
 
 const PASTE = /<pasted_content\b[^>]*>([\s\S]*?)(<\/pasted_content>|$)/g;

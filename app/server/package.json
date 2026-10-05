@@ -5,7 +5,8 @@
   "scripts": {
     "build": "tsc -p .",
     "dev": "tsc -p . && (tsc -p . -w --preserveWatchOutput &) && node --watch --watch-preserve-output dist/main.js",
-    "start": "node dist/main.js"
+    "start": "node dist/main.js",
+    "test": "tsc -p . && node --test \"test/*.test.cjs\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

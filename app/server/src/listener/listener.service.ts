@@ -1,4 +1,5 @@
-import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from "@nestjs/common";
+import { HttpAdapterHost } from "@nestjs/core";
 import chokidar, { type FSWatcher } from "chokidar";
 import { closeSync, existsSync, openSync, readdirSync, readSync, statSync } from "node:fs";
 import { basename, join, relative, resolve, sep } from "node:path";
@@ -73,6 +74,32 @@ type RawLine = {
 };
 
 type SessionRow = { id: string; cwd: string; title: string; started_at: string; last_event_at: string; custom_title: number; title_set: number };
+type BatchSession = SessionRow & { isNew: boolean; dirty: boolean };
+
+/** One chunk of a file being stored: passed down the parse, so reads of several files can interleave. */
+type Batch = {
+  /** Lines ending at or before this byte offset are history: stored, not broadcast as live activity. */
+  quietUntil: number;
+  /** The line being parsed is history. */
+  quiet: boolean;
+  /** Session rows this chunk touched, written once at its end. */
+  sessions: Map<string, BatchSession>;
+  /** Live steps and session announcements, in order, sent once the chunk is committed. */
+  events: ({ step: Step } | { session: string })[];
+  announced: Set<string>;
+  /** Each touched session's next seq before the chunk, put back if it rolls back. */
+  seqBefore: Map<string, number | undefined>;
+};
+
+/** Read size per step of a file. */
+const CHUNK_BYTES = 4 * 1024 * 1024;
+/** Lines stored per transaction, about: the server answers requests between batches. */
+const BATCH_BYTES = 1024 * 1024;
+/** A longer line is skipped (with a warning) instead of buffered. The longest seen in real logs is 13 MB (a pasted image). */
+const MAX_LINE_BYTES = 16 * 1024 * 1024;
+const NL = 0x0a;
+const yieldToLoop = () => new Promise<void>((r) => setImmediate(r));
+const isSqliteError = (e: unknown) => String((e as { code?: unknown })?.code ?? "").startsWith("ERR_SQLITE");
 
 /** Threads deleted in Claude's desktop app: it leaves a `deleted_<sessionId>` file per thread. Re-read at most once a minute. */
 let deletedCache: { at: number; ids: Set<string> } | null = null;
@@ -89,7 +116,7 @@ function deletedThreads(): Set<string> {
 }
 
 @Injectable()
-export class ListenerService implements OnModuleInit {
+export class ListenerService implements OnModuleInit, OnModuleDestroy {
   private log = new Logger("Listener");
   // SESSION_FILTER env is a permanent override (substring match, old behavior). Otherwise the
   // active workspace's Claude Code project folder prefix is used (set on "workspace", owner: S).
@@ -102,12 +129,30 @@ export class ListenerService implements OnModuleInit {
   private nextSeq = new Map<string, number>();
   private ready = false;
   private watcher?: FSWatcher;
+  /** Bytes read per chunk, stored per transaction, and the longest line kept. Fields so tests can make them small. */
+  chunkBytes = CHUNK_BYTES;
+  batchBytes = BATCH_BYTES;
+  maxLineBytes = MAX_LINE_BYTES;
+  /** Resolves once the HTTP server listens: history is read after that, so the app answers from the first second. */
+  private listening!: Promise<void>;
+  private isListening = false;
+  /** Files being read now, and the next pass to make once the current one ends (the file changed meanwhile). */
+  private reading = new Map<string, { again?: number; done?: Promise<void> }>();
+  /** Each file's size when the backfill listed it: lines up to there are history, anything after is live. */
+  private historyEnd = new Map<string, number>();
+  /** SESSION_FILTER's first scan reads files one at a time. */
+  private historyChain: Promise<void> = Promise.resolve();
+  private backfillGen = 0;
+  /** Top-level project folders chokidar watches (only the active workspace's are descended into). */
+  private watchedTop = new Set<string>();
+  private st!: ReturnType<ListenerService["prepare"]>;
 
   constructor(
     private dbs: DbService,
     private bus: BusService,
     private gateway: EventsGateway,
     private cfg: ConfigService,
+    @Optional() private adapterHost?: HttpAdapterHost,
   ) {}
 
   onModuleInit() {
@@ -129,6 +174,7 @@ export class ListenerService implements OnModuleInit {
     db.exec(`CREATE INDEX IF NOT EXISTS steps_label ON steps(kind, label)`);
     // Added 3 Oct 2026: compacted-conversation recaps were stored as prompts; they read as the agent's text.
     db.exec(`UPDATE steps SET kind = 'text' WHERE kind = 'prompt' AND text LIKE 'This session is being continued from a previous conversation%'`);
+    this.st = this.prepare();
 
     for (const row of db.prepare(`SELECT file, offset FROM listener_offsets`).all() as { file: string; offset: number }[]) {
       this.offsets.set(row.file, row.offset);
@@ -136,25 +182,75 @@ export class ListenerService implements OnModuleInit {
     for (const row of db.prepare(`SELECT session_id, MAX(seq) as m FROM steps GROUP BY session_id`).all() as { session_id: string; m: number }[]) {
       this.nextSeq.set(row.session_id, row.m + 1);
     }
+    this.listening = this.whenListening();
 
     // Start out scoped to the configured default root (repo root, or MAP_ROOT) until a workspace
     // is explicitly chosen (WorkspaceService then emits "workspace" and we re-scope, see below).
     this.setRoot(this.cfg.defaultRoot);
     this.bus.on("workspace", ({ root }) => this.onWorkspaceChanged(root));
 
-    this.watcher = chokidar.watch(this.cfg.claudeProjectsDir, {
+    const projects = this.cfg.claudeProjectsDir;
+    this.watcher = chokidar.watch(projects, {
       ignoreInitial: false,
       depth: 4,
-      ignored: (path: string, stats?: { isFile(): boolean }) => (stats?.isFile() ? !path.endsWith(".jsonl") : false),
+      // Only the active workspace's project folders are descended into (a workspace change adds its own, see
+      // watchMatching): other projects' gigabytes of logs aren't stat'ed or watched.
+      ignored: (path: string, stats?: { isFile(): boolean }) => {
+        const rel = relative(projects, path);
+        if (rel && !rel.startsWith("..") && !this.matchesFilter(rel.split(sep)[0])) return true;
+        return stats?.isFile() ? !path.endsWith(".jsonl") : false;
+      },
     });
-    this.watcher.on("add", (f) => this.handleFile(f));
-    this.watcher.on("change", (f) => this.handleFile(f));
+    this.watcher.on("addDir", (d) => {
+      const rel = relative(projects, d);
+      if (rel && !rel.startsWith("..") && !rel.includes(sep)) this.watchedTop.add(rel);
+    });
+    this.watcher.on("add", (f) => this.onAdd(f));
+    this.watcher.on("change", (f) => void this.runFile(f, this.historyEnd.get(f) ?? 0));
     this.watcher.on("error", (e) => this.log.warn(`watcher error: ${(e as Error).message}`));
     this.watcher.on("ready", () => {
       this.ready = true;
-      if (!this.sessionFilterOverride) this.backfillForNewFilter(); // the older threads skipped at boot
-      this.log.log(`backfill complete, watching ${this.cfg.claudeProjectsDir} live (filter="${this.sessionFilterOverride ?? this.projectFilterPrefixes.join(", ")}")`);
+      if (!this.sessionFilterOverride) this.backfillForNewFilter(); // the whole history, once the server is up
+      this.log.log(`watching ${projects} live (filter="${this.sessionFilterOverride ?? this.projectFilterPrefixes.join(", ")}")`);
     });
+  }
+
+  async onModuleDestroy() {
+    this.backfillGen++; // stops a backfill between files
+    await this.watcher?.close();
+  }
+
+  /** Resolves when the HTTP server is listening (at once in tests, where there is none). */
+  private whenListening(): Promise<void> {
+    const server = this.adapterHost?.httpAdapter?.getHttpServer?.() as { listening?: boolean; once?: (e: string, f: () => void) => void } | undefined;
+    return new Promise<void>((res) => {
+      const done = () => { this.isListening = true; res(); };
+      if (!server || typeof server.once !== "function") setImmediate(done);
+      else if (server.listening) done();
+      else server.once("listening", done);
+    });
+  }
+
+  private prepare() {
+    const db = this.dbs.db;
+    return {
+      insertStep: db.prepare(
+        `INSERT OR REPLACE INTO steps (id, session_id, seq, ts, kind, text, tool, input, file_path, diff, label, risk, is_subagent, tool_use_id)
+         VALUES (@id, @session_id, @seq, @ts, @kind, @text, @tool, @input, @file_path, @diff, @label, @risk, @is_subagent, @tool_use_id)`,
+      ),
+      sessionRow: db.prepare(`SELECT * FROM sessions WHERE id = ?`),
+      insertSession: db.prepare(`INSERT INTO sessions (id, cwd, title, started_at, last_event_at, custom_title, title_set) VALUES (?, ?, ?, ?, ?, ?, ?)`),
+      updateSession: db.prepare(`UPDATE sessions SET cwd = ?, title = ?, last_event_at = ?, title_set = ?, custom_title = ? WHERE id = ?`),
+      allSessions: db.prepare(`SELECT * FROM sessions ORDER BY last_event_at DESC`),
+      saveOffset: db.prepare(`INSERT INTO listener_offsets (file, offset) VALUES (?, ?) ON CONFLICT(file) DO UPDATE SET offset = excluded.offset`),
+      stepById: db.prepare(`SELECT * FROM steps WHERE id = ?`),
+      stepsOf: db.prepare(`SELECT * FROM steps WHERE session_id = ? ORDER BY seq ASC`),
+      stepPos: db.prepare(`SELECT session_id, seq FROM steps WHERE id = ?`),
+      stepsBefore: db.prepare(`SELECT * FROM steps WHERE session_id = ? AND seq < ? ORDER BY seq DESC LIMIT ?`),
+      stepLabel: db.prepare(`SELECT label, risk FROM steps WHERE id = ?`),
+      updateLabel: db.prepare(`UPDATE steps SET label = ?, risk = ? WHERE id = ?`),
+      unlabeled: db.prepare(`SELECT * FROM steps WHERE kind IN ('edit','tool_call','prompt') AND label IS NULL ORDER BY ts DESC LIMIT ?`),
+    };
   }
 
   // ---- workspace switching (owner: S) ----
@@ -180,37 +276,53 @@ export class ListenerService implements OnModuleInit {
     this.backfillForNewFilter();
   }
 
-  /** Read every thread of the project folders now matching the filter that we haven't tailed yet, newest first:
-   * the last two weeks right away, older ones a file at a time so the server stays responsive. Quietly: history
-   * isn't live activity (no step broadcasts, map touches, agent markers or labels), only new threads are announced.
-   * Reuses handleFile's offset bookkeeping, so nothing duplicates. */
+  /** Read every thread of the project folders now matching the filter, newest first, once the server is up: a chunk
+   * at a time, so the app stays responsive and live steps keep flowing. Quietly: history isn't live activity (no
+   * step broadcasts, map touches, agent markers or labels), only new threads are announced. What a file had when it
+   * was listed is history; whatever it gains after is live. Reuses the offset bookkeeping, so nothing duplicates. */
   private backfillForNewFilter() {
+    const projects = this.cfg.claudeProjectsDir;
     let dirs: string[];
-    try { dirs = readdirSync(this.cfg.claudeProjectsDir); } catch (e) {
-      this.log.warn(`backfill: cannot read ${this.cfg.claudeProjectsDir}: ${(e as Error).message}`);
+    try { dirs = readdirSync(projects); } catch (e) {
+      this.log.warn(`backfill: cannot read ${projects}: ${(e as Error).message}`);
       return;
     }
-    const files: { path: string; mtimeMs: number }[] = [];
-    for (const d of dirs) if (this.matchesFilter(d)) this.collectJsonl(join(this.cfg.claudeProjectsDir, d), files);
+    const matching = dirs.filter((d) => this.matchesFilter(d));
+    const files: { path: string; mtimeMs: number; size: number }[] = [];
+    for (const d of matching) this.collectJsonl(join(projects, d), files);
     files.sort((a, b) => b.mtimeMs - a.mtimeMs);
-    const gen = ++this.backfillGen;
-    const recent = files.filter((f) => Date.now() - f.mtimeMs <= RECENT_MS);
-    const older = files.slice(recent.length);
-    for (const f of recent) this.handleFile(f.path, true);
-    this.log.log(`backfill: read ${recent.length} recent jsonl file(s) for the new workspace, ${older.length} older ones to follow`);
-    const next = (i: number) => {
-      if (gen !== this.backfillGen) return;                     // the workspace changed again: that backfill takes over
-      if (i >= older.length) { if (older.length) this.log.log(`backfill: read ${older.length} older jsonl file(s)`); return; }
-      this.handleFile(older[i].path, true);
-      setTimeout(() => next(i + 1), 0);
-    };
-    setTimeout(() => next(0), 0);
+    this.historyEnd.clear();
+    for (const f of files) if ((this.offsets.get(f.path) ?? 0) < f.size) this.historyEnd.set(f.path, f.size);
+    if (this.ready) this.watchMatching(matching);
+    void this.readHistory(++this.backfillGen, files);
   }
-  private backfillGen = 0;
-  /** True while reading history: steps are stored, not broadcast as live activity. */
-  private quiet = false;
 
-  private collectJsonl(dir: string, out: { path: string; mtimeMs: number }[]) {
+  private async readHistory(gen: number, files: { path: string; mtimeMs: number }[]) {
+    await this.listening;
+    if (gen !== this.backfillGen) return;
+    const started = Date.now();
+    const todo = files.filter((f) => this.historyEnd.has(f.path));
+    const recent = todo.filter((f) => started - f.mtimeMs <= RECENT_MS).length;
+    this.log.log(`backfill: reading ${todo.length} of ${files.length} jsonl file(s), newest first (${recent} from the last two weeks)`);
+    for (const f of todo) {
+      if (gen !== this.backfillGen) return; // the workspace changed again: that backfill takes over
+      const end = this.historyEnd.get(f.path);
+      if (end === undefined) continue;     // read meanwhile (it changed, and was read up to its end)
+      await this.runFile(f.path, end);
+      await yieldToLoop();
+    }
+    this.log.log(`backfill: finished ${todo.length} file(s) in ${Date.now() - started} ms`);
+  }
+
+  /** Watch the matching project folders chokidar skipped (they didn't match before), stop watching the others. */
+  private watchMatching(matching: string[]) {
+    if (!this.watcher) return;
+    const projects = this.cfg.claudeProjectsDir;
+    for (const d of matching) if (!this.watchedTop.has(d)) { this.watchedTop.add(d); this.watcher.add(join(projects, d)); }
+    for (const d of [...this.watchedTop]) if (!this.matchesFilter(d)) { this.watchedTop.delete(d); this.watcher.unwatch(join(projects, d)); }
+  }
+
+  private collectJsonl(dir: string, out: { path: string; mtimeMs: number; size: number }[]) {
     let entries: string[];
     try { entries = readdirSync(dir); } catch { return; }
     for (const name of entries) {
@@ -218,95 +330,192 @@ export class ListenerService implements OnModuleInit {
       let st;
       try { st = statSync(p); } catch { continue; }
       if (st.isDirectory()) { this.collectJsonl(p, out); continue; } // e.g. <session>/subagents/
-      if (name.endsWith(".jsonl")) out.push({ path: p, mtimeMs: st.mtimeMs });
+      if (name.endsWith(".jsonl")) out.push({ path: p, mtimeMs: st.mtimeMs, size: st.size });
     }
   }
 
   // ---- file tailing ----
 
-  private handleFile(file: string, history = false) {
-    try {
-      // Session files live at <projectsDir>/<project>/<sessionId>.jsonl, and subagent
-      // transcripts one level deeper at <projectsDir>/<project>/<sessionId>/subagents/agent-*.jsonl.
-      // Filter on the top-level project folder name either way.
-      const rel = relative(this.cfg.claudeProjectsDir, file);
-      const projectDir = rel.split(sep)[0] ?? "";
-      if (!this.matchesFilter(projectDir)) return;
-      const stat = statSync(file);
-      // At boot only the last two weeks are read before the server is up; older threads follow once it is (see "ready").
-      if (!this.ready && !history && Date.now() - stat.mtimeMs > RECENT_MS) return;
+  private onAdd(file: string) {
+    if (this.ready) {
+      // A new thread (or subagent) is live from its first line; a file the backfill listed is read by it.
+      if (!this.historyEnd.has(file)) void this.runFile(file, 0);
+      return;
+    }
+    // Chokidar's first scan. The backfill reads everything once the server is up; with SESSION_FILTER (no backfill)
+    // the last two weeks are read here, as history, one file at a time.
+    if (!this.sessionFilterOverride) return;
+    let mtimeMs: number;
+    try { mtimeMs = statSync(file).mtimeMs; } catch { return; }
+    if (Date.now() - mtimeMs > RECENT_MS) return;
+    this.historyChain = this.historyChain.then(() => this.runFile(file, Infinity));
+  }
 
-      const prevOffset = this.offsets.get(file) ?? 0;
-      const { text, newOffset } = this.readAppended(file, prevOffset, stat.size);
-      if (!text) {
-        if (newOffset !== prevOffset) this.saveOffset(file, newOffset);
-        return;
-      }
-      const lines = text.split("\n").filter((l) => l.length > 0);
-      this.quiet = history;
+  /** Read what `file` gained since its offset. One pass at a time per file: a change during a pass queues another.
+   * Lines ending at or before byte `quietUntil` are history (not broadcast). Never rejects. */
+  private runFile(file: string, quietUntil: number): Promise<void> {
+    const cur = this.reading.get(file);
+    if (cur) {
+      cur.again = Math.min(cur.again ?? Infinity, quietUntil);
+      return cur.done!;
+    }
+    const entry: { again?: number; done?: Promise<void> } = { again: quietUntil };
+    this.reading.set(file, entry);
+    entry.done = (async () => {
       try {
-        for (const line of lines) {
-          try {
-            const obj = JSON.parse(line) as RawLine;
-            this.ingestLine(obj);
-          } catch (e) {
-            this.log.warn(`bad jsonl line in ${file}: ${(e as Error).message}`);
-          }
+        while (entry.again !== undefined) {
+          const q = entry.again;
+          entry.again = undefined;
+          await this.readFile(file, q);
         }
-      } finally { this.quiet = false; }
-      this.saveOffset(file, newOffset);
-    } catch (e) {
-      this.log.warn(`handleFile(${file}) failed: ${(e as Error).message}`);
+      } catch (e) {
+        this.log.warn(`handleFile(${file}) failed: ${(e as Error).message}`);
+      } finally {
+        this.reading.delete(file);
+        const end = this.historyEnd.get(file);
+        if (end !== undefined && (this.offsets.get(file) ?? 0) >= end) this.historyEnd.delete(file);
+      }
+    })();
+    return entry.done;
+  }
+
+  /** Read the appended bytes chunkBytes at a time, split on newline bytes before decoding (a multibyte character
+   * never spans one), and store the complete lines about batchBytes per transaction, each with the byte offset after
+   * its last line, yielding in between. A partial last line waits for the next change. */
+  private async readFile(file: string, quietUntil: number): Promise<void> {
+    // Session files live at <projectsDir>/<project>/<sessionId>.jsonl, and subagent
+    // transcripts one level deeper at <projectsDir>/<project>/<sessionId>/subagents/agent-*.jsonl.
+    // Filter on the top-level project folder name either way.
+    const projectDir = relative(this.cfg.claudeProjectsDir, file).split(sep)[0] ?? "";
+    if (!this.matchesFilter(projectDir)) return;
+    let fd: number | undefined;
+    try {
+      const size = statSync(file).size;
+      const prev = this.offsets.get(file) ?? 0;
+      if (size < prev) { this.saveOffset(file, 0); return; } // file rotated/truncated
+      if (size === prev) return;
+      fd = openSync(file, "r");
+      let pos = prev;                     // next byte to read
+      let pending: Buffer | null = null;  // the start of a line not complete yet
+      let skipping = false;               // inside a line longer than maxLineBytes: dropped up to its end
+      let first = true;
+      while (pos < size) {
+        if (!first) await yieldToLoop();
+        first = false;
+        const want = Math.min(this.chunkBytes, size - pos);
+        const chunk = Buffer.allocUnsafe(want);
+        const n = readSync(fd, chunk, 0, want, pos);
+        if (n <= 0) break;
+        const chunkStart = pos;
+        pos += n;
+        let data = chunk.subarray(0, n);
+        let dataStart = chunkStart;
+        if (skipping) {
+          const nl = data.indexOf(NL);
+          if (nl === -1) continue;
+          skipping = false;
+          data = data.subarray(nl + 1);
+          dataStart = chunkStart + nl + 1;
+          this.saveOffset(file, dataStart); // past the long line
+        }
+        const work: Buffer = pending ? Buffer.concat([pending, data]) : data;
+        const workStart = dataStart - (pending ? pending.length : 0);
+        pending = null;
+        const lastNl = work.lastIndexOf(NL);
+        let rest: Buffer = work;
+        if (lastNl !== -1) {
+          // Stored a batch of about batchBytes at a time, yielding in between, so a request waits one batch at most.
+          const end = lastNl + 1;
+          for (let s = 0; s < end;) {
+            let e = end;
+            if (end - s > this.batchBytes) {
+              e = work.lastIndexOf(NL, s + this.batchBytes - 1) + 1;
+              if (e <= s) e = work.indexOf(NL, s + this.batchBytes) + 1; // one line longer than a batch
+            }
+            if (!this.commitChunk(file, work, workStart, s, e, quietUntil)) return;
+            s = e;
+            if (s < end) await yieldToLoop();
+          }
+          rest = work.subarray(end);
+        }
+        if (rest.length > this.maxLineBytes) {
+          this.log.warn(`skipping a line over ${Math.round(this.maxLineBytes / 1048576)} MB in ${file} (byte ${workStart + work.length - rest.length})`);
+          skipping = true;
+        } else if (rest.length) pending = Buffer.from(rest); // a copy: don't keep the whole chunk alive
+      }
+    } finally {
+      if (fd !== undefined) closeSync(fd);
     }
   }
 
-  /** Read only the appended bytes since prevOffset, holding back a partial trailing line. */
-  private readAppended(file: string, prevOffset: number, size: number): { text: string; newOffset: number } {
-    if (size < prevOffset) return { text: "", newOffset: 0 }; // file rotated/truncated
-    if (size === prevOffset) return { text: "", newOffset: prevOffset };
-    const fd = openSync(file, "r");
-    let text: string;
+  /** Store the complete lines buf[start, end) (buf[0] is byte `bufStart` of the file) and the offset after them in
+   * one transaction, then announce what was live. On a database error nothing of it is kept (seqs put back, offset
+   * unchanged), so the file's next change retries it; returns false then. */
+  private commitChunk(file: string, buf: Buffer, bufStart: number, start: number, end: number, quietUntil: number): boolean {
+    const db = this.dbs.db;
+    const batch: Batch = { quietUntil, quiet: true, sessions: new Map(), events: [], announced: new Set(), seqBefore: new Map() };
+    db.exec("BEGIN");
     try {
-      const len = size - prevOffset;
-      const buf = Buffer.alloc(len);
-      readSync(fd, buf, 0, len, prevOffset);
-      text = buf.toString("utf8");
-    } finally {
-      closeSync(fd);
+      for (let s = start; s < end;) {
+        let e = buf.indexOf(NL, s);
+        if (e === -1 || e >= end) e = end;
+        if (e - s > this.maxLineBytes) {
+          this.log.warn(`skipping a line over ${Math.round(this.maxLineBytes / 1048576)} MB in ${file} (byte ${bufStart + s})`);
+        } else if (e > s) {
+          batch.quiet = bufStart + e + 1 <= quietUntil;
+          let obj: RawLine | undefined;
+          try {
+            obj = JSON.parse(buf.toString("utf8", s, e)) as RawLine;
+          } catch (err) {
+            this.log.warn(`bad jsonl line in ${file}: ${(err as Error).message}`);
+          }
+          if (obj) {
+            try { this.ingestLine(obj, batch); } catch (err) {
+              if (isSqliteError(err)) throw err; // the database, not the line: roll the batch back
+              this.log.warn(`bad jsonl line in ${file}: ${(err as Error).message}`);
+            }
+          }
+        }
+        s = e + 1;
+      }
+      this.flushSessions(batch);
+      this.st.saveOffset.run(file, bufStart + end);
+      db.exec("COMMIT");
+    } catch (e) {
+      try { db.exec("ROLLBACK"); } catch { /* already rolled back */ }
+      for (const [id, n] of batch.seqBefore) if (n === undefined) this.nextSeq.delete(id); else this.nextSeq.set(id, n);
+      this.log.warn(`storing ${file} from byte ${bufStart + start} failed, retried on its next change: ${(e as Error).message}`);
+      return false;
     }
-    const lastNewline = text.lastIndexOf("\n");
-    if (lastNewline === -1) return { text: "", newOffset: prevOffset }; // no complete line yet
-    const consumed = text.slice(0, lastNewline + 1);
-    const consumedBytes = Buffer.byteLength(consumed, "utf8");
-    return { text: consumed, newOffset: prevOffset + consumedBytes };
+    this.offsets.set(file, bufStart + end);
+    this.announce(batch);
+    return true;
   }
 
   private saveOffset(file: string, offset: number) {
     this.offsets.set(file, offset);
-    this.dbs.db
-      .prepare(`INSERT INTO listener_offsets (file, offset) VALUES (?, ?) ON CONFLICT(file) DO UPDATE SET offset = excluded.offset`)
-      .run(file, offset);
+    this.st.saveOffset.run(file, offset);
   }
 
   // ---- parsing ----
 
-  private ingestLine(o: RawLine) {
+  private ingestLine(o: RawLine, b: Batch) {
     if (o.type === "custom-title") {
-      if (o.sessionId && o.customTitle) this.setCustomTitle(o.sessionId, o.customTitle);
+      if (o.sessionId && o.customTitle) this.setCustomTitle(b, o.sessionId, o.customTitle);
       return;
     }
     if (o.type === "user") {
-      this.ingestUser(o);
+      this.ingestUser(o, b);
       return;
     }
     if (o.type === "assistant") {
-      this.ingestAssistant(o);
+      this.ingestAssistant(o, b);
       return;
     }
     // Ignore attachment, system, queue-operation, agent-name, last-prompt, atis-latch, file-history-snapshot, etc.
   }
 
-  private ingestUser(o: RawLine) {
+  private ingestUser(o: RawLine, b: Batch) {
     const sessionId = o.sessionId;
     if (!sessionId) return;
     const content = o.message?.content;
@@ -315,13 +524,13 @@ export class ListenerService implements OnModuleInit {
 
     if (o.isCompactSummary) { // the recap Claude Code writes when it compacts a long conversation
       const text = typeof content === "string" ? content : Array.isArray(content) ? content.filter((b: any) => b?.type === "text").map((b: any) => b.text).join("\n\n") : "";
-      if (text.trim()) this.storeStep(this.makeStep(o, sessionId, 0, ts, "text", text, isSubagent), { cwd: o.cwd });
+      if (text.trim()) this.storeStep(b, this.makeStep(b, o, sessionId, 0, ts, "text", text, isSubagent), { cwd: o.cwd });
       return;
     }
 
     if (typeof content === "string") {
-      const step = this.makeStep(o, sessionId, 0, ts, "prompt", content, isSubagent);
-      this.storeStep(step, { cwd: o.cwd, promptTitle: content });
+      const step = this.makeStep(b, o, sessionId, 0, ts, "prompt", content, isSubagent);
+      this.storeStep(b, step, { cwd: o.cwd, promptTitle: content });
       return;
     }
     if (!Array.isArray(content)) return;
@@ -333,24 +542,24 @@ export class ListenerService implements OnModuleInit {
     if (textBlocks.length) {
       const joined = textBlocks.map((b) => b.text).join("\n\n");
       if (/^\s*\[Request interrupted by user/.test(joined)) return; // harness notice, not a human prompt
-      const step = this.makeStep(o, sessionId, textBlocks[0].i, ts, "prompt", joined, isSubagent);
-      this.storeStep(step, { cwd: o.cwd, promptTitle: joined });
+      const step = this.makeStep(b, o, sessionId, textBlocks[0].i, ts, "prompt", joined, isSubagent);
+      this.storeStep(b, step, { cwd: o.cwd, promptTitle: joined });
     }
 
-    content.forEach((b: any, i: number) => {
-      if (!b || b.type !== "tool_result") return;
+    content.forEach((block: any, i: number) => {
+      if (!block || block.type !== "tool_result") return;
       let text: string;
-      if (typeof b.content === "string") text = b.content;
-      else if (Array.isArray(b.content)) text = b.content.filter((c: any) => c?.type === "text").map((c: any) => c.text).join("\n\n");
-      else text = JSON.stringify(b.content ?? "");
-      const step = this.makeStep(o, sessionId, i, ts, "tool_result", sanitizeText(text, TOOL_RESULT_LIMIT), isSubagent);
-      if (typeof b.tool_use_id === "string") step.toolUseId = b.tool_use_id;
-      if (b.is_error) step.input = { isError: true, toolUseId: b.tool_use_id }; // read by the failures module
-      this.storeStep(step, { cwd: o.cwd });
+      if (typeof block.content === "string") text = block.content;
+      else if (Array.isArray(block.content)) text = block.content.filter((c: any) => c?.type === "text").map((c: any) => c.text).join("\n\n");
+      else text = JSON.stringify(block.content ?? "");
+      const step = this.makeStep(b, o, sessionId, i, ts, "tool_result", sanitizeText(text, TOOL_RESULT_LIMIT), isSubagent);
+      if (typeof block.tool_use_id === "string") step.toolUseId = block.tool_use_id;
+      if (block.is_error) step.input = { isError: true, toolUseId: block.tool_use_id }; // read by the failures module
+      this.storeStep(b, step, { cwd: o.cwd });
     });
   }
 
-  private ingestAssistant(o: RawLine) {
+  private ingestAssistant(o: RawLine, b: Batch) {
     const sessionId = o.sessionId;
     if (!sessionId) return;
     const content = o.message?.content;
@@ -358,19 +567,19 @@ export class ListenerService implements OnModuleInit {
     const ts = o.timestamp ?? new Date().toISOString();
     const isSubagent = o.isSidechain === true;
 
-    content.forEach((b: any, i: number) => {
-      if (!b || typeof b !== "object") return;
-      if (b.type === "text" && typeof b.text === "string" && b.text.trim()) {
-        this.storeStep(this.makeStep(o, sessionId, i, ts, "text", b.text, isSubagent), { cwd: o.cwd });
-      } else if (b.type === "thinking" && typeof b.thinking === "string" && b.thinking.trim()) {
-        this.storeStep(this.makeStep(o, sessionId, i, ts, "thinking", b.thinking, isSubagent), { cwd: o.cwd });
-      } else if (b.type === "tool_use") {
-        this.ingestToolUse(o, sessionId, i, ts, isSubagent, b.name, b.input, typeof b.id === "string" ? b.id : undefined);
+    content.forEach((block: any, i: number) => {
+      if (!block || typeof block !== "object") return;
+      if (block.type === "text" && typeof block.text === "string" && block.text.trim()) {
+        this.storeStep(b, this.makeStep(b, o, sessionId, i, ts, "text", block.text, isSubagent), { cwd: o.cwd });
+      } else if (block.type === "thinking" && typeof block.thinking === "string" && block.thinking.trim()) {
+        this.storeStep(b, this.makeStep(b, o, sessionId, i, ts, "thinking", block.thinking, isSubagent), { cwd: o.cwd });
+      } else if (block.type === "tool_use") {
+        this.ingestToolUse(b, o, sessionId, i, ts, isSubagent, block.name, block.input, typeof block.id === "string" ? block.id : undefined);
       }
     });
   }
 
-  private ingestToolUse(o: RawLine, sessionId: string, i: number, ts: string, isSubagent: boolean, name: string, input: any, toolUseId?: string) {
+  private ingestToolUse(b: Batch, o: RawLine, sessionId: string, i: number, ts: string, isSubagent: boolean, name: string, input: any, toolUseId?: string) {
     const isEdit = name === "Edit" || name === "MultiEdit" || name === "Write";
     const id = `${o.uuid ?? ""}:${i}`;
     let filePath: string | undefined = typeof input?.file_path === "string" ? input.file_path : typeof input?.path === "string" ? input.path : undefined;
@@ -389,86 +598,93 @@ export class ListenerService implements OnModuleInit {
         after = input.edits.map((e: any) => (typeof e?.new_string === "string" ? e.new_string : "")).join("\n---\n");
       }
       const step: Step = {
-        id, sessionId, seq: this.allocSeq(sessionId), ts, kind: "edit",
+        id, sessionId, seq: this.allocSeq(b, sessionId), ts, kind: "edit",
         tool: name, input: sanitizeDeep(input) as unknown, filePath,
         diff: { before: sanitizeText(before, TEXT_LIMIT), after: sanitizeText(after, TEXT_LIMIT) },
         isSubagent, ...(isSubagent && (o as { agentId?: string }).agentId ? { agentId: (o as { agentId?: string }).agentId } : {}),
         ...(toolUseId ? { toolUseId } : {}),
       };
-      this.storeStep(step, { cwd: o.cwd });
+      this.storeStep(b, step, { cwd: o.cwd });
     } else {
       const step: Step = {
-        id, sessionId, seq: this.allocSeq(sessionId), ts, kind: "tool_call",
+        id, sessionId, seq: this.allocSeq(b, sessionId), ts, kind: "tool_call",
         tool: name, input: sanitizeDeep(input) as unknown, filePath, isSubagent,
         ...(isSubagent && (o as { agentId?: string }).agentId ? { agentId: (o as { agentId?: string }).agentId } : {}),
         ...(toolUseId ? { toolUseId } : {}),
       };
-      this.storeStep(step, { cwd: o.cwd });
+      this.storeStep(b, step, { cwd: o.cwd });
     }
   }
 
-  private makeStep(o: RawLine, sessionId: string, blockIndex: number, ts: string, kind: StepKind, text: string, isSubagent: boolean): Step {
+  private makeStep(b: Batch, o: RawLine, sessionId: string, blockIndex: number, ts: string, kind: StepKind, text: string, isSubagent: boolean): Step {
     return {
       id: `${o.uuid ?? ""}:${blockIndex}`,
-      sessionId, seq: this.allocSeq(sessionId), ts, kind,
+      sessionId, seq: this.allocSeq(b, sessionId), ts, kind,
       text: sanitizeText(text, kind === "tool_result" ? TOOL_RESULT_LIMIT : TEXT_LIMIT),
       isSubagent,
       ...(isSubagent && (o as { agentId?: string }).agentId ? { agentId: (o as { agentId?: string }).agentId } : {}),
     };
   }
 
-  private allocSeq(sessionId: string): number {
-    const n = this.nextSeq.get(sessionId) ?? 0;
+  private allocSeq(b: Batch, sessionId: string): number {
+    const cur = this.nextSeq.get(sessionId);
+    if (!b.seqBefore.has(sessionId)) b.seqBefore.set(sessionId, cur);
+    const n = cur ?? 0;
     this.nextSeq.set(sessionId, n + 1);
     return n;
   }
 
   // ---- storage + broadcast ----
 
-  private storeStep(step: Step, opts?: { cwd?: string; promptTitle?: string }) {
-    this.dbs.db
-      .prepare(
-        `INSERT OR REPLACE INTO steps (id, session_id, seq, ts, kind, text, tool, input, file_path, diff, label, risk, is_subagent, tool_use_id)
-         VALUES (@id, @session_id, @seq, @ts, @kind, @text, @tool, @input, @file_path, @diff, @label, @risk, @is_subagent, @tool_use_id)`,
-      )
-      .run({
-        id: step.id,
-        session_id: step.sessionId,
-        seq: step.seq,
-        ts: step.ts,
-        kind: step.kind,
-        text: step.text ?? null,
-        tool: step.tool ?? null,
-        input: step.input !== undefined ? JSON.stringify(step.input) : null,
-        file_path: step.filePath ?? null,
-        diff: step.diff ? JSON.stringify(step.diff) : null,
-        label: step.label ?? null,
-        risk: step.risk ? JSON.stringify(step.risk) : null,
-        is_subagent: step.isSubagent ? 1 : 0,
-        tool_use_id: step.toolUseId ?? null,
-      });
-
-    this.upsertSession(step.sessionId, opts?.cwd ?? "", step.ts, opts?.promptTitle);
-
-    if (this.ready && !this.quiet) {
-      this.bus.emit("step", step);
-      this.gateway.broadcast({ type: "step", step });
-      if (step.kind === "edit" && step.filePath) {
-        this.bus.emit("file-touched", { path: step.filePath, sessionId: step.sessionId, ts: step.ts });
-      }
-    }
+  private storeStep(b: Batch, step: Step, opts?: { cwd?: string; promptTitle?: string }) {
+    this.st.insertStep.run({
+      id: step.id,
+      session_id: step.sessionId,
+      seq: step.seq,
+      ts: step.ts,
+      kind: step.kind,
+      text: step.text ?? null,
+      tool: step.tool ?? null,
+      input: step.input !== undefined ? JSON.stringify(step.input) : null,
+      file_path: step.filePath ?? null,
+      diff: step.diff ? JSON.stringify(step.diff) : null,
+      label: step.label ?? null,
+      risk: step.risk ? JSON.stringify(step.risk) : null,
+      is_subagent: step.isSubagent ? 1 : 0,
+      tool_use_id: step.toolUseId ?? null,
+    });
+    this.upsertSession(b, step.sessionId, opts?.cwd ?? "", step.ts, opts?.promptTitle);
+    if (!b.quiet) b.events.push({ step });
   }
 
-  private upsertSession(sessionId: string, cwd: string, ts: string, rawPrompt?: string) {
-    const db = this.dbs.db;
+  /** The chunk's copy of a session row (read once per chunk), or undefined if there is none yet. */
+  private batchSession(b: Batch, sessionId: string): BatchSession | undefined {
+    let r = b.sessions.get(sessionId);
+    if (!r) {
+      const row = this.st.sessionRow.get(sessionId) as SessionRow | undefined;
+      if (!row) return undefined;
+      r = { ...row, isNew: false, dirty: false };
+      b.sessions.set(sessionId, r);
+    }
+    return r;
+  }
+
+  private announceSession(b: Batch, sessionId: string) {
+    if (b.announced.has(sessionId)) return;
+    b.announced.add(sessionId);
+    b.events.push({ session: sessionId });
+  }
+
+  private upsertSession(b: Batch, sessionId: string, cwd: string, ts: string, rawPrompt?: string) {
     const promptTextForTitle = rawPrompt ? promptTitle(rawPrompt) : undefined;
-    const row = db.prepare(`SELECT * FROM sessions WHERE id = ?`).get(sessionId) as SessionRow | undefined;
+    const row = this.batchSession(b, sessionId);
     if (!row) {
       const title = promptTextForTitle ? promptTextForTitle.slice(0, 80) : "(untitled session)";
-      db.prepare(
-        `INSERT INTO sessions (id, cwd, title, started_at, last_event_at, custom_title, title_set) VALUES (?, ?, ?, ?, ?, 0, ?)`,
-      ).run(sessionId, cwd, title, ts, ts, promptTextForTitle ? 1 : 0);
-      if (this.ready) this.broadcastSession(sessionId);
+      b.sessions.set(sessionId, {
+        id: sessionId, cwd, title, started_at: ts, last_event_at: ts, custom_title: 0, title_set: promptTextForTitle ? 1 : 0,
+        isNew: true, dirty: true,
+      });
+      this.announceSession(b, sessionId);
       return;
     }
     let title = row.title;
@@ -480,22 +696,53 @@ export class ListenerService implements OnModuleInit {
     const lastEventAt = ts > row.last_event_at ? ts : row.last_event_at;
     const newCwd = cwd || row.cwd;
     const titleOrCwdChanged = title !== row.title || newCwd !== row.cwd;
-    db.prepare(`UPDATE sessions SET cwd = ?, title = ?, last_event_at = ?, title_set = ? WHERE id = ?`).run(newCwd, title, lastEventAt, titleSet, sessionId);
-    if (titleOrCwdChanged && this.ready) this.broadcastSession(sessionId);
+    if (titleOrCwdChanged || lastEventAt !== row.last_event_at || titleSet !== row.title_set) {
+      Object.assign(row, { cwd: newCwd, title, last_event_at: lastEventAt, title_set: titleSet, dirty: true });
+    }
+    if (titleOrCwdChanged) this.announceSession(b, sessionId);
   }
 
-  private setCustomTitle(sessionId: string, customTitle: string) {
-    const db = this.dbs.db;
-    const row = db.prepare(`SELECT * FROM sessions WHERE id = ?`).get(sessionId) as SessionRow | undefined;
+  private setCustomTitle(b: Batch, sessionId: string, customTitle: string) {
+    const row = this.batchSession(b, sessionId);
     const now = new Date().toISOString();
     if (!row) {
-      db.prepare(`INSERT INTO sessions (id, cwd, title, started_at, last_event_at, custom_title, title_set) VALUES (?, '', ?, ?, ?, 1, 1)`).run(
-        sessionId, customTitle, now, now,
-      );
+      b.sessions.set(sessionId, {
+        id: sessionId, cwd: "", title: customTitle, started_at: now, last_event_at: now, custom_title: 1, title_set: 1, isNew: true, dirty: true,
+      });
     } else {
-      db.prepare(`UPDATE sessions SET title = ?, custom_title = 1, title_set = 1 WHERE id = ?`).run(customTitle, sessionId);
+      Object.assign(row, { title: customTitle, custom_title: 1, title_set: 1, dirty: true });
     }
-    if (this.ready) this.broadcastSession(sessionId);
+    this.announceSession(b, sessionId);
+  }
+
+  /** Write the chunk's session rows, each once. */
+  private flushSessions(b: Batch) {
+    for (const r of b.sessions.values()) {
+      if (!r.dirty) continue;
+      if (r.isNew) this.st.insertSession.run(r.id, r.cwd, r.title, r.started_at, r.last_event_at, r.custom_title, r.title_set);
+      else this.st.updateSession.run(r.cwd, r.title, r.last_event_at, r.title_set, r.custom_title, r.id);
+    }
+  }
+
+  /** After the commit: new threads and title changes (once the server is up), live steps in order. Each step goes to
+   * the bus first, then over the socket as the same object (the reader adds its label to it in between). */
+  private announce(b: Batch) {
+    for (const ev of b.events) {
+      try {
+        if ("session" in ev) {
+          if (this.ready || this.isListening) this.broadcastSession(ev.session);
+        } else if (this.ready) {
+          const step = ev.step;
+          this.bus.emit("step", step);
+          this.gateway.broadcast({ type: "step", step });
+          if (step.kind === "edit" && step.filePath) {
+            this.bus.emit("file-touched", { path: step.filePath, sessionId: step.sessionId, ts: step.ts });
+          }
+        }
+      } catch (e) {
+        this.log.warn(`announcing a step failed: ${(e as Error).message}`);
+      }
+    }
   }
 
   private broadcastSession(sessionId: string) {
@@ -514,13 +761,13 @@ export class ListenerService implements OnModuleInit {
   }
 
   getSession(id: string): Session | undefined {
-    const row = this.dbs.db.prepare(`SELECT * FROM sessions WHERE id = ?`).get(id) as SessionRow | undefined;
+    const row = this.st.sessionRow.get(id) as SessionRow | undefined;
     return row ? this.rowToSession(row) : undefined;
   }
 
   /** Only sessions whose cwd is the active workspace root or inside it (owner: S). */
   listSessions(): Session[] {
-    const rows = this.dbs.db.prepare(`SELECT * FROM sessions ORDER BY last_event_at DESC`).all() as SessionRow[];
+    const rows = this.st.allSessions.all() as SessionRow[];
     // Titles stored before promptTitle() existed can still start with Claude Code's wrapper tags.
     const sessions = rows.map((r) => this.rowToSession(r.custom_title ? r : { ...r, title: promptTitle(r.title) ?? "(untitled session)" }));
     // A thread where no agent did anything but answer a slash command (opening this app, /compact) isn't work to show.
@@ -565,41 +812,33 @@ export class ListenerService implements OnModuleInit {
   }
 
   getStep(id: string): Step | undefined {
-    const row = this.dbs.db.prepare(`SELECT * FROM steps WHERE id = ?`).get(id);
+    const row = this.st.stepById.get(id);
     return row ? this.rowToStep(row) : undefined;
   }
 
   listSteps(sessionId: string): Step[] {
-    const rows = this.dbs.db.prepare(`SELECT * FROM steps WHERE session_id = ? ORDER BY seq ASC`).all(sessionId);
-    return rows.map((r) => this.rowToStep(r));
+    return this.st.stepsOf.all(sessionId).map((r) => this.rowToStep(r));
   }
 
   /** The n steps immediately before `stepId` in the same session, chronological order. */
   stepsBefore(stepId: string, n: number): Step[] {
-    const target = this.dbs.db.prepare(`SELECT session_id, seq FROM steps WHERE id = ?`).get(stepId) as { session_id: string; seq: number } | undefined;
+    const target = this.st.stepPos.get(stepId) as { session_id: string; seq: number } | undefined;
     if (!target) return [];
-    const rows = this.dbs.db
-      .prepare(`SELECT * FROM steps WHERE session_id = ? AND seq < ? ORDER BY seq DESC LIMIT ?`)
-      .all(target.session_id, target.seq, n);
-    return rows.map((r) => this.rowToStep(r)).reverse();
+    return this.st.stepsBefore.all(target.session_id, target.seq, n).map((r) => this.rowToStep(r)).reverse();
   }
 
   updateStep(id: string, patch: { label?: string; risk?: string[] }) {
-    const db = this.dbs.db;
-    const row = db.prepare(`SELECT * FROM steps WHERE id = ?`).get(id) as any;
+    const row = this.st.stepLabel.get(id) as { label: string | null; risk: string | null } | undefined;
     if (!row) return;
     const label = patch.label !== undefined ? patch.label : row.label;
     const risk = patch.risk !== undefined ? JSON.stringify(patch.risk) : row.risk;
-    db.prepare(`UPDATE steps SET label = ?, risk = ? WHERE id = ?`).run(label ?? null, risk ?? null, id);
+    this.st.updateLabel.run(label ?? null, risk ?? null, id);
     this.gateway.broadcast({ type: "step-update", id, label: patch.label, risk: patch.risk });
   }
 
   /** Most recent steps of kind edit/tool_call/prompt with no label yet — for the reader's (B) backfill. */
   unlabeledSteps(limit: number): Step[] {
-    const rows = this.dbs.db
-      .prepare(`SELECT * FROM steps WHERE kind IN ('edit','tool_call','prompt') AND label IS NULL ORDER BY ts DESC LIMIT ?`)
-      .all(limit);
-    return rows.map((r) => this.rowToStep(r));
+    return this.st.unlabeled.all(limit).map((r) => this.rowToStep(r));
   }
 }
 

@@ -106,6 +106,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 - 23:55 (4 Oct) [lead] Thread panel, simpler: clicking a thread opens its steps right away, at the end (a running one follows live). The summary card is gone: its numbers (changed, read, steps, time) are the line above the sidebar, and the footer pill holds Replay (Follow live / Live for a running thread) and Share. Your messages are chat bubbles, the agent's work the thin line of colored moments under each. The open thread gets most of the sidebar's height.
 - 00:56 (5 Oct) [lead] Planning only, nothing built: `docs/todo.md` lists the work to bring Brainstorm into the Claude Code workflow (more hooks, follow-me, end-of-turn recap, needs-you board, notifications) and the bigger features after it (claim check, approve and steer, rewind, runtime errors, MCP).
 
+- 00:05 (5 Oct) [step-panel] Step panel content, readable (`feature/step-panel`): commands as a terminal (one step per line, flags and strings colored, inline scripts as their own block, "Failed · exit code N"), reads as numbered code, each browser action as a row with its result and the screenshots, searches as links, JSON anywhere as a collapsible tree, other tools' inputs as labelled fields, agent instructions and messages as Markdown. Smaller title (17 px, 3 lines), no close button (click outside, Esc).
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

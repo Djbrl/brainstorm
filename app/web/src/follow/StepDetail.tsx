@@ -5,8 +5,9 @@ import type { Step } from "@contract";
 import { AskBox } from "../ask/AskBox";
 import { Markdown } from "../ask/Markdown";
 import { useNav } from "../lib/nav";
-import { CloseIcon, FileIcon, Glyph, RiskIcon } from "./Glyph";
-import { basename, clockTime, displayLabel, resultText, stepFile, toolName, unwrapPastes } from "./format";
+import { FileIcon, Glyph, RiskIcon } from "./Glyph";
+import { ToolView } from "./content/ToolView";
+import { basename, clockTime, displayLabel, stepFile, toolName, unwrapPastes } from "./format";
 
 const BIG_DIFF = 400; // lines; above this the diff starts collapsed
 
@@ -74,32 +75,8 @@ function EditBody({ step }: { step: Step }) {
   );
 }
 
-function ToolBody({ step, result }: { step: Step; result?: Step }) {
-  const i = inputOf(step);
-  const command = typeof i.command === "string" ? i.command : null;
-  const out = result ? resultText(result) : "";
-  const [full, setFull] = useState(false);
-  useEffect(() => setFull(false), [step.id]);
-  const shown = full || out.length <= 2400 ? out : `${out.slice(0, 2400)}…`;
-  return (
-    <>
-      {command ? (
-        <pre className="sd-code sd-shell"><span className="prompt">$</span> {command}</pre>
-      ) : step.input != null ? (
-        <pre className="sd-code">{typeof step.input === "string" ? step.input : JSON.stringify(step.input, null, 2)}</pre>
-      ) : null}
-      {out.trim() && (
-        <div className="sd-output">
-          <div className="sd-subhead">Output</div>
-          <pre className="sd-code sd-out">{shown}</pre>
-          {out.length > 2400 && !full && <button className="sd-link" onClick={() => setFull(true)}>Show all output</button>}
-        </div>
-      )}
-    </>
-  );
-}
-
-export function StepDetail({ step, result, onClose }: { step: Step; result?: Step; onClose: () => void }) {
+/** One step in full. No close button: a click outside the panel, Esc or Back closes it (see StepPanel). */
+export function StepDetail({ step, result }: { step: Step; result?: Step; onClose?: () => void }) {
   const { openFile } = useNav();
   const file = stepFile(step);
   const label = displayLabel(step);
@@ -108,10 +85,9 @@ export function StepDetail({ step, result, onClose }: { step: Step; result?: Ste
     <aside className="sd" key={step.id}>
       <div className="sd-scroll">
         <header className="sd-head">
-          <div className={`sd-glyph k-${step.kind}`}><Glyph kind={step.kind} tool={step.tool} size={18} /></div>
-          <button className="sd-close" onClick={onClose} aria-label="Close"><CloseIcon /></button>
+          <div className={`sd-glyph k-${step.kind}`}><Glyph kind={step.kind} tool={step.tool} size={14} /></div>
+          <h2 className="sd-title" title={label}>{step.kind === "prompt" ? "Your prompt" : label}</h2>
         </header>
-        <h2 className="sd-title">{step.kind === "prompt" ? "Your prompt" : label}</h2>
         <div className="sd-meta">
           <span>{clockTime(step.ts)}</span>
           {step.tool && step.kind !== "edit" && <><span className="sep">·</span><span>{toolName(step.tool)}</span></>}
@@ -128,7 +104,7 @@ export function StepDetail({ step, result, onClose }: { step: Step; result?: Ste
 
         <div className="sd-body">
           {step.kind === "edit" ? <EditBody step={step} />
-            : step.kind === "tool_call" ? <ToolBody step={step} result={result} />
+            : step.kind === "tool_call" ? <ToolView step={step} result={result} />
             : step.text ? <div className={`sd-text ${step.kind === "thinking" ? "thinking" : ""}`}><Markdown text={unwrapPastes(step.text)} /></div>
             : null}
         </div>

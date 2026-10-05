@@ -163,6 +163,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 22:50 (5 Oct) [map] With a thread open, the files outside its focus show at 30% instead of 15%, and folders dim half as much as files (the lay of the land stays readable). An image an agent reads (png, jpg, gif, webp, bmp) now shows in the step panel and the file window: Claude Code passes the picture itself to the model, and the server already keeps those like screenshots (`shots/`), loaded only when shown.
 
+- 23:40 (5 Oct) [viewers] Code is colour-coded in the step panel and the file window (reads, written files, diffs), in every theme: light themes in GitHub light, PS2 and Dead Space in a dark palette. Same grammars as the diff viewer (refractor, already in the app): its core and each language's grammar load the first time that language is shown, only the lines on show are coloured, nothing new to install. Diffs in the step panel now have a dark mode too. HTML files read from their top, or written whole, open as the page (Page | Code): a sandboxed frame with no permissions (no scripts, forms, popups or navigation) and a page policy that refuses every request but inline styles and embedded images, scaled from a 1280 px layout to the panel; checked that the landing page's preview contacts no host but the app (its font link is refused).
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

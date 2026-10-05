@@ -7,6 +7,7 @@ import { Markdown } from "../ask/Markdown";
 import { useNav } from "../lib/nav";
 import { FileIcon, Glyph, RiskIcon } from "./Glyph";
 import { ToolView } from "./content/ToolView";
+import { HtmlPreview, isHtml, PAGE_MARKUP, ViewSwitch } from "./content/HtmlPreview";
 import { basename, displayLabel, stepFile, timeIn, toolName, unwrapPastes } from "./format";
 
 const BIG_DIFF = 400; // lines; above this the diff starts collapsed
@@ -17,8 +18,29 @@ const RISK_LEVEL: Record<string, "high" | "mid"> = {
   "touches auth": "mid", "touches payment": "mid", "large deletion": "mid",
 };
 
+/** The dark themes' diff colours (PS2, Dead Space): tints over the panel, the theme's own ink. */
+const darkDiff = {
+  diffViewerBackground: "transparent",
+  diffViewerColor: "var(--ink)",
+  addedBackground: "rgba(52,199,89,.14)",
+  addedColor: "var(--ink)",
+  removedBackground: "rgba(255,69,58,.14)",
+  removedColor: "var(--ink)",
+  wordAddedBackground: "rgba(52,199,89,.34)",
+  wordRemovedBackground: "rgba(255,69,58,.34)",
+  addedGutterBackground: "rgba(52,199,89,.2)",
+  removedGutterBackground: "rgba(255,69,58,.2)",
+  gutterBackground: "transparent",
+  gutterColor: "var(--ink-3)",
+  codeFoldGutterBackground: "var(--hover)",
+  codeFoldBackground: "var(--hover)",
+  codeFoldContentColor: "var(--ink-3)",
+  emptyLineBackground: "transparent",
+};
+
 export const diffStyles = {
   variables: {
+    dark: darkDiff,
     light: {
       diffViewerBackground: "#ffffff",
       diffViewerColor: "#1d1d1f",
@@ -68,14 +90,17 @@ function EditBody({ step }: { step: Step }) {
   const lines = pair ? pair.before.split("\n").length + pair.after.split("\n").length : 0;
   const [open, setOpen] = useState(lines <= BIG_DIFF);
   useEffect(() => setOpen(lines <= BIG_DIFF), [step.id, lines]);
+  // A whole HTML file written: shown as the page first, the lines it wrote a click away.
+  const page = !!pair && !pair.before && isHtml(step.filePath) && PAGE_MARKUP.test(pair.after);
+  const [view, setView] = useState<"page" | "code">("page");
   if (!pair) return <p className="sd-muted">No diff recorded for this edit.</p>;
   const added = pair.after ? pair.after.split("\n").length : 0;
   const removed = pair.before ? pair.before.split("\n").length : 0;
   return (
     <div className="sd-diff">
-      <div className="sd-diffstat"><span className="add">+{added}</span><span className="del">−{removed}</span></div>
-      {open ? (
-        <div className="sd-diff-scroll"><Diff oldValue={pair.before} newValue={pair.after} splitView={false} showDiffOnly extraLinesSurroundingDiff={2} hideSummary styles={diffStyles} /></div>
+      <div className="sd-diffstat"><span className="add">+{added}</span><span className="del">−{removed}</span>{page && <ViewSwitch view={view} onView={setView} />}</div>
+      {page && view === "page" ? <HtmlPreview html={pair.after} /> : open ? (
+        <div className="sd-diff-scroll"><Diff oldValue={pair.before} newValue={pair.after} splitView={false} showDiffOnly extraLinesSurroundingDiff={2} hideSummary styles={diffStyles} path={step.filePath} /></div>
       ) : (
         <button className="sd-expand" onClick={() => setOpen(true)}>Large change, {lines} lines. Show the diff</button>
       )}

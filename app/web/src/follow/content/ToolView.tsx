@@ -1,11 +1,13 @@
 // The body of a tool step in the step panel, shaped per tool: a terminal for commands, numbered code for
 // reads, one row per browser action with its screenshots, links for searches, and fields or a JSON tree for the rest.
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Step } from "@contract";
 import { Markdown } from "../../ask/Markdown";
 import { useNav } from "../../lib/nav";
+import { highlightLines, langOf, renderPieces, useGrammar, usePalette } from "../../lib/highlight";
 import { basename, displayLabel } from "../format";
 import { JsonView } from "./JsonView";
+import { HtmlPreview, isHtml, PAGE_MARKUP, ViewSwitch } from "./HtmlPreview";
 import { cleanResult, formatCommand, hostOf, humanKey, parseJson, parseNumbered, parseSearch, parseShell, splitBatch, splitTabContext, type Tab } from "./parse";
 import "./content.css";
 
@@ -126,15 +128,23 @@ function Terminal({ input, result, title }: { input: Input; result?: Step; title
 // ---------- files and searches ----------
 
 /** Numbered lines (a read, a new file), the first 80 with a button for the rest. */
-export function Code({ start, lines }: { start: number; lines: string[] }) {
+/**
+ * Numbered lines of a file, colour-coded by its language (`path`'s extension: lib/highlight.ts) once the grammar is in;
+ * the first 80, or all of them on request. Very long files stay plain.
+ */
+export function Code({ start, lines, path }: { start: number; lines: string[]; path?: string }) {
   const [all, setAll] = useState(false);
   const max = 80;
-  const shown = all ? lines : lines.slice(0, max);
+  const shown = useMemo(() => (all ? lines : lines.slice(0, max)), [all, lines]);
   const width = String(start + lines.length).length;
+  const lang = shown.length <= 3000 ? langOf(path) : undefined;
+  const hasGrammar = useGrammar(lang);
+  const { palette } = usePalette();
+  const coloured = useMemo(() => (hasGrammar ? highlightLines(shown.join("\n"), lang) : null), [hasGrammar, shown, lang]);
   return (
     <>
       <pre className="cv-code cv-numbered" style={{ ["--gutter" as string]: `${width + 1}ch` }}>
-        {shown.map((l, i) => <div key={i}><span className="cv-ln">{start + i}</span>{l || " "}</div>)}
+        {shown.map((l, i) => <div key={i}><span className="cv-ln">{start + i}</span>{coloured?.[i]?.length ? renderPieces(coloured[i], palette) : l || " "}</div>)}
       </pre>
       {!all && lines.length > max && <button className="cv-more" onClick={() => setAll(true)}>Show all {lines.length} lines</button>}
     </>
@@ -148,10 +158,15 @@ function ReadView({ input, result }: { input: Input; result?: Step }) {
   const numbered = parseNumbered(text);
   const offset = Number(input.offset) || 0, limit = Number(input.limit) || 0;
   const range = numbered ? `Lines ${numbered.start}–${numbered.start + numbered.lines.length - 1}` : offset || limit ? `From line ${offset || 1}` : null;
+  // An HTML file read from its top (a page, not a stretch of its CSS): shown as the page first, its code a click away.
+  const page = isHtml(path) && !!numbered && numbered.start === 1 && PAGE_MARKUP.test(text);
+  const [view, setView] = useState<"page" | "code">("page");
   return (
-    <Block title={<button className="cv-file" onClick={() => openFile(path)} title={`${path}\nShow on the map`}>{basename(path)}</button>} aside={range}>
+    <Block title={<button className="cv-file" onClick={() => openFile(path)} title={`${path}\nShow on the map`}>{basename(path)}</button>}
+      aside={page ? <ViewSwitch view={view} onView={setView} /> : range}>
       {!result ? <p className="cv-muted">Reading…</p>
-        : numbered ? <Code start={numbered.start} lines={numbered.lines} />
+        : page && view === "page" ? <HtmlPreview html={numbered!.lines.join("\n")} />
+        : numbered ? <Code start={numbered.start} lines={numbered.lines} path={path} />
         : text ? <Clip text={text} className="cv-code" />
         : IMAGE.test(path) ? <Shots resultId={result.id} label="Image" />
         : <p className="cv-muted">Empty file.</p>}

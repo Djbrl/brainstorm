@@ -76,25 +76,7 @@ function folderOf(path: string, roots: string): string {
   return dir.length > 3 ? `…/${dir.slice(-3).join("/")}` : dir.join("/");
 }
 
-const darkDiff = {
-  diffViewerBackground: "transparent",
-  diffViewerColor: "var(--ink)",
-  addedBackground: "rgba(52,199,89,.14)",
-  addedColor: "var(--ink)",
-  removedBackground: "rgba(255,69,58,.14)",
-  removedColor: "var(--ink)",
-  wordAddedBackground: "rgba(52,199,89,.34)",
-  wordRemovedBackground: "rgba(255,69,58,.34)",
-  addedGutterBackground: "rgba(52,199,89,.2)",
-  removedGutterBackground: "rgba(255,69,58,.2)",
-  gutterBackground: "transparent",
-  gutterColor: "var(--ink-3)",
-  codeFoldGutterBackground: "var(--hover)",
-  codeFoldBackground: "var(--hover)",
-  codeFoldContentColor: "var(--ink-3)",
-  emptyLineBackground: "transparent",
-};
-const peekStyles = { ...diffStyles, variables: { ...diffStyles.variables, dark: darkDiff } };
+const peekStyles = diffStyles;
 
 const lines = (t: string) => (t ? t.split("\n") : []);
 
@@ -105,19 +87,19 @@ function Body({ step, result }: { step: Step; result?: Step }) {
   if (step.kind === "edit") {
     if (!pair) return <p className="peek-muted">No change recorded for this edit.</p>;
     const big = lines(pair.before).length + lines(pair.after).length > BIG;
-    if (!pair.before || big) return <Code key={step.id} start={1} lines={lines(pair.after)} />;
+    if (!pair.before || big) return <Code key={step.id} start={1} lines={lines(pair.after)} path={step.filePath} />;
     return (
       <div className="sd-diff">
         <Diff oldValue={pair.before} newValue={pair.after} splitView={false} showDiffOnly extraLinesSurroundingDiff={2} hideSummary
-          useDarkTheme={dark} styles={peekStyles} />
+          useDarkTheme={dark} styles={peekStyles} path={step.filePath} />
       </div>
     );
   }
   if (!result) return <p className="peek-muted">Reading…</p>;
   const text = cleanResult(result.text ?? "");
   const numbered = parseNumbered(text);
-  if (numbered) return <Code key={step.id} start={numbered.start} lines={numbered.lines} />;
-  if (text) return <Code key={step.id} start={1} lines={lines(text)} />;
+  if (numbered) return <Code key={step.id} start={numbered.start} lines={numbered.lines} path={step.filePath} />;
+  if (text) return <Code key={step.id} start={1} lines={lines(text)} path={step.filePath} />;
   // An image or a PDF comes back as a picture for the model, not text: nothing to show here, but it isn't empty.
   if (IMAGE.test(step.filePath ?? "")) return <div className="peek-image"><Shots key={result.id} resultId={result.id} label="Image" /></div>;
   return <p className="peek-muted">{/\.pdf$/i.test(step.filePath ?? "") ? "A PDF: open the step to see what was read." : "Empty file."}</p>;

@@ -40,3 +40,9 @@
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) .sd-risk { background: var(--hover); color: var(--ink-2); }
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) .sd-risk.mid { background: rgba(255,184,77,.15); color: #ffcf7a; }
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) .sd-risk.high { background: rgba(255,105,97,.16); color: #ffaba5; }
+
+/* An HTML file written whole: the Page | Code switch at the right of the stats, the page under them. */
+.sd-diffstat .cv-switch { margin-left: auto; font-family: var(--font-body); }
+.sd-diff > .cv-html { padding: 12px 14px; }
+/* The dark themes: the diff's stats bar on the panel, not a white strip. */
+:root:is([data-theme="ps2"], [data-theme="deadspace"]) .sd-diffstat { background: rgba(0,0,0,.22); }

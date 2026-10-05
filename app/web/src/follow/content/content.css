@@ -148,3 +148,10 @@
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) .cv-page:hover { border-color: var(--ink-3); }
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) .cv-shots img { background: var(--hover); }
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) .cv-todos .box { border-color: var(--ink-3); }
+
+/* An HTML file shown as a page (HtmlPreview.tsx): a scaled-down desktop page in a quiet frame. */
+.cv-html-frame { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.cv-html-frame iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: 0 0; background: #fff; }
+.cv-switch { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--hover, rgba(0,0,0,.05)); }
+.cv-switch button { border: 0; background: none; font: 500 12px/1 var(--font-body); color: var(--ink-2); padding: 5px 9px; border-radius: 6px; cursor: pointer; }
+.cv-switch button.on { background: var(--sheet, #fff); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }

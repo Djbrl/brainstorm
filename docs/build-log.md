@@ -145,6 +145,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 15:05 (5 Oct) [map-quiet] Less ink on the map. Import lines show only around the file under the pointer or the selected one (they were a grey haze nobody read); Metro keeps its lines, they are the theme. The tracer draws only the recent window (the "On the map, show" setting, or the last 25 moments for the whole thread), each segment fading out over its last 3 moments in it; the faint path through the whole history is gone (the Track tab has it), along with its 16-layer cache.
 
+- 16:40 (5 Oct) [map-fold] Folders fold on the map (`map/fold.ts`). The biggest folders open first until the map shows about 70 circles; the rest show as one circle each, named inside with how many files it holds ("map · 37 files"), in its files' latest colour. A folder's circle takes the room its files would, where they would sit, so opening it bursts it into its files in place and the rest of the map barely moves. Click a circle to open it; "Fold folders" (beside the fit button) folds back what you opened. The file you select, the files an open thread shows (its recent window, or all of it) and the file a followed agent works on open their folders, and keep them open until the thread closes or you stop following. Imports, the tracer, agents and footprints land on a folded file's circle. Settings, "Group files into folders" turns it off. This repo: 228 files → about 50 circles. Also (`[map-names]`): file names are drawn from cached pictures and measured at their size on screen: zooming in no longer drops frames (`strokeText` was 78% of the work; 4× CPU: 11–17 → 30 fps, headless Chrome's cap).
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

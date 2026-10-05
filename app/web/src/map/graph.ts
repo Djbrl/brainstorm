@@ -6,10 +6,13 @@ import type { Edge, FileNode, ProjectMap } from "@contract";
 import type { Look } from "./replay/layer";
 import type { StampMemo } from "./sprites";
 import type { Positions } from "./positions";
-import { mapStyle, reachOf, type RGB } from "./themes";
+import { mapStyle, reachOf, type MapStyle, type RGB } from "./themes";
+import type { Fold, FoldFile } from "./fold";
 
 export type GNode = NodeObject & {
   id: string; file: FileNode; r: number; ax: number; ay: number;
+  /** A folded folder's circle (fold.ts): what it holds. */
+  fold?: Fold;
   // Kept per file between frames (perf-canvas): its colour, its focus look this frame, its cube's turn.
   cAt?: string; cEp?: number; c?: RGB; css?: string;
   lf?: number; lk?: Look | null;
@@ -18,6 +21,12 @@ export type GNode = NodeObject & {
 export type GLink = { source: GNode; target: GNode };
 
 export const radius = (lines: number) => Math.min(22, 3.5 + Math.sqrt(Math.max(0, lines)) * 0.55);
+/** The room a file takes in the layout: its reach in the theme plus air, squared (an area, give or take π). */
+const roomOf = (f: FileNode, st: MapStyle) => (reachOf(radius(f.lines), false, st) + AIR) ** 2;
+/** A folded folder's circle takes the room its files would: opening it doesn't push the rest of the map around. */
+const foldRadius = (fold: Fold, st: MapStyle) => Math.max(6, Math.sqrt(fold.files.reduce((s, f) => s + roomOf(f, st), 0)) - AIR);
+/** How far a circle reaches on the canvas: a file as its theme draws it, a folder's circle as it is. */
+export const nodeReach = (n: GNode, st?: MapStyle) => (n.fold ? n.r : reachOf(n.r, !!n.file.activeSessionId, st));
 
 // ---------- layout: room for every file ----------
 export const AIR = 8;          // clear space around each file's mark, past its reach (graph units): neighbours sit 2×AIR apart
@@ -92,22 +101,24 @@ function sameEdges(a: Edge[], b: Edge[]) {
  * of it or among its folder's files: the layout only needs a gentle push. On first load, the positions saved last time
  * (positions.ts) put every file back where it was.
  */
-export function useGraph(map: ProjectMap | null, theme: string, saved: { pos: Positions; sameTheme: boolean } | null | undefined, structureVersion?: number) {
+export function useGraph(map: ProjectMap | null, theme: string, saved: { pos: Positions; sameTheme: boolean } | null | undefined, structureVersion?: number | string) {
   const nodesRef = useRef(new Map<string, GNode>());
-  const lastRef = useRef<{ root: string; files: FileNode[]; edges: Edge[]; theme: string; sv?: number; graph: Graph; discs: Map<string, number> } | null>(null);
+  const lastRef = useRef<{ root: string; files: FileNode[]; edges: Edge[]; theme: string; sv?: number | string; graph: Graph; discs: Map<string, number> } | null>(null);
   return useMemo(() => {
     if (!map || saved === undefined) return EMPTY;   // saved positions still loading (a moment at most)
     const last = lastRef.current;
     const sameRoot = last?.root === map.root;
+    const st = mapStyle();
+    const shape = (n: GNode, f: FoldFile) => { n.file = f; n.fold = f.fold; n.r = f.fold ? foldRadius(f.fold, st) : radius(f.lines); };
     if (last && sameRoot && last.theme === theme && ((structureVersion !== undefined && structureVersion === last.sv) || (sameFiles(last.files, map.files) && sameEdges(last.edges, map.edges)))) {
-      for (const f of map.files) { const n = nodesRef.current.get(f.path); if (n) { n.file = f; n.r = radius(f.lines); } }
+      for (const f of map.files) { const n = nodesRef.current.get(f.path); if (n) shape(n, f); }
       last.files = map.files; last.edges = map.edges; last.sv = structureVersion;
       return last.graph;
     }
     // Module anchors, sized by the room each folder's files take once none covers another: the subfolders of one folder
     // packed around the biggest (so "app/server" sits next to "app/web"), then the top-level folders packed the same way.
-    const st = mapStyle(), room = new Map<string, number>();
-    for (const f of map.files) room.set(f.module, (room.get(f.module) ?? 0) + (reachOf(radius(f.lines), false, st) + AIR) ** 2);
+    const room = new Map<string, number>();
+    for (const f of map.files as FoldFile[]) room.set(f.module, (room.get(f.module) ?? 0) + (f.fold ? f.fold.files.reduce((s, c) => s + roomOf(c, st), 0) : roomOf(f, st)));
     const disc = (m: string) => Math.sqrt((room.get(m) ?? 0) / PACKED);
     const discs = new Map([...room.keys()].map((m) => [m, disc(m)]));
     // Same folders, each within 15% of its size: they keep their places (a repack would move every folder for one file).
@@ -130,9 +141,9 @@ export function useGraph(map: ProjectMap | null, theme: string, saved: { pos: Po
     const prev = sameRoot ? nodesRef.current : new Map<string, GNode>();
     const next = new Map<string, GNode>();
     const restore = prev.size === 0 && saved ? saved : null;
-    let fresh = 0, restored = 0;
+    let fresh = 0, restored = 0, unfolded = 0;
     const placeLater: GNode[] = [];
-    const nodes = map.files.map((f) => {
+    const nodes = (map.files as FoldFile[]).map((f) => {
       const an = anchors.get(f.module) ?? { x: 0, y: 0 };
       let n = prev.get(f.path);
       if (!n) {
@@ -141,10 +152,31 @@ export function useGraph(map: ProjectMap | null, theme: string, saved: { pos: Po
         if (at) { n.x = at.x; n.y = at.y; restored++; }
         else { fresh++; placeLater.push(n); }
       }
-      n.file = f; n.r = radius(f.lines); n.ax = an.x; n.ay = an.y;
+      shape(n, f); n.ax = an.x; n.ay = an.y;
       next.set(f.path, n);
       return n;
     });
+    // A folder opened or folded (fold.ts): its files burst out of its circle, or its circle forms where its files were.
+    if (placeLater.length && prev.size) {
+      const born = (n: GNode) => {
+        if (n.fold) {
+          let x = 0, y = 0, k = 0;
+          for (const [id, o] of prev) if (id.startsWith(n.id) && o.x !== undefined && o.y !== undefined) { x += o.x; y += o.y; k++; }
+          if (k) { n.x = x / k; n.y = y / k; }
+          if (k) return true;
+        }
+        for (let cut = n.id.lastIndexOf("/", n.id.length - 2); cut > 0; cut = n.id.lastIndexOf("/", cut - 1)) {
+          const o = prev.get(n.id.slice(0, cut + 1));
+          if (o?.fold && o.x !== undefined && o.y !== undefined) {
+            const a = Math.random() * 2 * Math.PI, d = Math.sqrt(Math.random()) * Math.max(0, o.r - n.r);
+            n.x = o.x + Math.cos(a) * d; n.y = o.y + Math.sin(a) * d;
+            return true;
+          }
+        }
+        return false;
+      };
+      for (let i = placeLater.length - 1; i >= 0; i--) if (born(placeLater[i])) { placeLater.splice(i, 1); unfolded++; }
+    }
     // New files: by a file they import or that imports them (in their own folder first), else among their folder's
     // files, else at the folder's anchor. Random only within their own room.
     if (placeLater.length) {
@@ -159,7 +191,7 @@ export function useGraph(map: ProjectMap | null, theme: string, saved: { pos: Po
         c.x += n.x; c.y += n.y; c.n++; centre.set(n.file.module, c);
       }
       for (const n of placeLater) {
-        const jit = reachOf(n.r, false, st) + AIR;
+        const jit = nodeReach(n, st) + AIR;
         const nb = (near.get(n.id) ?? []).map((id) => next.get(id)).filter((o): o is GNode => !!o && o.x !== undefined)
           .sort((a, b) => Number(b.file.module === n.file.module) - Number(a.file.module === n.file.module))[0];
         const c = centre.get(n.file.module);
@@ -177,6 +209,7 @@ export function useGraph(map: ProjectMap | null, theme: string, saved: { pos: Po
     let heat = 1;
     if (!last || !sameRoot || prev.size === 0) heat = restore ? (restored / total >= 0.95 && restore.sameTheme ? 0.02 : restored / total >= 0.5 ? 0.1 : 1) : 1;
     else if (last.theme !== theme) heat = 1;
+    else if (unfolded && unfolded === fresh) heat = 0.15;   // a folder opened or folded: its files settle in its room
     else heat = fresh / total > 0.3 ? 1 : fresh || prev.size !== next.size ? 0.1 : 0.05;
     const graph: Graph = { nodes, links, anchors, heat, data: { nodes, links: NO_LINKS }, id: ++graphIds };
     lastRef.current = { root: map.root, files: map.files, edges: map.edges, theme, sv: structureVersion, graph, discs };
@@ -223,7 +256,7 @@ function linkForce(links: { current: GLink[] }, heat: HeatRef) {
     dist = new Float64Array(ls.length); str = new Float64Array(ls.length); bias = new Float64Array(ls.length);
     ls.forEach((l, i) => {
       const s = l.source, t = l.target, inside = s.file?.module === t.file?.module;
-      dist[i] = inside ? reachOf(s.r) + reachOf(t.r) + 2 * AIR + 8 : 110;
+      dist[i] = inside ? nodeReach(s) + nodeReach(t) + 2 * AIR + 8 : 110;
       str[i] = inside ? 0.2 : 0.03;
       const cs = count.get(s) ?? 1, ct = count.get(t) ?? 1;
       bias[i] = cs / (cs + ct);
@@ -249,7 +282,7 @@ function collideForce(strength = 0.8) {
     const st = mapStyle();
     let max = 1;
     for (let i = 0; i < n; i++) {
-      const a = nodes[i], r = reachOf(a.r, !!a.file.activeSessionId, st) + AIR;
+      const a = nodes[i], r = nodeReach(a, st) + AIR;
       rs[i] = r; if (r > max) max = r;
       px[i] = (a.x ?? 0) + (a.vx ?? 0); py[i] = (a.y ?? 0) + (a.vy ?? 0);
     }

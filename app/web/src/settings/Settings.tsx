@@ -4,6 +4,7 @@ import { useNotifyPref } from "../lib/attention";
 import { isReplay } from "../lib/live";
 import { setTheme, THEMES, useTheme } from "../lib/theme";
 import { setStepWindow, STEP_WINDOWS, useStepWindow } from "../map/prefs";
+import { setFoldOn, useFoldOn } from "../map/fold";
 import "./settings.css";
 
 export function SettingsButton() {
@@ -36,6 +37,7 @@ export function SettingsButton() {
             ))}
           </div>
           <WindowSetting />
+          <FoldSetting />
           <NotifySetting />
         </div>
       )}
@@ -56,6 +58,20 @@ function WindowSetting() {
           </button>
         ))}
       </div>
+    </>
+  );
+}
+
+/** Folders as one circle until opened (map/fold.ts). */
+function FoldSetting() {
+  const on = useFoldOn();
+  return (
+    <>
+      <h3>Folders</h3>
+      <label className="notify-opt">
+        <input type="checkbox" checked={on} onChange={() => setFoldOn(!on)} />
+        <span><b>Group files into folders</b><small>Big folders show as one circle until you click it, or an agent you follow works in it</small></span>
+      </label>
     </>
   );
 }

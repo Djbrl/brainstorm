@@ -187,6 +187,7 @@ export function drawFile(ctx: CanvasRenderingContext2D, n: GNode, scale: number,
   // Off screen (with room for a glow, a ripple and a name): nothing to draw.
   const m = 3.7 * r + 34 / scale;
   if (x + m < F.x0 || x - m > F.x1 || y + m < F.y0 || y - m > F.y1) return;
+  if (n.fold) { drawFolder(ctx, n, scale, F, c); return; }
   const tokens = F.tokens, st = F.st, t = F.t;
   const active = !!n.file.activeSessionId;
   const isSel = n.id === F.sel, isHover = n.id === F.hover;
@@ -284,6 +285,60 @@ export function drawFile(ctx: CanvasRenderingContext2D, n: GNode, scale: number,
   }
 }
 
+/** Under this size on screen (radius, px) a folder's circle is named below it, like a file; above, inside it. */
+const FOLDER_TEXT_PX = 15;
+
+/**
+ * A folded folder (fold.ts): a soft disc in its files' latest colour, ringed, with its name and how many files it
+ * holds inside. Every theme draws it the same way: it reads as a group, not as one more file. A click opens it.
+ */
+function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: Frame, c: Caches) {
+  const x = n.x!, y = n.y!, r = n.r, tokens = F.tokens, st = F.st;
+  const active = !!n.file.activeSessionId, isSel = n.id === F.sel, isHover = n.id === F.hover;
+  const look = lookOf(n, F);
+  if (look) { F.anyLook = true; F.lookSum += look.alpha * 3 + look.tone; }
+  const alpha = look?.alpha ?? 1;
+  const own = ownColour(n, F);
+  let rgbCss = own.css!;
+  if (look && look.tone >= 1) rgbCss = focusColour(look.edited, F, c.focusColours).css;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, TAU);
+  ctx.globalAlpha = alpha * (isHover ? 0.24 : 0.16); ctx.fillStyle = rgbCss; ctx.fill();
+  ctx.globalAlpha = alpha * (isHover || isSel ? 0.9 : 0.5);
+  ctx.lineWidth = (isHover || isSel ? 1.8 : 1.2) / scale;
+  ctx.strokeStyle = active ? tokens.accent : isHover || isSel ? tokens.ink : rgbCss;
+  ctx.stroke();
+  if (active) { ctx.beginPath(); ctx.arc(x, y, r + 3.5 / scale, 0, TAU); ctx.globalAlpha = 0.9 * alpha; ctx.lineWidth = 1.6 / scale; ctx.strokeStyle = tokens.accent; ctx.stroke(); }
+  ctx.globalAlpha = 1;
+  const px = r * scale, count = n.fold!.files.length;
+  if (px < FOLDER_TEXT_PX) {
+    // Small on screen: named below, like a file (drawn in the label pass).
+    if (isSel || isHover || px > 6 || active) { F.labN.push(n); F.labP.push((isHover ? 4e6 : 0) + (active ? 1e6 : 0) + 7e5 + r); }
+    return;
+  }
+  const name = folderName(n), family = st.labelFont ?? tokens.body, size = Math.min(22, Math.max(11, px * 0.2));
+  screenText(ctx, name, x, y, size, 650, family, st.fileInk, alpha * (isHover || active ? 1 : 0.85), -0.15 * size);
+  if (px > 34) screenText(ctx, count === 1 ? "1 file" : `${count} files`, x, y, Math.max(11, size * 0.62), 500, family, st.fileInkQuiet, alpha * 0.9, 0.85 * size);
+}
+/** A folder's name: its last folder, or two when the last alone says little ("src", "lib"). */
+const folderName = (n: GNode) => {
+  const segs = n.fold!.rel.split("/"), last = segs[segs.length - 1];
+  return segs.length > 1 && /^(src|lib|test|tests|app|components|utils|internal|pkg)$/.test(last) ? segs.slice(-2).join("/") : last;
+};
+/**
+ * Text at a size on screen, at a graph point (its middle `dy` screen pixels down), set in device pixels: small text
+ * drawn at a tiny size and scaled up comes out spaced wrong with system fonts.
+ */
+function screenText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, px: number, weight: number, family: string, color: string, alpha: number, dy = 0) {
+  const m = ctx.getTransform(), dpr = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.font = `${weight} ${px * dpr}px ${family}`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.globalAlpha = alpha; ctx.fillStyle = color;
+  ctx.fillText(text, Math.round(x * m.a + y * m.c + m.e), Math.round(x * m.b + y * m.d + m.f + dy * dpr));
+  ctx.restore();
+}
+
 /** A queued file's label, built in full (only for the ones that may be drawn this frame). */
 export function labelFor(n: GNode, prio: number, F: Frame): QueuedLabel {
   const st = F.st, tokens = F.tokens, scale = F.scale, r = n.r, x = n.x!, y = n.y!;
@@ -293,9 +348,9 @@ export function labelFor(n: GNode, prio: number, F: Frame): QueuedLabel {
   const forced = isSel || isHover || (active && !focusing);
   const fs = Math.max(11, Math.min(14, 11 + r * scale * 0.08)) / scale;
   // Clear of what the theme draws (a cube's corners, a plate's rim) and of the selection ring.
-  const ringR = Math.max(reachOf(r, active, st), isSel || isHover ? (st.node === "dot" ? r : r * 1.35 + 2 / scale) : 0);
+  const ringR = n.fold ? r : Math.max(reachOf(r, active, st), isSel || isHover ? (st.node === "dot" ? r : r * 1.35 + 2 / scale) : 0);
   return {
-    text: (n.bn ??= baseName(n.id)), x, y: y + ringR + 3 / scale, size: fs, scale, alpha: isSel || isHover ? 1 : inFocus ? Math.max(alpha, 0.8) : alpha,
+    text: (n.bn ??= n.fold ? folderName(n) : baseName(n.id)), x, y: y + ringR + 3 / scale, size: fs, scale, alpha: isSel || isHover ? 1 : inFocus ? Math.max(alpha, 0.8) : alpha,
     at: { id: n.id, x, y, r: ringR }, must: isSel || isHover,
     weight: isSel || (active && !focusing) ? 600 : 500, family: st.labelFont ?? tokens.body,
     ink: isSel || (active && !focusing) || isHover || (inFocus && look!.edited) ? st.fileInk : st.fileInkQuiet, halo: st.halo,

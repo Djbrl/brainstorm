@@ -120,6 +120,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
   - **Docs:** `CLAUDE.md` and `docs/README.md` rewritten for the repo as it is now; `app/README.md` marked as the hackathon briefing.
 - 02:55 (5 Oct) [review] Product discussion: the next big directions are sharing and live replays, and an experiments lab ([share-and-experiments.md](share-and-experiments.md)); the other ideas went into the roadmap's Fridge.
 
+- 03:10 (5 Oct) [review] Plugin 0.4.0: the step panel shaped per tool, "waiting for you" states with new background hooks (PermissionRequest, Notification, Stop, UserPromptSubmit), and the UX review work (Track as the thread view, the map camera, one wording for counts and times, consistent panels with file links, tablet and phone widths). Built and smoke-tested (health, app, deep links, hooks endpoint).
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

@@ -2,7 +2,7 @@
 
 A live map and replay of what your agents do: every session, every file and place they touch, what broke. Everything runs on your machine.
 
-Preview release (0.3). The full release is planned for late October 2026.
+Preview release (0.4). The full release is planned for late October 2026.
 
 - **Map:** your project's files as a graph, with what changed since you last looked. Each agent is a marker that moves to the file it's working on. Open a thread to see what it touched first, then its steps or its replay; a running one can be followed live.
 - **Places:** where the thread went outside the code: websites, your local apps, services like GitHub and Vercel, and what it changed there (pushes, deploys, sent forms). Click a place to read its step.
@@ -49,6 +49,7 @@ Summaries of files and labels written by a model are off in this release. They'l
 - Data: `~/.claude/plugins/data/brainstorm-brainstorm/` (a SQLite database, the server log, `server.json`, `notices.json`). Uninstalling the plugin deletes it.
 - Once a day, Brainstorm fetches its own version number from GitHub to tell you about updates. That request carries nothing about you or your code.
 - The server listens on `127.0.0.1` only (port 4747, or the next free one). It refuses requests addressed to other host names, and WebSocket connections from other websites.
+- To show when a thread is waiting for you, the plugin's hooks tell the local server when Claude Code asks for a permission, shows a notification, finishes a turn or gets a new message (the tool's name and input, never the conversation). They only talk to `127.0.0.1`.
 - Nothing else is sent anywhere, except your questions to Claude if you set a key. Sharing only saves files on your computer; you decide where they go.
 - A shared file contains the thread's prompts, messages, commands and code changes, and the project's file list. Before it's saved, secrets are masked again, email addresses are masked, and your home folder, account name and computer name are replaced. Screenshots are never included. Read it before you send it anywhere.
 
@@ -56,6 +57,7 @@ Summaries of files and labels written by a model are off in this release. They'l
 
 - `build/server.js` is the Brainstorm server (`app/server`) bundled into one file, and `build/web/` is the web app (`app/web`), which the server serves, and `build/share.html` is the same app in one file, which shared replays are poured into. Rebuild both from `app/` with `node scripts/build-plugin.mjs`, and commit `build/` with each release.
 - `scripts/launch.mjs` starts the server or reuses the running one, restarts it when the plugin version changed, and opens the browser. The `SessionStart` hook runs it through `scripts/hook.sh` (which checks for Node) with `--background`, where it prints at most one JSON `systemMessage` for the user: welcome, updated, update available, or Node too old.
+- The `PermissionRequest`, `Notification`, `Stop` and `UserPromptSubmit` hooks run `scripts/signal.mjs` in the background (async, they never slow a session): it posts the event to the running server's `/api/hooks`, which works out whether a thread needs you (see `docs/attention.md`).
 - Releasing: bump `version` in `.claude-plugin/plugin.json`, rebuild, commit, push. Users on a pinned version don't get new commits until the version changes.
 
 ## License

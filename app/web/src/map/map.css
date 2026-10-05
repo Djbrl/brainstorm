@@ -1,6 +1,23 @@
 /* Owner: D. Map view. Light, airy, one clean sheet on the right. */
 .map-wrap { position: relative; width: 100%; height: 100%; overflow: hidden; overflow: clip; background: var(--bg); }
 .map-wrap canvas { display: block; }
+/* The canvas fades out toward the top and bottom edges, under the floating chrome (the lens pill, the stats line, the
+   footer), so files and names never print through it; the camera's framing keeps them out of these bands (camera.ts). */
+.map-wrap { --fade-top: 84px; --fade-bottom: 64px; }
+.map-wrap .force-graph-container canvas {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, rgba(0,0,0,.4) calc(var(--fade-top) * .45), #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), rgba(0,0,0,.4) calc(100% - var(--fade-bottom) * .45), transparent);
+  mask-image: linear-gradient(to bottom, transparent, rgba(0,0,0,.4) calc(var(--fade-top) * .45), #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), rgba(0,0,0,.4) calc(100% - var(--fade-bottom) * .45), transparent);
+}
+@media (max-width: 600px) { .map-wrap { --fade-top: 104px; } }
+@media (max-width: 1100px) { .dock-legend-read { display: none !important; } } /* the footer keeps one row beside the fit button */
+/* Tablet: when the footer wraps (Lock camera on a second row), it keeps clear of the fit button in the corner. */
+@media (min-width: 601px) and (max-width: 1100px) { .map-wrap .dock { max-width: calc(100% - 150px); } }
+/* A side panel open beside the sidebar leaves the footer the gap between them: the legend steps out so the switches fit. */
+.map-wrap:has(.map-sidebar:not(.sidebar-overlay)):has(.map-panel.open) .dock-pill:has(.dock-reads) .dock-legend { display: none; } /* the pills and the stats line take two rows there */
+/* The stats line floats on the map: a frosted capsule in the backdrop's colour (no border, no shadow) keeps it
+   readable over a busy map in every theme, like the lens pill beside it, without a bar. */
+.map-wrap .map-stats { padding: 3px 12px; margin-left: -12px; border-radius: 999px;
+  background: color-mix(in srgb, var(--bg) 78%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
 
 .map-empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 10px; color: var(--ink-3); }
 .map-empty h2 { font-size: 34px; font-weight: 700; color: var(--ink); }

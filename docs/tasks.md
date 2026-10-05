@@ -4,20 +4,13 @@ Every agent session told as a task you can replay: the goal, a filmstrip of what
 
 Shipped in plugin 0.2 (29 Sep 2026), merged from `feature/tasks`. Local app only: the hosted demos have no Tasks API.
 
-## What you see (updated 28 Sep, evening)
+## What you see (updated 5 Oct)
 
-There is no separate Tasks tab anymore. A thread is picked once, and the Map tab shows it two ways, switched at the top: **Map** (where in the code it happened) and **Track** (the story, top to bottom).
+A thread opens on the map, and its steps sit next to it in the sidebar's **Track** tab (the sidebar's tabs: Threads, Track, Files). Scrolling the Track moves the tracer on the map; clicking a step opens it in the side panel. The dock has **Replay** for every thread (it plays from the start) and **Live** / **Follow live** for a running one. On the Places lens, the Track tab lists the thread's places instead.
 
-- **Sidebar, same on both:**
-  - Clicking a thread plays it. A running thread pulses blue and plays live, following its newest step; opening the Map picks the newest running thread by itself.
-  - The open thread's steps fill the sidebar. Clicking the open thread again, or × on the player, closes it. **Open in Follow** is on the player and opens Follow at the step you're on.
-  - Going to the newest step of a running thread (the end of the slider, or the bottom of the Track) follows it live again.
-- **Track:**
-  - One vertical line. Each stop is a stretch of work in one place (a file, a website, a command-line tool, a service), with an icon for what happened: made a file, edited, read, searched, ran, browsed, used a service.
-  - Going back to an earlier place is a compact "Back to …" row; three or more in a row fold into "Back and forth between …".
-  - Your requests are chapters. New files are square stops with their names.
-  - The window on the right stays in view and shows the stop you're on: the screenshot, the image or video it made, the code it wrote, or the command (FFmpeg explained). It also has Open in Follow and Show on map.
-- **Errors:** a failed tool call turns the agent's marker red with one red ring (live and in replay). It shows red in Follow with the first line of the error, as red ticks on the replay bar, and as red stops with the error text in the Track.
+The full-screen Track (one vertical line of stops with a window on the right: screenshots, images and video it made, code, commands) was a lens of its own from 28 Sep to 5 Oct. It hid the map, so it's no longer mounted; `/thread/<id>/track` links open the map. `tasks/TrackView.tsx` stays in the tree until its best parts (screenshots, made files) move into the sidebar's Track.
+
+- **Errors:** a failed tool call turns the agent's marker red with one red ring (live and in replay). It shows red in Follow with the first line of the error, as red ticks on the replay bar, and as red rows in the Track.
 
 ## How it works
 
@@ -35,7 +28,7 @@ There is no separate Tasks tab anymore. A thread is picked once, and the Map tab
   - `GET /api/tasks/:sessionId`: one task (`TaskDetail` in `types.ts`).
   - `GET /api/tasks/shot/:stepId/:idx`: a screenshot.
   - `GET /api/tasks/:sessionId/file?path=[&frame=1]`: a file the task made or used. `frame=1` returns a still of a video, made with FFmpeg if it's installed and cached in `data/previews`.
-- `app/web/src/tasks/`: `TrackView.tsx` and `track.css`. The Map | Track switch is `app/web/src/map/LensSwitch.tsx`.
+- `app/web/src/map/sidebar/TrackPanel.tsx` (the Track tab) shows `map/replay/ReplaySteps.tsx`, or `cowork/PlaceSteps.tsx` on Places. `app/web/src/tasks/TrackView.tsx` is the old full-screen Track, not mounted; `track.css` still styles the Map | Places switch (`map/LensSwitch.tsx`).
 
 ## Privacy
 

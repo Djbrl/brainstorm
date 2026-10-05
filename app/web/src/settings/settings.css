@@ -2,10 +2,8 @@
 .settings { position: relative; margin-right: 10px; }
 /* The header is its own layer (backdrop-filter): lift it above the banner and the map so the menu can open over them. */
 .topbar { position: relative; z-index: 30; }
-.settings-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); display: grid; place-items: center; padding: 0; }
-.settings-btn:hover, .settings-btn[aria-expanded="true"] { color: var(--ink); border-color: var(--ink-3); }
-.settings-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.settings-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+/* The settings button is a word, like "Change project" next to it (a gear was hard to read). */
+.settings-btn:hover, .settings-btn[aria-expanded="true"] { border-color: var(--ink-3); }
 
 .settings-pop { position: absolute; right: -8px; top: calc(100% + 10px); z-index: 50; width: 340px;
   background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px;
@@ -49,3 +47,15 @@
 .notify-opt span { display: grid; gap: 1px; }
 .notify-opt b { font-size: 13.5px; font-weight: 600; }
 .notify-opt small { font-size: 12px; color: var(--ink-3); line-height: 1.35; }
+.settings .settings-btn { margin-right: 0; }
+
+/* Open, the menu sits on a light veil over everything behind it (its own spread shadow, so no extra layer): a panel or
+   a chip under its edge reads as behind it instead of peeking out. A click on the veil closes it, as before. */
+.settings-pop { box-shadow: 0 24px 60px rgba(0,0,0,.18), 0 0 0 200vmax rgba(24,24,36,.12); }
+:root:is([data-theme="ps2"], [data-theme="deadspace"]) .settings-pop { box-shadow: 0 24px 60px rgba(0,0,0,.45), 0 0 0 200vmax rgba(0,0,0,.32); }
+.theme-list + h3 { margin-top: 18px; }
+/* "On the map, show": the same rows as the themes, text only, one line each. */
+.view-list { gap: 2px; }
+.view-opt { padding: 7px 10px; }
+.view-opt b { font-weight: 500; }
+.view-opt.on b { font-weight: 600; }

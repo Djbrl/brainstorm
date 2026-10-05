@@ -123,6 +123,8 @@ function aggregate(nodes: LabelNode[], key: (n: LabelNode) => string) {
 
 export function drawModuleLabels(ctx: CanvasRenderingContext2D, scale: number, nodes: LabelNode[], opts: {
   font: string; now: number; focus: Set<string>; busy: Set<string>; space: LabelSpace;
+  /** With a thread open: the folders that have files in its focus. The others' names step back with their files. */
+  lit?: Set<string> | null;
 }) {
   const mods = aggregate(nodes, (n) => n.module);
   const groups = new Map<string, Agg[]>();
@@ -176,8 +178,10 @@ export function drawModuleLabels(ctx: CanvasRenderingContext2D, scale: number, n
     if (y === undefined) continue;
     opts.space.add(box(y));
     const lively = focused || c.prio >= 1e5;
+    const back = !focused && !!opts.lit && !c.mods.some((m) => opts.lit!.has(m));   // none of its files in the thread's focus
     if (style.moduleColored) { ctx.globalAlpha = lively ? 0.95 : 0.7; ctx.fillStyle = moduleColor(c.mods[0]); }
     else ctx.fillStyle = lively ? style.moduleInkLively : style.moduleInk;
+    if (back) ctx.globalAlpha *= 0.3;
     ctx.fillText(c.text, c.x, y);
     ctx.globalAlpha = 1;
   }

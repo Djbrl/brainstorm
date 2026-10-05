@@ -1,6 +1,6 @@
 // Owned by the lead. The shell: the header with where you are (project › thread › step), and the view for that place.
 import { isReplay, useLive } from "./lib/live";
-import { END, NavProvider, threadLens, useNav } from "./lib/nav";
+import { END, NavProvider, useNav } from "./lib/nav";
 import { useThread } from "./lib/thread";
 import { displayLabel } from "./follow/format";
 import { SetupView } from "./setup/SetupView";
@@ -12,7 +12,6 @@ import "./boot.css";
 
 // The views (and the graph library the Map needs) load when they're opened.
 const MapView = lazy(() => import("./map/MapView").then((m) => ({ default: m.MapView })));
-const TrackView = lazy(() => import("./tasks/TrackView").then((m) => ({ default: m.TrackView })));
 const PlacesView = lazy(() => import("./cowork/CoworkView").then((m) => ({ default: m.PlacesView })));
 
 /** Project › Thread › Step: each part takes you back up to it. */
@@ -41,7 +40,7 @@ function Shell() {
   const { state, reload } = useLive();
   const [setupOpen, setSetupOpen] = useState(false);
   const { lens, replay, back, startReplay, stopReplay, selectFile } = useNav();
-  useAttentionAlerts((sid) => startReplay(sid, END, { live: true, lens: threadLens() })); // a notification opens the thread's Track
+  useAttentionAlerts((sid) => startReplay(sid, END, { live: true, lens: "map" })); // a notification opens the thread, its Track in the sidebar
 
   // Esc closes the innermost thing first: a popover (it handles Esc itself and marks it handled), then a panel (step,
   // file), then the player, then the thread (not while typing).
@@ -107,7 +106,6 @@ function Shell() {
       {!replay && !state.shared && <Welcome />}
       <main className="view"><Suspense fallback={<Loading />}>{
         replay && state.sessionsLoaded && !state.sessions.some((s) => s.id === replay.sessionId) ? <MissingThread onBack={stopReplay} />
-          : replay && lens === "track" && !state.replay ? <TrackView />
           : replay && lens === "places" ? <PlacesView />
           : <MapView />
       }</Suspense></main>

@@ -2,13 +2,14 @@
 // ask for it. The player is only what playing needs: back, play, forward, a timeline cut by chapter (red where one
 // failed), speed and hide. The rest moved: the step panel follows the cursor (no "Open step"), the camera recenters
 // itself, "Every step" is under the step list. With a thread open the pill leads with what you can do with it:
-// Replay (or Live, for a running thread) and Share.
+// Live (a running thread), Replay and Share.
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNav, type ReplaySpeed } from "../../lib/nav";
 import { isReplay, useLive } from "../../lib/live";
 import { useThread, type Thread } from "../../lib/thread";
 import { chaptersOf } from "../../lib/chapters";
 import { togglePlay } from "./layer";
+import { setCameraLock, useCameraLock } from "../prefs";
 import "./replay.css";
 
 const SPEEDS: ReplaySpeed[] = [1, 2, 4];
@@ -123,19 +124,37 @@ export function Dock({ children }: { children: ReactNode }) {
     <div className="dock">
       {on && <Player />}
       <div className="dock-pill">
-        {replay && (running && !on
-          ? <button className={`dock-replay live${replay.live ? " on" : ""}`} onClick={() => setReplayLive(!replay.live)} aria-pressed={!!replay.live}
-              title={replay.live ? "Following its newest step. Click to stop" : "Jump to its newest step and follow it"}>
-              <i className="dock-live-dot" aria-hidden="true" />{replay.live ? "Live" : "Follow live"}
-            </button>
-          : <button className={`dock-replay${on ? " on" : ""}`} onClick={toggle} disabled={!thread?.beats.length} aria-pressed={on}
-              title={on ? "Hide the player (Esc)" : "Play this thread from the start"}>
-              {Icon.small}{on ? "Hide replay" : "Replay"}
-            </button>)}
+        {replay && running && !on && (
+          <button className={`dock-replay live${replay.live ? " on" : ""}`} onClick={() => setReplayLive(!replay.live)} aria-pressed={!!replay.live}
+            title={replay.live ? "Following its newest step. Click to stop" : "Jump to its newest step and follow it"}>
+            <i className="dock-live-dot" aria-hidden="true" />{replay.live ? "Live" : "Follow live"}
+          </button>
+        )}
+        {replay && (
+          <button className={`dock-replay${on ? " on" : ""}`} onClick={toggle} disabled={!thread?.beats.length} aria-pressed={on}
+            title={on ? "Hide the player (Esc)" : "Play this thread from the start"}>
+            {Icon.small}{on ? "Hide replay" : "Replay"}
+          </button>
+        )}
         {replay && !isReplay() && <ShareMenu sessionId={replay.sessionId} className="dock-share" />}
         {children}
       </div>
     </div>
+  );
+}
+
+/**
+ * Lock camera: the camera keeps the tracer (or the agent you follow) centred while you zoom; off, it frames it once and
+ * stays where you put it. Shown while something moves on the map: a thread open, or an agent followed.
+ */
+export function LockToggle({ shown }: { shown: boolean }) {
+  const lock = useCameraLock();
+  if (!shown) return null;
+  return (
+    <button className="dock-reads" role="switch" aria-checked={lock} onClick={() => setCameraLock(!lock)}
+      title={lock ? "The camera keeps the agent centred (you can still zoom). Click to move the map freely" : "Keep the agent centred as it moves"}>
+      Lock camera<i aria-hidden="true" />
+    </button>
   );
 }
 

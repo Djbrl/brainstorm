@@ -34,6 +34,10 @@ export function measureSafe(host: HTMLElement): Safe {
   const across = (b: DOMRect) => shown(b) && b.right > x0 && b.left < x1;
   for (const el of scope.querySelectorAll(TOP)) { const b = el.getBoundingClientRect(); if (across(b)) top = Math.max(top, b.bottom - r.top + GAP); }
   for (const el of scope.querySelectorAll(BOTTOM)) { const b = el.getBoundingClientRect(); if (across(b)) bottom = Math.max(bottom, r.bottom - b.top + GAP); }
+  // The canvas fades out in a band at the top and bottom (map.css, --fade-top / --fade-bottom): keep framings out of it too.
+  const cs = getComputedStyle(scope);
+  top = Math.max(top, parseFloat(cs.getPropertyValue("--fade-top")) || 0);
+  bottom = Math.max(bottom, parseFloat(cs.getPropertyValue("--fade-bottom")) || 0);
   // A tiny window: never squeeze the safe area below a usable size.
   const minW = Math.min(240, w * 0.5), minH = Math.min(200, h * 0.5);
   if (w - left - right < minW) { const k = Math.max(0, w - minW) / Math.max(1, left + right); left *= k; right *= k; }
@@ -89,6 +93,8 @@ export type Camera = {
   reveal: (x: number, y: number, r: number, ms?: number) => void;
   /** One step of a follow: ease the centre toward putting (x, y) in the middle of the safe area. */
   easeToward: (x: number, y: number, f: number) => void;
+  /** Whether graph point (x, y) is on screen, at least `m` pixels inside the safe area. */
+  sees: (x: number, y: number, m?: number) => boolean;
   /** Stop a glide in progress. */
   stop: () => void;
 };
@@ -190,7 +196,13 @@ export function useCamera(fg: RefObject<Graph | undefined | null>, hostRef: RefO
       const dx = t.x - p.x, dy = t.y - p.y;
       if (Math.hypot(dx, dy) * k > 1.5) c.centerAt(p.x + dx * f, p.y + dy * f);
     };
-    return { safe, version, measure, userAt: () => userAt.current, view, moveTo, lookAt, frame, reveal, easeToward, stop };
+    const sees = (x: number, y: number, m = 24) => {
+      const v = view(), s = safe.current;
+      if (!v) return true;
+      const sx = s.w / 2 + (x - v.x) * v.k, sy = s.h / 2 + (y - v.y) * v.k;
+      return sx > s.left + m && sx < s.w - s.right - m && sy > s.top + m && sy < s.h - s.bottom - m;
+    };
+    return { safe, version, measure, userAt: () => userAt.current, view, moveTo, lookAt, frame, reveal, easeToward, sees, stop };
   }, [fg, hostRef, version]);
 }
 

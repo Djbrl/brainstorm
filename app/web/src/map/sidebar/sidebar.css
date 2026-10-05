@@ -175,3 +175,8 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 /* Desktop with the sidebar folded: the stats line would sit over Track's first rows, and Track's header has the same numbers. */
 .trk-wrap:has(.sidebar-collapsed) .map-stats { display: none; }
 @media (max-width: 600px) { .map-stats { top: 66px; left: 16px; max-width: calc(100% - 32px); font-size: 13.5px; } }
+
+/* The Track tab: the step list scrolls by itself (its scroll moves the tracer), so the body doesn't. */
+.sidebar-body:has(> .sidebar-track) { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
+.sidebar-track { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.sidebar-tabs button:disabled { color: var(--ink-3); opacity: .55; cursor: default; }

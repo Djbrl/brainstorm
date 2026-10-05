@@ -203,6 +203,9 @@
   font-size: 13.5px; font-weight: 600; padding: 8px 16px; }
 .dock-replay.on { background: var(--accent-soft); color: #3f3fb0; }
 .dock-replay:disabled { opacity: .45; cursor: default; }
+/* Next to Live (a running thread), Replay steps back to an outline: one filled button per pill. */
+.dock-replay.live ~ .dock-replay:not(.on) { background: var(--surface); color: var(--accent); box-shadow: inset 0 0 0 1px var(--line); }
+.dock-replay.live ~ .dock-replay:not(.on):hover { box-shadow: inset 0 0 0 1px var(--accent); }
 .dock-replay:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* A running thread: Follow live, then Live (a pulsing dot) while it follows the newest step. */
 .dock-live-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
@@ -242,6 +245,9 @@
 .rp-waiting-detail { font-family: var(--font-mono); font-size: 11.5px; color: inherit; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rp-waiting-hint { font-size: 12px; opacity: .8; }
 .rp-waiting-open { justify-self: start; border: 0; background: transparent; padding: 2px 0 0; color: var(--accent); font-size: 12px; font-weight: 600; }
+/* Dark themes: the light amber and grey sheets would glare (and the grey one left its pale text at 1.5:1). */
+:root:is([data-theme="ps2"], [data-theme="deadspace"]) .rp-waiting.blocked { background: rgba(245,158,11,.14); color: #f5c06a; }
+:root:is([data-theme="ps2"], [data-theme="deadspace"]) .rp-waiting.turn { background: var(--hover); color: var(--ink-2); }
 @keyframes attn-breathe { 0% { box-shadow: 0 0 0 0 rgba(245,158,11,.55); } 70% { box-shadow: 0 0 0 7px rgba(245,158,11,0); } 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); } }
 
 /* Narrow (tablet and phone): the footer and the player fit the width they have. */

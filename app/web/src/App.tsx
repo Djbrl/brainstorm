@@ -1,6 +1,6 @@
 // Owned by the lead. The shell: the header with where you are (project › thread › step), and the view for that place.
 import { isReplay, useLive } from "./lib/live";
-import { END, NavProvider, useNav } from "./lib/nav";
+import { END, NavProvider, threadLens, useNav } from "./lib/nav";
 import { useThread } from "./lib/thread";
 import { displayLabel } from "./follow/format";
 import { SetupView } from "./setup/SetupView";
@@ -40,7 +40,7 @@ function Shell() {
   const { state, reload } = useLive();
   const [setupOpen, setSetupOpen] = useState(false);
   const { lens, replay, back, startReplay } = useNav();
-  useAttentionAlerts((sid) => startReplay(sid, END, { live: true }));
+  useAttentionAlerts((sid) => startReplay(sid, END, { live: true, lens: threadLens() })); // a notification opens the thread's Track
 
   // Esc goes up one level: step → thread → project (not while typing).
   useEffect(() => {

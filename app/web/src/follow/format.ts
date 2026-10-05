@@ -6,24 +6,65 @@ import { commandLabel, toolLabel } from "@shared/labels";
 
 export const basename = (p?: string) => (p ? p.split(/[\\/]/).filter(Boolean).pop() ?? p : "");
 
-export function relTime(iso: string, now = clock()): string {
-  const t = Date.parse(iso);
-  if (Number.isNaN(t)) return "";
-  const s = Math.max(0, Math.round((now - t) / 1000));
-  if (s < 45) return "just now";
-  const m = Math.round(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.round(h / 24);
-  if (d < 7) return `${d}d ago`;
-  return new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+// ---- Times: one way to say when, everywhere ----
+
+const toMs = (t: string | number | Date) => (typeof t === "number" ? t : typeof t === "string" ? Date.parse(t) : t.getTime());
+const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** "14:05" (24-hour, local time); "14:05:09" with seconds. */
+export function hhmm(t: string | number | Date, seconds = false): string {
+  const d = new Date(toMs(t));
+  if (Number.isNaN(d.getTime())) return "";
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}${seconds ? `:${pad(d.getSeconds())}` : ""}`;
 }
 
-export const clockTime = (iso: string) => {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-};
+/** "Mon 2 Oct", with the year only when it isn't this year ("Thu 2 Oct 2025"). */
+export function dayLabel(t: string | number | Date, now = clock()): string {
+  const d = new Date(toMs(t));
+  if (Number.isNaN(d.getTime())) return "";
+  const day = `${d.toLocaleDateString("en-GB", { weekday: "short" })} ${d.getDate()} ${d.toLocaleDateString("en-GB", { month: "short" })}`;
+  return d.getFullYear() === new Date(now).getFullYear() ? day : `${day} ${d.getFullYear()}`;
+}
+
+/**
+ * How long ago, the one way the app says it: "just now" (under a minute), "5 min ago", "3 h ago" (under a day),
+ * "yesterday 14:05", then "Mon 2 Oct" (the year only when it isn't this year).
+ */
+export function relTime(iso: string | number | Date | undefined, now = clock()): string {
+  if (iso === undefined) return "";
+  const t = toMs(iso);
+  if (Number.isNaN(t)) return "";
+  const s = Math.max(0, Math.floor((now - t) / 1000));
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86_400) return `${Math.floor(s / 3600)} h ago`;
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (dayKey(new Date(t)) === dayKey(yesterday)) return `yesterday ${hhmm(t)}`;
+  return dayLabel(t, now);
+}
+
+/** True when the steps run over more than one calendar day (then their clock times need a date). */
+export function spansDays(steps: { ts: string }[]): boolean {
+  if (steps.length < 2) return false;
+  return dayKey(new Date(steps[0].ts)) !== dayKey(new Date(steps[steps.length - 1].ts));
+}
+
+/**
+ * A clock time inside a thread (a chapter, a step, a stop): "14:05", or "Mon 2 Oct · 14:05" when the thread runs
+ * over more than one day (`multiDay`, see spansDays) or the time isn't today.
+ */
+export function timeIn(iso: string, multiDay = false, opts: { seconds?: boolean; now?: number } = {}): string {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return "";
+  const now = opts.now ?? clock();
+  const time = hhmm(t, opts.seconds);
+  return multiDay || dayKey(new Date(t)) !== dayKey(new Date(now)) ? `${dayLabel(t, now)} · ${time}` : time;
+}
+
+/** "14:05:09". Kept for callers that slice it; new code uses timeIn, which adds the date when it's needed. */
+export const clockTime = (iso: string) => hhmm(iso, true);
 
 const PASTE = /<pasted_content\b[^>]*>([\s\S]*?)(<\/pasted_content>|$)/g;
 

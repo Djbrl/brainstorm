@@ -2,6 +2,8 @@
 // The time is saved when the page is hidden or closed, and read once when it opens: looking at the map doesn't move
 // the line, coming back later does. Per browser; a blocked storage means every visit counts as the first.
 
+import { relTime } from "../follow/format";
+
 const KEY = "brainstorm-last-seen";
 const WELCOMED = "brainstorm-welcomed";
 
@@ -30,13 +32,8 @@ if (typeof window !== "undefined") {
 export const welcomed = () => read(WELCOMED) === "1";
 export const markWelcomed = () => write(WELCOMED, "1");
 
-/** "3 h ago", "yesterday", "on 28 Sep": how long since `ms`, for a sentence. */
+/** When `ms` was, for a sentence: relTime's words ("3 h ago", "yesterday 14:05"), with "on" before a date ("on Mon 2 Oct"). */
 export function sinceLabel(ms: number, now = Date.now()): string {
-  const min = Math.round((now - ms) / 60_000);
-  if (min < 2) return "a moment ago";
-  if (min < 60) return `${min} min ago`;
-  const h = Math.round(min / 60);
-  if (h < 24) return `${h} h ago`;
-  if (h < 48) return "yesterday";
-  return `on ${new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`;
+  const t = relTime(ms, now);
+  return /ago$|^just|^yesterday/.test(t) ? t : `on ${t}`;
 }

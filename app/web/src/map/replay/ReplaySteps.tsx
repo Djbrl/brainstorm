@@ -2,16 +2,22 @@
 // work it led to is one line per moment under it. The chapter you're in is open; the others show your message, when,
 // how long, what it changed and whether something failed. Times and counts stay out of the rows: the step panel has
 // them. The list follows the replay cursor, and scrolling it moves the cursor (the moment nearest the center line).
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+//
+// A long thread can have thousands of moments in one chapter ("Show every step"): an open chapter draws only the rows
+// around what you see and around the cursor (every row is one line, the same height), with empty space standing in
+// for the rest, so the scroll bar, the follow and the center line work as if they were all there.
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { isReplay, useLive } from "../../lib/live";
 import { useNav } from "../../lib/nav";
-import { beatLabel, useThread, type Beat } from "../../lib/thread";
+import { beatLabel, useThread, type Beat, type Thread } from "../../lib/thread";
 import { chapterAt, chaptersOf, duration, injectedLabel, type Chapter } from "../../lib/chapters";
 import { timeIn } from "../../follow/format";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
 import "./replay.css";
 
 const USER_MS = 400;       // the list stops following the cursor this long after the user scrolls it
+const ROW_H = 30;          // a moment's row height until one is measured (.rp-m: one line)
+const OVERSCAN = 40;       // rows drawn past each edge of the view, and around the cursor
 
 type RowState = "done" | "current" | "todo";
 
@@ -22,24 +28,32 @@ function tone(b: Beat): string {
   if (b.kind === "summary" || b.step.kind === "text" || b.step.kind === "prompt") return "say";
   return "";
 }
+/** A moment's label and tone, worked out once per beat (a beat is rebuilt when its thread is). */
+const rowText = new WeakMap<Beat, { label: string; tone: string }>();
+function textOf(b: Beat) {
+  let t = rowText.get(b);
+  if (!t) rowText.set(b, (t = { label: injectedLabel(b.step) ?? beatLabel(b), tone: tone(b) }));
+  return t;
+}
 
-const Moment = memo(function Moment({ beat, state, onPick }: { beat: Beat; state: RowState; onPick: (i: number) => void }) {
-  const label = injectedLabel(beat.step) ?? beatLabel(beat);
+/** One moment. Its props are plain values, so a new step (which rebuilds every beat) redraws only the rows that changed. */
+const Moment = memo(function Moment({ index, label, tone, failed, state, onPick }:
+  { index: number; label: string; tone: string; failed: boolean; state: RowState; onPick: (i: number) => void }) {
   return (
-    <button className={`rp-m ${tone(beat)} ${state}`} data-beat={beat.index} onClick={() => onPick(beat.index)}
+    <button className={`rp-m ${tone} ${state}`} data-beat={index} onClick={() => onPick(index)}
       aria-current={state === "current" ? "step" : undefined} title={label}>
       <b aria-hidden="true" />
       <span>{label}</span>
-      {beat.failed > 0 && <em>failed</em>}
+      {failed && <em>failed</em>}
     </button>
   );
 });
 
 /** A chapter's heading is also its first moment (your message): the cursor can sit on it, and scrolling can land on it. */
-function ChapterHead({ c, open, at, multiDay, onToggle }: { c: Chapter; open: boolean; at: boolean; multiDay: boolean; onToggle: () => void }) {
+const ChapterHead = memo(function ChapterHead({ c, open, at, multiDay, onToggle }: { c: Chapter; open: boolean; at: boolean; multiDay: boolean; onToggle: (i: number) => void }) {
   const files = c.files ? `${c.files} file${c.files === 1 ? "" : "s"}` : "no files";
   return (
-    <button className={`rp-ch-head${open ? " open" : ""}${at ? " at" : ""}${c.hasPrompt ? "" : " pre"}`} onClick={onToggle} aria-expanded={open}
+    <button className={`rp-ch-head${open ? " open" : ""}${at ? " at" : ""}${c.hasPrompt ? "" : " pre"}`} onClick={() => onToggle(c.index)} aria-expanded={open}
       data-beat={c.hasPrompt ? c.first : undefined} aria-current={at ? "step" : undefined}>
       <span className="rp-ch-title" title={c.title}>{c.title}</span>
       <span className="rp-ch-meta">
@@ -48,28 +62,116 @@ function ChapterHead({ c, open, at, multiDay, onToggle }: { c: Chapter; open: bo
       </span>
     </button>
   );
-}
+});
+
+type Range = [number, number]; // rows [start, end) of a chapter, as beat indexes
+
+/**
+ * An open chapter's moments, beats `from`..`last`: the rows in view and around the cursor, with spacers for the rest.
+ * Each spacer says which rows it stands for (data-from), so the center line can find a moment there too.
+ */
+const Moments = memo(function Moments({ beats, from, last, index, rowH, onPick, onRowH }:
+  { beats: Beat[]; from: number; last: number; index: number; rowH: number; onPick: (i: number) => void; onRowH: (h: number) => void }) {
+  const box = useRef<HTMLDivElement>(null);
+  const end = last + 1;
+  const clamp = (r: Range): Range => [Math.max(from, r[0]), Math.min(end, r[1])];
+  // The rows in view, from where this chapter sits in the list's scroll.
+  const inView = useCallback((): Range | null => {
+    const el = box.current, list = el?.closest(".rp-list");
+    if (!el || !list) return null;
+    const top = el.getBoundingClientRect().top - list.getBoundingClientRect().top;
+    const a = from + Math.floor(-top / rowH), b = from + Math.ceil((list.clientHeight - top) / rowH);
+    return [a, b];
+  }, [from, rowH]);
+  const [view, setView] = useState<Range>(() => [index - OVERSCAN, index + OVERSCAN]);
+  // Follow the list's scroll: draw again only once the view nears the edge of what is drawn.
+  useLayoutEffect(() => {
+    const list = box.current?.closest(".rp-list");
+    if (!list) return;
+    const update = () => {
+      const v = inView();
+      if (v) setView((cur) => (v[0] - OVERSCAN / 2 < cur[0] && cur[0] > from) || (v[1] + OVERSCAN / 2 > cur[1] && cur[1] < end) || v[1] < cur[0] || v[0] > cur[1]
+        ? [v[0] - OVERSCAN, v[1] + OVERSCAN] : cur);
+    };
+    update();
+    list.addEventListener("scroll", update, { passive: true });
+    return () => list.removeEventListener("scroll", update);
+  }, [inView, from, end]);
+  // Measure a row: the spacers are rows' worth of height.
+  useLayoutEffect(() => {
+    const row = box.current?.querySelector<HTMLElement>(".rp-m");
+    const h = row?.getBoundingClientRect().height;
+    if (h && Math.abs(h - rowH) > 0.05) onRowH(h);
+  });
+
+  // What to draw: the view, and the cursor's neighbourhood (the list scrolls to it right after this render).
+  const ranges: Range[] = [clamp(view)];
+  if (index >= from && index <= last) ranges.push(clamp([index - OVERSCAN, index + OVERSCAN]));
+  ranges.sort((p, q) => p[0] - q[0]);
+  const merged: Range[] = [];
+  for (const r of ranges) {
+    if (r[1] <= r[0]) continue;
+    const m = merged[merged.length - 1];
+    if (m && r[0] <= m[1]) m[1] = Math.max(m[1], r[1]); else merged.push([r[0], r[1]]);
+  }
+  const out: ReactNode[] = [];
+  const spacer = (a: number, b: number) => out.push(<div key={`s${a}`} className="rp-m-gap" data-from={a} style={{ height: (b - a) * rowH }} aria-hidden="true" />);
+  let at = from;
+  for (const [a, b] of merged) {
+    if (a > at) spacer(at, a);
+    for (let i = a; i < b; i++) {
+      const beat = beats[i], t = textOf(beat);
+      out.push(<Moment key={beat.step.id} index={i} label={t.label} tone={t.tone} failed={beat.failed > 0} onPick={onPick}
+        state={i < index ? "done" : i === index ? "current" : "todo"} />);
+    }
+    at = b;
+  }
+  if (at < end) spacer(at, end);
+  return <div className="rp-ch-moments" ref={box}>{out}</div>;
+});
 
 export function ReplaySteps() {
   const { replay, setReplayIndex, setReplayPlaying, setReplayDetail, openStep } = useNav();
-  const { state } = useLive();
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
+  if (!replay) return null;
+  if (!thread) return <div className="rp-steps"><p className="rp-quiet rp-pad"><Loading /></p></div>;
+  if (!thread.beats.length) return <div className="rp-steps"><p className="rp-quiet rp-pad">This thread has no steps yet.</p></div>;
+  const len = thread.beats.length;
+  return (
+    <TrackList thread={thread} sessionId={replay.sessionId} index={Math.min(replay.index, Math.max(0, len - 1))} playing={!!replay.playing}
+      full={replay.detail === "full"} setReplayIndex={setReplayIndex} setReplayPlaying={setReplayPlaying} setReplayDetail={setReplayDetail} openStep={openStep} />
+  );
+}
+
+/** While the steps load; a recorded demo that has none for this thread says so. */
+function Loading() {
+  const { state } = useLive();
+  return <>{isReplay() && state.sessions.length > 0 ? "No steps were recorded for this thread." : "Loading steps…"}</>;
+}
+
+type TrackProps = {
+  thread: Thread; sessionId: string; index: number; playing: boolean; full: boolean;
+  setReplayIndex: (i: number | ((prev: number) => number)) => void; setReplayPlaying: (p: boolean) => void;
+  setReplayDetail: (d: "light" | "full") => void; openStep: (sessionId: string, stepId: string) => void;
+};
+
+/** The list itself. Memoised: a live message that doesn't change this thread or its cursor leaves it alone. */
+const TrackList = memo(function TrackList({ thread, sessionId, index, playing, full, setReplayIndex, setReplayPlaying, setReplayDetail, openStep }: TrackProps) {
   const threadRef = useRef(thread); threadRef.current = thread;
   const listRef = useRef<HTMLDivElement>(null);
   const userAt = useRef(0);
   const dragging = useRef(false);
+  const [rowH, setRowH] = useState(ROW_H);
 
-  const len = thread?.beats.length ?? 0;
-  const index = replay ? Math.min(replay.index, Math.max(0, len - 1)) : 0;
-  const playing = !!replay?.playing;
-  const chapters = useMemo(() => (thread ? chaptersOf(thread) : []), [thread]);
+  const len = thread.beats.length;
+  const chapters = useMemo(() => chaptersOf(thread), [thread]);
   const here = chapters.length ? chapterAt(chapters, index).index : -1;
   const multiDay = chapters.length > 1 && new Date(chapters[0].at).toDateString() !== new Date(chapters[chapters.length - 1].at).toDateString();
 
   // Open chapters: the one the cursor is in, plus any you opened. Moving into another chapter opens it (and folds the rest).
   const [open, setOpen] = useState<Set<number>>(new Set());
-  useEffect(() => { if (here >= 0) setOpen(new Set([here])); }, [here, replay?.sessionId]);
-  const toggle = (i: number) => setOpen((o) => { const n = new Set(o); if (n.has(i)) n.delete(i); else n.add(i); return n; });
+  useEffect(() => { if (here >= 0) setOpen(new Set([here])); }, [here, sessionId]);
+  const toggle = useCallback((i: number) => setOpen((o) => { const n = new Set(o); if (n.has(i)) n.delete(i); else n.add(i); return n; }), []);
 
   const playingRef = useRef(playing); playingRef.current = playing;
   const indexRef = useRef(index); indexRef.current = index;
@@ -78,10 +180,10 @@ export function ReplaySteps() {
   const onPick = useCallback((i: number) => {
     setReplayPlaying(false); setReplayIndex(i); userAt.current = 0;
     const beat = threadRef.current?.beats[i];
-    if (!beat || !replay) return;
+    if (!beat) return;
     const words = beat.kind === "summary" ? [...beat.steps].reverse().find((s) => s.kind === "text" && s.text?.trim()) : undefined;
-    openStep(replay.sessionId, (words ?? beat.step).id);
-  }, [setReplayIndex, setReplayPlaying, openStep, replay?.sessionId]);
+    openStep(sessionId, (words ?? beat.step).id);
+  }, [setReplayIndex, setReplayPlaying, openStep, sessionId]);
 
   // Any real scroll input from the user (wheel, touch, scrollbar drag, keys).
   const markUser = useCallback(() => { userAt.current = performance.now(); }, []);
@@ -92,8 +194,9 @@ export function ReplaySteps() {
     return () => { window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up); };
   }, [markUser]);
 
-  // The list's scroll moves the cursor to the moment nearest the center line.
+  // The list's scroll moves the cursor to the moment nearest the center line (a spacer stands for rows of moments).
   const raf = useRef(0);
+  const rowHRef = useRef(rowH); rowHRef.current = rowH;
   const onScroll = useCallback(() => {
     if (!dragging.current && performance.now() - userAt.current > USER_MS) return; // our own scroll or layout shift
     cancelAnimationFrame(raf.current);
@@ -102,13 +205,15 @@ export function ReplaySteps() {
       if (!el) return;
       const r = el.getBoundingClientRect();
       const cy = r.top + r.height / 2;
-      let row: Element | null = null;
+      let i = NaN;
       for (const dy of [0, -6, 6, -14, 14]) {
-        row = document.elementFromPoint(r.left + r.width / 2, cy + dy)?.closest("[data-beat]") ?? null;
-        if (row && el.contains(row)) break;
-        row = null;
+        const hit = document.elementFromPoint(r.left + r.width / 2, cy + dy);
+        const row = hit?.closest<HTMLElement>("[data-beat], .rp-m-gap");
+        if (!row || !el.contains(row)) continue;
+        i = row.dataset.beat !== undefined ? Number(row.dataset.beat)
+          : Number(row.dataset.from) + Math.floor((cy + dy - row.getBoundingClientRect().top) / rowHRef.current);
+        break;
       }
-      const i = row ? Number((row as HTMLElement).dataset.beat) : NaN;
       if (Number.isFinite(i) && i !== indexRef.current) {
         if (playingRef.current) setReplayPlaying(false);
         setReplayIndex(i);
@@ -116,29 +221,35 @@ export function ReplaySteps() {
     });
   }, [setReplayIndex, setReplayPlaying]);
 
-  // The cursor scrolls the list, unless the user scrolled it just now.
+  // The cursor scrolls the list, unless the user scrolled it just now. A moment that isn't drawn yet is found by its
+  // place in its chapter (every row is one line).
   const first = useRef(true);
   useLayoutEffect(() => {
     const el = listRef.current;
     if (!el || !len) return;
     if (dragging.current || performance.now() - userAt.current < USER_MS) return;
-    const row = el.querySelector<HTMLElement>(`[data-beat="${index}"]`) ?? el.querySelector<HTMLElement>(`[data-chapter="${here}"] .rp-ch-head`);
-    if (!row) return;
-    const top = Math.max(0, row.offsetTop - el.clientHeight / 2 + row.offsetHeight / 2);
+    let rowTop: number | null = null, rowHeight = 0;
+    const row = el.querySelector<HTMLElement>(`[data-beat="${index}"]`);
+    if (row) { rowTop = row.offsetTop; rowHeight = row.offsetHeight; }
+    else if (here >= 0 && open.has(here)) {
+      const c = chapters[here], from = c.hasPrompt ? c.first + 1 : c.first;
+      const box = el.querySelector<HTMLElement>(`[data-chapter="${here}"] .rp-ch-moments`);
+      if (box && index >= from && index <= c.last) { rowTop = box.offsetTop + (index - from) * rowH; rowHeight = rowH; }
+    }
+    if (rowTop === null) {
+      const head = el.querySelector<HTMLElement>(`[data-chapter="${here}"] .rp-ch-head`);
+      if (!head) return;
+      rowTop = head.offsetTop; rowHeight = head.offsetHeight;
+    }
+    const top = Math.max(0, rowTop - el.clientHeight / 2 + rowHeight / 2);
     const delta = Math.abs(el.scrollTop - top);
     if (delta < 2) return;
     el.scrollTo({ top, behavior: first.current || delta > 1600 ? "auto" : "smooth" });
     first.current = false;
-  }, [index, len, here, open]);
-  useEffect(() => { first.current = true; }, [replay?.sessionId]);
+  }, [index, len, here, open, chapters, rowH]);
+  useEffect(() => { first.current = true; }, [sessionId]);
 
-  if (!replay) return null;
-  if (!thread) {
-    const missing = isReplay() && state.sessions.length > 0;
-    return <div className="rp-steps"><p className="rp-quiet rp-pad">{missing ? "No steps were recorded for this thread." : "Loading steps…"}</p></div>;
-  }
-  if (!len) return <div className="rp-steps"><p className="rp-quiet rp-pad">This thread has no steps yet.</p></div>;
-  const full = replay.detail === "full";
+  const onRowH = useCallback((h: number) => setRowH(h), []);
 
   return (
     <div className="rp-steps">
@@ -150,25 +261,21 @@ export function ReplaySteps() {
           const from = c.hasPrompt ? c.first + 1 : c.first; // the message itself is the heading
           return (
             <section key={c.first} className="rp-ch" data-chapter={c.index}>
-              <ChapterHead c={c} open={isOpen} multiDay={multiDay} at={c.hasPrompt && index === c.first} onToggle={() => toggle(c.index)} />
+              <ChapterHead c={c} open={isOpen} multiDay={multiDay} at={c.hasPrompt && index === c.first} onToggle={toggle} />
               {isOpen && from <= c.last && (
-                <div className="rp-ch-moments">
-                  {thread.beats.slice(from, c.last + 1).map((b) => (
-                    <Moment key={b.step.id} beat={b} onPick={onPick} state={b.index < index ? "done" : b.index === index ? "current" : "todo"} />
-                  ))}
-                </div>
+                <Moments beats={thread.beats} from={from} last={c.last} index={index} rowH={rowH} onPick={onPick} onRowH={onRowH} />
               )}
             </section>
           );
         })}
-        <WaitingRow sessionId={replay.sessionId} onOpen={(stepId) => openStep(replay.sessionId, stepId)} />
+        <WaitingRow sessionId={sessionId} onOpen={(stepId) => openStep(sessionId, stepId)} />
         <button className="rp-detail-switch" onClick={() => setReplayDetail(full ? "light" : "full")}>
           {full ? "Group the steps into moments" : "Show every step"}
         </button>
       </div>
     </div>
   );
-}
+});
 
 /** The live end of the list: the agent is waiting on you (or done and it's your turn). */
 function WaitingRow({ sessionId, onOpen }: { sessionId: string; onOpen: (stepId: string) => void }) {

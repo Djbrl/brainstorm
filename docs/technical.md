@@ -140,7 +140,8 @@ Everything is masked first. Cost is tokens × price ($5 in, $25 out per million 
 | `lib/live.tsx` | One store. Loads `/api/sessions` and `/api/map`, polls `/api/failures` every 15 s, and applies WebSocket messages. In replay mode it loads a static JSON file instead, and `clock()` runs from the export time so "just now" and the recency colors look as they did when recorded |
 | `lib/nav.tsx` | Current view, selected session, focused file (`openFile`) and focused step (`openStep`). `?view=map` and `?view=failures` open a view directly |
 | `follow/` | Sessions list, timeline, step detail with the diff and the Ask box |
-| `map/` | react-force-graph-2d graph: nodes are files sized by line count and colored by recency, grouped by module, with a pulsing ring where an agent is editing. Clicking a file opens its summary, recent steps and Ask |
+| `map/` | react-force-graph-2d graph: nodes are files sized by line count and colored by recency, grouped by module, with a pulsing ring where an agent is editing. Clicking a file opens its summary, recent steps and Ask. `MapView.tsx` wires the canvas; `graph.ts` holds the nodes, layout and forces, `drawNode.ts` draws a frame, `labels.ts` places names, `useMapCamera.ts` frames the camera, `useLiveAgents.ts` holds the agents |
+| `map/` on big projects | The canvas redraws only while something moves (`redraw.ts`): at rest it does no work. A frame draws only what's on screen; themed marks are stamped from small cached pictures (`sprites.ts`); idle import lines are batched, and hidden when zoomed out on a big map. The layout keeps nodes in place when the same files come back, settles new files gently, and is saved per project and theme in the browser's IndexedDB (`positions.ts`) so a reload doesn't lay out thousands of files again |
 | `failures/` | Ranked groups; each piece of evidence opens its step in Follow |
 | `ask/` | Question box with suggestion chips, markdown answers, and model, tokens and cost |
 

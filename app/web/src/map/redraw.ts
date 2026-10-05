@@ -10,7 +10,7 @@
 /** What the last drawn frame still had moving: nothing, something smooth (every frame), or only slow motion. */
 export const Motion = { None: 0, Smooth: 1, Slow: 2 } as const;
 export type Motion = (typeof Motion)[keyof typeof Motion];
-const SLOW_MS = 33;   // slow motion only (a cube turning): about 30 frames a second is plenty
+const SLOW_MS = 66;   // slow motion only (a cube turning a few degrees a second): 15 frames a second is plenty
 
 export type Redraw = {
   /** Draw the next frame, and keep drawing for `ms` more (a glide or a flash we know the length of). */

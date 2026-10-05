@@ -146,7 +146,7 @@ export function drawCube(ctx: CanvasRenderingContext2D, x: number, y: number, s:
 }
 
 /** Below this size on screen (half a cube's width, in pixels) a cube stands still: its turn wouldn't show. */
-export const CUBE_STILL_PX = 2;
+export const CUBE_STILL_PX = 3;
 const CUBE_STAMP_PX = 12;    // up to here a cube is stamped at one of ANGLES angles; bigger ones are drawn as they turn
 const ANGLES = 32;           // per quarter turn (a cube looks the same a quarter turn on): 2.8° apart
 const QUARTER = Math.PI / 2;

@@ -121,3 +121,70 @@ Nothing timed out and every page rendered. These are the worst numbers, most imp
 - **At rest, panning, live, replay:** 10-second windows on the cached page. Panning drags from an empty spot and
   scrolls the wheel in and out. Replay opens the thread's link, presses Replay and picks 4×.
 - **JS heap:** used heap from the DevTools protocol at the end of a window.
+
+## The overnight pass (5–6 Oct 2026)
+
+Three read-only audits (front end, server, code health) found where the time goes. The work was split into branches
+that never edit the same files, each measured on its own, then merged into `perf/integrate` and checked together. None
+of it is on `main` until the human says so.
+
+### Where the time went
+
+- **The map redrew every file, 60 times a second, forever,** including files off screen, and laid out names for files
+  that couldn't be seen.
+- **Every websocket message re-rendered the whole app,** and about eight components each rebuilt the same thread model
+  and file lookup.
+- **The server recomputed on timers:** failures read every step of every thread every 15 s; the attention sweep scanned
+  the steps table every 2 s.
+- **The first import blocked startup** and read whole logs into memory; a log over about 512 MB never imported.
+- **On big repos, the file scanner** watched every folder, ran the whole `git log` synchronously, and rebuilt everything
+  on each change.
+
+### What each branch did
+
+Numbers are each branch's own measurements, mostly on a machine loaded by the other agents, so read them as ratios.
+
+| Branch | What | Result |
+| --- | --- | --- |
+| `perf/canvas` | The map pauses when nothing moves; off-screen files skipped; colours, text widths and folder labels cached; theme shapes from cached pictures; idle import lines batched and hidden when zoomed out on big maps; no full layout restart on live updates; positions saved per project and theme (IndexedDB). `MapView.tsx` split from 1,237 to 413 lines (`graph.ts`, `color.ts`, `drawNode.ts`, `useMapCamera.ts`, `useLiveAgents.ts`) | 20k files at rest: 3–11 → 58–60 fps, main thread 86–89% → 3–4% busy (PS2 45%). 20k files at 4× CPU: the page used to stop answering for 4 minutes; now 58–59 fps at rest, 14–22 fps panning |
+| `perf/replay-lists` | Replay trail cached in layers, per-cursor caches, binary search, the camera loop stops when settled; windowed Track list and file tree | 10k-step thread at 4× CPU: "Show every step" 1.8 → 0.7 s; scrolling Track 5–7 → 23–28 fps; full-detail replay 10–12 → 29–34 fps; Files search on 19k files 1.9 s → 37 ms |
+| `perf/web-store` | Websocket messages applied once per frame; selector hooks; O(1) reducer updates; `structureVersion`; nav split into actions, state and cursor; the unused failures poll removed; one steps download per thread; the map chunk prefetched | 1,000 messages at 250/s: renders 556 → 229 (project) and 674 → 225 (thread open); 4 s of messages handled in 6.5 s and 4.9 s (was 13.9 s and 13.6 s); header renders ~600 → 0–1 |
+| `perf/web-thread` | One shared thread build and file resolver for all components, incremental for live threads; cached chapters and timestamps | A "file" message across 8 views 115–294 → 0.4–2 ms; one new step 197–268 → 2.6–6.7 ms; identical output in 16,524 checks (`node app/web/scripts/perf-thread.mjs`) |
+| `perf/server-ingest` | Import after the server starts; 4 MB chunked reads split on bytes; transactions and prepared statements; cached session list; masking before truncation; `/steps` built by SQLite and `?afterSeq=`; watching only the workspace's log folders | 561 MB of real logs: answering 12.4–13.7 → 0.9–1.2 s; full import 12.6–14.0 → 5.7–8.2 s while answering; peak memory 625–646 → 297–384 MB; a 600 MB log (never imported before) imports in 26 s at 220 MB; identical steps and `/steps` bytes |
+| `perf/server-live` | Attention sweep on recent threads; labels set on the step before it's sent (fixes live steps arriving without labels); agent messages only on change, time updates at most once a second | Messages per live step 3.34 → 1.28; sweep 20 → 0.02 ms (316k steps: 92 → 0.08 ms); live labels on the first message 0/36 → 36/36 |
+| `perf/mapper` | One ignore rule; files from `git ls-files` (respects `.gitignore`); one recursive watch instead of chokidar; changes batched every 100 ms; `git log` streamed and bounded; the 800 files chosen across every folder; `totalFiles`; `BRAINSTORM_MAX_FILES` | 20k repo: 21,028 watch handles (crashed) → 1; 60k commits: event loop blocked 4.9–14.4 s → 0.4–0.8 s; 2k changes: ~1,500–1,900 messages → 22; a 5k repo shows 25 of 25 folders (was 4). One change now reaches the page in 110–180 ms (was 3–55 ms) |
+| `perf/server-pollers` | Failures and Places keep each thread's result until its steps change, reading only calls, edits and results | Same answers on a frozen copy of the real database (16/16); 147–152 → 21–24 ms |
+| `fix/server-bugs` | Bus listeners isolated; screenshots load again in the step panel (only the unmounted full-screen Track used to trigger the scan) | A failing listener no longer drops the event for the others; a new thread's screenshot returns in 0.21 s |
+| `fix/web-panels` | Places deep-link crash; risk labels styled; dark-theme contrast for code, output and JSON | `/thread/<id>/places/step/<id>` opens instead of crashing; dark-theme content at 7:1 or better |
+| `refactor/web-dead-code` | Dead exports and CSS from removed views; the FilePanel ↔ MapView circular import | −328 lines, built CSS −15 KB (−16%), screens pixel-identical |
+| `perf/bench` | This benchmark | Baseline above |
+
+Tests: `cd app/server && npm test` (49 tests: listener reading and masking, sessions, steps, attention, agents, reader,
+mapper, bus), `node app/web/scripts/perf-thread.mjs` (thread model equivalence).
+
+### Left for later
+
+- **Narrow hooks everywhere:** the map, replay and sidebar still read the whole store with `useLive()`/`useNav()`; moving
+  them to `useLiveSelector`, `useNavState`, `useNavActions` and `useReplayCursor` is the biggest remaining front-end
+  win, especially for the Track list.
+- **Live agents in PS2 and Dead Space** stay slow at 4× CPU (about 7 fps at 5k files): a file with an agent on it still
+  uses the old glow drawing.
+- **Agent labels** ("Subagent · … · Editing") don't use the label space, so they can overlap file names.
+- **Server:** light step payloads (fetch the full step when opened); coalesced file and summary broadcasts; the
+  listener, reader and workspace split into smaller modules; one shared rule for failed results, call pairing and
+  prompt cleanup.
+- **Docs:** `docs/technical.md` still describes some removed views.
+
+### Decisions for the human
+
+1. **Merge `perf/integrate` into `main`?** It holds every branch above and has been checked together (tests, both
+   typechecks, a production build, the app on real logs: live following, Track, replay with Lock camera, focus).
+2. **"Ask about this thread"** only existed in the unmounted full-screen Track (`tasks/TrackView.tsx`). Move it into the
+   sidebar's Track tab, or drop it? Then the old Track and its `/api/tasks` routes can go (the screenshot route stays).
+3. **Save the subagent id** with each step (a small schema change), so threads with parallel subagents group the same
+   way after a reload as they do live.
+4. **The 800-file cap.** With the canvas work, 20k files render smoothly. Raise the default (2–5k), and show
+   "800 of 20,312 files" when a repo is bigger?
+5. **Fonts.** The Fontshare stylesheet is the one request that leaves the computer and blocks the first paint for
+   0.3–1.3 s on a cold cache. Self-host the fonts (license check needed) or use system fonts?
+6. **`?mockmap`,** the dev-only fake map: keep it as a test fixture or delete it?

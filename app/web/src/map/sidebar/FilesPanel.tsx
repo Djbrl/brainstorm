@@ -37,7 +37,11 @@ function useFileTree(map: ProjectMap | null): BuiltTree | null {
   }, [files, base]);
 }
 
-export function FilesPanel({ map, onFocusFile }: { map: ProjectMap | null; onFocusFile: (path: string) => void }) {
+export function FilesPanel({ map, onFocusFile, hidden = false }: {
+  map: ProjectMap | null; onFocusFile: (path: string) => void;
+  /** A file is open in its place (FileView): the tree stays, as it was, out of sight. */
+  hidden?: boolean;
+}) {
   useTick(20000);
   const now = clock();
   const { replay } = useNav();
@@ -72,10 +76,10 @@ export function FilesPanel({ map, onFocusFile }: { map: ProjectMap | null; onFoc
   const focusRef = useRef(onFocusFile); focusRef.current = onFocusFile;
   const focusFile = useCallback((path: string) => focusRef.current(path), []);
 
-  if (!map || !tree) return <p className="sidebar-empty">No files mapped yet.</p>;
+  if (!map || !tree) return hidden ? null : <p className="sidebar-empty">No files mapped yet.</p>;
 
   return (
-    <div className="sidebar-files">
+    <div className="sidebar-files" hidden={hidden}>
       <div className="sidebar-search">
         <input type="search" placeholder="Search files" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search files" />
       </div>

@@ -18,7 +18,7 @@ import { MapKey } from "./MapKey";
 import { useStepWindow } from "./prefs";
 import { TalkCard } from "./replay/TalkCard";
 import { StepPanel } from "./StepPanel";
-import { FilePanel, useSelectedFile } from "./FilePanel";
+import { useSelectedFile } from "./useSelectedFile";
 import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
 import { makeFileResolver } from "../lib/paths";
 import { clearTextWidths, drawQueuedLabels, LabelSpace, type QueuedLabel } from "./labels";
@@ -76,7 +76,7 @@ export function MapView() {
   // ---- folders (fold.ts): open as you zoom; the files you look at, a thread's, an agent's open theirs at any zoom ----
   const foldOn = useFoldOn();
   const foldOnRef = useRef(foldOn); foldOnRef.current = foldOn;
-  const [selected, setSelected] = useSelectedFile(map?.root ?? ""); // in the link: /file/<path>
+  const [selected, setSelected, picked] = useSelectedFile(map?.root ?? ""); // in the link: /file/<path>; shown in the sidebar
   // What an open thread showed on the map and where a followed agent worked: their folders stay open while you watch.
   const [watched, setWatched] = useState<{ key: string; files: string[] }>({ key: "", files: [] });
   const [wrapRef, size] = useSize<HTMLDivElement>();
@@ -87,7 +87,6 @@ export function MapView() {
   const style = mapStyle();
   const stepWindow = useStepWindow();
   const [hover, setHover] = useState<string | null>(null);
-  const root = map?.root ?? "";
   // The camera works in the part of the canvas the sidebar, the side panels, the stats line and the footer leave free.
   const cam = useCamera(fg as never, wrapRef);
   const camRef = useRef<Camera>(cam); camRef.current = cam;
@@ -357,6 +356,7 @@ export function MapView() {
   const onBackgroundClick = useCallback(() => setSelected(null), [setSelected]);
 
   const sel = selected ? nodeIndex.get(selected)?.file : undefined;
+  const closeFile = useCallback(() => setSelected(null), [setSelected]);
 
   return (
     <div className="map-wrap" ref={wrapRef}>
@@ -391,7 +391,8 @@ export function MapView() {
 
 
       <MapSidebar agents={agents} accent={tokens.accent} followId={followId}
-        onFollow={(id) => setFollowId(id)} onFocusFile={focusOnFile} map={map} />
+        onFollow={(id) => setFollowId(id)} onFocusFile={focusOnFile} map={map}
+        file={sel} picked={picked} onCloseFile={closeFile} />
       <MapStats />
       <TalkCard />
       <LensSwitch />
@@ -406,7 +407,6 @@ export function MapView() {
       </Dock>
 
       <StepPanel />
-      <FilePanel file={step ? undefined : sel} root={root} steps={state.steps} edges={map?.edges ?? []} onFocus={focusOnFile} onClose={() => setSelected(null)} />
     </div>
   );
 }

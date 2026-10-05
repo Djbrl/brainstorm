@@ -249,7 +249,7 @@
   .rp-player { min-width: 0; width: min(640px, calc(100vw - 48px)); }
   /* One row while it fits (the dock sizes to its content, not to the half width left of its anchor), then it wraps. */
   .dock { width: max-content; }
-  .dock-pill { flex-wrap: wrap; justify-content: center; row-gap: 6px; max-width: 100%; }
+  .dock-pill { flex-wrap: wrap; justify-content: center; row-gap: 6px; max-width: 100%; border-radius: 26px; }
   .map-wrap:has(.map-panel.open) .dock:not(:has(.dock-replay)) { display: none; }
   /* A side panel open: the footer keeps to the space left of it, the legend makes way (the panel says what's selected). */
   .map-wrap:has(.map-panel.open) .dock { left: 16px; right: 456px; width: auto; transform: none; max-width: none; }
@@ -262,7 +262,7 @@
 @media (max-width: 600px) {
   .dock { bottom: 12px; max-width: calc(100% - 24px); }
   .map-wrap:has(.map-panel.open) .dock { left: 50%; right: auto; transform: translateX(-50%); max-width: calc(100% - 24px); }
-  .dock-pill { gap: 10px; white-space: normal; border-radius: 22px; }
+  .dock-pill { gap: 10px; white-space: normal; }
   .dock-pill:has(.dock-replay) .dock-legend { display: none; }
   .dock-legend { flex-wrap: wrap; justify-content: center; gap: 4px 14px; }
   .dock-legend span { white-space: nowrap; }

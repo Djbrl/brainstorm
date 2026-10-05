@@ -61,7 +61,8 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
     addEventListener("keydown", esc, true);
     return () => removeEventListener("keydown", esc, true);
   }, [over]);
-  const fold = <T,>(f: (x: T) => void) => (x: T) => { if (phone) setOver(false); f(x); };
+  // Picking a file opens its panel on the right: the sheet folds at any narrow width so the panel can be seen.
+  const fold = <T,>(f: (x: T) => void, always = false) => (x: T) => { if (phone || always) setOver(false); f(x); };
 
   const tabButton = (
     <button className="sidebar-collapsed" onClick={() => setCollapsed(false)} aria-label="Open sidebar" aria-expanded={!collapsed}>
@@ -86,9 +87,9 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
       </div>
       <div className="sidebar-body">
         {tab === "threads" ? (
-          <ThreadsPanel agents={agents} accent={accent} followId={followId} onFollow={fold(onFollow)} onFocusFile={fold(onFocusFile)} />
+          <ThreadsPanel agents={agents} accent={accent} followId={followId} onFollow={fold(onFollow)} onFocusFile={fold(onFocusFile, true)} />
         ) : (
-          <FilesPanel map={map} onFocusFile={fold(onFocusFile)} />
+          <FilesPanel map={map} onFocusFile={fold(onFocusFile, true)} />
         )}
       </div>
     </div>

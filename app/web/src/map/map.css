@@ -115,10 +115,12 @@
   /* The legend keeps clear of the folded sidebar tab and of the right edge; a side panel open covers its corner, so it steps aside. */
   .map-wrap:has(.sidebar-collapsed) .map-legend { max-width: calc(100% - 110px); }
   .map-wrap:has(.map-panel.open) .map-legend { display: none; }
+  .map-panel { z-index: 7; } /* over the lens pill, which reaches into it on a narrow screen */
 }
 @media (max-width: 600px) {
   /* Side panels fill the width, with a close button, and room at the bottom for the footer that floats over them. */
   .map-panel { width: 100%; border-left: 0; box-shadow: none; }
+  .map-wrap .dock { z-index: 8; } /* the footer stays over a panel, so a replay can still be driven */
   .map-panel-inner { padding: 30px 20px 120px; }
   .map-panel h2 { font-size: 28px; padding-right: 36px; }
   .map-panel-close { display: grid; place-items: center; position: absolute; top: 22px; right: 14px; z-index: 1; width: 36px; height: 36px;

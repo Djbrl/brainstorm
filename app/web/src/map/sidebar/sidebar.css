@@ -152,8 +152,8 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 /* Narrow (tablet and phone): the sidebar starts folded and opens over the content, with a light scrim behind it
    (tap it, ‹ or Esc to fold). The folded tab stays put underneath, so nothing behind the sheet moves. */
 @media (max-width: 1100px) {
-  .map-sidebar.sidebar-overlay { z-index: 8; box-shadow: 0 24px 70px rgba(0,0,0,.16); background: rgba(255,255,255,.96); }
-  .sidebar-scrim { position: absolute; inset: 0; z-index: 7; border: 0; padding: 0; margin: 0; cursor: default;
+  .map-sidebar.sidebar-overlay { z-index: 10; box-shadow: 0 24px 70px rgba(0,0,0,.16); background: rgba(255,255,255,.96); }
+  .sidebar-scrim { position: absolute; inset: 0; z-index: 9; border: 0; padding: 0; margin: 0; cursor: default;
     background: rgba(29,29,31,.10); animation: sidebar-scrim-in .2s ease-out; }
   .map-sidebar.sidebar-overlay { animation: sidebar-sheet-in .26s cubic-bezier(.2,.8,.2,1); }
 }

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNotifyPref } from "../lib/attention";
 import { isReplay } from "../lib/live";
 import { setTheme, THEMES, useTheme } from "../lib/theme";
+import { setStepWindow, STEP_WINDOWS, useStepWindow } from "../map/prefs";
 import "./settings.css";
 
 export function SettingsButton() {
@@ -34,10 +35,28 @@ export function SettingsButton() {
               </button>
             ))}
           </div>
+          <WindowSetting />
           <NotifySetting />
         </div>
       )}
     </div>
+  );
+}
+
+/** How much of an open thread the map lights up and names (map/prefs.ts; the focus is in map/replay/layer.ts). */
+function WindowSetting() {
+  const win = useStepWindow();
+  return (
+    <>
+      <h3>On the map, show</h3>
+      <div className="theme-list view-list" role="radiogroup" aria-label="On the map, show">
+        {STEP_WINDOWS.map((w) => (
+          <button key={w.id} role="radio" aria-checked={win === w.id} className={`theme-opt view-opt ${win === w.id ? "on" : ""}`} onClick={() => setStepWindow(w.id)}>
+            <span className="theme-text"><b>{w.name}</b></span>
+          </button>
+        ))}
+      </div>
+    </>
   );
 }
 

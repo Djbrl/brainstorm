@@ -93,6 +93,8 @@ export type Camera = {
   reveal: (x: number, y: number, r: number, ms?: number) => void;
   /** One step of a follow: ease the centre toward putting (x, y) in the middle of the safe area. */
   easeToward: (x: number, y: number, f: number) => void;
+  /** Whether graph point (x, y) is on screen, at least `m` pixels inside the safe area. */
+  sees: (x: number, y: number, m?: number) => boolean;
   /** Stop a glide in progress. */
   stop: () => void;
 };
@@ -194,7 +196,13 @@ export function useCamera(fg: RefObject<Graph | undefined | null>, hostRef: RefO
       const dx = t.x - p.x, dy = t.y - p.y;
       if (Math.hypot(dx, dy) * k > 1.5) c.centerAt(p.x + dx * f, p.y + dy * f);
     };
-    return { safe, version, measure, userAt: () => userAt.current, view, moveTo, lookAt, frame, reveal, easeToward, stop };
+    const sees = (x: number, y: number, m = 24) => {
+      const v = view(), s = safe.current;
+      if (!v) return true;
+      const sx = s.w / 2 + (x - v.x) * v.k, sy = s.h / 2 + (y - v.y) * v.k;
+      return sx > s.left + m && sx < s.w - s.right - m && sy > s.top + m && sy < s.h - s.bottom - m;
+    };
+    return { safe, version, measure, userAt: () => userAt.current, view, moveTo, lookAt, frame, reveal, easeToward, sees, stop };
   }, [fg, hostRef, version]);
 }
 

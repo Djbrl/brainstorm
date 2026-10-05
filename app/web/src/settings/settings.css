@@ -54,3 +54,8 @@
 .settings-pop { box-shadow: 0 24px 60px rgba(0,0,0,.18), 0 0 0 200vmax rgba(24,24,36,.12); }
 :root:is([data-theme="ps2"], [data-theme="deadspace"]) .settings-pop { box-shadow: 0 24px 60px rgba(0,0,0,.45), 0 0 0 200vmax rgba(0,0,0,.32); }
 .theme-list + h3 { margin-top: 18px; }
+/* "On the map, show": the same rows as the themes, text only, one line each. */
+.view-list { gap: 2px; }
+.view-opt { padding: 7px 10px; }
+.view-opt b { font-weight: 500; }
+.view-opt.on b { font-weight: 600; }

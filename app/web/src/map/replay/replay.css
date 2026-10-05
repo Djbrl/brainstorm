@@ -212,3 +212,8 @@
   .rp-player .rp-speed { margin-left: auto; }
   .rp-talk { min-width: 0; width: calc(100% - 32px); }
 }
+
+/* ---------- long Track lists: an open chapter draws only the rows near the view and the cursor (ReplaySteps) ---------- */
+/* Every row is drawn for real (no placeholder height), so the empty space standing in for the others adds up exactly. */
+.rp-ch-moments .rp-m { content-visibility: visible; flex: none; }
+.rp-m-gap { flex: none; }

@@ -1,12 +1,12 @@
 // Owner: sidebar agent. Files tab: a searchable folder tree of the codebase, with per-file recency
 // dots and, during a replay, which files that thread touched.
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { ProjectMap } from "@contract";
 import { clock } from "../../lib/live";
 import { useNav } from "../../lib/nav";
 import { useThread } from "../../lib/thread";
 import { repoBase } from "../../lib/paths";
-import { buildTree, collectDirPaths, filterTree } from "./fileTree";
+import { buildTree, filterTree, flattenTree, refreshLeaves, samePaths, type BuiltTree } from "./fileTree";
 import { FileTreeView } from "./FileTreeView";
 
 function useTick(ms: number) {
@@ -17,34 +17,60 @@ function useTick(ms: number) {
   }, [ms]);
 }
 
+/**
+ * The folder tree for a map, built again only when a file is added or removed (or the root changes). An agent editing
+ * a file sends a new map for every edit: the same paths, so the tree stays and its leaves point at the new nodes.
+ */
+function useFileTree(map: ProjectMap | null): BuiltTree | null {
+  const built = useRef<{ files: ProjectMap["files"]; base: string; tree: BuiltTree } | null>(null);
+  const files = map?.files ?? null, base = map ? repoBase(map.root) : "";
+  return useMemo(() => {
+    if (!files) return null;
+    const b = built.current;
+    if (b && b.base === base && samePaths(b.files, files)) {
+      if (b.files !== files) { refreshLeaves(b.tree, files); b.files = files; }
+      return b.tree;
+    }
+    const tree = buildTree(files, base);
+    built.current = { files, base, tree };
+    return tree;
+  }, [files, base]);
+}
+
 export function FilesPanel({ map, onFocusFile }: { map: ProjectMap | null; onFocusFile: (path: string) => void }) {
   useTick(20000);
   const now = clock();
   const { replay } = useNav();
-  const thread = useThread(replay?.sessionId ?? null);
+  const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
   const [search, setSearch] = useState("");
   const [touchedOnly, setTouchedOnly] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  const base = useMemo(() => (map ? repoBase(map.root) : ""), [map]);
-  const tree = useMemo(() => (map ? buildTree(map.files, base) : null), [map, base]);
+  const built = useFileTree(map);
+  const tree = built?.root ?? null;
   const touched = replay ? thread?.touched ?? null : null;
-  const filtering = search.trim().length > 0 || touchedOnly;
+  // The box answers every key at once; the tree follows when there's time (typing never waits on a 20,000-file filter).
+  const query = useDeferredValue(search);
+  const filtering = query.trim().length > 0 || touchedOnly;
 
   const filtered = useMemo(() => {
     if (!tree) return null;
-    return filtering ? filterTree(tree, { query: search, touched, touchedOnly }) : tree;
-  }, [tree, filtering, search, touched, touchedOnly]);
+    return filtering ? filterTree(tree, { query, touched, touchedOnly }) : tree;
+  }, [tree, filtering, query, touched, touchedOnly]);
 
-  const forceExpanded = useMemo(() => (filtering && filtered ? collectDirPaths(filtered) : null), [filtering, filtered]);
+  // While filtering, every folder of the result is open.
+  const rows = useMemo(() => (filtered ? flattenTree(filtered, filtering ? null : expanded) : []), [filtered, filtering, expanded]);
 
-  const toggleDir = (path: string) =>
+  const toggleDir = useCallback((path: string) =>
     setExpanded((s) => {
       const n = new Set(s);
       if (n.has(path)) n.delete(path);
       else n.add(path);
       return n;
-    });
+    }), []);
+  // The sidebar hands a new function each render: the rows keep one that calls the latest.
+  const focusRef = useRef(onFocusFile); focusRef.current = onFocusFile;
+  const focusFile = useCallback((path: string) => focusRef.current(path), []);
 
   if (!map || !tree) return <p className="sidebar-empty">No files mapped yet.</p>;
 
@@ -60,7 +86,7 @@ export function FilesPanel({ map, onFocusFile }: { map: ProjectMap | null; onFoc
       )}
       <div className="sidebar-tree-scroll">
         {filtered ? (
-          <FileTreeView dir={filtered} depth={0} now={now} expanded={expanded} forceExpanded={forceExpanded} toggleDir={toggleDir} onFocusFile={onFocusFile} touched={touched} />
+          <FileTreeView rows={rows} files={map.files} now={now} toggleDir={toggleDir} onFocusFile={focusFile} touched={touched} />
         ) : (
           <p className="sidebar-empty">No matching files.</p>
         )}

@@ -6,7 +6,7 @@ import type { ForceGraphMethods } from "react-force-graph-2d";
 import { mapPrefs, replayCursor, useNav } from "../../lib/nav";
 import { useThread, type Thread } from "../../lib/thread";
 import { replayCamera } from "./store";
-import type { Camera } from "../camera";
+import { centerFor, type Camera } from "../camera";
 import { getCameraLock, getStepWindow, type StepWindow } from "../prefs";
 import { along, casing, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs } from "../themes";
 
@@ -56,6 +56,7 @@ const READ = 0.5;           // files it only read ("Show reads" on): there, quie
 const FADE_MS = 120;        // a file easing into or out of the focus (time constant: settled in about 400 ms)
 /** Fog of war (the whole-thread replay): only the last few moments are drawn in full (path, numbers, files). */
 const WINDOW = 25;
+const TRAIL_LAYERS = 16;    // strokes for the faint trail before the window (see fogTrail)
 const OTHER_MS = 120;       // playback pace for single "other" steps (every-step detail)
 const SUMMARY_MS = 380;     // playback pace for summary beats (light detail)
 const READ_MS = 520;        // playback pace for reads
@@ -63,12 +64,35 @@ const STEP_MS = 700;        // playback pace for edits and your prompts (at 1×)
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const STILL = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-/** The numbered stops: each file visited within the window, by its latest stop (the marker's own file has none). */
-function stopsOf(moves: Thread["moves"], mi: number, fogBefore: number, curFile: string | null) {
-  const last = new Map<string, number>();
-  for (let k = 0; k <= mi; k++) last.set(moves[k].file, k);
-  for (const [file, k] of last) if (moves[k].beatIndex < fogBefore || file === curFile) last.delete(file);
-  return last;
+/**
+ * The numbered stops: each file visited within the window, by its latest stop (the marker's own file has none), in the
+ * order of each file's first visit (the order they are drawn in). Moves are in beat order, so only the moves inside the
+ * window are read, from the marker back.
+ */
+function stopsOf(moves: Thread["moves"], mi: number, fogBefore: number, curFile: string | null, firstVisit: Map<string, number>) {
+  const latest = new Map<string, number>();
+  for (let k = mi; k >= 0 && moves[k].beatIndex >= fogBefore; k--) {
+    const f = moves[k].file;
+    if (f !== curFile && !latest.has(f)) latest.set(f, k);
+  }
+  if (latest.size < 2) return latest;
+  return new Map([...latest].sort((a, b) => (firstVisit.get(a[0]) ?? 0) - (firstVisit.get(b[0]) ?? 0)));
+}
+/** The first index in a sorted list whose value is over `v` (binary search). */
+function upperBound(sorted: ArrayLike<number>, v: number, hi = sorted.length) {
+  let lo = 0;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (sorted[m] <= v) lo = m + 1; else hi = m; }
+  return lo;
+}
+/** A file's changes in a thread: the beats that changed it (sorted) and when. */
+type Edits = { i: number[]; ts: string[] };
+/** When a file was last changed at or before beat `i` (undefined: not yet). */
+const editedBy = (e: Edits | undefined, i: number) => { if (!e) return undefined; const n = upperBound(e.i, i); return n ? e.ts[n - 1] : undefined; };
+/** The first move at or after a beat (binary search over the moves' beat indexes, up to `hi`). */
+function firstMoveFrom(moves: Thread["moves"], beat: number, hi: number) {
+  let lo = 0;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (moves[m].beatIndex < beat) lo = m + 1; else hi = m; }
+  return lo;
 }
 /** A stop's badge: just off the file's top-left. */
 const badgeAt = (n: { x: number; y: number; r: number }, scale: number) => {
@@ -106,8 +130,10 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
   const len = active ? thread!.beats.length : 0;
   const last = Math.max(0, len - 1);
   const index = replay ? Math.min(replay.index, last) : 0;
-  // Publish the step at the cursor so the URL can link to it (read by nav's URL effect in this same commit).
-  replayCursor.stepId = active && !replay?.atStep ? thread!.beats[index]?.step.id ?? null : replayCursor.stepId;
+  // Publish the step at the cursor (switching the detail lands on it, the Track lens opens on it). After every commit,
+  // as the render used to do, but outside the render.
+  const cursorStep = active && !replay?.atStep ? thread!.beats[index]?.step.id ?? null : undefined;
+  useEffect(() => { if (cursorStep !== undefined) replayCursor.stepId = cursorStep; });
 
   // Land on a step id (links, Follow, switching detail) once the thread is built.
   useEffect(() => {
@@ -178,36 +204,67 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
   // Locked: the marker stays in the middle of the part of the map no panel covers (easing, never snapping); the wheel
   // and pinch still zoom, and the zoom stays where you put it. Unlocked: the camera stays where it is; when the marker
   // leaves the view, MapView frames the recent window again, unless you moved the camera since it last framed it.
+  // The loop runs only while there is something to do: locked, until the camera has caught up with the marker;
+  // unlocked, while the marker is out of view. draw() starts it again when the marker, the view, the lock or the
+  // pinned file changes (see kickCamera).
+  const camLoop = useRef({ enabled: false, raf: 0, lostAt: 0, tick: () => {},
+    seen: { x: null as number | null, y: null as number | null, lock: false, pinned: false, safe: null as unknown, a: null as number | null, e: null as number | null, f: null as number | null } });
   useEffect(() => {
+    const L = camLoop.current;
     if (!active || mode === "footprint") return;
-    let raf = 0, lostAt = 0;
-    const tick = () => {
+    L.tick = () => {
+      L.raf = 0;
       const a = anim.current, cam = camera.current;
+      let busy = false;
       if (a.cam && !replayCamera.pinned) {
-        if (getCameraLock()) cam.easeToward(a.cam.x, a.cam.y, 0.08);
-        else if (performance.now() - lostAt > 1200 && !cam.sees(a.cam.x, a.cam.y)) { lostAt = performance.now(); replayCamera.lost?.(); }
+        if (getCameraLock()) {
+          // The same test easeToward makes before it moves (over 1.5 px off): once it's under, the camera has arrived.
+          const v = cam.view();
+          if (v) { const t = centerFor(cam.safe.current, a.cam.x, a.cam.y, v.k); busy = Math.hypot(t.x - v.x, t.y - v.y) * v.k > 1.5; }
+          if (busy) cam.easeToward(a.cam.x, a.cam.y, 0.08);
+        } else {
+          busy = !cam.sees(a.cam.x, a.cam.y);
+          if (busy && performance.now() - L.lostAt > 1200) { L.lostAt = performance.now(); replayCamera.lost?.(); }
+        }
       }
-      raf = requestAnimationFrame(tick);
+      if (busy) L.raf = requestAnimationFrame(L.tick);
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    L.enabled = true;
+    L.raf = requestAnimationFrame(L.tick);
+    return () => { L.enabled = false; cancelAnimationFrame(L.raf); L.raf = 0; };
   }, [active, mode, fg, camera]);
+  /** From draw(), every frame: start the camera loop again when something it follows changed since the last frame. */
+  const kickCamera = useCallback((ctx: CanvasRenderingContext2D) => {
+    const L = camLoop.current, s = L.seen, c = anim.current.cam, m = ctx.getTransform();
+    const x = c?.x ?? null, y = c?.y ?? null, lock = getCameraLock(), pinned = replayCamera.pinned, safe = camera.current.safe.current;
+    if (x === s.x && y === s.y && lock === s.lock && pinned === s.pinned && safe === s.safe && m.a === s.a && m.e === s.e && m.f === s.f) return;
+    s.x = x; s.y = y; s.lock = lock; s.pinned = pinned; s.safe = safe; s.a = m.a; s.e = m.e; s.f = m.f;
+    if (L.enabled && !L.raf) L.raf = requestAnimationFrame(L.tick);
+  }, [camera]);
 
   // ---- the focus ----
-  // Per moment: the files it touched, the ones it changed and when. Per file: when it was touched and changed (the fog).
-  const { beatFiles, touchedAt, editsAt } = useMemo(() => {
-    const touchedAt = new Map<string, number[]>(), editsAt = new Map<string, { i: number; ts: string }[]>();
+  // Per moment: the files it touched, the ones it changed and when. Per file: when it was touched and changed (the fog),
+  // as sorted beat indexes (binary search). Per tracer move: each file's first visit (the stops' order, the trail's files).
+  const data = useMemo(() => {
+    const touchedAt = new Map<string, number[]>(), editsAt = new Map<string, Edits>();
     const beatFiles = (thread?.beats ?? []).map((b) => {
-      const touched = new Set([...b.files, ...(b.file ? [b.file] : [])]);
-      for (const f of touched) touchedAt.set(f, [...(touchedAt.get(f) ?? []), b.index]);
+      const touched = new Set(b.files);
+      if (b.file) touched.add(b.file);
+      for (const f of touched) { const l = touchedAt.get(f); if (l) l.push(b.index); else touchedAt.set(f, [b.index]); }
       if (b.action !== "edit") return { touched, edited: null, ts: undefined };
-      const ts = b.steps.filter((x) => x.kind === "edit").pop()?.ts ?? b.step.ts;
-      for (const f of b.files) editsAt.set(f, [...(editsAt.get(f) ?? []), { i: b.index, ts }]);
+      let ts = b.step.ts;
+      for (let k = b.steps.length - 1; k >= 0; k--) if (b.steps[k].kind === "edit") { ts = b.steps[k].ts; break; }
+      for (const f of b.files) {
+        const e = editsAt.get(f);
+        if (e) { e.i.push(b.index); e.ts.push(ts); } else editsAt.set(f, { i: [b.index], ts: [ts] });
+      }
       return { touched, edited: new Set(b.files), ts };
     });
-    return { beatFiles, touchedAt, editsAt };
+    const firstVisit = new Map<string, number>(), firstFiles: string[] = [], firstK: number[] = [];
+    (thread?.moves ?? []).forEach((m, k) => { if (!firstVisit.has(m.file)) { firstVisit.set(m.file, k); firstFiles.push(m.file); firstK.push(k); } });
+    return { beatFiles, touchedAt, editsAt, firstVisit, firstFiles, firstK };
   }, [thread]);
-  const dataRef = useRef({ beatFiles, touchedAt, editsAt }); dataRef.current = { beatFiles, touchedAt, editsAt };
+  const dataRef = useRef(data); dataRef.current = data;
 
   /**
    * THE FOCUS, in one place: which files are lit (and named) now, and what every other file is; null when nothing is in
@@ -216,15 +273,16 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
    * what they read quieter (with "Show reads" on), the rest dimmed back with no names. As the cursor moves (live, a
    * replay, scrolling the Track tab) files enter and leave it, and `look` below eases each one. "The whole thread": at
    * rest its whole footprint, in a replay the fog of its last few moments. A thread that changed nothing lights nothing,
-   * as its "Changed no files" says. Cached per cursor: it's read for every file on every frame.
+   * as its "Changed no files" says. Cached per cursor: it's read for every file (twice per Metro line) on every frame,
+   * so the cache test compares fields and builds nothing.
    */
-  const cache = useRef<{ key: string; thread: Thread | null; focus: Focus | null }>({ key: "", thread: null, focus: null });
+  const cache = useRef<{ index: number; mode: string; win: StepWindow | null; reads: boolean; thread: Thread | null; focus: Focus | null }>(
+    { index: -1, mode: "", win: null, reads: false, thread: null, focus: null });
   const focus = useCallback((): Focus | null => {
     const s = st.current;
     if (!s.active || !s.thread) return null;
-    const win: StepWindow = getStepWindow(), reads = mapPrefs.showReads;
-    const key = `${s.index}|${s.mode}|${win}|${reads}`;
-    if (cache.current.thread === s.thread && cache.current.key === key) return cache.current.focus;
+    const win: StepWindow = getStepWindow(), reads = mapPrefs.showReads, c = cache.current;
+    if (c.thread === s.thread && c.index === s.index && c.mode === s.mode && c.win === win && c.reads === reads) return c.focus;
     const { beatFiles, touchedAt, editsAt } = dataRef.current;
     const files = new Map<string, Target>();
     if (win !== "all") {
@@ -238,28 +296,24 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
       }
       // The file the tracer stands on (the last one it changed) stays lit, even when the window is all talk.
       const mi = s.thread.beats[s.index]?.moveIndex ?? -1, here = mi >= 0 ? s.thread.moves[mi].file : null;
-      if (here && !files.get(here)?.edited) {
-        let edited: string | undefined;
-        for (const e of editsAt.get(here) ?? []) { if (e.i > s.index) break; edited = e.ts; }
-        files.set(here, { alpha: 1, edited, named: true });
-      }
+      if (here && !files.get(here)?.edited) files.set(here, { alpha: 1, edited: editedBy(editsAt.get(here), s.index), named: true });
     } else if (s.mode !== "play") {
       for (const id of s.thread.touched.keys()) {
         const e = editsAt.get(id);
-        if (e) files.set(id, { alpha: 1, edited: e[e.length - 1].ts });
+        if (e) files.set(id, { alpha: 1, edited: e.ts[e.ts.length - 1] });
         else if (reads) files.set(id, { alpha: READ });
       }
     } else {
       // The whole thread, replaying: files light up as it reaches them, and fade back once out of the last few moments.
       for (const [id, at] of touchedAt) {
-        let last = -1, edited: string | undefined;
-        for (const i of at) { if (i > s.index) break; last = i; }
-        for (const e of editsAt.get(id) ?? []) { if (e.i > s.index) break; edited = e.ts; }
-        if (last >= 0 && (edited || reads)) files.set(id, { alpha: s.index - last <= WINDOW ? 1 : PAST, edited });
+        const n = upperBound(at, s.index);   // touches up to the cursor
+        if (!n) continue;
+        const edited = editedBy(editsAt.get(id), s.index);
+        if (edited || reads) files.set(id, { alpha: s.index - at[n - 1] <= WINDOW ? 1 : PAST, edited });
       }
     }
     const f: Focus = { files, rest: { alpha: DIM } };
-    cache.current = { key, thread: s.thread, focus: f };
+    cache.current = { index: s.index, mode: s.mode, win, reads, thread: s.thread, focus: f };
     return f;
   }, []);
   const focusOf = useCallback((id: string): Target | null => { const f = focus(); return f ? f.files.get(id) ?? f.rest : null; }, [focus]);
@@ -285,6 +339,56 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     return e;
   }, [focusOf]);
   const nodeAlpha = useCallback((id: string) => look(id)?.alpha ?? 1, [look]);
+
+  // The numbered stops for a cursor: draw() and marks() both ask, every frame.
+  const stopsCache = useRef<{ thread: Thread | null; mi: number; fog: number; cur: string | null; stops: Map<string, number> }>(
+    { thread: null, mi: -2, fog: 0, cur: null, stops: new Map() });
+  const stopsAt = useCallback((thread: Thread, mi: number, fog: number, cur: string | null) => {
+    const c = stopsCache.current;
+    if (c.thread === thread && c.mi === mi && c.fog === fog && c.cur === cur) return c.stops;
+    const stops = stopsOf(thread.moves, mi, fog, cur, dataRef.current.firstVisit);
+    stopsCache.current = { thread, mi, fog, cur, stops };
+    return stops;
+  }, []);
+
+  /**
+   * The tracer before the fog window (segments 1..cut-1), faint. Each segment used to be its own stroke, so where they
+   * cross or a route is taken again the haze darkens; here they are dealt in turn into TRAIL_LAYERS paths, each stroked
+   * once: neighbouring and repeated segments still land in different strokes and still add up. Built again only when
+   * the window moves, the files move (the layout settling), the nodes are rebuilt, the theme's route changes, or, on
+   * routed themes (the track runs between the marker's stops, set off the files in screen pixels), the zoom changes.
+   */
+  const trail = useRef<{ thread: Thread | null; cut: number; route: string; scale: number; nodes: unknown; sig: number; paths: Path2D[] | null }>(
+    { thread: null, cut: 0, route: "", scale: 0, nodes: null, sig: 0, paths: null });
+  const fogTrail = useCallback((thread: Thread, cut: number, route: ReturnType<typeof mapStyle>["route"], scale: number,
+    stop: (id: string) => { x: number; y: number } | undefined): Path2D[] | null => {
+    if (cut <= 1) return null;
+    const nodes = nodeIndexRef.current, { firstFiles, firstK } = dataRef.current, moves = thread.moves;
+    // Where the trail's files are now: the files first visited before move `cut`, each weighted by its place in that list.
+    let sig = 0;
+    for (let i = 0, u = upperBound(firstK, cut - 1); i < u; i++) {
+      const n = nodes?.get(firstFiles[i]);
+      if (n?.x !== undefined && n.y !== undefined) sig += (i + 1) * (n.x * 3.1 + n.y * 1.7 + n.r);
+    }
+    const c = trail.current, sc = route === "glide" ? 0 : scale;
+    if (c.paths && c.thread === thread && c.cut === cut && c.route === route && c.scale === sc && c.nodes === nodes && c.sig === sig) return c.paths;
+    const paths = Array.from({ length: Math.min(TRAIL_LAYERS, cut - 1) }, () => new Path2D());
+    for (let k = 1; k < cut; k++) {
+      const p0 = stop(moves[k - 1].file), p1 = stop(moves[k].file);
+      if (!p0 || !p1) continue;
+      const path = paths[k % paths.length];
+      if (route !== "glide") {
+        const pts = routePoints(route, p0.x, p0.y, p1.x, p1.y);
+        path.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < pts.length; i++) path.lineTo(pts[i][0], pts[i][1]);
+      } else {
+        const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2, dx = p1.x - p0.x, dy = p1.y - p0.y;
+        path.moveTo(p0.x, p0.y); path.quadraticCurveTo(mx - dy * 0.15, my + dx * 0.15, p1.x, p1.y);
+      }
+    }
+    trail.current = { thread, cut, route, scale: sc, nodes, sig, paths };
+    return paths;
+  }, [nodeIndexRef]);
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
     const s = st.current;
@@ -324,12 +428,18 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     // Camera target: the marker; on a read, between the marker and the file read so both stay in view.
     const readPos = beat.action === "read" && beat.file ? pos(beat.file) : undefined; // the last file of a read group
     a.cam = target && readPos ? { x: (a.x + readPos.x) / 2, y: (a.y + readPos.y) / 2 } : target ? { x: a.x, y: a.y } : readPos ? { x: readPos.x, y: readPos.y } : null;
+    kickCamera(ctx);
 
     // Tracer path through moves[0..mi], newest segments strongest; segments older than the window are a faint thread.
     // Routed themes: the track runs between the marker's stops, not the files' centres, so a trip back retraces the same track.
     const win = getStepWindow(), fogBefore = s.index - (win === "all" ? WINDOW : win); // the path fades with the focus
     const stop = routed ? markerAt : pos;
-    for (let k = 1; k <= mi; k++) {
+    // Everything before the window is one faint path, built again only when it changes (see fogTrail); the segment
+    // into the marker is always drawn here, as it rides the marker.
+    const cut = mi >= 1 ? Math.min(firstMoveFrom(moves, fogBefore, mi + 1), mi) : 0;   // segments 1..cut-1 are old
+    const faint = fogTrail(s.thread, cut, style.route, scale, stop);
+    if (faint) { ctx.globalAlpha = 0.07; ctx.strokeStyle = line; ctx.lineWidth = 1 / scale; for (const p of faint) ctx.stroke(p); }
+    for (let k = Math.max(1, cut); k <= mi; k++) {
       const p0 = stop(moves[k - 1].file);
       const p1 = k === mi && target ? { x: a.x, y: a.y } : stop(moves[k].file);
       if (!p0 || !p1) continue;
@@ -348,7 +458,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = `700 ${BADGE_FONT / scale}px ${font}`;
-    for (const [file, k] of stopsOf(moves, mi, fogBefore, curFile)) {
+    for (const [file, k] of stopsAt(s.thread, mi, fogBefore, curFile)) {
       const n = pos(file);
       if (!n) continue;
       const label = String(k + 1);
@@ -447,7 +557,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
       }
     }
     ctx.restore();
-  }, [accent, font, nodeIndexRef]);
+  }, [accent, font, nodeIndexRef, fogTrail, stopsAt, kickCamera]);
 
   const marks = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
     const s = st.current, boxes: Box[] = [];
@@ -455,7 +565,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     if (!beat || !s.thread) return { boxes, named: null };
     const { moves } = s.thread, mi = beat.moveIndex, curFile = mi >= 0 ? moves[mi].file : null, nodes = nodeIndexRef.current;
     const h = 15 / scale, pad = 2 / scale, win = getStepWindow();
-    for (const [file, k] of stopsOf(moves, mi, s.index - (win === "all" ? WINDOW : win), curFile)) {   // as draw() does
+    for (const [file, k] of stopsAt(s.thread, mi, s.index - (win === "all" ? WINDOW : win), curFile)) {   // as draw() does
       const n = nodes?.get(file);
       if (n?.x === undefined || n.y === undefined) continue;
       const b = badgeAt({ x: n.x, y: n.y, r: n.r }, scale), w = Math.max(h, (String(k + 1).length * BADGE_FONT * 0.62 + 8) / scale);
@@ -477,7 +587,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
       boxes.push({ x0: read.x - w / 2 - pad, x1: read.x + w / 2 + pad, y0: by - 14 / scale, y1: by + pad });
     }
     return { boxes, named: curFile };
-  }, [font, nodeIndexRef]);
+  }, [font, nodeIndexRef, stopsAt]);
 
   const footprint = useCallback(() => {
     const s = st.current, f = focus();

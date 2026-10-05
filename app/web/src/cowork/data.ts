@@ -51,6 +51,11 @@ export const usePlaces = () => useSyncExternalStore(placesStore.subscribe, place
 
 /** The events at a place id: a page (`area|page`) or, for the map's site bubbles, a whole site (`area|site`). */
 export const eventsAt = (data: CoworkSummary, id: string) => data.events.filter((e) => `${e.area}|${e.page}` === id || `${e.area}|${e.site}` === id);
+/** The place (page) a step went to: its last one if it went to several. */
+export function placeOfStep(data: CoworkSummary, stepId: string): string | null {
+  const e = data.events.findLast((x) => x.stepId === stepId);
+  return e ? `${e.area}|${e.page}` : null;
+}
 /** Select a place and show its newest step (or a given one) in the panel. */
 export function selectPlace(id: string | null, stepId?: string) {
   const d = places.data;

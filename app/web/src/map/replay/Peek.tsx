@@ -117,7 +117,9 @@ function Body({ step, result }: { step: Step; result?: Step }) {
   const text = cleanResult(result.text ?? "");
   const numbered = parseNumbered(text);
   if (numbered) return <Code key={step.id} start={numbered.start} lines={numbered.lines} />;
-  return text ? <Code key={step.id} start={1} lines={lines(text)} /> : <p className="peek-muted">Empty file.</p>;
+  if (text) return <Code key={step.id} start={1} lines={lines(text)} />;
+  // An image or a PDF comes back as a picture for the model, not text: nothing to show here, but it isn't empty.
+  return <p className="peek-muted">{/\.(png|jpe?g|gif|webp|svg|ico|bmp|pdf)$/i.test(step.filePath ?? "") ? "A picture: open the step to see it." : "Empty file."}</p>;
 }
 
 /** What a read covered: "Lines 40–120". */

@@ -73,7 +73,8 @@ type RawLine = {
   message?: { role?: string; content?: unknown };
 };
 
-type SessionRow = { id: string; cwd: string; title: string; started_at: string; last_event_at: string; custom_title: number; title_set: number };
+/** `worked`: an agent called a tool or edited a file in the thread (one that only answered a slash command didn't). */
+type SessionRow = { id: string; cwd: string; title: string; started_at: string; last_event_at: string; custom_title: number; title_set: number; worked: number };
 type BatchSession = SessionRow & { isNew: boolean; dirty: boolean };
 
 /** One chunk of a file being stored: passed down the parse, so reads of several files can interleave. */
@@ -146,6 +147,11 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   /** Top-level project folders chokidar watches (only the active workspace's are descended into). */
   private watchedTop = new Set<string>();
   private st!: ReturnType<ListenerService["prepare"]>;
+  /** listSessions' rows: filtered, titles cleaned, newest first. Dropped when a session row is written or the
+   * workspace changes; status and deleted threads are worked out on each call. */
+  private sessionsCache: SessionRow[] | null = null;
+  /** Thread id → its transcript files (<project>/<sessionId>.jsonl), from the files read. Dropped when one is added. */
+  private transcripts: Map<string, string[]> | null = null;
 
   constructor(
     private dbs: DbService,
@@ -168,6 +174,15 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       text TEXT, tool TEXT, input TEXT, file_path TEXT, diff TEXT, label TEXT, risk TEXT,
       is_subagent INTEGER NOT NULL DEFAULT 0
     )`);
+    // Added 5 Oct 2026: sessions.worked, kept up to date as steps are stored, instead of a scan of every step per list.
+    if (!(db.prepare(`PRAGMA table_info(sessions)`).all() as { name: string }[]).some((c) => c.name === "worked")) {
+      db.exec("BEGIN");
+      try {
+        db.exec(`ALTER TABLE sessions ADD COLUMN worked INTEGER NOT NULL DEFAULT 0`);
+        db.exec(`UPDATE sessions SET worked = 1 WHERE id IN (SELECT DISTINCT session_id FROM steps WHERE kind IN ('tool_call', 'edit'))`);
+        db.exec("COMMIT");
+      } catch (e) { db.exec("ROLLBACK"); throw e; }
+    }
     // Added 30 Sep 2026: pairs a tool result with its call exactly (older rows are paired by order).
     if (!(db.prepare(`PRAGMA table_info(steps)`).all() as { name: string }[]).some((c) => c.name === "tool_use_id")) db.exec(`ALTER TABLE steps ADD COLUMN tool_use_id TEXT`);
     db.exec(`CREATE INDEX IF NOT EXISTS steps_session_seq ON steps(session_id, seq)`);
@@ -239,8 +254,8 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
          VALUES (@id, @session_id, @seq, @ts, @kind, @text, @tool, @input, @file_path, @diff, @label, @risk, @is_subagent, @tool_use_id)`,
       ),
       sessionRow: db.prepare(`SELECT * FROM sessions WHERE id = ?`),
-      insertSession: db.prepare(`INSERT INTO sessions (id, cwd, title, started_at, last_event_at, custom_title, title_set) VALUES (?, ?, ?, ?, ?, ?, ?)`),
-      updateSession: db.prepare(`UPDATE sessions SET cwd = ?, title = ?, last_event_at = ?, title_set = ?, custom_title = ? WHERE id = ?`),
+      insertSession: db.prepare(`INSERT INTO sessions (id, cwd, title, started_at, last_event_at, custom_title, title_set, worked) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`),
+      updateSession: db.prepare(`UPDATE sessions SET cwd = ?, title = ?, last_event_at = ?, title_set = ?, custom_title = ?, worked = ? WHERE id = ?`),
       allSessions: db.prepare(`SELECT * FROM sessions ORDER BY last_event_at DESC`),
       saveOffset: db.prepare(`INSERT INTO listener_offsets (file, offset) VALUES (?, ?) ON CONFLICT(file) DO UPDATE SET offset = excluded.offset`),
       stepById: db.prepare(`SELECT * FROM steps WHERE id = ?`),
@@ -261,6 +276,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     const base = repoBase(this.activeRoot);
     this.roots = [...new Set([this.activeRoot, base, ...formerRoots(this.cfg.claudeProjectsDir, this.activeRoot)])];
     this.projectFilterPrefixes = this.sessionFilterOverride ? [] : this.roots.map(encodeRoot);
+    this.sessionsCache = null;
   }
 
   /** True if `projectDir` (a top-level folder name under claudeProjectsDir) belongs to the active workspace. */
@@ -487,14 +503,18 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       this.log.warn(`storing ${file} from byte ${bufStart + start} failed, retried on its next change: ${(e as Error).message}`);
       return false;
     }
-    this.offsets.set(file, bufStart + end);
+    this.setOffset(file, bufStart + end);
     this.announce(batch);
     return true;
   }
 
   private saveOffset(file: string, offset: number) {
-    this.offsets.set(file, offset);
     this.st.saveOffset.run(file, offset);
+    this.setOffset(file, offset);
+  }
+  private setOffset(file: string, offset: number) {
+    if (!this.offsets.has(file)) this.transcripts = null;
+    this.offsets.set(file, offset);
   }
 
   // ---- parsing ----
@@ -653,7 +673,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       is_subagent: step.isSubagent ? 1 : 0,
       tool_use_id: step.toolUseId ?? null,
     });
-    this.upsertSession(b, step.sessionId, opts?.cwd ?? "", step.ts, opts?.promptTitle);
+    this.upsertSession(b, step.sessionId, opts?.cwd ?? "", step.ts, opts?.promptTitle, step.kind === "tool_call" || step.kind === "edit");
     if (!b.quiet) b.events.push({ step });
   }
 
@@ -675,14 +695,14 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     b.events.push({ session: sessionId });
   }
 
-  private upsertSession(b: Batch, sessionId: string, cwd: string, ts: string, rawPrompt?: string) {
+  private upsertSession(b: Batch, sessionId: string, cwd: string, ts: string, rawPrompt?: string, worked = false) {
     const promptTextForTitle = rawPrompt ? promptTitle(rawPrompt) : undefined;
     const row = this.batchSession(b, sessionId);
     if (!row) {
       const title = promptTextForTitle ? promptTextForTitle.slice(0, 80) : "(untitled session)";
       b.sessions.set(sessionId, {
         id: sessionId, cwd, title, started_at: ts, last_event_at: ts, custom_title: 0, title_set: promptTextForTitle ? 1 : 0,
-        isNew: true, dirty: true,
+        worked: worked ? 1 : 0, isNew: true, dirty: true,
       });
       this.announceSession(b, sessionId);
       return;
@@ -699,6 +719,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     if (titleOrCwdChanged || lastEventAt !== row.last_event_at || titleSet !== row.title_set) {
       Object.assign(row, { cwd: newCwd, title, last_event_at: lastEventAt, title_set: titleSet, dirty: true });
     }
+    if (worked && !row.worked) Object.assign(row, { worked: 1, dirty: true });
     if (titleOrCwdChanged) this.announceSession(b, sessionId);
   }
 
@@ -707,7 +728,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     const now = new Date().toISOString();
     if (!row) {
       b.sessions.set(sessionId, {
-        id: sessionId, cwd: "", title: customTitle, started_at: now, last_event_at: now, custom_title: 1, title_set: 1, isNew: true, dirty: true,
+        id: sessionId, cwd: "", title: customTitle, started_at: now, last_event_at: now, custom_title: 1, title_set: 1, worked: 0, isNew: true, dirty: true,
       });
     } else {
       Object.assign(row, { title: customTitle, custom_title: 1, title_set: 1, dirty: true });
@@ -719,8 +740,9 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   private flushSessions(b: Batch) {
     for (const r of b.sessions.values()) {
       if (!r.dirty) continue;
-      if (r.isNew) this.st.insertSession.run(r.id, r.cwd, r.title, r.started_at, r.last_event_at, r.custom_title, r.title_set);
-      else this.st.updateSession.run(r.cwd, r.title, r.last_event_at, r.title_set, r.custom_title, r.id);
+      if (r.isNew) this.st.insertSession.run(r.id, r.cwd, r.title, r.started_at, r.last_event_at, r.custom_title, r.title_set, r.worked);
+      else this.st.updateSession.run(r.cwd, r.title, r.last_event_at, r.title_set, r.custom_title, r.worked, r.id);
+      this.sessionsCache = null;
     }
   }
 
@@ -765,16 +787,35 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     return row ? this.rowToSession(row) : undefined;
   }
 
-  /** Only sessions whose cwd is the active workspace root or inside it (owner: S). */
+  /** Only sessions whose cwd is the active workspace root or inside it (owner: S). Called every 2 s (attention) and by
+   * most endpoints: the filtered rows are cached, and only the time-dependent parts are recomputed. */
   listSessions(): Session[] {
-    const rows = this.st.allSessions.all() as SessionRow[];
-    // Titles stored before promptTitle() existed can still start with Claude Code's wrapper tags.
-    const sessions = rows.map((r) => this.rowToSession(r.custom_title ? r : { ...r, title: promptTitle(r.title) ?? "(untitled session)" }));
-    // A thread where no agent did anything but answer a slash command (opening this app, /compact) isn't work to show.
-    const worked = new Set((this.dbs.db.prepare(`SELECT DISTINCT session_id FROM steps WHERE kind IN ('tool_call', 'edit')`).all() as { session_id: string }[]).map((r) => r.session_id));
-    const idle = (s: Session) => !worked.has(s.id) && (s.title.startsWith("/") || s.title === "(untitled session)");
+    this.sessionsCache ??= this.shownSessionRows();
     // A thread you deleted (in Claude's desktop app) isn't one any more: its transcript is gone and the app left a
     // marker. One that Claude Code cleaned up on its own (after ~30 days) stays: Brainstorm keeps that history.
+    const deleted = deletedThreads();
+    let rows = this.sessionsCache;
+    if (deleted.size) {
+      const transcripts = this.transcriptIndex();
+      const gone = (id: string) => { const files = transcripts.get(id); return deleted.has(id) && !!files && !files.some((f) => existsSync(f)); };
+      rows = rows.filter((r) => !gone(r.id));
+    }
+    return rows.map((r) => this.rowToSession(r));
+  }
+
+  private shownSessionRows(): SessionRow[] {
+    const rows = this.st.allSessions.all() as SessionRow[];
+    // Titles stored before promptTitle() existed can still start with Claude Code's wrapper tags.
+    const cleaned = rows.map((r) => (r.custom_title ? r : { ...r, title: promptTitle(r.title) ?? "(untitled session)" }));
+    // A thread where no agent did anything but answer a slash command (opening this app, /compact) isn't work to show.
+    const idle = (r: SessionRow) => !r.worked && (r.title.startsWith("/") || r.title === "(untitled session)");
+    const shown = cleaned.filter((r) => !idle(r));
+    if (!this.activeRoot) return shown;
+    return shown.filter((r) => this.isWithinRoot(r.cwd));
+  }
+
+  private transcriptIndex(): Map<string, string[]> {
+    if (this.transcripts) return this.transcripts;
     const transcripts = new Map<string, string[]>();
     for (const file of this.offsets.keys()) {
       const parts = relative(this.cfg.claudeProjectsDir, file).split(sep);
@@ -782,11 +823,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       const id = basename(file, ".jsonl");
       transcripts.set(id, [...(transcripts.get(id) ?? []), file]);
     }
-    const deleted = deletedThreads();
-    const gone = (s: Session) => { const files = transcripts.get(s.id); return deleted.has(s.id) && !!files && !files.some((f) => existsSync(f)); };
-    const shown = sessions.filter((s) => !idle(s) && !gone(s));
-    if (!this.activeRoot) return shown;
-    return shown.filter((s) => this.isWithinRoot(s.cwd));
+    return (this.transcripts = transcripts);
   }
 
   private isWithinRoot(cwd: string): boolean {

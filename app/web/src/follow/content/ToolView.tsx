@@ -1,4 +1,4 @@
-// Owner: C. The body of a tool step in the step panel, shaped per tool: a terminal for commands, numbered code for
+// The body of a tool step in the step panel, shaped per tool: a terminal for commands, numbered code for
 // reads, one row per browser action with its screenshots, links for searches, and fields or a JSON tree for the rest.
 import { useEffect, useState, type ReactNode } from "react";
 import type { Step } from "@contract";

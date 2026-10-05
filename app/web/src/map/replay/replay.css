@@ -1,31 +1,13 @@
-/* Owner: replay agent. Thread replay on the map: playback bar, step list, Follow button. */
+/* Thread replay on the map: the player and the footer around it (dock), the step list, the share menu, the talk card. */
 
-/* ---------- playback bar ---------- */
-.rp-bar { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 5;
-  width: min(760px, calc(100% - 32px)); padding: 12px 14px 12px 18px;
-  background: rgba(255,255,255,.88); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
-  border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 10px 40px rgba(0,0,0,.07); }
-.rp-bar-empty { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: auto; min-width: 320px; }
+/* ---------- player controls ---------- */
 .rp-empty { margin: 0; color: var(--ink-2); font-size: 14.5px; }
-/* The legend sits in the same corner; it hides while the player is up and fades back when it leaves. */
-.map-wrap:has(.rp-bar) .map-legend { display: none; }
+/* The legend fades in when it comes back. */
 .map-legend { animation: rp-fade .3s ease-out; }
 @keyframes rp-fade { from { opacity: 0; } to { opacity: 1; } }
-/* The player slides up in, and down out. */
-.rp-bar { animation: rp-in .38s cubic-bezier(.2,.85,.25,1); }
-.rp-bar.leaving { animation: rp-out .26s cubic-bezier(.5,0,.75,.2) forwards; pointer-events: none; }
-@keyframes rp-in { from { opacity: 0; transform: translate(-50%, 36px); } to { opacity: 1; transform: translate(-50%, 0); } }
-@keyframes rp-out { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, 36px); } }
-@media (prefers-reduced-motion: reduce) { .rp-bar, .rp-bar.leaving, .map-legend { animation-duration: .01s; } }
+@media (prefers-reduced-motion: reduce) { .map-legend { animation-duration: .01s; } }
 
-.rp-top { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.rp-count { font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink); }
-.rp-label { flex: 1; min-width: 0; font-size: 14px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.rp-controls { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
-.rp-group { display: flex; align-items: center; gap: 2px; }
-
-.rp-bar button, .rp-steps button, .rp-follow-btn { font: inherit; }
+.rp-steps button { font: inherit; }
 .rp-icon { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; border: 0; padding: 0;
   background: transparent; color: var(--ink-2); transition: background .15s, color .15s; }
 .rp-icon:hover:not(:disabled) { background: #f0f0f3; color: var(--ink); }
@@ -36,11 +18,10 @@
   font-size: 13.5px; font-weight: 500; padding: 5px 10px; border-radius: 999px; white-space: nowrap; }
 .rp-text:hover { background: #f0f0f3; color: var(--accent); }
 
-.rp-bar :focus-visible, .rp-steps :focus-visible, .rp-follow-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rp-steps :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Slider over all beats, with edit ticks underneath. */
+/* Slider over all beats, with a mark where each chapter starts (.rp-marks, below). */
 .rp-slider { position: relative; flex: 1; min-width: 80px; height: 32px; display: flex; align-items: center; }
-.rp-ticks { position: absolute; left: 7px; right: 7px; top: 21px; width: calc(100% - 14px); height: 7px; color: var(--accent); opacity: .55; pointer-events: none; }
 .rp-slider input { -webkit-appearance: none; appearance: none; width: 100%; height: 20px; margin: 0; background: transparent; cursor: pointer; }
 .rp-slider input::-webkit-slider-runnable-track { height: 4px; border-radius: 2px;
   background: linear-gradient(to right, var(--accent) var(--rp-pct), #e3e3ea var(--rp-pct)); }
@@ -58,20 +39,14 @@
 .rp-speed button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.1); }
 
 @media (max-width: 640px) {
-  .rp-bar { bottom: 16px; padding: 10px 10px 10px 14px; }
-  .rp-controls { flex-wrap: wrap; gap: 8px; }
   .rp-slider { order: 5; flex-basis: 100%; }
   .rp-text span { display: none; }
 }
 
 /* ---------- step list (fills the height the sidebar gives it) ---------- */
 .rp-steps { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-.rp-steps-sum { margin: 0 0 6px; font-size: 13px; color: var(--ink-3); }
 .rp-list { position: relative; flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; overscroll-behavior: contain; }
-/* Room below the last step so it can reach the center line; none above, so the start of a thread isn't a blank gap. */
-.rp-spacer { height: calc(50% - 26px); }
-.rp-spacer.top { height: 4px; }
-/* Rows fade as they scroll under the summary line instead of being cut. */
+/* Rows fade out at the top edge as they scroll, instead of being cut. */
 .rp-list { -webkit-mask-image: linear-gradient(transparent, #000 16px); mask-image: linear-gradient(transparent, #000 16px); }
 .rp-pad { padding: 12px 0; }
 .rp-quiet { margin: 0; color: var(--ink-3); font-size: 13.5px; }
@@ -82,57 +57,17 @@
 .rp-row-main:hover { background: rgba(0,0,0,.035); }
 .rp-glyph { flex: none; display: grid; place-items: center; width: 24px; height: 24px; margin-top: 1px; border-radius: 50%; background: #f0f0f3; color: var(--ink-3); }
 .rp-row.a-edit .rp-glyph { background: var(--accent-soft); color: var(--accent); }
-.rp-row.a-read .rp-glyph { background: transparent; color: var(--accent); box-shadow: inset 0 0 0 1.5px rgba(91,91,214,.45); }
 .rp-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .rp-row-label { font-size: 13.5px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rp-row.a-edit .rp-row-label { font-weight: 600; }
 .rp-row-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-3); white-space: nowrap; overflow: hidden; }
 .rp-row-meta time { font-variant-numeric: tabular-nums; }
-.rp-file { font-family: var(--font-mono); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
-.rp-chip { flex: none; border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; font-size: 11px; color: var(--ink-2); background: #fff; }
 
-.rp-row.todo .rp-row-main { color: var(--ink-3); }
-.rp-row.todo .rp-glyph { opacity: .6; }
-.rp-row.done .rp-row-label { color: var(--ink-2); }
 .rp-row.current { background: var(--accent-soft); }
 .rp-row.current .rp-row-main:hover { background: transparent; }
 .rp-row.current .rp-row-label { color: var(--ink); white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 .rp-row.current .rp-glyph { background: var(--accent); color: #fff; box-shadow: none; }
-
-.rp-detail { padding: 0 10px 12px 44px; display: flex; flex-direction: column; gap: 8px; }
-.rp-diff { border: 1px solid var(--line); border-radius: 10px; overflow: auto; max-height: 260px; background: #fff; }
-.rp-diff pre { font-family: var(--font-mono) !important; }
-.rp-pre { margin: 0; max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-family: var(--font-mono); font-size: 11.5px;
-  line-height: 1.5; color: var(--ink-2); background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
-.rp-path { margin: 0; font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); word-break: break-all; }
-.rp-link { align-self: flex-start; border: 0; background: none; padding: 2px 0; color: var(--accent); font-size: 13px; font-weight: 600; border-radius: 4px; }
-.rp-link:hover { text-decoration: underline; }
-
-/* ---------- Follow: "Replay on map" ---------- */
-.rp-follow-btn { display: inline-flex; align-items: center; gap: 7px; margin-top: 12px; border: 1px solid var(--line); background: var(--surface);
-  color: var(--ink); border-radius: 999px; padding: 5px 14px 5px 11px; font-size: 13.5px; font-weight: 600; transition: color .15s, border-color .15s; }
-.rp-follow-btn svg { color: var(--accent); }
-.rp-follow-btn:hover { color: var(--accent); border-color: var(--accent); }
-
-/* Light replay: summaries, read groups, failures */
-.rp-row.k-summary .rp-glyph { background: transparent; color: var(--ink-3); box-shadow: inset 0 0 0 1px var(--line); }
-.rp-row.k-summary .rp-row-label { color: var(--ink-2); }
-.rp-row.k-prompt .rp-row-label { font-weight: 600; }
-.rp-counts { overflow: hidden; text-overflow: ellipsis; }
-.rp-chip.fail { color: #c62828; border-color: rgba(198,40,40,.35); background: #fff5f5; font-weight: 600; }
-.rp-sub { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 2px; }
-.rp-sub button { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 0; background: transparent; padding: 5px 6px; border-radius: 8px; font: inherit; font-size: 12.5px; color: var(--ink-2); cursor: pointer; }
-.rp-sub button:hover { background: rgba(0,0,0,.04); color: var(--ink); }
-.rp-sub button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.rp-sub button.fail .rp-sub-label { color: #c62828; }
-.rp-sub-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rp-glyph.sm { width: 18px; height: 18px; flex: none; }
 .rp-fail-dot { width: 7px; height: 7px; border-radius: 50%; background: #d93025; flex: none; }
-.rp-detail-toggle { font-size: 12px; }
-.rp-detail-toggle.on { color: var(--accent); background: var(--accent-soft); }
-.rp-top .rp-chip.fail { margin-left: -4px; }
-.rp-why { overflow: hidden; text-overflow: ellipsis; color: var(--ink-3); font-style: italic; }
-.rp-fail-ticks { color: #d93025; }
 
 /* ---------- share menu (local app) ---------- */
 .rp-share { position: relative; }
@@ -144,8 +79,6 @@
 .rp-share-menu span { display: block; font-size: 13px; color: var(--ink-2); line-height: 1.4; margin-top: 2px; }
 .rp-share-note { margin: 6px 12px 6px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-3); line-height: 1.45; }
 @media (max-width: 600px) { .rp-share-menu { width: min(330px, calc(100vw - 32px)); } }
-
-.rp-sub-count { flex: none; margin-left: 4px; font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 
 /* A thread with no files: its conversation on one card over the map (TalkCard). */
 .rp-talk { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); width: min(520px, calc(100% - 820px)); min-width: 320px; z-index: 5;
@@ -220,7 +153,6 @@
 .dock-legend span { display: inline-flex; align-items: center; gap: 7px; }
 .dock-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 .dock-legend i.line { width: 16px; height: 2px; border-radius: 1px; }
-.dock .map-seg { margin-left: 0; }
 .map-wrap:has(.map-panel.open) .dock { left: calc(50% - 220px); }
 
 .rp-player { display: flex; align-items: center; gap: 8px; width: min(640px, calc(100vw - 480px)); min-width: 420px; padding: 10px 12px; border: 1px solid var(--line);

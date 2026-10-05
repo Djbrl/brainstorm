@@ -1,4 +1,4 @@
-// Owner: cowork. Loads GET /api/cowork?sessionId= for one thread and shapes it for the view: change groups, verb names, area names.
+// Loads GET /api/cowork?sessionId= for one thread and shapes it for the view: change groups, verb names, area names.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { CoworkArea, CoworkEvent, CoworkSummary, CoworkVerb } from "@contract";
 import { isReplay, replayCowork } from "../lib/live";
@@ -24,12 +24,6 @@ export function useCowork(sessionId: string | null, running: boolean, loaded = t
 }
 
 export const AREA_NAME: Record<CoworkArea, string> = { web: "Web", local: "Your apps", services: "Services", apps: "Apps" };
-export const AREA_HINT: Record<CoworkArea, string> = {
-  web: "Websites the agents opened, read or searched",
-  local: "Apps running on this computer, like your dev servers",
-  services: "Connected accounts and command-line tools: GitHub, Vercel, docs…",
-  apps: "Desktop and simulator apps driven by computer use",
-};
 export const AREAS: CoworkArea[] = ["web", "local", "services", "apps"];
 
 export const VERB_NAME: Record<CoworkVerb, string> = {

@@ -1,4 +1,4 @@
-/* Owner: C. Step panel content: terminal, code, browser actions, fields, JSON tree. Light, hairlines, small heads. */
+/* Step panel content: terminal, code, browser actions, fields, JSON tree. Light, hairlines, small heads. */
 .cv { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .cv-block { min-width: 0; }
 .cv-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }

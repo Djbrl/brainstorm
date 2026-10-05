@@ -1,4 +1,4 @@
-// Owner: C. A collapsible JSON tree: small things open, big things folded, long strings clipped.
+// A collapsible JSON tree: small things open, big things folded, long strings clipped.
 import { useState } from "react";
 
 const LONG = 220;

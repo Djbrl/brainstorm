@@ -1,4 +1,4 @@
-// Owner: C. Right pane: full detail of one step + AskBox.
+// The step panel's body: one step in full (its diff, text or tool view) and Ask.
 import { useEffect, useMemo, useState } from "react";
 import { Diff } from "../lib/Diff";
 import type { Step } from "@contract";

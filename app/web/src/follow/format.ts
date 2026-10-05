@@ -1,4 +1,4 @@
-// Owner: C. Display helpers for steps and sessions.
+// Display helpers for steps and sessions.
 import { clock } from "../lib/live";
 import type { Step } from "@contract";
 import { CallPairer } from "../lib/pairing";
@@ -45,15 +45,9 @@ export function relTime(iso: string | number | Date | undefined, now = clock()):
   return dayLabel(t, now);
 }
 
-/** True when the steps run over more than one calendar day (then their clock times need a date). */
-export function spansDays(steps: { ts: string }[]): boolean {
-  if (steps.length < 2) return false;
-  return dayKey(new Date(steps[0].ts)) !== dayKey(new Date(steps[steps.length - 1].ts));
-}
-
 /**
  * A clock time inside a thread (a chapter, a step, a stop): "14:05", or "Mon 2 Oct · 14:05" when the thread runs
- * over more than one day (`multiDay`, see spansDays) or the time isn't today.
+ * over more than one day (`multiDay`) or the time isn't today.
  */
 export function timeIn(iso: string, multiDay = false, opts: { seconds?: boolean; now?: number } = {}): string {
   const t = Date.parse(iso);
@@ -62,9 +56,6 @@ export function timeIn(iso: string, multiDay = false, opts: { seconds?: boolean;
   const time = hhmm(t, opts.seconds);
   return multiDay || dayKey(new Date(t)) !== dayKey(new Date(now)) ? `${dayLabel(t, now)} · ${time}` : time;
 }
-
-/** "14:05:09". Kept for callers that slice it; new code uses timeIn, which adds the date when it's needed. */
-export const clockTime = (iso: string) => hhmm(iso, true);
 
 const PASTE = /<pasted_content\b[^>]*>([\s\S]*?)(<\/pasted_content>|$)/g;
 
@@ -151,13 +142,6 @@ export function stepFile(s: Step): string | undefined {
   if (s.filePath) return s.filePath;
   const input = obj(s.input);
   return str(input.file_path) || str(input.notebook_path) || undefined;
-}
-
-/** Stringify a tool_result's text for the detail pane. */
-export function resultText(s: Step): string {
-  if (s.text) return s.text;
-  if (s.input == null) return "";
-  return typeof s.input === "string" ? s.input : JSON.stringify(s.input, null, 2);
 }
 
 /** Pair tool_call/edit steps with their tool_result: call id → result. */

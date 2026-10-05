@@ -196,3 +196,21 @@ export function shownLinks(g: Graph, cache: { key: string; links: GLink[]; g: Gr
   cache.g = g; cache.key = sig; cache.links = out;
   return out;
 }
+
+/**
+ * What's under a point (graph units) at this zoom: a file that shows (its folder open), nearest first, a tiny one
+ * taking at least 6 px; else the smallest closed folder around the point; else nothing. Asked on every pointer move
+ * and click, against where the circles are this frame (force-graph's own hit map is repainted at most every 0.8 s, so
+ * a click just after the camera moved could land on empty map).
+ */
+export function hitAt(g: Graph, x: number, y: number, scale: number): GNode | null {
+  let file: GNode | null = null, gap = Infinity, folder: GNode | null = null;
+  const slack = 3 / scale, least = 6 / scale;
+  for (const n of g.nodes) {
+    if (n.x === undefined || n.y === undefined || (n.shown ?? 1) < 0.5) continue;
+    const d = Math.hypot(x - n.x, y - n.y);
+    if (n.dir) { if ((n.open ?? 0) < 0.5 && d <= n.r && (!folder || n.r < folder.r)) folder = n; continue; }
+    if (d <= Math.max(n.r, least) + slack && d - n.r < gap) { file = n; gap = d - n.r; }
+  }
+  return file ?? folder;
+}

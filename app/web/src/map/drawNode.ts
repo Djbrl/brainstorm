@@ -68,11 +68,11 @@ export type Caches = {
   focusColours: Map<string, { rgb: RGB; css: string; ep: number }>;
   linkBatches: Map<string, { c: string; a: number; ls: GLink[] }>; metroVisible: GLink[]; metroAlpha: number[];
   /** The focused file's lines (drawFocusLinks): which file and since when, and the one before, fading out. */
-  lines: { id: string | null; at: number; full: boolean; fromStub: boolean; fullAt: number;
-    prev: string | null; prevAt: number; prevReach: ((stub: number) => number) | null };
+  /** How far each file's lines are drawn (drawFocusLinks): the focused one's, and any still drawing back. */
+  lines: Map<string, LineLevel>;
 };
 export const newCaches = (): Caches => ({ ripples: new Map(), dots: new Map(), focusColours: new Map(), linkBatches: new Map(), metroVisible: [], metroAlpha: [],
-  lines: { id: null, at: 0, full: false, fromStub: false, fullAt: 0, prev: null, prevAt: 0, prevReach: null } });
+  lines: new Map() });
 
 export const moreMotion = (F: Frame, m: Motion) => { if (m === Motion.Smooth || F.motion === Motion.None) F.motion = m; };
 
@@ -165,45 +165,43 @@ export function drawLinks(ctx: CanvasRenderingContext2D, scale: number, links: G
 }
 
 // ---------- the hovered or selected file's import lines ----------
-const LINES_IN_MS = 320;    // they grow out of the file
-const LINES_OUT_MS = 200;   // and fade when it's let go
-const STUB_PX = 26;         // pointed at: each line shows this far past the file's edge, enough to count them
+const LINES_GROW_MS = 320;   // lines growing out of the file, or a stub running out to the whole line
+const LINES_BACK_MS = 260;   // lines drawing back: a whole line to its stub, a stub into the file
+const STUB_PX = 26;          // pointed at: each line shows this far past the file's edge, enough to count them
 const easeOut = (k: number) => 1 - (1 - k) ** 3;
-/** How the focused file's lines are drawn this frame: a stub's or the whole line's share of each (0…1). */
-type Reach = (stub: number) => number;
+/** How far a file's lines are drawn: 0 not at all, 1 stubs, 2 whole lines, easing from `from` to `to` since `at`. */
+export type LineLevel = { from: number; to: number; at: number };
+const levelNow = (l: LineLevel, t: number) => {
+  const k = Math.min(1, (t - l.at) / (l.to > l.from ? LINES_GROW_MS : LINES_BACK_MS));
+  return l.from + (l.to - l.from) * easeOut(k);
+};
 /**
  * The lines of the file you point at or picked (what it imports, what uses it), drawn over the files at full strength in
- * every theme, so a station or a folder's disc never washes them out. Pointed at, each shows as a short stub out of the
- * file (how many, and which way); picked, they run the whole way. They grow out of the file, a stub carries on to the
- * full line on a click, and they fade when the file is let go (the last one fading while the next grows).
+ * every theme, so a station or a folder's disc never washes them out. Pointed at, each is a short stub out of the file
+ * (how many, and which way); picked, they run the whole way. Every change is drawn out, never cut: they grow out of the
+ * file, a stub runs out to the whole line on a click, and letting go draws them back the way they came (to stubs while
+ * you still point at the file, into the file once you don't). Another file's lines draw back while the new ones grow.
  */
 export function drawFocusLinks(ctx: CanvasRenderingContext2D, scale: number, links: GLink[], F: Frame, c: Caches) {
-  const a = c.lines, t = F.t, full = !!F.linkFocus && F.linkFocus === F.sel;
-  const at = (since: number) => easeOut(Math.min(1, (t - since) / LINES_IN_MS));
-  const now = (): Reach => {
-    if (!a.full) { const k = at(a.at); return (stub) => stub * k; }
-    if (a.fromStub) { const k = at(a.fullAt); return (stub) => stub + (1 - stub) * k; }
-    const k = at(a.at); return () => k;
-  };
-  if (F.linkFocus !== a.id) {
-    if (a.id) { const r = now(); a.prev = a.id; a.prevAt = t; a.prevReach = r; }
-    a.id = F.linkFocus; a.at = t; a.full = full; a.fromStub = false;
-  } else if (a.id && full !== a.full) {
-    // Picked after pointing at it: the stubs carry on to the whole lines (unpicked: back to stubs).
-    a.fromStub = full; a.full = full; a.fullAt = t; if (!full) a.at = t - LINES_IN_MS;
-  }
-  const fade = a.prev ? 1 - Math.min(1, (t - a.prevAt) / LINES_OUT_MS) : 0;
-  if (a.prev && fade <= 0) { a.prev = null; a.prevReach = null; }
-  const reach = a.id ? now() : null;
-  if ((a.id && t - Math.max(a.at, a.full && a.fromStub ? a.fullAt : 0) < LINES_IN_MS) || a.prev) moreMotion(F, Motion.Smooth);
+  const t = F.t, focus = F.linkFocus, levels = c.lines;
+  const aim = (id: string) => (id !== focus ? 0 : focus === F.sel ? 2 : 1);
+  if (focus && !levels.has(focus)) levels.set(focus, { from: 0, to: 0, at: t });
+  let moving = false;
   ctx.save();
   ctx.lineCap = "round"; ctx.lineJoin = "round";
-  if (a.prev && a.prev !== a.id && a.prevReach) roleLines(ctx, scale, links, a.prev, fade, a.prevReach, F);
-  if (a.id && reach) roleLines(ctx, scale, links, a.id, 1, reach, F);
+  for (const [id, l] of levels) {
+    const want = aim(id);
+    if (want !== l.to) { l.from = levelNow(l, t); l.to = want; l.at = t; }
+    const now = levelNow(l, t);
+    if (now !== l.to) moving = true;
+    if (now <= 0.001 && l.to === 0) { levels.delete(id); continue; }
+    roleLines(ctx, scale, links, id, Math.min(1, now * 4), (stub) => (now <= 1 ? stub * now : stub + (1 - stub) * (now - 1)), F);
+  }
   ctx.restore();
+  if (moving) moreMotion(F, Motion.Smooth);
 }
 /** One file's lines at a strength, each drawn from the file out to its `reach` and ended with a dot (arrowheads once a line arrives). */
-function roleLines(ctx: CanvasRenderingContext2D, scale: number, links: GLink[], focus: string, alpha: number, reach: Reach, F: Frame) {
+function roleLines(ctx: CanvasRenderingContext2D, scale: number, links: GLink[], focus: string, alpha: number, reach: (stub: number) => number, F: Frame) {
   const st = F.st, metro = st.link === "metro";
   ctx.globalAlpha = alpha;
   ctx.lineWidth = metro ? Math.max(3 / scale, 3.2) : 1.6 / scale;
@@ -449,17 +447,4 @@ export function flushDots(ctx: CanvasRenderingContext2D, dots: Dots, scale: numb
     ctx.fill();
   }
   ctx.globalAlpha = 1;
-}
-
-/** The hit canvas (what's under the pointer): off-screen files skipped, tiny ones as squares. */
-export function paintHit(n: GNode, color: string, ctx: CanvasRenderingContext2D, scale: number, F: Frame) {
-  const x = n.x, y = n.y;
-  if (x === undefined || y === undefined) return;
-  // What shows takes clicks: a file whose folder is open, a closed folder (an open one lets clicks through to its files).
-  if ((n.shown ?? 1) < 0.5 || (n.dir && (n.open ?? 0) >= 0.5)) return;
-  const m = n.r + 3;
-  if (x + m < F.x0 || x - m > F.x1 || y + m < F.y0 || y - m > F.y1) return;
-  ctx.fillStyle = color;
-  if (m * scale < 2) { ctx.fillRect(x - m, y - m, 2 * m, 2 * m); return; }
-  ctx.beginPath(); ctx.arc(x, y, m, 0, TAU); ctx.fill();
 }

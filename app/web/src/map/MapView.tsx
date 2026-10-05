@@ -29,9 +29,9 @@ import { mapStyle, settleLandings } from "./themes";
 import { clearSprites, spriteFrame } from "./sprites";
 import { createRedraw, Motion } from "./redraw";
 import { css, readTokens } from "./color";
-import { nodeReach, shownLinks, stepTween, useGraph, type GLink, type GNode } from "./graph";
+import { hitAt, nodeReach, shownLinks, stepTween, useGraph, type GLink, type GNode } from "./graph";
 import { foldFrame, openAround, useFoldOn } from "./fold";
-import { drawFile, drawFocusLinks, drawFolderNames, drawLinks, FILE_LABELS_MAX, flushDots, labelFor, lookOf, moreMotion, newCaches, paintHit, RIPPLE_MS, type Frame } from "./drawNode";
+import { drawFile, drawFocusLinks, drawFolderNames, drawLinks, FILE_LABELS_MAX, flushDots, labelFor, lookOf, moreMotion, newCaches, RIPPLE_MS, type Frame } from "./drawNode";
 import { useMapCamera } from "./useMapCamera";
 import { useLiveAgents } from "./useLiveAgents";
 import "./map.css";
@@ -317,8 +317,7 @@ export function MapView() {
     const F = frame.current;
     flushDots(ctx, caches.current.dots, scale);
     // The hovered or selected file's import lines, over the files (growing in, fading out: drawFocusLinks).
-    const ln = caches.current.lines;
-    if (F.linkFocus || ln.id || ln.prev) drawFocusLinks(ctx, scale, shownLinks(graphRef.current, linkCache.current, `${vis.current.sig}`), F, caches.current);
+    if (F.linkFocus || caches.current.lines.size) drawFocusLinks(ctx, scale, shownLinks(graphRef.current, linkCache.current, `${vis.current.sig}`), F, caches.current);
     drawModules(ctx, scale);
     drawAgentLayer(ctx, scale);
     ctx.globalAlpha = 1;
@@ -329,8 +328,6 @@ export function MapView() {
     redraw.drew(F.motion);
   }, [drawModules, drawAgentLayer, redraw]);
 
-  const paintHitArea = useCallback((node: NodeObject, color: string, ctx: CanvasRenderingContext2D, scale: number) =>
-    paintHit(node as GNode, color, ctx, scale, frame.current), []);
 
   // ---- what makes a frame come ----
   const fp = replayLayer.footprint();
@@ -345,15 +342,53 @@ export function MapView() {
 
   // Files came or went: the frame keeps coming while the circles that moved glide (stepTween).
   useEffect(() => { if (tween.current) redraw.kick(700); }, [graph, redraw, tween]);
-  const onNodeHover = useCallback((n: NodeObject | null) => setHover(n ? (n as GNode).id : null), []);
   // A closed folder: the camera goes into it (which opens it, fold.ts). A file: selected, or let go if it already was.
-  const onNodeClick = useCallback((n: NodeObject) => {
-    const g = n as GNode;
+  const onNodeClick = useCallback((g: GNode) => {
     if (!g.dir) { setSelected(selectedRef.current === g.id ? null : g.id); return; }   // the selected file again: let go of it
     const x = g.x ?? 0, y = g.y ?? 0, r = g.r;
     camRef.current.frame({ x0: x - r, x1: x + r, y0: y - r, y1: y + r }, { pad: 24, maxZoom: 12 }, 750);
   }, [setSelected]);
-  const onBackgroundClick = useCallback(() => setSelected(null), [setSelected]);
+  // Pointing and clicking, worked out against where the circles are this frame (graph.ts hitAt), not force-graph's hit
+  // map (repainted at most every 0.8 s). A click is a press and release less than 5 px apart: a trackpad's wobble
+  // still clicks, a pan doesn't.
+  const clickRef = useRef(onNodeClick); clickRef.current = onNodeClick;
+  const hasCanvas = graph.nodes.length > 0;
+  useEffect(() => {
+    const canvas = wrapRef.current?.querySelector("canvas");
+    if (!canvas) return;
+    const at = (e: PointerEvent) => {
+      const g = fg.current, r = canvas.getBoundingClientRect();
+      if (!g) return null;
+      const p = g.screen2GraphCoords(e.clientX - r.left, e.clientY - r.top);
+      return hitAt(graphRef.current, p.x, p.y, g.zoom());
+    };
+    let down: { x: number; y: number; t: number } | null = null, raf = 0, last: PointerEvent | null = null;
+    const point = () => {
+      raf = 0;
+      if (!last || down) return;
+      const n = at(last), id = n?.id ?? null;
+      canvas.style.cursor = n ? "pointer" : "";
+      if (id !== hoverRef.current) setHover(id);
+    };
+    const onMove = (e: PointerEvent) => { last = e; if (!raf) raf = requestAnimationFrame(point); };
+    const onDown = (e: PointerEvent) => { if (e.button === 0) down = { x: e.clientX, y: e.clientY, t: performance.now() }; };
+    const onUp = (e: PointerEvent) => {
+      const d = down; down = null;
+      if (!d || e.button !== 0 || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5) return;
+      const n = at(e);
+      if (n) clickRef.current(n); else setSelected(null);
+    };
+    const onLeave = () => { last = null; down = null; canvas.style.cursor = ""; if (hoverRef.current) setHover(null); };
+    canvas.addEventListener("pointermove", onMove);
+    canvas.addEventListener("pointerdown", onDown);
+    canvas.addEventListener("pointerup", onUp);
+    canvas.addEventListener("pointerleave", onLeave);
+    return () => {
+      cancelAnimationFrame(raf);
+      canvas.removeEventListener("pointermove", onMove); canvas.removeEventListener("pointerdown", onDown);
+      canvas.removeEventListener("pointerup", onUp); canvas.removeEventListener("pointerleave", onLeave);
+    };
+  }, [hasCanvas, setSelected]);
 
   const sel = selected ? nodeIndex.get(selected)?.file : undefined;
   const closeFile = useCallback(() => setSelected(null), [setSelected]);
@@ -377,15 +412,12 @@ export function MapView() {
           nodeVal={nodeVal}
           nodeLabel={noLabel}
           nodeCanvasObject={drawNode}
-          nodePointerAreaPaint={paintHitArea}
           onRenderFramePre={startFrame}
           onRenderFramePost={endFrame}
           warmupTicks={0}
           cooldownTicks={0}
           enableNodeDrag={false}
-          onNodeHover={onNodeHover}
-          onNodeClick={onNodeClick}
-          onBackgroundClick={onBackgroundClick}
+          enablePointerInteraction={false}
         />
       )}
 

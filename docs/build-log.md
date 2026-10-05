@@ -157,6 +157,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 21:10 (5 Oct) [map] Clicking the selected file again lets go of it (the sidebar goes back to the tree). Saved for later: the import graph as a tool for agents, blast radius first ([graph-for-agents.md](graph-for-agents.md), linked from the to-do list).
 
+- 21:40 (5 Oct) [map] Clicks no longer go missing. force-graph found what was under the pointer on a hidden hit map it repaints at most every 0.8 s, so a click just after a zoom, a pan or a camera glide landed on empty map (and let go of the file); and with a mouse, a single pixel of movement while pressed turned a click into a drag. The map now finds what's under the pointer itself, against this frame's positions (`hitAt` in `map/graph.ts`), for hover and clicks; a press and release under 5 px apart is a click; force-graph's pointer tracking is off (no hit map painted at all). Import lines now ease toward a level, never cut: stubs on hover, whole lines on a click, and letting go draws them back the way they came (to stubs while still pointed at, into the file otherwise), while another file's grow.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

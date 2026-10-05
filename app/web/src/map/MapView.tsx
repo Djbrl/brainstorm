@@ -173,7 +173,7 @@ function linkRole(l: GLink, focus: string | null): "imports" | "usedBy" | null {
 // ---------- view ----------
 export function MapView() {
   const { state } = useLive();
-  const { focusFile, setFocusFile, hiddenAgents, replay, step } = useNav();
+  const { focusFile, setFocusFile, hiddenAgents, replay, step, showReads } = useNav();
   const mock = useMemo(() => new URLSearchParams(location.search).has("mockmap"), []);
   const map = useMemo(() => (mock ? mockMap() : state.map), [mock, state.map]);
   const graph = useGraph(map);
@@ -268,7 +268,8 @@ export function MapView() {
   const applyIntent = useCallback((ms = 600) => {
     const i = intent.current, c = camRef.current;
     if (i.kind === "free" || c.userAt() > intentAt.current) return;
-    if (i.kind === "fit") { if (!replayRef.current.tracing) fitAll(ms); return; }
+    if (i.kind === "fit") { if (!replayRef.current.tracing || replayCamera.heldAt !== null) fitAll(ms); return; } // the tracer's camera, unless held on the fit
+
     const n = nodeIndexRef.current.get(i.id);
     if (!n || n.x === undefined || n.y === undefined) return;
     if (i.zoom) c.lookAt(n.x, n.y, 3, ms);
@@ -342,21 +343,25 @@ export function MapView() {
     return () => clearTimeout(t);
   }, [hasNodes, applyIntent]);
 
-  // A thread opens on its footprint: frame its files now, and again as the layout settles (a link opened straight
-  // onto a thread loads the map at the same time). Closing the thread frames the whole project again.
-  const footprintMode = replayLayer.footprintMode;
+  // A thread at rest on the map (not playing, no step open) shows what it did: frame its files (the whole project if it
+  // changed none) now, and again as the layout settles (a link opened straight onto a thread loads the map at the same
+  // time), with the tracer's camera held on that view. A step or the replay hands the camera back to the tracer.
+  // Closing the thread frames the whole project again.
   const openThread = replayLayer.active ? replay?.sessionId : undefined;
+  const atRest = !!openThread && replay?.mode !== "play" && !step;
+  const atRestRef = useRef(atRest); atRestRef.current = atRest;
   const hadThread = useRef(false);
   useEffect(() => {
     if (openThread) hadThread.current = true;
     else if (!hadThread.current) return;
-    if (openThread && !footprintMode) return;
+    if (openThread && !atRest) { replayCamera.recenter(); return; }
     if (!openThread) hadThread.current = false;
+    else replayCamera.hold();
     setIntent({ kind: "fit" });
     applyIntent(700);
     const ts = openThread ? [600, 1800].map((ms) => setTimeout(() => applyIntent(700), ms)) : [];
     return () => ts.forEach(clearTimeout);
-  }, [openThread, footprintMode, setIntent, applyIntent]);
+  }, [openThread, atRest, setIntent, applyIntent]);
 
   // Focus from Follow (and file links)
   useEffect(() => {
@@ -393,7 +398,10 @@ export function MapView() {
     const b = before.current;
     before.current = null;
     if (!b) return;
-    if (replayRef.current.tracing) { setIntent({ kind: "free" }); return; } // the replay's camera is on the tracer
+    if (replayRef.current.tracing) {
+      if (!atRestRef.current) { setIntent({ kind: "free" }); return; } // the replay's camera is on the tracer
+      replayCamera.hold(); // a thread at rest: back to the view of what it did
+    }
     if (b.view && b.intent.kind !== "fit") { setIntent(b.intent); c.moveTo(b.view, 700); }
     else { setIntent({ kind: "fit" }); applyIntent(700); }
   }, [panelFile, setIntent, applyIntent]);
@@ -425,7 +433,8 @@ export function MapView() {
     const now = clock();
     const active = !!n.file.activeSessionId;
     const isSel = n.id === selected, isHover = n.id === hover;
-    const alpha = replayRef.current.nodeAlpha(n.id);
+    const look = replayRef.current.look(n.id);   // an open thread: its own footprint, the rest dimmed back
+    const alpha = look?.alpha ?? 1;
     ctx.save();
     ctx.globalAlpha = alpha;
     const st = mapStyle();
@@ -458,7 +467,9 @@ export function MapView() {
       ctx.globalAlpha = alpha;
     }
 
-    const rgb = recencyRGB(tokens, n.file.lastChangedAt, now), lit = active || !same(rgb, tokens.cool);
+    // In a focus, a file takes the focus's colour (when the thread changed it, or the quiet one), not the project's.
+    const own = recencyRGB(tokens, n.file.lastChangedAt, now);
+    const rgb = look ? mixRGB(own, recencyRGB(tokens, look.edited, now), look.tone) : own, lit = active || !same(rgb, tokens.cool);
     if (st.node === "cube") {
       // An agent lands: the cube spins up and flashes gold for a moment.
       const landed = landings.get(n.id), k = landed === undefined ? 1 : (performance.now() - landed) / LAND_MS;
@@ -523,7 +534,10 @@ export function MapView() {
       const id = resolveId(a.file), n = id ? idx.get(id) : undefined;
       if (n) busy.add(n.file.module);
     }
-    drawModuleLabels(ctx, scale, graph.nodes.map((n) => ({ x: n.x, y: n.y, r: n.r, module: n.file.module, lastChangedAt: n.file.lastChangedAt, active: !!n.file.activeSessionId })),
+    // In a focus, folder names rank by what the thread changed, not by what the rest of the project did.
+    const looks = graph.nodes.map((n) => { const l = replayRef.current.look(n.id); return l && l.tone > 0.5 ? l : null; });
+    drawModuleLabels(ctx, scale, graph.nodes.map((n, i) => ({ x: n.x, y: n.y, r: n.r, module: n.file.module,
+      lastChangedAt: looks[i] ? looks[i].edited : n.file.lastChangedAt, active: !looks[i] && !!n.file.activeSessionId })),
       { font: tokens.display, now: clock(), focus, busy, space: moduleSpace.current });
   }, [graph.nodes, tokens, resolveId]);
   // Labels go on after the files (folder names, then file names), so no circle covers a name; then the agents.
@@ -588,6 +602,8 @@ export function MapView() {
           <span><i style={{ background: "var(--hot)" }} />Just now</span>
           <span><i style={{ background: "var(--warm)" }} />{isReplay() ? "This hour" : lastSeen ? "Since you last looked" : "In the last day"}</span>
           <span><i style={{ background: "var(--cool)" }} />Earlier</span>
+          {/* With a thread open the colours are its own changes; what it only read is the faint dot. */}
+          {replay && showReads && <span className="dock-legend-read" title="Files this thread read but didn't change"><i style={{ background: "var(--cool)", opacity: 0.5 }} />Read</span>}
           {sel && <span title="What the selected file imports"><i className="line" style={{ background: style.imports }} />Imports</span>}
         </div>
         <ReadsToggle />

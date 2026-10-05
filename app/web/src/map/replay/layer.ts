@@ -9,17 +9,27 @@ import type { Camera } from "../camera";
 import { along, casing, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs } from "../themes";
 
 export type NodePos = { x?: number; y?: number; r: number };
+/**
+ * How a file reads while something is in focus (an open thread): `alpha`, its strength; `tone`, how far its colour has
+ * moved from the map's own (when anyone last changed it) to the focus's (`edited`: when the thread last changed it, or
+ * the quiet colour if it didn't). Both ease, so focusing and unfocusing fade instead of snapping.
+ */
+export type Look = { alpha: number; tone: number; edited?: string };
+/** What a file should look like in the focus: its strength, and when the focus changed it (none: the quiet colour). */
+type Target = { alpha: number; edited?: string };
 
 export type ReplayLayerApi = {
   /** True while a thread replay is on (nav.replay is set and its thread is loaded). */
   active: boolean;
   /** Alpha for a node during replay: 1 = normal, lower = dimmed (not touched by the thread). */
   nodeAlpha: (id: string) => number;
+  /** How a file reads in the focus (eased), or null when nothing is in focus and its fade is over: the map as it is. */
+  look: (id: string) => Look | null;
   /** True while the tracer is drawn (a replay or steps, not the footprint): Metro quiets the import lines then. */
   tracing: boolean;
   /** The thread's footprint mode (its files lit, no tracer): MapView frames it. */
   footprintMode: boolean;
-  /** The files the open thread touched (what a fit frames), or null with no thread open. */
+  /** The files the open thread touched (what a fit frames; only its edits with "Show reads" off), or null with no thread open. */
   footprint: () => string[] | null;
   /** Draw the tracer, numbered stops, the current marker and read flashes. Called every frame after the agent layer. */
   draw: (ctx: CanvasRenderingContext2D, scale: number) => void;
@@ -30,8 +40,11 @@ const FLASH_MS = 600;       // read flash
 const PULSE_MS = 700;       // edit pulse on the marker
 const RED = "#d93025";      // a beat with a failed tool call
 const ERR_PULSE_MS = 1100;
-const DIM = 0.18;           // files the thread never touches (or hasn't reached yet, in a replay)
+const DIM = 0.16;           // files the thread never touches (or hasn't reached yet, in a replay)
 const PAST = 0.42;          // files it touched earlier than the window below
+const READ = 0.5;           // files it only read ("Show reads" on): there, quieter than what it changed
+const FADE_MS = 260;        // a file easing into or out of the focus (time constant)
+const HOLD_GRACE_MS = 1200; // a fit's glide from far away: the marker may be out of sight until it lands
 /** Fog of war: in a replay, only the last few moments are drawn in full (path, numbers, files); older ones fade back. */
 const WINDOW = 25;
 const BEAT_PX = 60;         // trackpad pixels per beat
@@ -41,6 +54,7 @@ const READ_MS = 520;        // playback pace for reads
 const STEP_MS = 700;        // playback pace for edits and your prompts (at 1×)
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const STILL = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 const baseName = (p: string) => p.split("/").pop() || p;
 const INK = "#1d1d1f";
 
@@ -197,7 +211,8 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
         const s = cam.safe.current, c = g.centerAt() as unknown as { x: number; y: number }, z = g.zoom();
         const sx = s.w / 2 + (a.cam.x - c.x) * z, sy = s.h / 2 + (a.cam.y - c.y) * z, m = 24;
         const inSight = sx > s.left + m && sx < s.w - s.right - m && sy > s.top + m && sy < s.h - s.bottom - m;
-        if (!inSight || Math.max(replayCamera.userAt, cam.userAt()) > replayCamera.heldAt) replayCamera.heldAt = null;
+        const landing = performance.now() - replayCamera.heldAt < HOLD_GRACE_MS;
+        if ((!inSight && !landing) || Math.max(replayCamera.userAt, cam.userAt()) > replayCamera.heldAt) replayCamera.heldAt = null;
       }
       if (g && a.cam && replayCamera.heldAt === null && !replayCamera.pinned && performance.now() - Math.max(replayCamera.userAt, cam.userAt()) > USER_CAMERA_MS) {
         // The marker goes to the middle of the part of the map no panel covers, not under the sidebar.
@@ -212,27 +227,62 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     return () => cancelAnimationFrame(raf);
   }, [active, mode, fg, camera]);
 
-  // For the fog: the moments at which each file was touched (edited or read), in order.
-  const touchedAt = useMemo(() => {
-    const m = new Map<string, number[]>();
-    for (const b of thread?.beats ?? []) for (const f of new Set([...b.files, ...(b.file ? [b.file] : [])])) m.set(f, [...(m.get(f) ?? []), b.index]);
-    return m;
+  // For the fog: the moments at which each file was touched (edited or read), in order; and its edits, for its colour.
+  const { touchedAt, editsAt } = useMemo(() => {
+    const touchedAt = new Map<string, number[]>(), editsAt = new Map<string, { i: number; ts: string }[]>();
+    for (const b of thread?.beats ?? []) {
+      for (const f of new Set([...b.files, ...(b.file ? [b.file] : [])])) touchedAt.set(f, [...(touchedAt.get(f) ?? []), b.index]);
+      if (b.action !== "edit") continue;
+      const ts = b.steps.filter((x) => x.kind === "edit").pop()?.ts ?? b.step.ts;
+      for (const f of b.files) editsAt.set(f, [...(editsAt.get(f) ?? []), { i: b.index, ts }]);
+    }
+    return { touchedAt, editsAt };
   }, [thread]);
   const touchedRef = useRef(touchedAt); touchedRef.current = touchedAt;
+  const editsRef = useRef(editsAt); editsRef.current = editsAt;
 
-  const nodeAlpha = useCallback((id: string) => {
+  /**
+   * The focus, in one place: what each file should look like now, or null when nothing is in focus (the map as it is).
+   * Today it's the open thread: at rest, its whole footprint (what it changed in its own recency colours, what it read
+   * quieter, the rest dimmed back), so the colours answer "what did this thread do" (a thread that changed nothing
+   * leaves every file quiet, as its "Changed no files" says); while it plays, the fog of its last few moments.
+   * To focus on something else (say, the files of the last N steps up to the cursor while following live), change this.
+   */
+  const focusOf = useCallback((id: string): Target | null => {
     const s = st.current;
-    if (!s.active || !s.thread || !s.thread.touched.size) return 1; // a thread with no files leaves the map as it is (see TalkCard)
+    if (!s.active || !s.thread) return null;
+    const edits = editsRef.current.get(id);
     // "Show reads" off: files the thread only read stay dimmed, so what lights up is what it changed.
-    if (!mapPrefs.showReads && (s.thread.touched.get(id)?.edits ?? 0) === 0) return DIM;
-    if (s.mode === "footprint") return s.thread.touched.has(id) ? 1 : DIM; // the whole footprint at once
-    // Steps and replay: files light up as the thread reaches them, and fade back once they're out of the last few moments.
+    if (s.mode !== "play") return edits ? { alpha: 1, edited: edits[edits.length - 1].ts } : { alpha: mapPrefs.showReads && s.thread.touched.has(id) ? READ : DIM };
+    // Replay: files light up as the thread reaches them, and fade back once they're out of the last few moments.
     const at = touchedRef.current.get(id);
-    if (!at) return DIM;
-    let last = -1;
+    if (!at) return { alpha: DIM };
+    let last = -1, edited: string | undefined;
     for (const i of at) { if (i > s.index) break; last = i; }
-    return last < 0 ? DIM : s.index - last <= WINDOW ? 1 : PAST;
+    for (const e of edits ?? []) { if (e.i > s.index) break; edited = e.ts; }
+    if (last < 0 || (!edited && !mapPrefs.showReads)) return { alpha: DIM };
+    return { alpha: s.index - last <= WINDOW ? 1 : PAST, edited };
   }, []);
+
+  // Each file eases toward its target (into the focus, and back to the map as it is when the focus ends).
+  const shown = useRef(new Map<string, Look & { t: number }>());
+  const look = useCallback((id: string): Look | null => {
+    const target = focusOf(id), now = performance.now();
+    let e = shown.current.get(id);
+    if (!e) {
+      if (!target) return null;
+      shown.current.set(id, (e = { alpha: 1, tone: 0, t: now }));
+    }
+    const k = STILL ? 1 : 1 - Math.exp(-(now - e.t) / FADE_MS);
+    e.t = now;
+    const toward = (v: number, to: number) => (Math.abs(to - v) < 0.004 ? to : v + (to - v) * k); // lands exactly (names show at 1)
+    e.alpha = toward(e.alpha, target?.alpha ?? 1);
+    e.tone = toward(e.tone, target ? 1 : 0);
+    if (target) e.edited = target.edited;    // fading out keeps the focus's colour it fades from
+    else if (e.tone === 0 && e.alpha === 1) { shown.current.delete(id); return null; }
+    return e;
+  }, [focusOf]);
+  const nodeAlpha = useCallback((id: string) => look(id)?.alpha ?? 1, [look]);
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
     const s = st.current;
@@ -404,10 +454,12 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
 
   const footprint = useCallback(() => {
     const s = st.current;
-    return s.active && s.thread ? [...s.thread.touched.keys()] : null;
+    if (!s.active || !s.thread) return null;
+    const all = [...s.thread.touched.keys()];
+    return mapPrefs.showReads ? all : all.filter((id) => editsRef.current.has(id));
   }, []);
 
-  return { active, tracing: active && mode !== "footprint", footprintMode: active && mode === "footprint", footprint, nodeAlpha, draw };
+  return { active, tracing: active && mode !== "footprint", footprintMode: active && mode === "footprint", footprint, nodeAlpha, look, draw };
 }
 
 /** Play/pause; pressing play at the last beat starts over. Shared by the keyboard and the ReplayBar. */

@@ -56,6 +56,23 @@
 .trk-working { position: relative; padding: 10px 0 10px 34px; color: var(--accent); font-weight: 600; font-size: 13.5px; }
 .trk-working .trk-dot { border-color: var(--accent); background: var(--accent); animation: sidebar-pulse 1.6s infinite; }
 
+/* The live end: waiting on you (amber) or your turn (grey). */
+.trk-waiting { position: relative; margin: 10px 0 4px; padding: 14px 16px 14px 34px; border-radius: 12px; }
+.trk-waiting .trk-dot { top: 22px; margin-top: -6px; }
+.trk-waiting.blocked { background: #fff7e8; color: #7a4600; }
+.trk-waiting.blocked .trk-dot { border-color: #f59e0b; background: #f59e0b; animation: attn-breathe 1.8s infinite; }
+.trk-waiting.turn { background: #f4f4f7; color: var(--ink-2); }
+.trk-waiting.turn .trk-dot { border-color: var(--ink-3); background: var(--ink-3); }
+.trk-waiting-body { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.trk-waiting-body b { font-size: 15px; font-weight: 650; line-height: 1.35; }
+.trk-waiting-body code { max-width: 100%; font-family: var(--font-mono); font-size: 12px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trk-waiting-body small { font-size: 13px; opacity: .85; }
+.trk-waiting-body button { margin-top: 4px; border: 0; background: transparent; padding: 0; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.trk-waiting-body button:hover { text-decoration: underline; }
+@media (prefers-reduced-motion: reduce) { .trk-waiting.blocked .trk-dot { animation: none; } }
+:root:is([data-theme="ps2"], [data-theme="deadspace"]) .trk-waiting.blocked { background: rgba(245,158,11,.14); color: #f5c06a; }
+:root:is([data-theme="ps2"], [data-theme="deadspace"]) .trk-waiting.turn { background: var(--hover); }
+
 /* the window */
 .trk-side { position: relative; }
 .trk-window { position: sticky; top: 76px; background: var(--surface); border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,.08), 0 0 0 1px var(--line); overflow: hidden; }

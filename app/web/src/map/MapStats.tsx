@@ -57,10 +57,10 @@ export function MapStats() {
   // A big repo: the map shows a chosen part of it (the server picks across every folder), and says so.
   const total = map.totalFiles ?? 0;
   const parts = [
+    total > map.files.length ? `Showing ${map.files.length.toLocaleString()} of ${n(total, "file")}` : "", // first: the line is cut on narrow sidebars
     working ? `${n(working, "agent")} working now` : "",
     threads || files ? `${n(threads, "thread")} and ${n(files, "file")} changed ${when}` : `Nothing changed ${when}`,
-    total > map.files.length ? `showing ${map.files.length.toLocaleString()} of ${n(total, "file")}` : "",
-  ].filter(Boolean);
+  ].filter(Boolean).map((p, i) => (i ? p.charAt(0).toLowerCase() + p.slice(1) : p));
   const line = parts.join(" · ");
   return <p className="map-stats" title={line}>{line}</p>;
 }

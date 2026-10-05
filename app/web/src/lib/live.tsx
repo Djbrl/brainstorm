@@ -28,7 +28,11 @@ export type LiveState = {
   sessions: Session[];
   steps: Record<string, Step[]>;   // by sessionId, ordered by seq
   map: ProjectMap | null;
-  /** Bumps when the set of files, a file's module or the root changes (not on recency, activity or summaries). */
+  /**
+   * Bumps on every file added or removed, a file's module changing, and every new map (a "map" message, a reload or
+   * workspace switch, a replay), even when its paths look the same. Unchanged means: the same file paths in the same
+   * order, the same root and former roots. Recency, activity, summary and line-count updates don't bump it.
+   */
   structureVersion: number;
   agents: Record<string, AgentPresence>; // live agents by id (main session thread or subagent)
   setup: SetupStatus | null;             // null until loaded (and always null in replay)

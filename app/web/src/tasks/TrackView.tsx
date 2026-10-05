@@ -10,6 +10,7 @@ import { clockTime, stripInjected } from "../follow/format";
 import { MapSidebar } from "../map/sidebar/MapSidebar";
 import { LensSwitch } from "../map/LensSwitch";
 import { MapStats } from "../map/MapStats";
+import { TrackCounts } from "../lib/ThreadCounts";
 import { StepPanel } from "../map/StepPanel";
 import { AskBox } from "../ask/AskBox";
 import "./track.css";
@@ -295,7 +296,7 @@ export function TrackView() {
             <div className="trk-main">
               <header className="trk-head">
                 <h1>{task.goal || session?.title || "Untitled thread"}</h1>
-                <p>{stops.length} stops · {task.counts.made} made{errors ? <> · <span className="err">{errors} failed</span></> : null}{task.counts.frames ? ` · ${task.counts.frames} screenshots` : ""}</p>
+                <TrackCounts sessionId={task.sessionId} failed={errors} screenshots={task.counts.frames} />
                 <ThreadAsk sessionId={task.sessionId} />
               </header>
               <ol className="trk-line">

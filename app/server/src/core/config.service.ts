@@ -4,8 +4,8 @@ import { join, resolve } from "node:path";
 
 @Injectable()
 export class ConfigService {
-  /** Where Claude Code writes session logs. */
-  readonly claudeProjectsDir = process.env.CLAUDE_PROJECTS_DIR ?? join(homedir(), ".claude", "projects");
+  /** Where Claude Code writes session logs. BRAINSTORM_CLAUDE_DIR points it at a copy (benchmarks, tests). */
+  readonly claudeProjectsDir = process.env.BRAINSTORM_CLAUDE_DIR ?? process.env.CLAUDE_PROJECTS_DIR ?? join(homedir(), ".claude", "projects");
   /** Project the map shows by default: the repo root (…/brainstorm). */
   /** Active workspace. Mutable: set by the setup screen (WorkspaceService). */
   defaultRoot = resolve(process.env.MAP_ROOT ?? process.env.BRAINSTORM_ROOT ?? resolve(__dirname, "../../../.."));

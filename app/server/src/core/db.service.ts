@@ -16,6 +16,9 @@ export class DbService {
     const dir = dataDir();
     mkdirSync(dir, { recursive: true });
     this.db = new DatabaseSync(resolve(dir, "brainstorm.db"));
-    this.db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
+    // temp_store: sorts and temp indexes in memory. cache_size: 32 MB of pages (default 2 MB) so big threads' reads
+    // and the import's index updates stay in memory. mmap_size: read the file through the OS page cache.
+    this.db.exec(`PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA temp_store = MEMORY;
+      PRAGMA cache_size = -32768; PRAGMA mmap_size = 268435456;`);
   }
 }

@@ -28,7 +28,7 @@ Everything runs on the user's machine. The only network calls are to the two mod
 | Module | Files | What it does |
 | --- | --- | --- |
 | Core | `core/` | `DbService` (one `node:sqlite` file at `server/data/brainstorm.db`), `BusService` (in-process events `session`, `step`, `file-touched`), `EventsGateway` (push-only WebSocket at `/ws`), `ConfigService` (env) |
-| Listener | `listener/` | Watches `~/.claude/projects/**/*.jsonl` with chokidar, remembers a byte offset per file, parses appended lines into `Step`s and `Session`s, stores them, emits them on the bus and broadcasts them over the socket |
+| Listener | `listener/` | Watches the workspace's folders in `~/.claude/projects/` with chokidar, remembers a byte offset per file, parses appended lines into `Step`s and `Session`s, stores them, emits them on the bus and broadcasts them over the socket. Files are read 4 MB at a time and stored about 1 MB per transaction; history is read after the server listens, newest first, without broadcasting it (what a file gains after it was listed is live) |
 | Mapper | `mapper/` | Walks the project root, counts lines, resolves imports (TS/JS `import`/`require`, Python `import`/`from`) into edges, takes `lastChangedAt` from one `git log` call plus file mtimes, watches for changes, and marks files an agent is editing (`activeSessionId`, cleared after 60 s) |
 | Reader | `reader/` | Nemotron step labels (at most 8 words), two-sentence file summaries cached by content hash, module summaries, and rule-based risk flags |
 | LLM | `llm/` | `NemotronService` (OpenAI-compatible client, 6 requests in flight, 20 s timeout, 2 retries, output validation) and `ClaudeService` (`@anthropic-ai/sdk`, 30 s timeout) |
@@ -77,7 +77,7 @@ WebSocket messages: `session`, `step`, `step-update` (a label or risk flags arri
 | Method | Path | Returns |
 | --- | --- | --- |
 | GET | `/sessions` | Sessions, most recent first |
-| GET | `/sessions/:id/steps` | Steps of one session, in order |
+| GET | `/sessions/:id/steps?afterSeq=` | Steps of one session, in order; with `afterSeq`, only the steps after that seq |
 | GET | `/map?root=` | The project map (default root: `MAP_ROOT`) |
 | POST | `/ask` | `AskResponse` |
 | GET | `/failures?sessionId=a,b` | Failure groups, most urgent first |

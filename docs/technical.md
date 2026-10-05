@@ -36,6 +36,7 @@ Everything runs on the user's machine. The only network calls are to the two mod
 | Privacy | `privacy/mask.ts` | `maskSecrets()`: redacts keys and tokens before anything is stored or sent |
 | Failures | `failures/` | `GET /api/failures`: finds failing tool calls, groups them, ranks them, has Nemotron name each group |
 | Replay | `replay/` | `GET /api/replay`: exports sessions, steps, the map, saved answers and failures as one JSON file for the hosted demo |
+| Shots | `shots/` | `GET /api/tasks/shot/:stepId/:idx`: screenshots that tools returned, read from the session logs into the database, for the step panel. Never part of a replay |
 
 Modules talk through the bus and a few public service methods, such as `ListenerService.getStep`, `stepsBefore`, `updateStep` and `unlabeledSteps`, and `ReaderService.getFileSummary`. That split let four agents build them in parallel.
 
@@ -82,6 +83,7 @@ WebSocket messages: `session`, `step`, `step-update` (a label or risk flags arri
 | POST | `/ask` | `AskResponse` |
 | GET | `/failures?sessionId=a,b` | Failure groups, most urgent first |
 | GET | `/replay?sessionId=a,b&root=` | A `Replay` file for the hosted demo |
+| GET | `/tasks/shot/:stepId/:idx` | One screenshot a tool returned (image bytes) |
 | GET | `/history?root=` | Empty for now (history is not built yet) |
 
 ## Storage

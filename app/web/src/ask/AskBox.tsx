@@ -1,4 +1,4 @@
-// Owner: C. Ask about a step (the step panel), a file (the map) or a whole thread (the Track). Shows answer, model and cost.
+// Owner: C. Ask about a step (the step panel) or a file (the map). Shows answer, model and cost.
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { AskRequest, AskResponse } from "@contract";
 import { ask } from "../lib/api";
@@ -26,7 +26,7 @@ export function AskBox({ context, placeholder, suggestions = SUGGESTIONS }: { co
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
-  const key = `${context.stepId ?? ""}|${context.filePath ?? ""}|${context.root ?? ""}|${context.sessionId ?? ""}`;
+  const key = `${context.stepId ?? ""}|${context.filePath ?? ""}|${context.root ?? ""}`;
 
   const keyRef = useRef(key);
   keyRef.current = key;

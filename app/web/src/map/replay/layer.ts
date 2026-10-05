@@ -130,7 +130,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
   const len = active ? thread!.beats.length : 0;
   const last = Math.max(0, len - 1);
   const index = replay ? Math.min(replay.index, last) : 0;
-  // Publish the step at the cursor (switching the detail lands on it, the Track lens opens on it). After every commit,
+  // Publish the step at the cursor (switching the detail lands on it). After every commit,
   // as the render used to do, but outside the render.
   const cursorStep = active && !replay?.atStep ? thread!.beats[index]?.step.id ?? null : undefined;
   useEffect(() => { if (cursorStep !== undefined) replayCursor.stepId = cursorStep; });

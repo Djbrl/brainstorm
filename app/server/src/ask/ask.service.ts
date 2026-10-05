@@ -10,7 +10,6 @@ import { ReaderService } from "../reader/reader.service";
 import { ClaudeService } from "../llm/claude.service";
 import { NemotronService } from "../llm/nemotron.service";
 import { maskSecrets } from "../privacy/mask";
-import { promptTitle } from "../listener/listener.service";
 
 // Owner: D.
 const SYSTEM = `You are Brainstorm, a guide to a codebase that AI coding agents are editing live.
@@ -65,10 +64,8 @@ export class AskService implements OnModuleInit {
     let filePath = req.filePath ?? step?.filePath;
     if (filePath && !isAbsolute(filePath)) filePath = resolve(req.root ?? this.cfg.defaultRoot, filePath);
     const content = filePath ? this.safe(() => readFileSync(filePath!, "utf8")) : undefined;
-    const threadSteps: Step[] = req.sessionId && !step && !filePath ? this.safe(() => this.listener.listSteps(req.sessionId!)) ?? [] : [];
-    // A thread question goes stale as the thread grows: its step count stands in for the file hash.
-    const fileHash = content !== undefined ? createHash("sha1").update(content).digest("hex") : threadSteps.length ? `thread:${threadSteps.length}` : "";
-    const target = req.stepId ?? (req.sessionId && !req.filePath ? `thread:${req.sessionId}` : "");
+    const fileHash = content !== undefined ? createHash("sha1").update(content).digest("hex") : "";
+    const target = req.stepId ?? "";
 
     // Cache: same question + same target + unchanged file (only real Claude answers, so a fixed key is picked up).
     // Answers of exactly 700 tokens were cut off by the old limit (before 5 Oct 2026): ask again.
@@ -77,7 +74,7 @@ export class AskService implements OnModuleInit {
       .get(question, target, req.filePath ?? "", fileHash) as { response: string } | undefined;
     if (cached) return JSON.parse(cached.response) as AskResponse;
 
-    const user = maskSecrets(threadSteps.length ? this.threadContext(question, threadSteps, req.root) : this.buildContext(question, step, filePath, content, req.root));
+    const user = maskSecrets(this.buildContext(question, step, filePath, content, req.root));
 
     let res: AskResponse;
     try {
@@ -147,22 +144,6 @@ export class AskService implements OnModuleInit {
     }
 
     parts.push(`## Question\n${question}`);
-    return parts.join("\n\n");
-  }
-
-  /** A whole thread, for a question asked from the Track: what you asked, the files it changed, and its steps (the most recent in full). */
-  private threadContext(question: string, steps: Step[], root?: string): string {
-    const base = root ?? this.cfg.defaultRoot;
-    const prompts = steps.filter((s) => s.kind === "prompt" && !s.isSubagent).map((s) => promptTitle(s.text ?? "", 600)).filter(Boolean);
-    const changed = [...new Set(steps.filter((s) => s.kind === "edit" && s.filePath).map((s) => relative(base, s.filePath!)))];
-    const work = steps.filter((s) => s.kind !== "tool_result" && !(s.kind === "thinking" && !s.text?.trim()));
-    const recent = work.slice(-160);
-    const parts = [
-      `## What the person asked, in order\n${prompts.map((p, i) => `${i + 1}. ${p}`).join("\n") || "(no prompts)"}`,
-      `## Files the agent changed (${changed.length})\n${changed.slice(0, 80).map((f) => `- ${f}`).join("\n") || "(none)"}`,
-      `## Its steps${work.length > recent.length ? ` (the last ${recent.length} of ${work.length})` : ""}\n${recent.map((s) => `- ${this.describe(s)}`).join("\n")}`,
-      `## Question\n${question}`,
-    ];
     return parts.join("\n\n");
   }
 

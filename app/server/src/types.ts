@@ -18,8 +18,8 @@ export type Edge = { from: string; to: string };
 /** `totalFiles`: how many mappable files the project has; more than `files.length` when the map shows a chosen subset ("800 of 20,312 files"). */
 export type ProjectMap = { root: string; files: FileNode[]; edges: Edge[]; modules: { id: string; summary?: string }[]; formerRoots?: string[]; totalFiles?: number };
 export type Snapshot = { ts: string; map: ProjectMap };
-/** What a question is about: a step, a file, or a whole thread (`sessionId`, asked from the Track). */
-export type AskRequest = { question: string; stepId?: string; filePath?: string; root?: string; sessionId?: string };
+/** What a question is about: a step or a file. */
+export type AskRequest = { question: string; stepId?: string; filePath?: string; root?: string };
 export type AskResponse = { answer: string; model: string; tokensIn: number; tokensOut: number; costUsd: number; fallback: boolean };
 export type WsMessage =
   | { type: "session"; session: Session }
@@ -135,34 +135,6 @@ export type CoworkSummary = {
   codeSteps: number;                   // tool calls that stay in the code (for scale)
   sites: CoworkSite[]; pages: CoworkPage[];
   events: CoworkEvent[];               // chronological
-};
-
-/**
- * Tasks (GET /api/tasks, /api/tasks/:sessionId). Any agent session told as a task: the goal, how the agent did it,
- * what it made, where it got things, and a filmstrip of the screenshots its tools took.
- * Local only: screenshots and file previews are never part of a replay export.
- */
-export type TaskKind = "code" | "web" | "media" | "docs" | "mixed";
-export type TaskListItem = {
-  sessionId: string; goal: string; startedAt: string; lastAt: string; live: boolean; kind: TaskKind;
-  counts: { steps: number; frames: number; made: number; sources: number };
-};
-/** One tool call in plain words. `explain` spells out a command's options (e.g. each FFmpeg flag). */
-export type TaskStep = { id: string; ts: string; tool: string; label: string; detail?: string; explain?: string[]; failed?: boolean; error?: string; frame?: number; subagent?: boolean };
-/** A stretch of work: a prompt from the human, or the agent saying what it's about to do, then the calls that followed. */
-export type TaskBeat = { id: string; ts: string; prompt?: string; text?: string; steps: TaskStep[] };
-/** A screenshot a tool returned (browser, computer use, simulator). `src` serves the image. */
-export type TaskFrame = { stepId: string; callId?: string; idx: number; ts: string; caption: string; page?: string; beat: number; src: string };
-export type TaskFileKind = "image" | "video" | "audio" | "pdf" | "doc" | "data" | "code" | "other";
-/** A file the task wrote or produced (edits, or an output of a command like ffmpeg). `src` serves a preview when there is one. */
-export type TaskArtifact = { path: string; name: string; kind: TaskFileKind; exists: boolean; bytes?: number; firstTs: string; firstStepId: string; lastTs: string; edits: number; via: string; stepId: string; src?: string };
-/** Something the task did outside this computer (sent, published, deployed...), from the places classifier. */
-export type TaskOutside = { verb: CoworkVerb; what: string; site: string; title?: string; ts: string; stepId: string; confidence: CoworkConfidence };
-export type TaskSourceSite = { site: string; visits: number; pages: { page: string; title?: string; url?: string; visits: number }[]; searches: string[] };
-export type TaskSourceFile = { path: string; name: string; kind: TaskFileKind; exists: boolean; src?: string };
-export type TaskDetail = TaskListItem & {
-  cwd: string; prompts: string[]; beats: TaskBeat[]; frames: TaskFrame[];
-  made: TaskArtifact[]; outside: TaskOutside[]; web: TaskSourceSite[]; files: TaskSourceFile[];
 };
 
 /**

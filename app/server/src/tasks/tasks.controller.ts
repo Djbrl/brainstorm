@@ -6,18 +6,17 @@ import { existsSync, mkdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { dataDir } from "../core/local";
 import { TasksService } from "./tasks.service";
-import { ShotsService } from "./shots.service";
 
 // Owned by the lead. Tasks API. Local only: the server listens on 127.0.0.1, and files are served only if the task
 // made or used them. None of this is part of a replay export.
 @Controller()
 export class TasksController {
-  constructor(private tasks: TasksService, private shots: ShotsService) {}
+  constructor(private tasks: TasksService) {}
 
   @Get("tasks") list() { return this.tasks.list(); }
 
   @Get("tasks/shot/:stepId/:idx") shot(@Param("stepId") stepId: string, @Param("idx") idx: string, @Res() res: Response) {
-    const s = this.shots.get(stepId, Number(idx) || 0);
+    const s = this.tasks.shot(stepId, Number(idx) || 0);
     if (!s) throw new NotFoundException();
     res.setHeader("Content-Type", s.media);
     res.setHeader("Cache-Control", "private, max-age=86400");

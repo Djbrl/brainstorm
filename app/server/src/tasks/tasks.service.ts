@@ -13,6 +13,7 @@ import { commandLabel, toolLabel } from "../shared/labels";
 // then the calls in plain words), what it made, where it got things, and a filmstrip of its tools' screenshots.
 
 const LIVE_MS = 2 * 60 * 1000;
+const SHOT_MISS_MS = 30 * 1000;
 const PREVIEW: Set<TaskFileKind> = new Set(["image", "video", "audio", "pdf", "doc", "data"]);
 const FAILED = /^\s*(<tool_use_error>|error\b)|was denied or failed|is not allowed|permission_required|timed out after|^\s*exit code [1-9]/i;
 
@@ -45,7 +46,30 @@ function toolName(tool: string): string {
 export class TasksService {
   private cache = new Map<string, { key: string; detail: TaskDetail }>();
 
+  /** Shots asked for and not found, by `stepId:idx` → when to look again, so a missing one doesn't rescan the logs on every request. */
+  private missedShots = new Map<string, number>();
+
   constructor(private listener: ListenerService, private shots: ShotsService) {}
+
+  /** A screenshot a tool returned. The step panel asks for them by result step id without opening the task first, so
+   * on a miss this reads what's new in that step's session logs (only new bytes) and looks once more. */
+  shot(stepId: string, idx: number): { media: string; data: Uint8Array } | undefined {
+    const hit = this.shots.get(stepId, idx);
+    if (hit) return hit;
+    const key = `${stepId}:${idx}`;
+    const now = Date.now();
+    if ((this.missedShots.get(key) ?? 0) > now) return undefined;
+    // A step's screenshots are stored together: if some are here, this one doesn't exist (the step panel probes one past the last).
+    const sessionId = this.shots.has(stepId) ? undefined : this.listener.getStep(stepId)?.sessionId;
+    if (sessionId) {
+      this.shots.scan(sessionId);
+      const found = this.shots.get(stepId, idx);
+      if (found) { this.missedShots.delete(key); return found; }
+    }
+    if (this.missedShots.size > 2000) for (const [k, until] of this.missedShots) if (until <= now) this.missedShots.delete(k);
+    this.missedShots.set(key, now + SHOT_MISS_MS);
+    return undefined;
+  }
 
   list(): TaskListItem[] {
     return this.listener.listSessions().map((s) => {

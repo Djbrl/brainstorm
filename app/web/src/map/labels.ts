@@ -11,6 +11,7 @@
 // moves, text widths are measured once per font, and only the names on screen are placed and drawn.
 
 import { mapStyle, moduleColor } from "./themes";
+import { bucket, sprite, type Sprite } from "./sprites";
 
 /** `r`: how far the file reaches on the canvas (themes.ts reachOf), not its bare radius. */
 export type LabelNode = { x?: number; y?: number; r: number; module: string; lastChangedAt?: string; active: boolean };
@@ -72,14 +73,18 @@ export class LabelSpace {
 // ---------- text widths, measured once per font ----------
 const REF = 100;
 const widths = new Map<string, number>();
-/** Width of `text` at `px` pixels in `weight` `family`: measured once at 100px, then scaled (canvas text scales linearly). */
-export function textWidth(ctx: CanvasRenderingContext2D, text: string, weight: number, family: string, px: number) {
-  const k = weight + "|" + family + "|" + text;
+/**
+ * Width of `text` at `px` in `weight` `family`: measured once at `ref` pixels, then scaled. Close enough for folder
+ * names; a file name passes its size on screen as `ref`, since system fonts space small text wider than big text
+ * (San Francisco: about 14% at 12px against 100px).
+ */
+export function textWidth(ctx: CanvasRenderingContext2D, text: string, weight: number, family: string, px: number, ref = REF) {
+  const k = weight + "|" + family + "|" + ref + "|" + text;
   let w = widths.get(k);
   if (w === undefined) {
     const font = ctx.font;
-    ctx.font = `${weight} ${REF}px ${family}`;
-    w = ctx.measureText(text).width / REF;
+    ctx.font = `${weight} ${ref}px ${family}`;
+    w = ctx.measureText(text).width / ref;
     ctx.font = font;
     if (widths.size > 20000) widths.clear();
     widths.set(k, w);
@@ -112,7 +117,7 @@ export function drawQueuedLabels(ctx: CanvasRenderingContext2D, queue: QueuedLab
   queue.sort((a, b) => b.prio - a.prio);
   for (const l of queue) {
     // Air around a name, wider to the sides: two names in a row shouldn't read as one.
-    const w = textWidth(ctx, l.text, l.weight, l.family, l.size), px = 6 / l.scale, py = 2.5 / l.scale, g = 3 / l.scale, f = l.at;
+    const on = bucket(l.size * l.scale), w = textWidth(ctx, l.text, l.weight, l.family, on, on) / l.scale, px = 6 / l.scale, py = 2.5 / l.scale, g = 3 / l.scale, f = l.at;
     const box = (x: number, y: number): Box => ({ x0: x - w / 2 - px, x1: x + w / 2 + px, y0: y - py, y1: y + l.size + py });
     let sx = l.x, sy = l.y, ok = !space.hits(box(sx, sy), f?.id);
     if (!ok && f) {
@@ -125,20 +130,33 @@ export function drawQueuedLabels(ctx: CanvasRenderingContext2D, queue: QueuedLab
     l.x = sx; l.y = sy;
     keep.push(l);
   }
+  // Each name is a small picture (its outline stroked once), copied in device pixels: stroking every name's outline on
+  // every frame was most of a frame zoomed in, where many names fit.
+  const m = ctx.getTransform(), dpr = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1;
   ctx.save();
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   for (let i = keep.length - 1; i >= 0; i--) {
-    const l = keep[i];
+    const l = keep[i], s = nameSprite(ctx, l);
+    if (!s) continue;
     ctx.globalAlpha = l.alpha;
-    ctx.font = `${l.weight} ${l.size}px ${l.family}`;
-    ctx.lineWidth = 3 / l.scale;
-    ctx.strokeStyle = l.halo;
-    ctx.strokeText(l.text, l.x, l.y);
-    ctx.fillStyle = l.ink;
-    ctx.fillText(l.text, l.x, l.y);
+    const dx = l.x * m.a + l.y * m.c + m.e, dy = l.x * m.b + l.y * m.d + m.f;   // the text's top centre, in device pixels
+    ctx.drawImage(s.canvas, Math.round(dx - s.ox * dpr), Math.round(dy - s.oy * dpr));
   }
   ctx.restore();
+}
+
+/** A name with its outline, as the label pass draws it, at its size on screen (half-pixel buckets): (ox, oy) is its top centre. */
+function nameSprite(ctx: CanvasRenderingContext2D, l: QueuedLabel): Sprite | null {
+  const px = bucket(l.size * l.scale), halo = 1.5, w = textWidth(ctx, l.text, l.weight, l.family, px, px);
+  const W = Math.ceil(w + 2 * halo + 2), H = Math.ceil(px * 1.3 + 2 * halo + 2), ox = W / 2, oy = halo + 1;
+  return sprite(`name|${l.text}|${l.weight}|${l.family}|${l.ink}|${l.halo}|${px}`, W, H, ox, oy, (c) => {
+    c.font = `${l.weight} ${px}px ${l.family}`;
+    c.textAlign = "center"; c.textBaseline = "top";
+    c.lineJoin = "round"; c.lineWidth = 2 * halo; c.strokeStyle = l.halo;
+    c.strokeText(l.text, ox, oy);
+    c.fillStyle = l.ink;
+    c.fillText(l.text, ox, oy);
+  });
 }
 
 const HOUR = 3_600_000;

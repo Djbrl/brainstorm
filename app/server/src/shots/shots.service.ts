@@ -3,16 +3,20 @@ import { closeSync, existsSync, openSync, readdirSync, readSync, statSync } from
 import { join } from "node:path";
 import { DbService } from "../core/db.service";
 import { ConfigService } from "../core/config.service";
+import { ListenerService } from "../listener/listener.service";
 
 // Owned by the lead. Screenshots that tools returned (browser, computer use, simulator), read from Claude Code's
-// session logs and kept in the local database, so a task's filmstrip survives Claude Code's log cleanup.
-// Local only: nothing here is part of a replay export.
+// session logs and kept in the local database, so they survive Claude Code's log cleanup. The step panel shows them
+// (web follow/content/ToolView.tsx). Local only: nothing here is part of a replay export.
 
-type Row = { step_id: string; idx: number };
+const SHOT_MISS_MS = 30 * 1000;
 
 @Injectable()
 export class ShotsService implements OnModuleInit {
-  constructor(private dbs: DbService, private cfg: ConfigService) {}
+  /** Shots asked for and not found, by `stepId:idx` → when to look again, so a missing one doesn't rescan the logs on every request. */
+  private missed = new Map<string, number>();
+
+  constructor(private dbs: DbService, private cfg: ConfigService, private listener: ListenerService) {}
 
   onModuleInit() {
     const db = this.dbs.db;
@@ -68,12 +72,24 @@ export class ShotsService implements OnModuleInit {
     }
   }
 
-  /** Screenshot counts per result step id. */
-  forSession(sessionId: string): Map<string, number> {
-    const rows = this.dbs.db.prepare(`SELECT step_id, idx FROM task_shots WHERE session_id = ?`).all(sessionId) as Row[];
-    const m = new Map<string, number>();
-    for (const r of rows) m.set(r.step_id, Math.max(m.get(r.step_id) ?? 0, r.idx + 1));
-    return m;
+  /** A screenshot a tool returned. The step panel asks for them by result step id, so on a miss this reads what's new
+   * in that step's session logs (only new bytes) and looks once more. */
+  shot(stepId: string, idx: number): { media: string; data: Uint8Array } | undefined {
+    const hit = this.get(stepId, idx);
+    if (hit) return hit;
+    const key = `${stepId}:${idx}`;
+    const now = Date.now();
+    if ((this.missed.get(key) ?? 0) > now) return undefined;
+    // A step's screenshots are stored together: if some are here, this one doesn't exist (the step panel probes one past the last).
+    const sessionId = this.has(stepId) ? undefined : this.listener.getStep(stepId)?.sessionId;
+    if (sessionId) {
+      this.scan(sessionId);
+      const found = this.get(stepId, idx);
+      if (found) { this.missed.delete(key); return found; }
+    }
+    if (this.missed.size > 2000) for (const [k, until] of this.missed) if (until <= now) this.missed.delete(k);
+    this.missed.set(key, now + SHOT_MISS_MS);
+    return undefined;
   }
 
   /** Whether any screenshot of this result step is stored (a step's screenshots are stored together). */

@@ -23,6 +23,9 @@ export type MapStyle = {
   track?: string;
   /** Subagent colours (main threads take the theme's accent). */
   palette: string[];
+  /** How far a file's mark reaches from its centre, in radii: idle, and with an agent on it (its ring, its bigger cube).
+   *  The layout keeps this clear between files and labels stay out of it (see reachOf). */
+  reach: [number, number];
 };
 
 const BASE: MapStyle = {
@@ -33,6 +36,7 @@ const BASE: MapStyle = {
   imports: "rgba(91,91,214,0.7)", usedBy: "rgba(15,157,138,0.7)",
   markerStroke: "#fff", markerText: "#fff", glow: false, route: "glide",
   palette: ["#2f7ae5", "#0f9d8a", "#c2409a", "#7c4dde", "#2e9e4f", "#0b8fb3", "#b5487a", "#4a6fa5"],
+  reach: [1, 1.2],                       // a dot; the active outline sits 3.5px out
 };
 
 const STYLES: Record<ThemeId, MapStyle> = {
@@ -40,6 +44,7 @@ const STYLES: Record<ThemeId, MapStyle> = {
   metro: {
     ...BASE, node: "station", link: "metro", moduleColored: true, route: "metro", track: "#1d1d1f",
     halo: "rgba(255,255,255,0.95)", moduleInk: "rgba(29,29,31,0.55)", moduleInkLively: "rgba(29,29,31,0.8)",
+    reach: [0.72, 1.1],                  // a station is 0.6r plus its ring; an agent adds one more ring
   },
   ps2: {
     ...BASE, node: "cube", route: "hop",
@@ -50,6 +55,7 @@ const STYLES: Record<ThemeId, MapStyle> = {
     imports: "rgba(242,227,106,0.9)", usedBy: "rgba(140,200,255,0.9)",
     markerStroke: "rgba(255,255,255,0.95)", markerText: "#1b1b40", glow: true,
     palette: ["#8fb4ff", "#7ee0ff", "#ff9ff3", "#c7a6ff", "#9dffb0", "#ffe08a", "#ffb38a", "#a6f0ff"],
+    reach: [1.25, 1.95],                 // a turning cube's corners (0.78r, tilted); active: 1.3x and the floor ring
   },
   deadspace: {
     ...BASE, node: "plate", route: "elbow",
@@ -60,10 +66,14 @@ const STYLES: Record<ThemeId, MapStyle> = {
     imports: "rgba(95,227,224,0.9)", usedBy: "rgba(57,231,95,0.85)",
     markerStroke: "#0b1214", markerText: "#0b1214", glow: true,
     palette: ["#5fe3e0", "#7cc8ff", "#b6f0ff", "#9ef7c8", "#3fc1c9", "#8fe9f0", "#6fd3a8", "#a3d8ff"],
+    reach: [1.2, 2.05],                  // a plate is 1.17r wide; active: the projected square around it
   },
 };
 
 export const mapStyle = (): MapStyle => STYLES[getTheme()];
+
+/** How far a file of radius r reaches on the canvas in this theme (graph units, never under 4: the smallest station). */
+export const reachOf = (r: number, active = false, st = mapStyle()) => Math.max(4, r * st.reach[active ? 1 : 0]);
 
 /** A folder's line colour (Metro): stable per folder name. */
 export function moduleColor(m: string): string {

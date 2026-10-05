@@ -1,11 +1,12 @@
 // Owned by the lead. The shell: the header with where you are (project › thread › step), and the view for that place.
 import { isReplay, useLive } from "./lib/live";
-import { NavProvider, useNav } from "./lib/nav";
+import { END, NavProvider, useNav } from "./lib/nav";
 import { useThread } from "./lib/thread";
 import { displayLabel } from "./follow/format";
 import { SetupView } from "./setup/SetupView";
 import { Welcome } from "./map/Welcome";
 import { SettingsButton } from "./settings/Settings";
+import { useAttentionAlerts } from "./lib/attention";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
 // The views (and the graph library the Map needs) load when they're opened.
@@ -38,7 +39,8 @@ function Crumbs({ project }: { project: string }) {
 function Shell() {
   const { state, reload } = useLive();
   const [setupOpen, setSetupOpen] = useState(false);
-  const { lens, replay, back } = useNav();
+  const { lens, replay, back, startReplay } = useNav();
+  useAttentionAlerts((sid) => startReplay(sid, END, { live: true }));
 
   // Esc goes up one level: step → thread → project (not while typing).
   useEffect(() => {

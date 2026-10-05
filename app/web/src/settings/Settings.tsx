@@ -1,5 +1,7 @@
 // Owned by the lead. The settings button in the header: for now, the map theme.
 import { useEffect, useRef, useState } from "react";
+import { useNotifyPref } from "../lib/attention";
+import { isReplay } from "../lib/live";
 import { setTheme, THEMES, useTheme } from "../lib/theme";
 import "./settings.css";
 
@@ -34,8 +36,25 @@ export function SettingsButton() {
               </button>
             ))}
           </div>
+          <NotifySetting />
         </div>
       )}
     </div>
+  );
+}
+
+/** Desktop notifications when a thread needs you (attention). Local app only: a replay has no live agents. */
+function NotifySetting() {
+  const { on, toggle, supported } = useNotifyPref();
+  if (!supported || isReplay()) return null;
+  const blocked = typeof Notification !== "undefined" && Notification.permission === "denied";
+  return (
+    <>
+      <h3>Notifications</h3>
+      <label className="notify-opt">
+        <input type="checkbox" checked={on} disabled={blocked} onChange={toggle} />
+        <span><b>Tell me when an agent needs me</b><small>{blocked ? "Blocked in this browser's site settings" : "A permission, a question, a plan to approve, or a finished turn, while this tab is in the background"}</small></span>
+      </label>
+    </>
   );
 }

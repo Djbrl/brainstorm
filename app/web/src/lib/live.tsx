@@ -1,7 +1,7 @@
 // Owned by the lead. One store for the whole app: REST bootstrap + websocket updates, or a static replay file.
 import { installSetupShim, startAgentPlayback } from "./preview";
 import { createContext, useCallback, useContext, useEffect, useReducer, type ReactNode } from "react";
-import type { AgentPresence, AskRequest, AskResponse, Edge, FailureGroup, FileNode, SetupStatus, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
+import type { AgentPresence, Attention, AskRequest, AskResponse, Edge, FailureGroup, FileNode, SetupStatus, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
 
 export type LiveState = {
   connected: boolean;
@@ -14,6 +14,7 @@ export type LiveState = {
   setup: SetupStatus | null;             // null until loaded (and always null in replay)
   preview: boolean;                      // replay built for the post-deadline preview (agent + setup playback)
   shared: Replay["shared"] | null;       // a replay file someone shared from their Brainstorm
+  attention: Record<string, Attention>;  // by sessionId: is a thread waiting on you (local app only)
 };
 
 type Action =
@@ -23,12 +24,13 @@ type Action =
   | { type: "map"; map: ProjectMap }
   | { type: "failures"; failures: FailureGroup[] }
   | { type: "agents"; agents: AgentPresence[] }
+  | { type: "attention-all"; list: Attention[] }
   | { type: "setup-status"; status: SetupStatus }
   | { type: "reset" }
   | { type: "replay"; data: Replay }
   | WsMessage;
 
-const initial: LiveState = { connected: false, replay: false, sessions: [], steps: {}, map: null, failures: [], agents: {}, setup: null, preview: false, shared: null };
+const initial: LiveState = { connected: false, replay: false, sessions: [], steps: {}, map: null, failures: [], agents: {}, setup: null, preview: false, shared: null, attention: {} };
 
 /** A changed file, and its outgoing imports when the server recomputed them. */
 function upsertFile(map: ProjectMap | null, file: FileNode, edges?: Edge[]): ProjectMap | null {
@@ -56,9 +58,11 @@ function reducer(s: LiveState, a: Action): LiveState {
     case "failures": return { ...s, failures: a.failures };
     case "agents": return { ...s, agents: Object.fromEntries(a.agents.map((g) => [g.id, g])) };
     case "agent": return { ...s, agents: { ...s.agents, [a.agent.id]: a.agent } };
+    case "attention-all": return { ...s, attention: Object.fromEntries(a.list.map((x) => [x.sessionId, x])) };
+    case "attention": return { ...s, attention: { ...s.attention, [a.attention.sessionId]: a.attention } };
     case "setup-status": return { ...s, setup: a.status };
     case "setup": return { ...s, setup: a.status };
-    case "reset": return { ...s, sessions: [], steps: {}, map: null, failures: [], agents: {} };
+    case "reset": return { ...s, sessions: [], steps: {}, map: null, failures: [], agents: {}, attention: {} };
     case "replay": {
       const steps: Record<string, Step[]> = {};
       for (const st of a.data.steps) (steps[st.sessionId] ??= []).push(st);
@@ -124,6 +128,7 @@ function loadAll(dispatch: (a: Action) => void) {
   fetch("/api/map").then((r) => r.json()).then((map) => dispatch({ type: "map", map })).catch(() => {});
   fetch("/api/failures").then((r) => r.json()).then((failures) => dispatch({ type: "failures", failures })).catch(() => {});
   fetch("/api/agents").then((r) => r.json()).then((agents) => dispatch({ type: "agents", agents })).catch(() => {});
+  fetch("/api/attention").then((r) => r.json()).then((list) => Array.isArray(list) && dispatch({ type: "attention-all", list })).catch(() => {});
 }
 
 const Ctx = createContext<{ state: LiveState; loadSteps: (sessionId: string) => void; reload: () => void } | null>(null);

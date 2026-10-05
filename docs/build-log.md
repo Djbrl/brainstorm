@@ -108,6 +108,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 00:05 (5 Oct) [step-panel] Step panel content, readable (`feature/step-panel`): commands as a terminal (one step per line, flags and strings colored, inline scripts as their own block, "Failed · exit code N"), reads as numbered code, each browser action as a row with its result and the screenshots, searches as links, JSON anywhere as a collapsible tree, other tools' inputs as labelled fields, agent instructions and messages as Markdown. Smaller title (17 px, 3 lines), no close button (click outside, Esc).
 
+- 01:10 (5 Oct) [attention] Waiting for you (`feature/waiting`): each thread's state (needs your permission, asked a question, plan to approve, stuck on 3 failures in a row, your turn) from the log, made sure by new plugin hooks (PermissionRequest, Notification, Stop, UserPromptSubmit → POST /api/hooks, async). Shows as an amber badge on the thread, a waiting row at the end of its steps, an amber ring on its agent on the map, a count in the tab title, and opt-in desktop notifications (Settings). See docs/attention.md.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

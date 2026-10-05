@@ -43,3 +43,9 @@
   linear-gradient(90deg, rgba(143,233,240,.08) 1px, transparent 1px) 0 0 / 8px 8px, #0c1012; }
 .sw-deadspace::before { content: ""; position: absolute; left: 14%; top: 30%; width: 44%; height: 32%; border-left: 2px solid #5fe3e0; border-bottom: 2px solid #5fe3e0; box-shadow: -2px 2px 8px rgba(95,227,224,.5); }
 .sw-deadspace::after { content: ""; position: absolute; left: 58%; top: 56%; width: 8px; height: 8px; transform: rotate(45deg); background: #39e75f; box-shadow: 0 0 8px #39e75f; }
+.notify-opt { display: flex; gap: 10px; align-items: flex-start; padding: 8px 6px; border-radius: 10px; cursor: pointer; }
+.notify-opt:hover { background: rgba(0,0,0,.03); }
+.notify-opt input { margin: 3px 0 0; accent-color: var(--accent); width: 15px; height: 15px; flex: none; }
+.notify-opt span { display: grid; gap: 1px; }
+.notify-opt b { font-size: 13.5px; font-weight: 600; }
+.notify-opt small { font-size: 12px; color: var(--ink-3); line-height: 1.35; }

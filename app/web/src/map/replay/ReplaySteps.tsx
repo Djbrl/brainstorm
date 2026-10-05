@@ -8,6 +8,7 @@ import { useNav } from "../../lib/nav";
 import { beatLabel, useThread, type Beat } from "../../lib/thread";
 import { chapterAt, chaptersOf, duration, injectedLabel, type Chapter } from "../../lib/chapters";
 import { clockTime } from "../../follow/format";
+import { attentionText, needsYou, yourTurn } from "../../lib/attention";
 import "./replay.css";
 
 const USER_MS = 400;       // the list stops following the cursor this long after the user scrolls it
@@ -159,10 +160,28 @@ export function ReplaySteps() {
             </section>
           );
         })}
+        <WaitingRow sessionId={replay.sessionId} onOpen={(stepId) => openStep(replay.sessionId, stepId)} />
         <button className="rp-detail-switch" onClick={() => setReplayDetail(full ? "light" : "full")}>
           {full ? "Group the steps into moments" : "Show every step"}
         </button>
       </div>
+    </div>
+  );
+}
+
+/** The live end of the list: the agent is waiting on you (or done and it's your turn). */
+function WaitingRow({ sessionId, onOpen }: { sessionId: string; onOpen: (stepId: string) => void }) {
+  const a = useLive().state.attention[sessionId];
+  if (!a || !(needsYou(a) || yourTurn(a))) return null;
+  const t = attentionText(a);
+  const blocked = needsYou(a);
+  return (
+    <div className={`rp-waiting ${blocked ? "blocked" : "turn"}`} role="status">
+      <b aria-hidden="true" />
+      <span className="rp-waiting-line">{t.line}</span>
+      {a.detail && <code className="rp-waiting-detail" title={a.detail}>{a.detail}</code>}
+      {blocked && <span className="rp-waiting-hint">{a.state === "stuck" ? "It may need a hint from you." : "Answer it in Claude Code."}</span>}
+      {a.stepId && <button className="rp-waiting-open" onClick={() => onOpen(a.stepId!)}>Show the step</button>}
     </div>
   );
 }

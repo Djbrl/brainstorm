@@ -10,6 +10,7 @@ const RIPPLE_MS = 700; // one ripple per edit
 import ForceGraph2D, { type ForceGraphMethods, type LinkObject, type NodeObject } from "react-force-graph-2d";
 import type { AgentPresence, Edge, FileNode, ProjectMap, Step } from "@contract";
 import { useLive } from "../lib/live";
+import { attentionText, needsYou } from "../lib/attention";
 import { mapPrefs, useNav } from "../lib/nav";
 import { AskBox } from "../ask/AskBox";
 import { mockAgents, mockMap } from "./mock";
@@ -195,12 +196,18 @@ export function MapView() {
   // ---- live agents ----
   const [mockTick, setMockTick] = useState(0);
   useEffect(() => { if (!mock) return; const t = setInterval(() => setMockTick((x) => x + 1), 2600); return () => clearInterval(t); }, [mock]);
-  const agents: AgentPresence[] = useMemo(
-    () => visibleAgents(mock && map ? mockAgents(map, mockTick) : Object.values(state.agents ?? {})),
-    [mock, map, mockTick, state.agents],
-  );
+  // An agent waiting on you stays on the map however long it waits.
+  const waitingIds = useMemo(() => new Set(Object.values(state.attention).filter(needsYou).map((a) => a.agentId ?? a.sessionId)), [state.attention]);
+  const agents: AgentPresence[] = useMemo(() => {
+    const all = mock && map ? mockAgents(map, mockTick) : Object.values(state.agents ?? {});
+    const shown = new Set(visibleAgents(all));
+    return all.filter((a) => shown.has(a) || waitingIds.has(a.id));
+  }, [mock, map, mockTick, state.agents, waitingIds]);
   // Hidden agents (sidebar toggles) and all live agents while a thread replay is on are not drawn.
   const drawnAgents = useMemo(() => (replay ? [] : agents.filter((a) => !hiddenAgents.has(a.id))), [agents, hiddenAgents, replay]);
+  // Agents waiting on you (attention): agent id → label. A subagent waits under its own id, a main thread under the session's.
+  const waiting = useMemo(() => new Map(Object.values(state.attention).filter(needsYou).map((a) => [a.agentId ?? a.sessionId, attentionText(a).badge === "Stuck" ? "Stuck" : `Needs you · ${attentionText(a).title.toLowerCase()}`])), [state.attention]);
+  const waitingRef = useRef(waiting); waitingRef.current = waiting;
   const agentsRef = useRef(drawnAgents); agentsRef.current = drawnAgents;
   const anim = useRef(new Map<string, AgentAnim>());
   const [followId, setFollowId] = useState<string | null>(null);
@@ -232,7 +239,7 @@ export function MapView() {
     replayRef.current.draw(ctx, scale);
     drawAgents({
       ctx, scale, agents: agentsRef.current, anim: anim.current, accent: tokens.accent, font: tokens.body,
-      hoverFile: hoverRef.current, followId: followRef.current, resolveId, showReads: mapPrefs.showReads, quiet: !openRef.current,
+      hoverFile: hoverRef.current, followId: followRef.current, resolveId, showReads: mapPrefs.showReads, quiet: !openRef.current, waiting: waitingRef.current,
       resolve: (id) => { const n = nodeIndexRef.current.get(id); return n && n.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y, r: n.r } : undefined; },
     });
   }, [tokens, resolveId]);

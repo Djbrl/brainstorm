@@ -144,3 +144,11 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 /* "Show all 12 threads" under the short list (ThreadsPanel). */
 .sidebar-more { display: block; width: 100%; margin-top: 6px; padding: 8px; border: 0; background: none; color: var(--accent); font-size: 13px; font-weight: 500; text-align: left; border-radius: 10px; }
 .sidebar-more:hover { background: #f4f4f7; }
+
+/* Waiting on you (attention): an amber dot that breathes, and a badge in place of the worktree name. */
+.sidebar-thread-status.waiting { background: #f59e0b; box-shadow: 0 0 0 0 rgba(245,158,11,.55); animation: attn-breathe 1.8s infinite; }
+@keyframes attn-breathe { 0% { box-shadow: 0 0 0 0 rgba(245,158,11,.55); } 70% { box-shadow: 0 0 0 7px rgba(245,158,11,0); } 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); } }
+.sidebar-thread-attn { flex: none; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.sidebar-thread-attn.blocked { background: #fff4e0; color: #9a5800; }
+.sidebar-thread-attn.turn { background: #f0f0f3; color: var(--ink-2); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .sidebar-thread-status.waiting { animation: none; box-shadow: 0 0 0 3px rgba(245,158,11,.25); } }

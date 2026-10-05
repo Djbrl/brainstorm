@@ -521,7 +521,7 @@ export function MapView() {
   }, [style]);
 
   const drawModules = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
-    moduleSpace.current.reset(); fileSpace.current.reset(); labelQueue.current = [];
+    moduleSpace.current.reset(); fileSpace.current.reset();
     const idx = nodeIndexRef.current;
     const focus = new Set<string>();
     for (const id of [hoverRef.current, selectedRef.current]) { const n = id ? idx.get(id) : undefined; if (n) focus.add(n.file.module); }
@@ -534,6 +534,12 @@ export function MapView() {
     drawModuleLabels(ctx, scale, graph.nodes.map((n) => ({ x: n.x, y: n.y, r: n.r, module: n.file.module, lastChangedAt: n.file.lastChangedAt, active: !!n.file.activeSessionId })),
       { font: tokens.display, now: clock(), focus, busy, space: moduleSpace.current });
   }, [graph.nodes, tokens, resolveId]);
+  // Labels go on after the files (folder names, then file names), so no circle covers a name; then the agents.
+  const startFrame = useCallback(() => { labelQueue.current = []; }, []);
+  const endFrame = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
+    drawModules(ctx, scale);
+    drawAgentLayer(ctx, scale);
+  }, [drawModules, drawAgentLayer]);
 
   const sel = selected ? graph.nodes.find((n) => n.id === selected)?.file : undefined;
 
@@ -559,8 +565,8 @@ export function MapView() {
           nodeLabel={() => ""}
           nodeCanvasObject={drawNode}
           nodePointerAreaPaint={(n, color, ctx) => { const g = n as GNode; ctx.fillStyle = color; ctx.beginPath(); ctx.arc(g.x ?? 0, g.y ?? 0, g.r + 3, 0, Math.PI * 2); ctx.fill(); }}
-          onRenderFramePre={drawModules}
-          onRenderFramePost={drawAgentLayer}
+          onRenderFramePre={startFrame}
+          onRenderFramePost={endFrame}
           linkColor={(l) => linkRole(l as GLink, linkFocus) === "imports" ? style.imports : linkRole(l as GLink, linkFocus) === "usedBy" ? style.usedBy : linkFocus || replayLayer.tracing ? style.linkDim : style.linkIdle}
           linkCanvasObjectMode={style.link === "metro" ? () => "replace" : undefined}
           linkCanvasObject={style.link === "metro" ? drawMetroLink : undefined}

@@ -96,7 +96,7 @@
   --accent-soft: rgba(57,231,95,.14);
   --cool: #5c6c70;
   --warm: #5fe3e0;          /* changed recently: cyan */
-  --hot: #c9fbff;           /* just now */
+  --hot: #ff7a45;           /* just now: the warning orange, so it never reads like the cyan of "since you last looked" */
   --chrome: rgba(10,16,18,.85);
   --sheet: rgba(14,22,24,.84);
   --hover: rgba(143,233,240,.08);

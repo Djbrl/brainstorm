@@ -2,8 +2,9 @@
 // stretch of work in a place. A row selects its place on the map and opens its newest step in the side panel.
 import type { ReactNode } from "react";
 import type { CoworkArea } from "@contract";
-import { clockTime } from "../follow/format";
+import { timeIn } from "../follow/format";
 import { VERB_NAME, placeRuns, placeTitle, placesStore, selectPlace, usePlaces } from "./data";
+import "../map/replay/replay.css"; // the row styles (.rp-list, .rp-row) it shares with the replay
 
 const ICON: Record<CoworkArea, ReactNode> = {
   web: <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M2 8h12M8 2c1.7 1.7 2.5 3.7 2.5 6S9.7 12.3 8 14M8 2C6.3 3.7 5.5 5.7 5.5 8s.8 4.3 2.5 6" /></svg>,
@@ -36,7 +37,7 @@ export function PlaceSteps() {
               <span className="rp-row-text">
                 <span className="rp-row-label">{title}</span>
                 <span className="rp-row-meta">
-                  <time>{clockTime(r.first.ts)}</time>
+                  <time>{timeIn(r.first.ts)}</time>
                   {changed && <span className="pl-verbs">{[...r.verbs].map(([v, n]) => `${VERB_NAME[v].toLowerCase()}${n > 1 ? ` ×${n}` : ""}`).join(", ")}</span>}
                   {!changed && r.count > 1 && <span>{r.count} steps</span>}
                   {r.failed > 0 && <span className="rp-fail-dot" aria-label={`${r.failed} failed`} />}

@@ -1,6 +1,6 @@
 // Owned by the lead. The shell: the header with where you are (project › thread › step), and the view for that place.
 import { isReplay, useLive } from "./lib/live";
-import { END, NavProvider, useNav } from "./lib/nav";
+import { END, NavProvider, threadLens, useNav } from "./lib/nav";
 import { useThread } from "./lib/thread";
 import { displayLabel } from "./follow/format";
 import { SetupView } from "./setup/SetupView";
@@ -8,6 +8,7 @@ import { Welcome } from "./map/Welcome";
 import { SettingsButton } from "./settings/Settings";
 import { useAttentionAlerts } from "./lib/attention";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import "./boot.css";
 
 // The views (and the graph library the Map needs) load when they're opened.
 const MapView = lazy(() => import("./map/MapView").then((m) => ({ default: m.MapView })));
@@ -39,10 +40,11 @@ function Crumbs({ project }: { project: string }) {
 function Shell() {
   const { state, reload } = useLive();
   const [setupOpen, setSetupOpen] = useState(false);
-  const { lens, replay, back, startReplay } = useNav();
-  useAttentionAlerts((sid) => startReplay(sid, END, { live: true }));
+  const { lens, replay, back, startReplay, stopReplay, selectFile } = useNav();
+  useAttentionAlerts((sid) => startReplay(sid, END, { live: true, lens: threadLens() })); // a notification opens the thread's Track
 
-  // Esc goes up one level: step → thread → project (not while typing).
+  // Esc closes the innermost thing first: a popover (it handles Esc itself and marks it handled), then a panel (step,
+  // file), then the player, then the thread (not while typing).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -53,10 +55,15 @@ function Shell() {
     return () => removeEventListener("keydown", onKey);
   }, [back]);
 
+  // First load: a quiet "Loading" until we know whether to show setup or the map, rather than a blank page or a flash of either.
+  const booting = useBooting();
+  if (booting) return <Loading />;
+
   // Local app: pick a workspace first (and whenever "Change" is clicked). The hosted demo never shows setup,
   // except the post-deadline preview, which plays back a recorded setup run (see lib/preview.ts).
   if ((setupOpen && (!state.replay || state.preview)) || (!state.replay && state.setup && !state.setup.root)) {
-    return <SetupView onDone={() => { setSetupOpen(false); reload(); }} onCancel={state.setup?.root || state.preview ? () => setSetupOpen(false) : undefined} />;
+    // Another project: whatever was open (a thread, a step, a file) belonged to the old one.
+    return <SetupView onDone={() => { setSetupOpen(false); stopReplay(); selectFile(null); reload(); }} onCancel={state.setup?.root || state.preview ? () => setSetupOpen(false) : undefined} />;
   }
   const project = state.setup?.name || "brainstorm";
 
@@ -72,11 +79,14 @@ function Shell() {
             <button className="ws-chip" title="Play back a recorded setup run" onClick={() => setSetupOpen(true)}>Setup preview</button>
           )}
           {!state.replay && state.setup?.root && (
-            <button className="ws-chip" title={state.setup.root} onClick={() => setSetupOpen(true)}>Change project</button>
+            <button className="ws-chip ws-change" title={state.setup.root} onClick={() => setSetupOpen(true)}>
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.75 6.25V15a1.25 1.25 0 0 0 1.25 1.25h12A1.25 1.25 0 0 0 17.25 15V8A1.25 1.25 0 0 0 16 6.75h-6.2L8.3 4.5a1 1 0 0 0-.83-.45H4A1.25 1.25 0 0 0 2.75 5.3Z" /></svg>
+              Change project
+            </button>
           )}
           <SettingsButton />
           <span className={`dot ${state.connected ? "live" : ""}`} />
-          {state.shared ? "Shared replay" : state.replay ? "Recorded demo" : state.connected ? "Live" : "Connecting…"}
+          <span className="status-text">{state.shared ? "Shared replay" : state.replay ? "Recorded demo" : state.connected ? "Live" : "Connecting…"}</span>
         </div>
       </header>
       {state.preview && (
@@ -95,13 +105,41 @@ function Shell() {
       {state.shared && <OpenShared />}
       <LiveFollow />
       {!replay && !state.shared && <Welcome />}
-      <main className="view"><Suspense fallback={null}>{
-        replay && lens === "track" && !state.replay ? <TrackView />
+      <main className="view"><Suspense fallback={<Loading />}>{
+        replay && state.sessionsLoaded && !state.sessions.some((s) => s.id === replay.sessionId) ? <MissingThread onBack={stopReplay} />
+          : replay && lens === "track" && !state.replay ? <TrackView />
           : replay && lens === "places" ? <PlacesView />
           : <MapView />
       }</Suspense></main>
     </div>
   );
+}
+
+/**
+ * Still loading: the workspace status (setup or map?) and, once there's a project, its map; a recording, until it's in.
+ * Gives up after a while so a server that doesn't answer shows the app (and its "Connecting…") instead.
+ */
+function useBooting(): boolean {
+  const { state } = useLive();
+  const ready = isReplay() ? state.replay : !!state.setup && (!state.setup.root || !!state.map);
+  const [waited, setWaited] = useState(false);
+  useEffect(() => { if (ready) return; const t = setTimeout(() => setWaited(true), 8000); return () => clearTimeout(t); }, [ready]);
+  return !ready && !waited;
+}
+
+/** A link to a thread this project doesn't have: another project's, a deleted one, or a typo. */
+function MissingThread({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="boot missing" role="status">
+      <h2>This thread isn't in this project</h2>
+      <p>It may belong to another project, or it was deleted.</p>
+      <button className="next-cta" onClick={onBack}>Back to the project</button>
+    </div>
+  );
+}
+
+function Loading() {
+  return <div className="boot" role="status" aria-live="polite"><p>Loading your project…</p></div>;
 }
 
 /** A shared replay holds one thread: it opens on that thread's footprint (unless its link names a place). */

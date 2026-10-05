@@ -18,6 +18,14 @@ Answer the question for someone learning this codebase. Use ONLY the context pro
 Be concise: 2 to 6 short sentences or a few bullets, plain language, name concrete files and functions.
 If the context does not contain the answer, say so plainly and say what you would need to look at. Never invent code that is not shown.`;
 
+/** Trim a cut-off answer back to its last complete sentence or list item, and say it was shortened. */
+export function endAtSentence(text: string): string {
+  const body = text.replace(/\s+\S*$/, ""); // drop the half word
+  const i = Math.max(body.lastIndexOf(". "), body.lastIndexOf(".\n"), body.lastIndexOf("\n- "), body.lastIndexOf("\n\n"));
+  const kept = i > body.length * 0.4 ? body.slice(0, i + 1).trimEnd() : `${body.trimEnd()}…`;
+  return `${kept}\n\n*(Answer shortened: ask a narrower question for the rest.)*`;
+}
+
 /** USD per million tokens [input, output]. */
 function pricing(model: string): [number, number] {
   const m = model.toLowerCase();
@@ -63,8 +71,9 @@ export class AskService implements OnModuleInit {
     const target = req.stepId ?? (req.sessionId && !req.filePath ? `thread:${req.sessionId}` : "");
 
     // Cache: same question + same target + unchanged file (only real Claude answers, so a fixed key is picked up).
+    // Answers of exactly 700 tokens were cut off by the old limit (before 5 Oct 2026): ask again.
     const cached = this.dbs.db
-      .prepare(`SELECT response FROM ask_answers WHERE question = ? AND step_id = ? AND file_path = ? AND file_hash = ? AND json_extract(response, '$.fallback') = 0 ORDER BY id DESC LIMIT 1`)
+      .prepare(`SELECT response FROM ask_answers WHERE question = ? AND step_id = ? AND file_path = ? AND file_hash = ? AND json_extract(response, '$.fallback') = 0 AND json_extract(response, '$.tokensOut') != 700 ORDER BY id DESC LIMIT 1`)
       .get(question, target, req.filePath ?? "", fileHash) as { response: string } | undefined;
     if (cached) return JSON.parse(cached.response) as AskResponse;
 
@@ -72,7 +81,9 @@ export class AskService implements OnModuleInit {
 
     let res: AskResponse;
     try {
-      const r = await this.claude.complete(SYSTEM, user, 700);
+      // Room for a full answer (the prompt asks for a short one); a cut answer ends at its last full sentence.
+      const r = await this.claude.complete(SYSTEM, user, 1500);
+      if (r.cut) r.text = endAtSentence(r.text);
       const [pi, po] = pricing(r.model);
       const costUsd = +((r.tokensIn * pi + r.tokensOut * po) / 1e6).toFixed(6);
       res = { answer: r.text, model: r.model, tokensIn: r.tokensIn, tokensOut: r.tokensOut, costUsd, fallback: false };

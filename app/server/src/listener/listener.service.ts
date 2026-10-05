@@ -1,7 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import chokidar, { type FSWatcher } from "chokidar";
-import { closeSync, openSync, readdirSync, readSync, statSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { closeSync, existsSync, openSync, readdirSync, readSync, statSync } from "node:fs";
+import { basename, join, relative, resolve, sep } from "node:path";
+import { homedir } from "node:os";
 import type { Session, Step, StepKind } from "../types";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
@@ -48,6 +49,20 @@ type RawLine = {
 };
 
 type SessionRow = { id: string; cwd: string; title: string; started_at: string; last_event_at: string; custom_title: number; title_set: number };
+
+/** Threads deleted in Claude's desktop app: it leaves a `deleted_<sessionId>` file per thread. Re-read at most once a minute. */
+let deletedCache: { at: number; ids: Set<string> } | null = null;
+function deletedThreads(): Set<string> {
+  if (deletedCache && Date.now() - deletedCache.at < 60_000) return deletedCache.ids;
+  const ids = new Set<string>();
+  const root = join(homedir(), "Library", "Application Support", "Claude", "claude-code-sessions"); // macOS; elsewhere nothing is found
+  const list = (dir: string) => { try { return readdirSync(dir); } catch { return []; } }; // no desktop app, or a file
+  for (const a of list(root)) for (const b of list(join(root, a))) for (const f of list(join(root, a, b))) {
+    if (f.startsWith("deleted_")) ids.add(f.slice("deleted_".length));
+  }
+  deletedCache = { at: Date.now(), ids };
+  return ids;
+}
 
 @Injectable()
 export class ListenerService implements OnModuleInit {
@@ -487,7 +502,18 @@ export class ListenerService implements OnModuleInit {
     // A thread where no agent did anything but answer a slash command (opening this app, /compact) isn't work to show.
     const worked = new Set((this.dbs.db.prepare(`SELECT DISTINCT session_id FROM steps WHERE kind IN ('tool_call', 'edit')`).all() as { session_id: string }[]).map((r) => r.session_id));
     const idle = (s: Session) => !worked.has(s.id) && (s.title.startsWith("/") || s.title === "(untitled session)");
-    const shown = sessions.filter((s) => !idle(s));
+    // A thread you deleted (in Claude's desktop app) isn't one any more: its transcript is gone and the app left a
+    // marker. One that Claude Code cleaned up on its own (after ~30 days) stays: Brainstorm keeps that history.
+    const transcripts = new Map<string, string[]>();
+    for (const file of this.offsets.keys()) {
+      const parts = relative(this.cfg.claudeProjectsDir, file).split(sep);
+      if (parts.length !== 2 || !file.endsWith(".jsonl")) continue; // <project>/<sessionId>.jsonl, not a subagent's
+      const id = basename(file, ".jsonl");
+      transcripts.set(id, [...(transcripts.get(id) ?? []), file]);
+    }
+    const deleted = deletedThreads();
+    const gone = (s: Session) => { const files = transcripts.get(s.id); return deleted.has(s.id) && !!files && !files.some((f) => existsSync(f)); };
+    const shown = sessions.filter((s) => !idle(s) && !gone(s));
     if (!this.activeRoot) return shown;
     return shown.filter((s) => this.isWithinRoot(s.cwd));
   }

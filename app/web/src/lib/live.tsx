@@ -15,6 +15,7 @@ export type LiveState = {
   preview: boolean;                      // replay built for the post-deadline preview (agent + setup playback)
   shared: Replay["shared"] | null;       // a replay file someone shared from their Brainstorm
   attention: Record<string, Attention>;  // by sessionId: is a thread waiting on you (local app only)
+  sessionsLoaded: boolean;               // the thread list has arrived (so a thread missing from it really is missing)
 };
 
 type Action =
@@ -30,7 +31,7 @@ type Action =
   | { type: "replay"; data: Replay }
   | WsMessage;
 
-const initial: LiveState = { connected: false, replay: false, sessions: [], steps: {}, map: null, failures: [], agents: {}, setup: null, preview: false, shared: null, attention: {} };
+const initial: LiveState = { connected: false, replay: false, sessions: [], steps: {}, map: null, failures: [], agents: {}, setup: null, preview: false, shared: null, attention: {}, sessionsLoaded: false };
 
 /** A changed file, and its outgoing imports when the server recomputed them. */
 function upsertFile(map: ProjectMap | null, file: FileNode, edges?: Edge[]): ProjectMap | null {
@@ -52,7 +53,7 @@ function removeFile(map: ProjectMap | null, path: string): ProjectMap | null {
 function reducer(s: LiveState, a: Action): LiveState {
   switch (a.type) {
     case "connected": return { ...s, connected: a.value };
-    case "sessions": return { ...s, sessions: sortSessions(a.sessions) };
+    case "sessions": return { ...s, sessions: sortSessions(a.sessions), sessionsLoaded: true };
     case "steps": return { ...s, steps: { ...s.steps, [a.sessionId]: a.steps } };
     case "map": return { ...s, map: a.map };
     case "failures": return { ...s, failures: a.failures };
@@ -62,12 +63,12 @@ function reducer(s: LiveState, a: Action): LiveState {
     case "attention": return { ...s, attention: { ...s.attention, [a.attention.sessionId]: a.attention } };
     case "setup-status": return { ...s, setup: a.status };
     case "setup": return { ...s, setup: a.status };
-    case "reset": return { ...s, sessions: [], steps: {}, map: null, failures: [], agents: {}, attention: {} };
+    case "reset": return { ...s, sessions: [], steps: {}, map: null, failures: [], agents: {}, attention: {}, sessionsLoaded: false };
     case "replay": {
       const steps: Record<string, Step[]> = {};
       for (const st of a.data.steps) (steps[st.sessionId] ??= []).push(st);
       Object.values(steps).forEach((l) => l.sort((x, y) => x.seq - y.seq));
-      return { ...s, replay: true, connected: true, sessions: sortSessions(a.data.sessions), steps, map: a.data.map, failures: a.data.failures ?? [], preview: !!(a.data.agentMoves?.length || a.data.setupPreview), shared: a.data.shared ?? null };
+      return { ...s, sessionsLoaded: true, replay: true, connected: true, sessions: sortSessions(a.data.sessions), steps, map: a.data.map, failures: a.data.failures ?? [], preview: !!(a.data.agentMoves?.length || a.data.setupPreview), shared: a.data.shared ?? null };
     }
     case "session": {
       const others = s.sessions.filter((x) => x.id !== a.session.id);

@@ -7,7 +7,7 @@ import { Markdown } from "../ask/Markdown";
 import { useNav } from "../lib/nav";
 import { FileIcon, Glyph, RiskIcon } from "./Glyph";
 import { ToolView } from "./content/ToolView";
-import { basename, clockTime, displayLabel, stepFile, toolName, unwrapPastes } from "./format";
+import { basename, displayLabel, stepFile, timeIn, toolName, unwrapPastes } from "./format";
 
 const BIG_DIFF = 400; // lines; above this the diff starts collapsed
 
@@ -34,8 +34,10 @@ const diffStyles = {
   },
   contentText: { fontFamily: "var(--font-mono)", fontSize: "12.5px", lineHeight: "1.55 !important" },
   lineNumber: { fontSize: "11.5px" },
-  gutter: { minWidth: "36px", padding: "0 6px" },
-  diffContainer: { borderRadius: "10px", overflow: "hidden" },
+  gutter: { minWidth: "28px", width: "28px", padding: "0 4px" },
+  // The viewer sets minWidth 1000px (unset only on narrow screens), so in the 440px panel every line scrolled sideways.
+  // Fill the panel instead; long lines wrap (follow.css, .sd-diff pre).
+  diffContainer: { borderRadius: "10px", overflow: "hidden", minWidth: 0 },
 };
 
 function inputOf(s: Step): Record<string, unknown> {
@@ -89,7 +91,7 @@ export function StepDetail({ step, result }: { step: Step; result?: Step; onClos
           <h2 className="sd-title" title={label}>{step.kind === "prompt" ? "Your prompt" : label}</h2>
         </header>
         <div className="sd-meta">
-          <span>{clockTime(step.ts)}</span>
+          <span>{timeIn(step.ts, false, { seconds: true })}</span>
           {step.tool && step.kind !== "edit" && <><span className="sep">·</span><span>{toolName(step.tool)}</span></>}
           {step.isSubagent && <><span className="sep">·</span><span>Subagent</span></>}
           {file && (

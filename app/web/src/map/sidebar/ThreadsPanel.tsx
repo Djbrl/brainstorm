@@ -1,16 +1,17 @@
-// Owner: sidebar agent. Threads tab: every thread; clicking one opens its step list at the end (a running one follows
-// live), or its places in the Places view, which fills the sidebar's height; clicking it again closes it. The thread's
-// summary is the line above the sidebar (MapStats); Replay, Live and Share are in the footer (ReplayBar's Dock).
-// Agents: follow the camera, show/hide. With a thread open, its agents fold into one row so the steps keep their room:
-// opening the agents folds the steps, and the other way round. The eye in the title row shows or hides all its agents.
+// Owner: sidebar agent. Threads tab: the list of threads, nothing more. Clicking one opens its Track (the thread as a
+// line of steps with a window on what the agent saw; a running one follows live); Map and Places are one click away on
+// the lens switch. Clicking the open thread again closes it. The thread's summary is the line above the sidebar
+// (MapStats); Replay, Live and Share are in the Map's footer (ReplayBar's Dock).
+// Under the open thread: what it waits on you for, if it's blocked, and its agents folded into one row (follow, show/hide).
+// The eye in the title row shows or hides all its agents.
 import { useEffect, useState } from "react";
 import type { AgentPresence, Session } from "@contract";
 import { clock, useLive } from "../../lib/live";
-import { END, useNav } from "../../lib/nav";
+import { END, threadLens, useNav } from "../../lib/nav";
+import { relTime } from "../../follow/format";
 import { agentColor, baseName, initial, shortName, verbIng } from "../agents";
-import { ReplaySteps } from "../replay/ReplaySteps";
-import { PlaceSteps } from "../../cowork/PlaceSteps";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
+import { PlaceSteps } from "../../cowork/PlaceSteps";
 
 function useTick(ms: number) {
   const [, setTick] = useState(0);
@@ -18,14 +19,6 @@ function useTick(ms: number) {
     const t = setInterval(() => setTick((x) => x + 1), ms);
     return () => clearInterval(t);
   }, [ms]);
-}
-
-function ago(iso: string, now: number): string {
-  const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
-  if (s < 10) return "now";
-  if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.round(s / 60)} min ago`;
-  return `${Math.round(s / 3600)} h ago`;
 }
 
 function EyeIcon({ off }: { off: boolean }) {
@@ -60,39 +53,36 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }
     return <p className="sidebar-empty">No agent threads yet. Start Claude Code in this project.</p>;
   }
 
-  // Clicking a thread opens its steps: at the end, and a running one keeps following its newest step.
+  // Clicking a thread opens its Track at the end, and a running one keeps following its newest step.
   const select = (s: Session) => {
     if (replay?.sessionId === s.id) { stopReplay(); return; } // clicking the open thread closes it
     const running = s.status === "running";
-    startReplay(s.id, running ? 0 : END, { live: running });
+    startReplay(s.id, running ? 0 : END, { live: running, lens: threadLens() });
   };
   // The most recent few; the rest behind "Show all" (the open thread always shows).
   const SHORT = 5;
   const shown = all || sessions.length <= SHORT + 1 ? sessions : sessions.filter((x, i) => i < SHORT || x.id === replay?.sessionId);
 
   return (
-    <div className={`sidebar-threads ${replay ? "has-open" : ""}`}>
+    <div className="sidebar-threads">
       <ul className="sidebar-thread-list">
-        {shown.map((session) => {
-          const selected = replay?.sessionId === session.id;
-          return (
-            <ThreadRow
-              key={session.id}
-              session={session}
-              selected={selected}
-              agents={agents.filter((a) => a.sessionId === session.id)}
-              accent={accent}
-              followId={followId}
-              onFollow={onFollow}
-              onFocusFile={onFocusFile}
-              hiddenAgents={hiddenAgents}
-              toggleAgent={toggleAgent}
-              setHiddenAgents={setHiddenAgents}
-              now={now}
-              onSelect={() => select(session)}
-            />
-          );
-        })}
+        {shown.map((session) => (
+          <ThreadRow
+            key={session.id}
+            session={session}
+            selected={replay?.sessionId === session.id}
+            agents={agents.filter((a) => a.sessionId === session.id)}
+            accent={accent}
+            followId={followId}
+            onFollow={onFollow}
+            onFocusFile={onFocusFile}
+            hiddenAgents={hiddenAgents}
+            toggleAgent={toggleAgent}
+            setHiddenAgents={setHiddenAgents}
+            now={now}
+            onSelect={() => select(session)}
+          />
+        ))}
       </ul>
       {sessions.length > shown.length && <button className="sidebar-more" onClick={() => setAll(true)}>Show all {sessions.length} threads</button>}
       {all && sessions.length > SHORT + 1 && <button className="sidebar-more" onClick={() => setAll(false)}>Show fewer</button>}
@@ -118,8 +108,8 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
   const running = session.status === "running";
   // Which git worktree the thread ran in ("hackathon-landing-page", without Claude Code's random suffix).
   const tree = /\/\.claude\/worktrees\/([^/]+)/.exec(session.cwd ?? "")?.[1]?.replace(/-[0-9a-f]{6}$/, "");
-  const { lens } = useNav();
   const [agentsOpen, setAgentsOpen] = useState(false);
+  const { lens } = useNav();
   useEffect(() => { if (!selected) setAgentsOpen(false); }, [selected]);
   const ids = sorted.map((a) => a.id);
   const allHidden = ids.length > 0 && ids.every((id) => hiddenAgents.has(id));
@@ -131,13 +121,13 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
   return (
     <li className={`sidebar-thread ${selected ? "selected" : ""}${blocked ? " needs-you" : ""}`}>
       <div className="sidebar-thread-headrow">
-        <button className="sidebar-thread-head" onClick={onSelect} aria-pressed={selected} title={selected ? "Close this thread" : running ? "Open this thread and follow it live" : "Open this thread: its steps"}>
+        <button className="sidebar-thread-head" onClick={onSelect} aria-pressed={selected} title={selected ? "Close this thread" : running ? "Open this thread and follow it live" : "Open this thread"}>
           <span className={`sidebar-thread-status ${session.status}${blocked ? " waiting" : ""}`} aria-hidden="true" />
           <span className="sidebar-thread-title">{session.title || "Untitled thread"}</span>
           {say
             ? <span className={`sidebar-thread-attn ${blocked ? "blocked" : "turn"}`} title={`${say.line}${attention?.detail ? `\n${attention.detail}` : ""}`}>{say.badge}</span>
             : tree && <span className="sidebar-thread-tree" title={session.cwd}>{tree}</span>}
-          <time>{running ? "live" : ago(session.lastEventAt, now)}</time>
+          <time>{running ? "live" : relTime(session.lastEventAt, now)}</time>
         </button>
         {ids.length > 0 && (
           <button className="sidebar-agent-eye" onClick={toggleAll} aria-label={allHidden ? "Show this thread's agents on the map" : "Hide this thread's agents from the map"} title={allHidden ? "Show its agents" : "Hide its agents"}>
@@ -145,6 +135,7 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
           </button>
         )}
       </div>
+      {selected && blocked && say && <p className="sidebar-thread-note blocked" title={attention?.detail}>{say.line}</p>}
       {selected && sorted.length > 0 && (
         <button className="sidebar-fold" onClick={() => setAgentsOpen((o) => !o)} aria-expanded={agentsOpen}>
           <span className="sidebar-fold-avatars" aria-hidden="true">
@@ -162,7 +153,7 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
             const name = shortName(a, 22);
             return (
               <li key={a.id} className={`${following ? "following" : ""} ${hidden ? "hidden-agent" : ""}`}>
-                <button className="sidebar-agent-main" onClick={() => onFollow(following ? null : a.id)} title={following ? "Stop following" : "Follow this agent"}>
+                <button className="sidebar-agent-main" onClick={() => onFollow(following ? null : a.id)} title={following ? "Stop following" : "Follow this agent on the map"}>
                   <i className="sidebar-agent-avatar" style={{ background: agentColor(a, accent) }}>{initial(a)}</i>
                   <span className="sidebar-agent-text">
                     <span className="sidebar-agent-name">{name}</span>
@@ -185,9 +176,8 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
           })}
         </ul>
       )}
-      {selected && (agentsOpen
-        ? <button className="sidebar-fold" onClick={() => setAgentsOpen(false)}><span className="sidebar-fold-text">{lens === "places" ? "Places" : "Steps"}</span><i className="sidebar-tree-caret" aria-hidden="true">›</i></button>
-        : <div className="sidebar-replay-steps sidebar-thread-steps">{lens === "places" ? <PlaceSteps /> : <ReplaySteps />}</div>)}
+      {/* Places has no view of its own for the list: its places stay here, a short list (not every step). */}
+      {selected && lens === "places" && !agentsOpen && <div className="sidebar-thread-steps"><PlaceSteps /></div>}
     </li>
   );
 }

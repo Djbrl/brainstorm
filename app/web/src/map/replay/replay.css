@@ -243,3 +243,34 @@
 .rp-waiting-hint { font-size: 12px; opacity: .8; }
 .rp-waiting-open { justify-self: start; border: 0; background: transparent; padding: 2px 0 0; color: var(--accent); font-size: 12px; font-weight: 600; }
 @keyframes attn-breathe { 0% { box-shadow: 0 0 0 0 rgba(245,158,11,.55); } 70% { box-shadow: 0 0 0 7px rgba(245,158,11,0); } 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); } }
+
+/* Narrow (tablet and phone): the footer and the player fit the width they have. */
+@media (max-width: 1100px) {
+  .rp-player { min-width: 0; width: min(640px, calc(100vw - 48px)); }
+  /* One row while it fits (the dock sizes to its content, not to the half width left of its anchor), then it wraps. */
+  .dock { width: max-content; }
+  .dock-pill { flex-wrap: wrap; justify-content: center; row-gap: 6px; max-width: 100%; border-radius: 26px; }
+  .map-wrap:has(.map-panel.open) .dock:not(:has(.dock-replay)) { display: none; }
+  /* A side panel open: the footer keeps to the space left of it, the legend makes way (the panel says what's selected). */
+  .map-wrap:has(.map-panel.open) .dock { left: 16px; right: 456px; width: auto; transform: none; max-width: none; }
+  .map-wrap:has(.map-panel.open) .dock-legend { display: none; }
+  .map-wrap:has(.map-panel.open) .rp-player { width: 100%; flex-wrap: wrap; }
+  .map-wrap:has(.map-panel.open) .rp-player .rp-slider { order: 5; flex-basis: 100%; margin: 0; }
+}
+/* Phone: Replay, Share and Show reads stay; with a thread open the colour legend goes (the dots still read on the
+   map), without one it wraps. The share menu opens centred over the footer. */
+@media (max-width: 600px) {
+  .dock { bottom: 12px; max-width: calc(100% - 24px); }
+  .map-wrap:has(.map-panel.open) .dock { left: 50%; right: auto; transform: translateX(-50%); max-width: calc(100% - 24px); }
+  .dock-pill { gap: 10px; white-space: normal; }
+  .dock-pill:has(.dock-replay) .dock-legend { display: none; }
+  .dock-legend { flex-wrap: wrap; justify-content: center; gap: 4px 14px; }
+  .dock-legend span { white-space: nowrap; }
+  .dock-share { margin-left: -4px; }
+  .rp-share { position: static; }
+  .dock .rp-share-menu { left: 50%; right: auto; transform: translateX(-50%); }
+  .rp-player, .map-wrap:has(.map-panel.open) .rp-player { width: calc(100vw - 24px); flex-wrap: wrap; gap: 4px 6px; }
+  .rp-player .rp-slider, .map-wrap:has(.map-panel.open) .rp-player .rp-slider { order: 5; flex-basis: 100%; margin: 0; }
+  .rp-player .rp-speed { margin-left: auto; }
+  .rp-talk { min-width: 0; width: calc(100% - 32px); }
+}

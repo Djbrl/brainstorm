@@ -90,7 +90,7 @@ Brainstorm was built in about three hours on 27 September 2026 at GOMYCODE × NV
 
 ## Known limits
 
-Claude Code only today (Codex is next). No file summaries or model-written step labels in the plugin yet. The history slider, pause/steer and sharing are not built yet; see the [roadmap](docs/roadmap.md).
+Claude Code only today (Codex is next). No file summaries or model-written step labels in the plugin yet. The history slider and pause/steer are not built yet; see the [to-do list](docs/todo.md) and the [roadmap](docs/roadmap.md).
 
 ## License
 

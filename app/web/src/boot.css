@@ -1,0 +1,12 @@
+/* The first load (App's Loading): one quiet line in the middle, faded in only if it takes a moment. */
+.boot { height: 100%; display: grid; place-items: center; background: var(--bg); }
+.boot p { margin: 0; font-family: var(--font-display); font-size: 22px; font-weight: 500; letter-spacing: -0.01em; color: var(--ink-3);
+  opacity: 0; animation: boot-in .5s ease .25s forwards, boot-breathe 2.4s ease-in-out .75s infinite; }
+@keyframes boot-in { to { opacity: 1; } }
+@keyframes boot-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .boot p { animation: boot-in .2s ease .25s forwards; } }
+/* A link to a thread this project doesn't have (App.tsx MissingThread). */
+.boot.missing { align-content: center; justify-items: center; gap: 10px; text-align: center; padding: 24px; }
+.boot.missing h2 { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+.boot.missing p { animation: none; opacity: 1; font-family: var(--font-body); font-size: 16px; color: var(--ink-2); }
+.boot.missing .next-cta { margin: 8px 0 0; border: 0; font: inherit; font-size: 14px; font-weight: 600; padding: 9px 18px; }

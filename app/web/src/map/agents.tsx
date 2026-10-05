@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import type { AgentPresence } from "@contract";
 import { clock } from "../lib/live";
+import { relTime } from "../follow/format";
 import { along, casing, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs } from "./themes";
 
 // Colors that do not clash with the recency scale (orange/amber/grey). Main threads get the accent (Metro: their own ink line).
@@ -37,14 +38,6 @@ export function visibleAgents(agents: AgentPresence[], now = clock()): AgentPres
   return agents.filter((a) => a.active || now - Date.parse(a.ts) < 10 * 60_000);
 }
 
-function ago(iso: string, now: number) {
-  const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
-  if (s < 10) return "now";
-  if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.round(s / 60)} min ago`;
-  return `${Math.round(s / 3600)} h ago`;
-}
-
 function useTick(ms: number) {
   const [, set] = useState(0);
   useEffect(() => { const t = setInterval(() => set((x) => x + 1), ms); return () => clearInterval(t); }, [ms]);
@@ -73,7 +66,7 @@ export function AgentTracker({ agents, accent, followId, onFollow, onFocusFile }
                 <button className="map-agent-head" onClick={() => onFollow(following ? null : a.id)} title={following ? "Stop following" : "Follow this agent"}>
                   <i style={{ background: agentColor(a, accent) }} />
                   <span className="map-agent-name">{shortName(a, 40)}</span>
-                  <time>{ago(a.ts, now)}</time>
+                  <time>{relTime(a.ts, now)}</time>
                 </button>
                 <p className="map-agent-now">
                   {verbIng(a.action)}{a.file ? <> <b>{baseName(a.file)}</b></> : null}
@@ -120,7 +113,10 @@ const ERR_MS = 2600;        // how long the marker stays red
 const ERR_PULSE_MS = 1100;  // one red ring
 const WAIT_MS = 1800;       // the amber ring's breath while an agent waits on you
 const WAIT_AMBER = "#f59e0b";
-const WAIT_TEXT = "#9a5800";
+const WAIT_TEXT = "#9a5800";      // on a light outline
+const WAIT_TEXT_DARK = "#ffc56b"; // on a dark one (PS2, Dead Space)
+/** A dark theme draws labels on a dark outline (its halo). */
+const darkHalo = (halo: string) => Number(/\d+/.exec(halo)?.[0] ?? 255) < 128;
 export const isWrite = (action?: string) => action === "edit" || action === "write";
 
 /** Where the marker stands: the last file written, or before any write, the first file touched. */
@@ -297,7 +293,7 @@ export function drawAgents(opts: {
         const lx = st.x + 13 / scale, ly = st.y;
         ctx.lineWidth = 3.5 / scale; ctx.strokeStyle = style.halo;
         ctx.strokeText(label, lx, ly);
-        ctx.fillStyle = waitLabel ? WAIT_TEXT : color;
+        ctx.fillStyle = waitLabel ? (darkHalo(style.halo) ? WAIT_TEXT_DARK : WAIT_TEXT) : color;
         ctx.fillText(label, lx, ly);
       }
       ctx.globalAlpha = 1;

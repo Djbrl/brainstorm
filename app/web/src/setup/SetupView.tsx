@@ -102,7 +102,7 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
                 <span className="su-ws-path">{s.root}</span>
               </span>
               <span className="su-ws-meta">
-                {!s.exists ? "folder not found" : <>{plural(s.sessions, "thread")}{s.lastActiveAt && <><br />{relTime(s.lastActiveAt, now)}</>}</>}
+                {!s.exists ? "folder not found" : <>{s.sessions ? plural(s.sessions, "thread") : "no threads yet"}{s.lastActiveAt && <><br />{relTime(s.lastActiveAt, now)}</>}</>}
               </span>
               <span className="su-ws-go">{busy === s.root ? <span className="su-spin" /> : <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3.5L10.5 8 6 12.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}</span>
             </button>
@@ -111,7 +111,7 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
       ) : (
         <p className="su-none">{isPath ? "Press Enter to open this folder." : list?.length ? `No project matches “${q}”. Paste its folder path to open it.` : "No Claude Code projects found on this computer yet. Paste a folder path above."}</p>
       )}
-      {shown && shown.length > 0 && <p className="su-count">{q ? `${shown.length} of ${list!.length} projects` : plural(list!.length, "project")} with Claude Code threads</p>}
+      {shown && shown.length > 0 && <p className="su-count">{q ? `${shown.length} of ${list!.length} Claude Code projects` : plural(list!.length, "Claude Code project")} on this computer</p>}
     </div>
   );
 }

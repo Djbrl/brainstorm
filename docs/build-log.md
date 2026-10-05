@@ -110,6 +110,16 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 01:10 (5 Oct) [attention] Waiting for you (`feature/waiting`): each thread's state (needs your permission, asked a question, plan to approve, stuck on 3 failures in a row, your turn) from the log, made sure by new plugin hooks (PermissionRequest, Notification, Stop, UserPromptSubmit → POST /api/hooks, async). Shows as an amber badge on the thread, a waiting row at the end of its steps, an amber ring on its agent on the map, a count in the tab title, and opt-in desktop notifications (Settings). See docs/attention.md.
 
+- 02:55 (5 Oct) [review] UX review fixes, from a review by another agent (at 1440×900 plus tablet and phone), on `integrate/review`:
+  - **Thread view:** the sidebar lists threads only; opening a thread shows its Track (`/thread/<id>`, the map at `/thread/<id>/map`); the waiting row moved to Track's end.
+  - **Map camera:** frames into the part no panel covers; a fit button (F or 0); returns after a file closes; labels drawn over circles; nothing under the top band.
+  - **Words and numbers:** one thread count and one step count everywhere; `relTime` and `timeIn` time formats with dates; threads deleted in Claude's desktop app leave the list.
+  - **Panels:** the file panel closes like the step panel (Esc, click outside); files have links (`/file/<path>`); Replay starts at the beginning and plays; "Show reads" with a hint; a loading state; no white slab.
+  - **Fixes:** Ask answers up to 1500 tokens and end at a sentence; "since you last looked" survives reloads; diffs fit the step panel; changing project closes the old thread; a missing thread says so; "No summary" instead of "Summarizing…" when no AI is set up; dark-theme labels and badges; Dead Space's "just now" in orange.
+  - **Narrow widths:** no sideways scroll from 360 px; the sidebar folds below 1100 px; Track's window becomes a bottom sheet; a phone header.
+  - **Docs:** `CLAUDE.md` and `docs/README.md` rewritten for the repo as it is now; `app/README.md` marked as the hackathon briefing.
+- 02:55 (5 Oct) [review] Product discussion: the next big directions are sharing and live replays, and an experiments lab ([share-and-experiments.md](share-and-experiments.md)); the other ideas went into the roadmap's Fridge.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

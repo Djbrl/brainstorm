@@ -16,6 +16,10 @@ const LIVE_MS = 2 * 60 * 1000;
 const PREVIEW: Set<TaskFileKind> = new Set(["image", "video", "audio", "pdf", "doc", "data"]);
 const FAILED = /^\s*(<tool_use_error>|error\b)|was denied or failed|is not allowed|permission_required|timed out after|^\s*exit code [1-9]/i;
 
+/** A step as the step list shows it (web follow/format isVisible): the one step count for a thread, in every view.
+ * Tool results belong to their call; empty thinking and empty replies aren't steps. */
+const shownStep = (s: Step) => s.kind !== "tool_result" && !(s.kind === "thinking" && !s.text?.trim()) && !(s.kind === "text" && !s.text?.trim() && !s.label);
+
 const short = (s: string, n: number) => { const t = s.replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
 
 /** A prompt without Claude Code's wrapper tags (slash commands keep their name). */
@@ -46,7 +50,7 @@ export class TasksService {
   list(): TaskListItem[] {
     return this.listener.listSessions().map((s) => {
       const d = this.detail(s.id);
-      return d && d.counts.steps ? { sessionId: d.sessionId, goal: d.goal, startedAt: d.startedAt, lastAt: d.lastAt, live: d.live, kind: d.kind, counts: d.counts } : null;
+      return d && d.beats.some((b) => b.steps.length) ? { sessionId: d.sessionId, goal: d.goal, startedAt: d.startedAt, lastAt: d.lastAt, live: d.live, kind: d.kind, counts: d.counts } : null;
     }).filter((x): x is TaskListItem => !!x);
   }
 
@@ -208,7 +212,7 @@ export class TasksService {
     return {
       sessionId, cwd, goal: short(prompts[0] ?? title, 300), prompts,
       startedAt: steps[0]?.ts ?? "", lastAt, live: !!lastAt && Date.now() - Date.parse(lastAt) < LIVE_MS, kind,
-      counts: { steps: taskSteps.size, frames: frames.length, made: madeList.length, sources: web.reduce((n, s) => n + s.pages.length + s.searches.length, 0) + files.length },
+      counts: { steps: steps.filter(shownStep).length, frames: frames.length, made: madeList.length, sources: web.reduce((n, s) => n + s.pages.length + s.searches.length, 0) + files.length },
       beats, frames, made: madeList, outside, web, files,
     };
   }

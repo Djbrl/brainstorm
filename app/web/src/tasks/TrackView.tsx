@@ -5,13 +5,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { TaskArtifact, TaskDetail, TaskStep } from "@contract";
 import { useLive } from "../lib/live";
-import { replayCursor, useNav } from "../lib/nav";
-import { clockTime, stripInjected } from "../follow/format";
+import { END, replayCursor, useNav } from "../lib/nav";
+import { stripInjected, timeIn } from "../follow/format";
 import { MapSidebar } from "../map/sidebar/MapSidebar";
 import { LensSwitch } from "../map/LensSwitch";
 import { MapStats } from "../map/MapStats";
+import { TrackCounts } from "../lib/ThreadCounts";
 import { StepPanel } from "../map/StepPanel";
 import { AskBox } from "../ask/AskBox";
+import { attentionText, needsYou, yourTurn } from "../lib/attention";
 import "./track.css";
 
 type Area = "files" | "web" | "commands" | "services";
@@ -167,7 +169,7 @@ function Window({ task, stop, onMap }: { task: TaskDetail; stop: Stop; onMap: ()
       <header>
         <span className={`trk-ico a-${stop.area} ${stop.failed.length ? "err" : ""}`}><Icon k={stop.failed.length ? "error" : stop.action} /></span>
         <div><b>{stop.name}</b>{stop.sub && <small>{stop.sub}</small>}</div>
-        <time>{clockTime(stop.steps[0].ts)}</time>
+        <time>{timeIn(stop.steps[0].ts)}</time>
       </header>
       <div className="trk-screen">
         {media?.kind === "video" ? <video key={media.src} src={media.src} controls muted playsInline poster={`${media.src}&frame=1`} />
@@ -211,10 +213,29 @@ function ThreadAsk({ sessionId }: { sessionId: string }) {
   );
 }
 
+/** The live end of the track: the agent waits on you (amber), or it finished and it's your turn (grey). */
+function WaitingRow({ sessionId, onShow }: { sessionId: string; onShow: (stepId: string) => void }) {
+  const a = useLive().state.attention[sessionId];
+  if (!a || !(needsYou(a) || yourTurn(a))) return null;
+  const t = attentionText(a);
+  const blocked = needsYou(a);
+  return (
+    <li className={`trk-waiting ${blocked ? "blocked" : "turn"}`} role="status">
+      <i className="trk-dot" />
+      <div className="trk-waiting-body">
+        <b>{t.line}</b>
+        {a.detail && <code title={a.detail}>{a.detail}</code>}
+        {blocked && <small>{a.state === "stuck" ? "It may need a hint from you." : "Answer it in Claude Code."}</small>}
+        {a.stepId && <button onClick={() => onShow(a.stepId!)}>Show the step</button>}
+      </div>
+    </li>
+  );
+}
+
 // ---- the view ----
 export function TrackView() {
   const { state } = useLive();
-  const { replay, setLens, startReplay, setReplayLive, step: openStepId, showStep } = useNav();
+  const { replay, setLens, startReplay, setReplayLive, step: openStepId, showStep, openStep } = useNav();
   const session = state.sessions.find((s) => s.id === replay?.sessionId);
   const running = session?.status === "running";
   const task = useTask(replay?.sessionId ?? null, session?.status === "running");
@@ -248,8 +269,14 @@ export function TrackView() {
     return () => { el.removeEventListener("scroll", on); cancelAnimationFrame(raf); };
   }, [measure]);
 
-  const goTo = useCallback((i: number, smooth = true) => {
-    const el = scroller.current, n = el?.querySelector<HTMLElement>(`[data-stop="${i}"]`);
+  const rowsRef = useRef(rows); rowsRef.current = rows;
+  const goTo = useCallback((i: number, smooth = true, unfold = true) => {
+    const el = scroller.current;
+    let n = el?.querySelector<HTMLElement>(`[data-stop="${i}"]`);
+    // A stop inside a folded "back and forth" row has no row of its own: unfold it, then go there.
+    const fold = n || !unfold ? undefined : rowsRef.current.find((r) => r.type === "bounce" && r.rows.some((x) => x.index === i));
+    if (fold) { setOpen((o) => new Set(o).add(fold.id)); setCur(i); setTimeout(() => goTo(i, smooth, false), 0); return; }
+    n ??= [...(el?.querySelectorAll<HTMLElement>("[data-stop]") ?? [])].filter((x) => Number(x.dataset.stop) <= i).pop();
     // Positions relative to the scrolling area (offsetTop would be relative to the line).
     if (el && n) el.scrollTo({ top: n.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - el.clientHeight * 0.4 + 10, behavior: smooth ? "smooth" : "auto" });
     setCur(i);
@@ -264,10 +291,21 @@ export function TrackView() {
     const atTs = at ? state.steps[task.sessionId]?.find((s) => s.id === at)?.ts : undefined;
     let i = at ? stops.findIndex((r) => r.stop.steps.some((s) => s.id === at)) : -1;
     if (i < 0 && atTs) stops.forEach((r, k) => { if (r.stop.steps[0].ts <= atTs) i = k; });
-    setTimeout(() => goTo(replay?.live || i < 0 ? (replay?.live ? stops.length - 1 : 0) : i, false), 0);
-  }, [task, stops, replay?.atStep, replay?.live, goTo, state.steps]);
+    // A thread opened at its end (from the sidebar, where its last steps and anything waiting on you are) lands there.
+    const end = replay?.live || replay?.index === END;
+    setTimeout(() => goTo(replay?.live || i < 0 ? (end ? stops.length - 1 : 0) : i, false), 0);
+  }, [task, stops, replay?.atStep, replay?.live, replay?.index, goTo, state.steps]);
   // Live: new stops keep the track at the bottom.
   useEffect(() => { if (replay?.live && stops.length) setTimeout(() => goTo(stops.length - 1, false), 0); }, [replay?.live, stops.length, goTo]);
+
+  // "Show the step" on the waiting row: go to the stop that holds it, and open it in the side panel.
+  const showWaiting = useCallback((stepId: string) => {
+    const i = stops.findIndex((r) => r.stop.steps.some((s) => s.id === stepId));
+    if (i >= 0) goTo(i, false); // a jump, so the panel doesn't follow the stops in between
+    if (replay) openStep(replay.sessionId, stepId);
+  }, [stops, goTo, openStep, replay]);
+  const attention = replay ? state.attention[replay.sessionId] : undefined;
+  const waiting = needsYou(attention) || yourTurn(attention);
 
   const current = stops[Math.min(cur, stops.length - 1)]?.stop;
   useEffect(() => { if (current) replayCursor.stepId = current.steps[0].id; }, [current]);
@@ -295,7 +333,7 @@ export function TrackView() {
             <div className="trk-main">
               <header className="trk-head">
                 <h1>{task.goal || session?.title || "Untitled thread"}</h1>
-                <p>{stops.length} stops · {task.counts.made} made{errors ? <> · <span className="err">{errors} failed</span></> : null}{task.counts.frames ? ` · ${task.counts.frames} screenshots` : ""}</p>
+                <TrackCounts sessionId={task.sessionId} failed={errors} screenshots={task.counts.frames} />
                 <ThreadAsk sessionId={task.sessionId} />
               </header>
               <ol className="trk-line">
@@ -320,7 +358,8 @@ export function TrackView() {
                     {r.stop.frame !== undefined && r.stop.area === "web" && <img className="trk-thumb" src={task.frames[r.stop.frame]?.src} alt="" loading="lazy" />}
                   </li>
                 ))}
-                {session?.status === "running" && <li className="trk-working"><i className="trk-dot" />Working…</li>}
+                {session?.status === "running" && !waiting && <li className="trk-working"><i className="trk-dot" />Working…</li>}
+                <WaitingRow sessionId={task.sessionId} onShow={showWaiting} />
               </ol>
             </div>
             <aside className="trk-side">

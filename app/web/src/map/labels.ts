@@ -22,6 +22,41 @@ export class LabelSpace {
   claim(b: Box, force = false) { if (!force && this.hits(b)) return false; this.add(b); return true; }
 }
 
+/** A file name waiting for the label pass (graph coordinates; `y` is the top of the text). */
+export type QueuedLabel = {
+  text: string; x: number; y: number; size: number; scale: number; alpha: number;
+  font: string; ink: string; halo: string; prio: number; forced: boolean;
+};
+
+/**
+ * File names, drawn in one pass after all the files so no circle covers one. Higher priority claims its space first
+ * (a name that would print over a taken one is skipped, unless forced) and is drawn last, so it sits on top.
+ */
+export function drawQueuedLabels(ctx: CanvasRenderingContext2D, queue: QueuedLabel[], space: LabelSpace) {
+  if (!queue.length) return;
+  const keep: QueuedLabel[] = [];
+  queue.sort((a, b) => b.prio - a.prio);
+  for (const l of queue) {
+    ctx.font = l.font;
+    const w = ctx.measureText(l.text).width, pad = 3 / l.scale;
+    if (space.claim({ x0: l.x - w / 2 - pad, x1: l.x + w / 2 + pad, y0: l.y - pad, y1: l.y + l.size + pad }, l.forced)) keep.push(l);
+  }
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  for (let i = keep.length - 1; i >= 0; i--) {
+    const l = keep[i];
+    ctx.globalAlpha = l.alpha;
+    ctx.font = l.font;
+    ctx.lineWidth = 3 / l.scale;
+    ctx.strokeStyle = l.halo;
+    ctx.strokeText(l.text, l.x, l.y);
+    ctx.fillStyle = l.ink;
+    ctx.fillText(l.text, l.x, l.y);
+  }
+  ctx.restore();
+}
+
 const HOUR = 3_600_000;
 const COLLAPSE_PX = 280;          // a parent's subfolders fold into one label below this size on screen
 const SHORTEN_FROM = 4;           // subfolders a parent needs before their labels drop its name

@@ -34,6 +34,10 @@ export function measureSafe(host: HTMLElement): Safe {
   const across = (b: DOMRect) => shown(b) && b.right > x0 && b.left < x1;
   for (const el of scope.querySelectorAll(TOP)) { const b = el.getBoundingClientRect(); if (across(b)) top = Math.max(top, b.bottom - r.top + GAP); }
   for (const el of scope.querySelectorAll(BOTTOM)) { const b = el.getBoundingClientRect(); if (across(b)) bottom = Math.max(bottom, r.bottom - b.top + GAP); }
+  // The canvas fades out in a band at the top and bottom (map.css, --fade-top / --fade-bottom): keep framings out of it too.
+  const cs = getComputedStyle(scope);
+  top = Math.max(top, parseFloat(cs.getPropertyValue("--fade-top")) || 0);
+  bottom = Math.max(bottom, parseFloat(cs.getPropertyValue("--fade-bottom")) || 0);
   // A tiny window: never squeeze the safe area below a usable size.
   const minW = Math.min(240, w * 0.5), minH = Math.min(200, h * 0.5);
   if (w - left - right < minW) { const k = Math.max(0, w - minW) / Math.max(1, left + right); left *= k; right *= k; }

@@ -13,16 +13,17 @@
 .map-legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .map-legend i.ring { background: transparent; border: 2px solid var(--accent); width: 12px; height: 12px; }
 
-.map-panel { position: absolute; top: 0; right: 0; bottom: 0; width: 440px; max-width: 100%;
+.map-panel { position: absolute; top: 0; right: 0; bottom: 0; width: 440px; max-width: 100%; z-index: 4;
   background: rgba(255,255,255,.94); backdrop-filter: saturate(180%) blur(24px);
-  border-left: 1px solid var(--line); box-shadow: -20px 0 60px rgba(0,0,0,.05);
-  transform: translateX(104%); transition: transform .38s cubic-bezier(.2,.8,.2,1); overflow-y: auto; }
-.map-panel.open { transform: none; }
+  border-left: 1px solid var(--line); box-shadow: -20px 0 60px rgba(0,0,0,.05); overflow-y: auto;
+  /* Closing: it slides out with what it showed and fades as it goes, then leaves the page (no empty sheet left behind). */
+  transform: translateX(104%); opacity: 0; visibility: hidden; pointer-events: none;
+  transition: transform .3s cubic-bezier(.4,0,.7,.2), opacity .22s ease-in, visibility 0s linear .3s; }
+.map-panel.open { transform: none; opacity: 1; visibility: visible; pointer-events: auto;
+  transition: transform .38s cubic-bezier(.2,.8,.2,1), opacity .16s ease-out, visibility 0s; }
+@media (prefers-reduced-motion: reduce) { .map-panel, .map-panel.open { transition: opacity .15s, visibility 0s linear .15s; transform: none; } .map-panel.open { transition-delay: 0s; } }
 .map-panel-inner { padding: 40px 36px 48px; position: relative; }
-.map-close { position: absolute; top: 20px; right: 20px; width: 34px; height: 34px; border-radius: 50%; border: 0;
-  background: #f0f0f3; color: var(--ink-2); font-size: 20px; line-height: 1; }
-.map-close:hover { background: #e7e7ec; }
-.map-panel h2 { font-size: 32px; font-weight: 800; line-height: 1.1; padding-right: 40px; word-break: break-word; }
+.map-panel h2 { font-size: 32px; font-weight: 800; line-height: 1.1; word-break: break-word; }
 .map-path { font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-3); margin: 10px 0 0; word-break: break-all; }
 .map-meta { color: var(--ink-2); margin: 14px 0 0; font-size: 14px; }
 .map-live { display: flex; align-items: center; gap: 10px; margin: 18px 0 0; color: var(--accent); font-weight: 500; }
@@ -86,3 +87,14 @@
 .pl-panel-nav button:hover:not(:disabled) { background: #e7e7ec; color: var(--ink); }
 .pl-panel-nav button:disabled { opacity: .35; }
 .map-wrap:has(.map-panel.open) .map-legend { max-width: calc(100% - 520px); }
+
+/* The dock's "Show reads" switch (ReplayBar's ReadsToggle). */
+.dock-reads { display: inline-flex; align-items: center; gap: 9px; border: 0; background: none; padding: 4px 6px 4px 2px; border-radius: 999px;
+  font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+.dock-reads i { position: relative; width: 28px; height: 17px; border-radius: 999px; background: var(--line); transition: background .18s; flex: none; }
+.dock-reads i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .18s cubic-bezier(.2,.8,.2,1); }
+.dock-reads[aria-checked="true"] i { background: var(--accent); }
+.dock-reads[aria-checked="true"] i::after { transform: translateX(11px); }
+.dock-reads:hover { color: var(--ink); }
+.dock-reads:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

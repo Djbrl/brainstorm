@@ -4,6 +4,7 @@
 //   /                                   the project: the map at rest, live agents as dots, what changed since you last looked
 //   /thread/<id>                        one thread: its steps, at the end (a running one follows live); its replay from the footer
 //   /thread/<id>/step/<stepId>          one step, in a side panel (its diff, its output, Ask)
+//   …/file/<path>                       a file open in the side panel (its path from the project root), on the project or a thread's map
 // A thread can be seen three ways, the lens: /thread/<id> (the map), /thread/<id>/track, /thread/<id>/places.
 // Opening or closing a thread, a step or a lens adds a browser history entry, so Back and Esc go up one level. Moving
 // through a replay doesn't. A file opened from disk (a shared replay) keeps the same paths after a `#`.
@@ -39,6 +40,10 @@ type Nav = {
   focusFile: string | null; setFocusFile: (p: string | null) => void;
   /** Select a file on the map. */
   openFile: (path: string) => void;
+  /** The file open in the side panel, as a path from the project root (it's in the link), or null. See map/FilePanel. */
+  file: string | null;
+  /** Open a file in the panel (a path from the project root), or close it with null. */
+  selectFile: (rel: string | null) => void;
 
   /** The open thread, or null on the project overview. */
   replay: ThreadReplay | null;
@@ -69,7 +74,7 @@ type Nav = {
   /** Show another step of the open thread in the panel as the cursor moves (scrolling, scrubbing): no new history entry. */
   showStep: (stepId: string) => void;
   closeStep: () => void;
-  /** Up one level: step → thread → project. */
+  /** Up one level: step → file → player → thread → project. */
   back: () => void;
 
   /** Agents hidden from the map (agent ids: sessionId for main threads, agentId for subagents). */
@@ -94,7 +99,7 @@ function loadHidden(): Set<string> {
 
 // ---- links ----
 
-type Place = { thread: string | null; step: string | null; lens: Lens };
+type Place = { thread: string | null; step: string | null; lens: Lens; file?: string | null };
 const hashMode = typeof location !== "undefined" && location.protocol === "file:"; // a shared .html opened from disk
 
 /** The query a hosted demo needs on every link (?replay=…), kept as is. */
@@ -103,17 +108,25 @@ function keptQuery(): string {
   return replay ? `?${new URLSearchParams({ replay })}` : "";
 }
 
+/** A file's link keeps its slashes: /file/app/web/src/App.tsx. */
+const filePart = (f: string) => `/file/${f.split("/").map(encodeURIComponent).join("/")}`;
+
 export function pathFor(p: Place): string {
-  if (!p.thread) return "/";
+  // A file is on the map: it shows in the link on the Map lens, when no step covers it.
+  const file = p.file && !p.step && (!p.thread || p.lens === "map") ? filePart(p.file) : "";
+  if (!p.thread) return file || "/";
   let path = `/thread/${encodeURIComponent(p.thread)}${p.lens === "map" ? "" : `/${p.lens}`}`;
   if (p.step) path += `/step/${encodeURIComponent(p.step)}`;
-  return path;
+  return path + file;
 }
 
 function readPlace(): Place {
   const raw = hashMode ? location.hash.replace(/^#/, "") || "/" : location.pathname;
-  const m = /^\/thread\/([^/]+)(?:\/(track|places))?(?:\/step\/([^/]+))?\/?$/.exec(raw);
-  if (m) return { thread: decodeURIComponent(m[1]), lens: (m[2] as Lens) ?? "map", step: m[3] ? decodeURIComponent(m[3]) : null };
+  const m = /^(?:\/thread\/([^/]+)(?:\/(track|places))?(?:\/step\/([^/]+))?)?(?:\/file\/(.+?))?\/?$/.exec(raw);
+  if (m && (m[1] || m[4])) {
+    const file = m[4] ? m[4].split("/").map(decodeURIComponent).join("/") : null;
+    return { thread: m[1] ? decodeURIComponent(m[1]) : null, lens: (m[2] as Lens) ?? "map", step: m[3] ? decodeURIComponent(m[3]) : null, file };
+  }
   // Links from before the paths: ?view=map&lens=places&thread=<id>&step=<id> (and ?view=cowork for Places).
   const q = new URLSearchParams(location.search), thread = q.get("thread");
   const lens: Lens = q.get("lens") === "track" || q.get("lens") === "places" ? (q.get("lens") as Lens) : q.get("view") === "cowork" ? "places" : "map";
@@ -132,6 +145,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
     return f.thread ? { sessionId: f.thread, index: END, playing: false, speed: 1, detail: "light", mode: "steps", atStep: f.step ?? undefined } : null;
   });
   const [step, setStep] = useState<string | null>(first.current.step);
+  const [file, setFile] = useState<string | null>(first.current.file ?? null);
   const [lens, setLensState] = useState<Lens>(first.current.lens);
   const [hiddenAgents, setHidden] = useState<Set<string>>(loadHidden);
   const [showReads, setShowReadsState] = useState<boolean>(() => (mapPrefs.showReads = loadShowReads()));
@@ -146,14 +160,14 @@ export function NavProvider({ children }: { children: ReactNode }) {
   const replaceNext = useRef(false); // a move that shouldn't add a history entry (the panel following the cursor)
   const thread = replay?.sessionId ?? null;
   useEffect(() => {
-    const href = hrefFor({ thread, step: thread ? step : null, lens: thread ? lens : "map" });
+    const href = hrefFor({ thread, step: thread ? step : null, lens: thread ? lens : "map", file });
     if (href !== hereHref()) {
       if (fromUrl.current || replaceNext.current) history.replaceState(null, "", href);
       else history.pushState(null, "", href);
     }
     fromUrl.current = false;
     replaceNext.current = false;
-  }, [thread, step, lens]);
+  }, [thread, step, lens, file]);
 
   // Back and Forward: go where the URL says.
   useEffect(() => {
@@ -162,6 +176,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
       fromUrl.current = true;
       setLensState(p.lens);
       setStep(p.step);
+      setFile(p.file ?? null);
       setReplay((r) => {
         if (!p.thread) { replayCursor.stepId = null; return null; }
         if (r && r.sessionId === p.thread) return p.step ? { ...r, atStep: p.step, playing: false, mode: r.mode === "footprint" ? "steps" : r.mode } : r;
@@ -206,18 +221,20 @@ export function NavProvider({ children }: { children: ReactNode }) {
   }, []);
   const showStep = useCallback((stepId: string) => { replaceNext.current = true; setStep(stepId); }, []);
   const closeStep = useCallback(() => setStep(null), []);
+  const selectFile = useCallback((rel: string | null) => setFile(rel), []);
   const back = useCallback(() => {
     if (step) { setStep(null); return; }
+    if (file && lens === "map") { setFile(null); return; }
     if (replay?.mode === "play") { setThreadMode("steps"); return; }
     if (replay) stopReplay();
-  }, [step, replay, setThreadMode, stopReplay]);
+  }, [step, file, lens, replay, setThreadMode, stopReplay]);
 
   const toggleAgent = useCallback((id: string) => setHidden((h) => { const n = new Set(h); if (n.has(id)) n.delete(id); else n.add(id); return n; }), []);
   const setHiddenAgents = useCallback((ids: Iterable<string>) => setHidden(new Set(ids)), []);
 
   return (
     <Ctx.Provider value={{
-      focusFile, setFocusFile, openFile,
+      focusFile, setFocusFile, openFile, file, selectFile,
       replay, startReplay, setThreadMode, setReplayIndex, setReplayPlaying, setReplaySpeed, setReplayDetail, landReplay, stopReplay, followLive, setReplayLive, lens, setLens,
       step, openStep, showStep, closeStep, back,
       hiddenAgents, toggleAgent, setHiddenAgents, showReads, setShowReads,

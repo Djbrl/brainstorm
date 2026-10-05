@@ -140,6 +140,42 @@ of it is on `main` until the human says so.
 - **On big repos, the file scanner** watched every folder, ran the whole `git log` synchronously, and rebuilt everything
   on each change.
 
+### Before and after, same machine, back to back (5 Oct, 06:01–06:20)
+
+`main` at `aba7993` against `perf/integrate` at `61bdb13`, the same benchmark run straight after each other on a quiet
+machine (load average 2.4–8.3 on 8 cores; the baseline above ran at 15–119). Synthetic repos, a 10,000-step thread, a
+live writer. The map shows 800 files in both (the cap is unchanged).
+
+**Web app at 4× CPU** (roughly a mid-range laptop):
+
+| | 1k files | 5k files | 20k files |
+| --- | --- | --- | --- |
+| At rest | 52.5 → 59.9 fps, main thread 82% → 3% busy | 49.2 → 59.9 fps, 86% → 2% | 50.2 → 59.9 fps, 86% → 2% |
+| Panning and zooming | 15.6 → 56.9 fps (p95 117 → 17 ms) | 31.6 → 55.2 fps | 19.6 → 56.7 fps (p95 133 → 17 ms) |
+| Live writer running | 16.6 → 60 fps | 18.2 → 59.2 fps | 19 → 59.9 fps |
+| Replay at 4× | 24 → 59.5 fps | 24.4 → 60 fps | 27.4 → 60 fps |
+| Opening the 10k-step thread | 2.2 → 0.96 s, steps fetched 5× → 1× | 1.8 → 0.95 s, 4× → 1× | 2.1 → 0.98 s, 5× → 1× |
+| JS heap during replay | 96 → 38 MB | 120 → 46 MB | 81 → 47 MB |
+
+At 1× CPU everything was already about 60 fps; the main thread at rest went from 23–25% to 3% busy, and while the live
+writer runs from 40–88% to 10–14%.
+
+**Server:**
+
+| | 1k files | 5k files | 20k files |
+| --- | --- | --- | --- |
+| Cold boot, answering (thread never read) | 1.85 → 0.31 s | 2.11 → 0.34 s | 2.09 → 0.35 s |
+| Cold boot, the long thread listed | 1.89 → 0.58 s | 2.25 → 0.80 s | 2.44 → 0.87 s |
+| Empty boot, busy until | 0.65 → 1.01 s | 1.30 → 0.99 s | 3.55 → 0.88 s |
+| CPU seconds until quiet (empty) | 0.63 → 0.63 | 1.58 → 0.83 | 4.73 → 0.91 |
+| `/api/sessions` | 5.4 → 1.2 ms | 5.3 → 1.0 ms | 9.0 → 0.6 ms |
+| Peak memory | 371 → 398 MB | 427 → 410 MB | 542 → 451 MB |
+| Websocket messages per second, live | 14.6 → 6.6 | 10.9 → 5.3 | 14.0 → 6.3 |
+
+Live latency (log line to websocket) stays 2–6 ms at the median. The JS bundle grew from 886 to 922 KB (+35 KB, 323 KB
+gzipped), mostly the canvas branch's position cache and drawing code; the first load is 295 KB (93 KB gzipped). The
+benchmark's "mapped" and "build ms" columns are empty on the new branch because the mapper's log line changed.
+
 ### What each branch did
 
 Numbers are each branch's own measurements, mostly on a machine loaded by the other agents, so read them as ratios.

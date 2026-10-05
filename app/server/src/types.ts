@@ -18,8 +18,8 @@ export type Edge = { from: string; to: string };
 /** `totalFiles`: how many mappable files the project has; more than `files.length` when the map shows a chosen subset ("800 of 20,312 files"). */
 export type ProjectMap = { root: string; files: FileNode[]; edges: Edge[]; modules: { id: string; summary?: string }[]; formerRoots?: string[]; totalFiles?: number };
 export type Snapshot = { ts: string; map: ProjectMap };
-/** What a question is about: a step, a file, or a whole thread (`sessionId`, asked from the Track). */
-export type AskRequest = { question: string; stepId?: string; filePath?: string; root?: string; sessionId?: string };
+/** What a question is about: a step or a file. */
+export type AskRequest = { question: string; stepId?: string; filePath?: string; root?: string };
 export type AskResponse = { answer: string; model: string; tokensIn: number; tokensOut: number; costUsd: number; fallback: boolean };
 export type WsMessage =
   | { type: "session"; session: Session }

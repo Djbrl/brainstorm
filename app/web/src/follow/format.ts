@@ -3,6 +3,7 @@ import { clock } from "../lib/live";
 import type { Step } from "@contract";
 import { CallPairer } from "../lib/pairing";
 import { commandLabel, toolLabel } from "@shared/labels";
+import { parsePrompt } from "./prompt";
 
 export const basename = (p?: string) => (p ? p.split(/[\\/]/).filter(Boolean).pop() ?? p : "");
 
@@ -68,18 +69,28 @@ export const withoutPastes = (t = "") => {
 /** The full prompt: pasted text stays, its wrapper tag goes. */
 export const unwrapPastes = (t = "") => t.replace(PASTE, "\n$1\n");
 
-/** Drop blocks Claude Code injects into the log (e.g. `<system-reminder>…</system-reminder>`); they aren't what the person or agent wrote. */
-export const stripInjected = (t = "") =>
+/**
+ * What the person typed in a prompt: the blocks Claude Code and its host add to their turn (`<system-reminder>`,
+ * `<artifact-view-context>`, a slash command's tags, a background task's notification…) left out; see prompt.ts.
+ * Empty when the prompt is only such blocks. A command run with ! reads "$ git push".
+ */
+export const stripInjected = (t = "") => parsePrompt(t).words;
+
+/** A prompt as a label: the person's words, or the plain name of what it is ("Command: /compact") when there are none. */
+export const promptLabel = (t = "") => parsePrompt(t).label;
+
+/** Drop blocks Claude Code injects into a tool result (e.g. `<system-reminder>…</system-reminder>`); they aren't what the tool returned. */
+export const stripNoise = (t = "") =>
   withoutPastes(t).replace(/<bash-input>([\s\S]*?)(<\/bash-input>|$)/g, "$ $1") // a command you ran with ! in Claude Code
     .replace(/<(bash-stdout|bash-stderr)>[\s\S]*?(<\/\1>|$)/g, " ")
     .replace(/<(system-reminder|command-[a-z-]+|local-command-[a-z-]+|task-notification)>[\s\S]*?(<\/\1>|$)/g, " ")
     .replace(/^\[Image[:#][^\]]*\]\s*$/gm, "") // Claude Code's note on an image a tool returned
     .trim();
 
-const firstLine = (t = "", max = 140) => {
-  const line = stripInjected(t).replace(/```[\s\S]*?```/g, " ").replace(/\*\*|__|`|^#+\s*/gm, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/\s+/g, " ").trim();
-  return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line;
-};
+const clip = (line: string, max: number) => (line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line);
+const flat = (t: string) => t.replace(/```[\s\S]*?```/g, " ").replace(/\*\*|__|`|^#+\s*/gm, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/\s+/g, " ").trim();
+
+const firstLine = (t = "", max = 140) => clip(flat(stripNoise(t)), max);
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" ? (v as Record<string, unknown>) : {});
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -88,7 +99,7 @@ const str = (v: unknown) => (typeof v === "string" ? v : "");
 export function fallbackLabel(s: Step): string {
   const input = obj(s.input);
   switch (s.kind) {
-    case "prompt": return firstLine(s.text, 400) || "Prompt";
+    case "prompt": return clip(flat(promptLabel(s.text)), 400) || "Prompt";
     case "text": return firstLine(s.text, 180) || "Reply";
     case "thinking": return s.text ? `Thinking: ${firstLine(s.text, 120)}` : "Thinking";
     case "edit": {
@@ -106,7 +117,7 @@ export function fallbackLabel(s: Step): string {
         case "Grep": return `Search for “${firstLine(str(input.pattern), 60)}”`;
         case "Glob": return `Find files ${firstLine(str(input.pattern), 60)}`;
         case "Task": case "Agent": return str(input.description) ? `Delegate: ${str(input.description)}` : "Start a subagent";
-        case "WebFetch": return `Fetch ${firstLine(str(input.url), 70)}`;
+        case "WebFetch": return str(input.url) ? `Fetch ${str(input.url).trim()}` : "Fetch a page"; // the address is shortened where it's shown (lib/links.tsx)
         case "WebSearch": return `Search the web for “${firstLine(str(input.query), 60)}”`;
         case "TodoWrite": return "Update the plan";
         case "ToolSearch": return "Look up tools";

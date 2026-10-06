@@ -8,7 +8,9 @@ import { FileIcon, Glyph, RiskIcon } from "./Glyph";
 import { ToolView } from "./content/ToolView";
 import { editorLink, editorName, openInEditor, useEditor } from "../lib/editor";
 import { HtmlPreview, isHtml, PAGE_MARKUP, ViewSwitch } from "./content/HtmlPreview";
-import { basename, displayLabel, stepFile, timeIn, toolName, unwrapPastes } from "./format";
+import { basename, displayLabel, stepFile, stripInjected, timeIn, toolName } from "./format";
+import { PromptBody } from "./PromptBody";
+import { LinkedLabel } from "../lib/links";
 
 const BIG_DIFF = 400; // lines; above this the diff starts collapsed
 
@@ -128,7 +130,7 @@ export function StepDetail({ step, result }: { step: Step; result?: Step; onClos
       <div className="sd-scroll">
         <header className="sd-head">
           <div className={`sd-glyph k-${step.kind}`}><Glyph kind={step.kind} tool={step.tool} size={14} /></div>
-          <h2 className="sd-title" title={label}>{step.kind === "prompt" ? "Your prompt" : label}</h2>
+          <h2 className="sd-title" title={label}>{step.kind !== "prompt" ? <LinkedLabel text={label} links max={32} /> : stripInjected(step.text) ? "Your prompt" : label}</h2>
         </header>
         <div className="sd-meta">
           <span>{timeIn(step.ts, false, { seconds: true })}</span>
@@ -145,7 +147,8 @@ export function StepDetail({ step, result }: { step: Step; result?: Step; onClos
         <div className="sd-body">
           {step.kind === "edit" ? <EditBody step={step} />
             : step.kind === "tool_call" ? <ToolView step={step} result={result} />
-            : step.text ? <div className={`sd-text ${step.kind === "thinking" ? "thinking" : ""}`}><Markdown text={unwrapPastes(step.text)} /></div>
+            : step.kind === "prompt" && step.text ? <div className="sd-text"><PromptBody text={step.text} /></div>
+            : step.text ? <div className={`sd-text ${step.kind === "thinking" ? "thinking" : ""}`}><Markdown text={step.text} /></div>
             : null}
         </div>
 

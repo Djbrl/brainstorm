@@ -25,8 +25,8 @@ const INJECTED = /^\s*(Another Claude session sent a message|\[SYSTEM NOTIFICATI
 
 export function isPersonPrompt(s: Step): boolean {
   if (s.kind !== "prompt" || s.isSubagent) return false;
-  const text = stripInjected(s.text);
-  return !!text && !INJECTED.test(s.text ?? "") && !INJECTED.test(text);
+  const text = stripInjected(s.text); // the person's words: a <system-reminder> or an artifact's view state before them doesn't count
+  return !!text && !INJECTED.test(text);
 }
 
 /** A step written in the person's turn that isn't theirs, named for what it is. */

@@ -1,19 +1,34 @@
-// Owner: C. Tiny hand-rolled markdown: paragraphs, headings, bullet/numbered lists, `code`, **bold**, *italic*, fenced code blocks.
+// Owner: C. Tiny hand-rolled markdown: paragraphs, headings, bullet/numbered lists, `code`, **bold**, *italic*, fenced code blocks,
+// [links](https://…) and bare web addresses (whole address in link colour, shortened in the middle: lib/links.tsx).
 import type { ReactNode } from "react";
+import { trimUrl, UrlLink } from "../lib/links";
+
+const TOKEN = /(`[^`]+`|\[[^\]\n]+\]\(https?:\/\/[^)\s]+\)|https?:\/\/[^\s<>"'`]+|\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g;
 
 function inline(text: string, keyBase: string): ReactNode[] {
   const out: ReactNode[] = [];
-  const re = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g;
+  const re = new RegExp(TOKEN.source, "g");
   let last = 0;
   let m: RegExpExecArray | null;
   let i = 0;
   while ((m = re.exec(text))) {
-    if (m.index > last) out.push(text.slice(last, m.index));
-    const tok = m[0];
+    let tok = m[0];
     const k = `${keyBase}-${i++}`;
+    if (/^https?:/.test(tok)) {
+      tok = trimUrl(tok);
+      if (m.index > last) out.push(text.slice(last, m.index));
+      out.push(<UrlLink key={k} url={tok} />);
+      last = re.lastIndex = m.index + tok.length;
+      continue;
+    }
+    if (m.index > last) out.push(text.slice(last, m.index));
     if (tok.startsWith("`")) out.push(<code key={k}>{tok.slice(1, -1)}</code>);
-    else if (tok.startsWith("**")) out.push(<strong key={k}>{tok.slice(2, -2)}</strong>);
-    else out.push(<em key={k}>{tok.slice(1, -1)}</em>);
+    else if (tok.startsWith("[")) {
+      const [, label, href] = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(tok)!;
+      out.push(<a key={k} className="md-link" href={href} target="_blank" rel="noreferrer noopener" title={href}>{label}</a>);
+    }
+    else if (tok.startsWith("**")) out.push(<strong key={k}>{inline(tok.slice(2, -2), k)}</strong>);
+    else out.push(<em key={k}>{inline(tok.slice(1, -1), k)}</em>);
     last = m.index + tok.length;
   }
   if (last < text.length) out.push(text.slice(last));
@@ -46,8 +61,9 @@ export function Markdown({ text }: { text: string }) {
     }
     if (/^\s*\d+[.)]\s+/.test(line)) {
       const items: string[] = [];
+      const start = Number(/^\s*(\d+)/.exec(line)![1]); // "2) yes" is the second item, not the first
       while (i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*\d+[.)]\s+/, ""));
-      blocks.push(<ol key={b++}>{items.map((t, j) => <li key={j}>{inline(t, `o${b}-${j}`)}</li>)}</ol>);
+      blocks.push(<ol key={b++} start={start !== 1 ? start : undefined}>{items.map((t, j) => <li key={j}>{inline(t, `o${b}-${j}`)}</li>)}</ol>);
       continue;
     }
     const para: string[] = [];

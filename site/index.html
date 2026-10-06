@@ -21,10 +21,9 @@
   --muted: #6e6e73;
   --faint: #a1a1a6;
   --line: #e4e4de;
-  --teal: #13a89e;     /* the first step */
-  --teal-ink: #0b7f78; /* teal under white text (4.8:1; the logo teal is 3:1) */
-  --blue: #2f6bff;     /* the second step: highlighted words, links, focus */
+  --blue: #2563eb;     /* cobalt, the second step: buttons, links, focus */
   --orange: #ff5b1f;   /* the lead step: what is happening now */
+  --red: #ef3b2d;      /* accented words in the headlines */
   --cool: #b4c2d4;   /* unchanged file */
   --warm: #ff9f0a;   /* changed recently */
   --hot: #ff375f;    /* agent editing now */
@@ -68,8 +67,8 @@ nav .links a:hover { color: var(--text); }
 
 /* ---------- buttons ---------- */
 .btns { display: flex; justify-content: center; flex-wrap: wrap; gap: 14px 28px; align-items: center; margin-top: 40px; }
-.btn { background: var(--teal-ink); color: #fff; padding: 12px 24px; border-radius: 999px; font-weight: 600; font-size: 17px; transition: background .2s; }
-.btn:hover { background: #096b65; }
+.btn { background: var(--blue); color: #fff; padding: 12px 24px; border-radius: 999px; font-weight: 600; font-size: 17px; transition: background .2s; }
+.btn:hover { background: #1d4fd0; }
 .btn.small { padding: 5px 14px; font-size: 13px; margin-left: 4px; }
 .more { color: var(--blue); font-size: 17px; font-weight: 500; }
 .more::after { content: " ›"; }
@@ -81,7 +80,7 @@ nav .links a:hover { color: var(--text); }
 .stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; }
 
 /* hero */
-#hero { height: 330vh; }
+#hero { height: 420vh; }
 #hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero-type {
   position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -92,7 +91,7 @@ nav .links a:hover { color: var(--text); }
 .hero-type h1 .line { display: block; overflow: hidden; padding-bottom: .06em; }
 .hero-type h1 .line span { display: inline-block; transform: translateY(105%); animation: rise 1.2s var(--ease) forwards; }
 .hero-type h1 .line:nth-child(2) span { animation-delay: .12s; }
-.hero-type h1 .grad { color: var(--blue); }
+.hero-type h1 .grad { color: var(--red); }
 .hero-type p { font: 500 clamp(20px, 2.4vw, 28px)/1.3 var(--body); color: var(--muted); margin-top: 28px; opacity: 0; animation: fade 1s .6s var(--ease) forwards; }
 @keyframes rise { to { transform: none; } }
 @keyframes fade { to { opacity: 1; } }
@@ -100,7 +99,7 @@ nav .links a:hover { color: var(--text); }
   position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 24px 44px; text-align: center; opacity: 0;
   background: linear-gradient(to top, #fff 80%, rgba(255,255,255,0));
 }
-.hero-end h2 { font-size: clamp(34px, 5vw, 64px); line-height: 1; }
+.hero-end h2 { font-size: clamp(30px, min(5vw, 8vh), 64px); line-height: 1; }
 .hero-end .said { font-size: clamp(17px, 1.7vw, 20px); color: var(--muted); font-weight: 500; margin-top: 14px; }
 .hcap {
   position: absolute; left: 0; right: 0; bottom: 13vh; padding: 0 24px; text-align: center; pointer-events: none; opacity: 0;
@@ -109,11 +108,18 @@ nav .links a:hover { color: var(--text); }
 }
 
 /* stats: a static row, the numbers count up once in view */
-#stats { padding: 88px 0 80px; text-align: center; }
+#stats { height: 300vh; text-align: center; }
+#stats .stage { display: flex; align-items: center; padding: 104px 0 24px; box-sizing: border-box; }  /* 104: under the band and the nav */
+#stats .stage > .wrap { width: 100%; }
+#stats .stats-head { font-size: clamp(30px, min(4.8vw, 8.5vh), 64px); }
+#stats .stats3 { margin-top: min(52px, 5vh); }
+#stats .stat3 .n { font-size: clamp(44px, min(6.4vw, 11vh), 84px); }
+#stats .stat3 p { font-size: clamp(15px, 2.6vh, 19px); margin-top: min(14px, 1.6vh); }
+#stats .study { margin-top: min(20px, 2.4vh); padding-top: min(14px, 1.6vh); font-size: clamp(12px, 1.9vh, 13.5px); }
 .stats-head { font-size: clamp(34px, 4.8vw, 64px); line-height: 1; }
 .stats3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 52px; }
 .stat3 .n { font: 900 clamp(56px, 6.4vw, 84px)/1 var(--display); letter-spacing: -0.045em; white-space: nowrap; }
-.stat3 .n.warm { color: var(--blue); }
+.stat3 .n.warm { color: var(--red); }
 .stat3 p { color: var(--muted); font-size: 19px; font-weight: 500; margin: 14px auto 0; max-width: 22ch; }
 .stat3 p b { color: var(--text); font-weight: 500; }
 .study { display: block; margin: 20px auto 0; padding-top: 14px; border-top: 1px solid var(--line); max-width: 30ch; font-size: 13.5px; line-height: 1.4; color: var(--muted); font-weight: 500; }
@@ -158,7 +164,7 @@ nav .links a:hover { color: var(--text); }
 .tk-line li.fail b { color: var(--risk); }
 .tk-line li.fail.on::before { background: var(--risk); animation: tk-err 1.4s ease-out 1; }
 @keyframes tk-err { 0% { box-shadow: 0 0 0 0 rgba(217,48,37,.55); } 100% { box-shadow: 0 0 0 14px rgba(217,48,37,0); } }
-.tk-agent { position: absolute; left: 6px; top: 0; width: 16px; height: 16px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 5px rgba(47,107,255,.18); transition: top .5s var(--ease), background .3s, box-shadow .3s; z-index: 1; pointer-events: none; }
+.tk-agent { position: absolute; left: 6px; top: 0; width: 16px; height: 16px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 5px rgba(37,99,235,.18); transition: top .5s var(--ease), background .3s, box-shadow .3s; z-index: 1; pointer-events: none; }
 .tk-agent.err { background: var(--risk); box-shadow: 0 0 0 5px rgba(217,48,37,.2); }
 
 .tk-win { background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 30px 80px -30px rgba(0,0,0,.22); transition: box-shadow .3s; }
@@ -277,7 +283,7 @@ html { scroll-padding-top: 96px; }
 .wl-mini { display: flex; align-items: center; gap: 8px; }
 .wl-mini input { width: 190px; height: 26px; border: 1px solid #d2d2d7; border-radius: 999px; padding: 0 12px; background: #fff; color: var(--text); font: 500 13px var(--body); outline: none; transition: border-color .2s, box-shadow .2s; }
 .wl-mini input::placeholder { color: var(--faint); }
-.wl-mini input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(47,107,255,.15); }
+.wl-mini input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
 .wl-mini button { border: 0; background: none; padding: 0; color: var(--blue); font: 600 13.5px var(--body); cursor: pointer; white-space: nowrap; }
 .wl-mini button::after { content: " ›"; }
 .wl-mini button:hover { text-decoration: underline; }
@@ -291,14 +297,14 @@ nav { top: 40px; }
 
 /* roadmap */
 .road { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 72px; text-align: left; }
-.road::before { content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 2px; background: linear-gradient(90deg, var(--teal) 0 22%, var(--blue) 42%, var(--orange) 62%, var(--line) 85%); }
+.road::before { content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 2px; background: linear-gradient(90deg, var(--text) 0 22%, var(--blue) 42%, var(--orange) 62%, var(--line) 85%); }
 .road > div { position: relative; }
 .road .dot { display: block; position: relative; z-index: 1; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid var(--line); box-sizing: border-box; }
-.road .now .dot { background: var(--teal); border-color: var(--teal); }
+.road .now .dot { background: var(--text); border-color: var(--text); }
 .road .next .dot { background: var(--orange); border-color: var(--orange); animation: road-pulse 2.2s ease-out infinite; }
 @keyframes road-pulse { 0% { box-shadow: 0 0 0 0 rgba(255,91,31,.45); } 100% { box-shadow: 0 0 0 16px rgba(255,91,31,0); } }
 .road h3 { font-size: clamp(28px, 3vw, 38px); margin-top: 26px; letter-spacing: -0.03em; }
-.road .next h3 { color: var(--blue); }
+.road .next h3 { color: var(--red); }
 .road .when { color: var(--muted); font-weight: 500; margin-top: 4px; }
 .road ul { list-style: none; margin: 22px 0 0; padding: 0; }
 .road li { padding: 12px 0; border-top: 1px solid var(--line); font-weight: 500; line-height: 1.4; }
@@ -308,8 +314,8 @@ nav { top: 40px; }
 .road li small a::after { content: " ›"; }
 .wl-big { display: flex; justify-content: center; gap: 10px; margin: 96px auto 0; max-width: 520px; }
 .wl-big input { flex: 1; min-width: 0; height: 52px; border: 1px solid var(--line); border-radius: 999px; padding: 0 22px; font: 500 17px var(--body); background: #fff; outline: none; transition: border-color .2s, box-shadow .2s; }
-.wl-big input:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(47,107,255,.15); }
-.wl-big .btn { border: 0; cursor: pointer; font-family: var(--body); background: var(--teal-ink); }
+.wl-big input:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(37,99,235,.15); }
+.wl-big .btn { border: 0; cursor: pointer; font-family: var(--body); background: var(--blue); }
 .wl-note { margin-top: 16px; color: var(--muted); font-size: 14px; font-weight: 500; }
 .wl-big + .wl-note:empty { display: none; }
 
@@ -320,7 +326,7 @@ nav { top: 40px; }
 .closing { padding: 160px 0 150px; }
 .closing h2 { font-size: clamp(52px, 9vw, 140px); line-height: .92; letter-spacing: -0.05em; }
 .closing h2 span { display: block; }
-.closing h2 .grad { color: var(--blue); }
+.closing h2 .grad { color: var(--red); }
 .closing .btns { margin-top: 56px; }
 .btn.big { font-size: 20px; padding: 17px 36px; }
 .btn.pending { opacity: .5; pointer-events: none; }
@@ -348,7 +354,7 @@ footer a:hover { text-decoration: underline; }
   .wl-mini, .has-waitlist .band .dim { display: none; }
   .has-waitlist .band-link { display: inline; }
   .road { grid-template-columns: 1fr; gap: 40px; margin-top: 64px; padding-left: 36px; }
-  .road::before { left: 7px; right: auto; top: 8px; bottom: 0; width: 2px; height: auto; background: linear-gradient(180deg, var(--teal) 0 22%, var(--blue) 40%, var(--orange) 60%, var(--line) 85%); }
+  .road::before { left: 7px; right: auto; top: 8px; bottom: 0; width: 2px; height: auto; background: linear-gradient(180deg, var(--text) 0 22%, var(--blue) 40%, var(--orange) 60%, var(--line) 85%); }
   .road .dot { position: absolute; left: -36px; top: 8px; }
   .road h3 { margin-top: 0; }
   .wl-big { flex-direction: column; margin-top: 64px; }
@@ -375,7 +381,8 @@ footer a:hover { text-decoration: underline; }
   .nav-install { display: none; }
   .nav-demo { display: inline-block; }
   .block { padding: 88px 0; }
-  #stats { padding: 88px 0; }
+  #stats { padding: 88px 0; height: auto; }
+  #stats .stage { padding: 0; }
   .closing { padding: 112px 0 104px; }
   .scene, #hero, #tasks { height: auto; }
   .scene .stage { position: relative; height: auto; overflow: visible; }
@@ -448,7 +455,7 @@ footer a:hover { text-decoration: underline; }
 <nav>
   <div class="wrap">
     <a class="logo" href="#hero" aria-label="Rundown">
-      <svg class="mark" viewBox="0 0 473.78 67.50" height="22" role="img" aria-label="Rundown"><g transform="translate(-15.00 -22.50) scale(0.9374)"><rect x="16" y="24" width="58" height="16" rx="8" fill="#13A89E"/><rect x="31" y="52" width="58" height="16" rx="8" fill="#2F6BFF"/><rect x="46" y="80" width="58" height="16" rx="8" fill="#FF5B1F"/></g><path transform="translate(93.27 66.35)" fill="currentColor" d="M21.032 0.0H6.776V-65.11999999999999H31.944Q43.824 -65.11999999999999 50.292 -59.61999999999999Q56.76 -54.12 56.76 -44.0Q56.76 -31.415999999999997 45.936 -25.872L57.376 0.0H41.8L32.032 -22.791999999999998H21.032ZM21.032 -52.448V-35.288H31.855999999999998Q36.519999999999996 -35.288 39.116 -37.57599999999999Q41.711999999999996 -39.864 41.711999999999996 -44.0Q41.711999999999996 -48.135999999999996 39.20399999999999 -50.292Q36.696 -52.448 31.944 -52.448ZM91.78399999999999 -44.0H105.336V0.0H92.576L91.696 -4.928Q89.672 -2.1999999999999997 85.93199999999999 -0.5279999999999999Q82.192 1.144 78.232 1.144Q70.752 1.144 66.396 -3.564Q62.04 -8.272 62.04 -16.368V-44.0H75.592V-21.296Q75.592 -15.927999999999999 77.52799999999999 -13.419999999999998Q79.464 -10.911999999999999 83.6 -10.911999999999999Q87.91199999999999 -10.911999999999999 89.84799999999998 -13.288Q91.78399999999999 -15.664 91.78399999999999 -21.119999999999997ZM126.01599999999999 0.0H112.464V-44.0H125.22399999999999L126.104 -39.424Q130.416 -45.407999999999994 139.56799999999998 -45.407999999999994Q147.4 -45.407999999999994 151.756 -40.611999999999995Q156.112 -35.815999999999995 156.112 -27.192V0.0H142.56V-23.936Q142.56 -28.072 140.448 -30.58Q138.336 -33.088 134.816 -33.088Q130.768 -33.088 128.392 -30.668Q126.01599999999999 -28.247999999999998 126.01599999999999 -24.112ZM181.192 1.144Q171.688 1.144 166.012 -5.103999999999999Q160.336 -11.351999999999999 160.336 -21.735999999999997Q160.336 -32.296 166.23200000000003 -38.852Q172.12800000000001 -45.407999999999994 182.072 -45.407999999999994Q186.12 -45.407999999999994 189.728 -43.91199999999999Q193.336 -42.416 195.272 -39.952V-66.35199999999999H208.824V0.0H196.064L195.36 -5.632Q193.6 -2.552 189.728 -0.7040000000000001Q185.856 1.144 181.192 1.144ZM176.836 -14.299999999999999Q179.696 -11.264 184.44799999999998 -11.264Q189.2 -11.264 192.192 -14.299999999999999Q195.184 -17.336 195.184 -22.264Q195.184 -27.192 192.192 -30.227999999999998Q189.2 -33.263999999999996 184.44799999999998 -33.263999999999996Q179.696 -33.263999999999996 176.836 -30.227999999999998Q173.976 -27.192 173.976 -22.264Q173.976 -17.336 176.836 -14.299999999999999ZM237.864 -45.32Q248.424 -45.32 255.24400000000003 -38.896Q262.064 -32.472 262.064 -22.087999999999997Q262.064 -11.792 255.24400000000003 -5.368Q248.424 1.056 237.864 1.056Q227.216 1.056 220.39600000000002 -5.324Q213.57600000000002 -11.703999999999999 213.57600000000002 -22.088Q213.57600000000002 -32.472 220.39600000000002 -38.896Q227.216 -45.32 237.864 -45.32ZM227.216 -22.176Q227.216 -17.16 230.16400000000002 -14.123999999999999Q233.11200000000002 -11.088 237.864 -11.088Q242.52800000000002 -11.088 245.476 -14.123999999999999Q248.424 -17.16 248.424 -22.176Q248.424 -27.104 245.476 -30.139999999999997Q242.52800000000002 -33.175999999999995 237.864 -33.175999999999995Q233.11200000000002 -33.175999999999995 230.16400000000002 -30.139999999999997Q227.216 -27.104 227.216 -22.176ZM276.76 0.0 262.592 -44.0H276.848L280.89599999999996 -29.656Q282.568 -23.496 283.62399999999997 -17.16Q284.50399999999996 -22.439999999999998 286.792 -29.656L291.28 -44.0H305.18399999999997L309.32 -29.656Q311.52 -22.087999999999997 312.312 -17.16Q312.928 -20.68 315.392 -29.656L319.616 -44.0H333.96L318.56 0.0H305.976L301.752 -13.991999999999999Q298.76 -23.671999999999997 298.144 -28.247999999999998Q297.352 -24.2 294.18399999999997 -13.728L289.96 0.0ZM350.416 0.0H336.864V-44.0H349.62399999999997L350.504 -39.424Q354.816 -45.407999999999994 363.96799999999996 -45.407999999999994Q371.8 -45.407999999999994 376.156 -40.611999999999995Q380.512 -35.815999999999995 380.512 -27.192V0.0H366.96V-23.936Q366.96 -28.072 364.84799999999996 -30.58Q362.736 -33.088 359.216 -33.088Q355.168 -33.088 352.79200000000003 -30.668Q350.416 -28.247999999999998 350.416 -24.112Z"/></svg>
+      <svg class="mark" viewBox="0 0 473.78 67.50" height="22" role="img" aria-label="Rundown"><g transform="translate(-15.00 -22.50) scale(0.9374)"><rect x="16" y="24" width="58" height="16" rx="8" fill="currentColor"/><rect x="31" y="52" width="58" height="16" rx="8" fill="#2563EB"/><rect x="46" y="80" width="58" height="16" rx="8" fill="#FF5B1F"/></g><path transform="translate(93.27 66.35)" fill="currentColor" d="M21.032 0.0H6.776V-65.11999999999999H31.944Q43.824 -65.11999999999999 50.292 -59.61999999999999Q56.76 -54.12 56.76 -44.0Q56.76 -31.415999999999997 45.936 -25.872L57.376 0.0H41.8L32.032 -22.791999999999998H21.032ZM21.032 -52.448V-35.288H31.855999999999998Q36.519999999999996 -35.288 39.116 -37.57599999999999Q41.711999999999996 -39.864 41.711999999999996 -44.0Q41.711999999999996 -48.135999999999996 39.20399999999999 -50.292Q36.696 -52.448 31.944 -52.448ZM91.78399999999999 -44.0H105.336V0.0H92.576L91.696 -4.928Q89.672 -2.1999999999999997 85.93199999999999 -0.5279999999999999Q82.192 1.144 78.232 1.144Q70.752 1.144 66.396 -3.564Q62.04 -8.272 62.04 -16.368V-44.0H75.592V-21.296Q75.592 -15.927999999999999 77.52799999999999 -13.419999999999998Q79.464 -10.911999999999999 83.6 -10.911999999999999Q87.91199999999999 -10.911999999999999 89.84799999999998 -13.288Q91.78399999999999 -15.664 91.78399999999999 -21.119999999999997ZM126.01599999999999 0.0H112.464V-44.0H125.22399999999999L126.104 -39.424Q130.416 -45.407999999999994 139.56799999999998 -45.407999999999994Q147.4 -45.407999999999994 151.756 -40.611999999999995Q156.112 -35.815999999999995 156.112 -27.192V0.0H142.56V-23.936Q142.56 -28.072 140.448 -30.58Q138.336 -33.088 134.816 -33.088Q130.768 -33.088 128.392 -30.668Q126.01599999999999 -28.247999999999998 126.01599999999999 -24.112ZM181.192 1.144Q171.688 1.144 166.012 -5.103999999999999Q160.336 -11.351999999999999 160.336 -21.735999999999997Q160.336 -32.296 166.23200000000003 -38.852Q172.12800000000001 -45.407999999999994 182.072 -45.407999999999994Q186.12 -45.407999999999994 189.728 -43.91199999999999Q193.336 -42.416 195.272 -39.952V-66.35199999999999H208.824V0.0H196.064L195.36 -5.632Q193.6 -2.552 189.728 -0.7040000000000001Q185.856 1.144 181.192 1.144ZM176.836 -14.299999999999999Q179.696 -11.264 184.44799999999998 -11.264Q189.2 -11.264 192.192 -14.299999999999999Q195.184 -17.336 195.184 -22.264Q195.184 -27.192 192.192 -30.227999999999998Q189.2 -33.263999999999996 184.44799999999998 -33.263999999999996Q179.696 -33.263999999999996 176.836 -30.227999999999998Q173.976 -27.192 173.976 -22.264Q173.976 -17.336 176.836 -14.299999999999999ZM237.864 -45.32Q248.424 -45.32 255.24400000000003 -38.896Q262.064 -32.472 262.064 -22.087999999999997Q262.064 -11.792 255.24400000000003 -5.368Q248.424 1.056 237.864 1.056Q227.216 1.056 220.39600000000002 -5.324Q213.57600000000002 -11.703999999999999 213.57600000000002 -22.088Q213.57600000000002 -32.472 220.39600000000002 -38.896Q227.216 -45.32 237.864 -45.32ZM227.216 -22.176Q227.216 -17.16 230.16400000000002 -14.123999999999999Q233.11200000000002 -11.088 237.864 -11.088Q242.52800000000002 -11.088 245.476 -14.123999999999999Q248.424 -17.16 248.424 -22.176Q248.424 -27.104 245.476 -30.139999999999997Q242.52800000000002 -33.175999999999995 237.864 -33.175999999999995Q233.11200000000002 -33.175999999999995 230.16400000000002 -30.139999999999997Q227.216 -27.104 227.216 -22.176ZM276.76 0.0 262.592 -44.0H276.848L280.89599999999996 -29.656Q282.568 -23.496 283.62399999999997 -17.16Q284.50399999999996 -22.439999999999998 286.792 -29.656L291.28 -44.0H305.18399999999997L309.32 -29.656Q311.52 -22.087999999999997 312.312 -17.16Q312.928 -20.68 315.392 -29.656L319.616 -44.0H333.96L318.56 0.0H305.976L301.752 -13.991999999999999Q298.76 -23.671999999999997 298.144 -28.247999999999998Q297.352 -24.2 294.18399999999997 -13.728L289.96 0.0ZM350.416 0.0H336.864V-44.0H349.62399999999997L350.504 -39.424Q354.816 -45.407999999999994 363.96799999999996 -45.407999999999994Q371.8 -45.407999999999994 376.156 -40.611999999999995Q380.512 -35.815999999999995 380.512 -27.192V0.0H366.96V-23.936Q366.96 -28.072 364.84799999999996 -30.58Q362.736 -33.088 359.216 -33.088Q355.168 -33.088 352.79200000000003 -30.668Q350.416 -28.247999999999998 350.416 -24.112Z"/></svg>
     </a>
     <div class="links">
       <a href="#tasks">Beyond code</a>
@@ -474,9 +481,9 @@ footer a:hover { text-decoration: underline; }
         <a class="more" data-wl-link href="#waitlist">Join the waitlist</a>
       </div>
     </div>
-    <p class="hcap" data-in=".1" data-out=".37">One agent, you can follow.</p>
-    <p class="hcap" data-in=".4" data-out=".54">Three, you can't.</p>
-    <p class="hcap" data-in=".57" data-out=".68">Each one is somewhere in your work.</p>
+    <p class="hcap" data-in=".08" data-out=".28">One agent, you can follow.</p>
+    <p class="hcap" data-in=".31" data-out=".43">Three, you can't.</p>
+    <p class="hcap" data-in=".47" data-out=".68">Each one is somewhere in your work.</p>
     <div class="hero-end" id="heroEnd">
       <h2>We give you the rundown.</h2>
       <p class="said">Nobody reads a list of 47 changed files. You look at a map.</p>
@@ -488,27 +495,29 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- 2. Research: one row, the numbers count up once in view -->
-<section id="stats">
+<!-- 2. Research: pinned for a while, each number comes in and counts up as you scroll -->
+<section class="scene" id="stats">
+  <div class="stage">
   <div class="wrap">
     <h2 class="stats-head rv">Agents write more.<br>We understand less.</h2>
     <div class="stats3">
-      <div class="stat3 rv">
-        <div class="n" data-count="240" data-suffix="%">240%</div>
+      <div class="stat3">
+        <div class="n" data-to="240">240%</div>
         <p>more commits with autonomous coding agents. <b>Only 30% more releases.</b></p>
         <a class="study" href="https://www.nber.org/papers/w35275" target="_blank" rel="noopener"><cite>Writing Code vs. Shipping Code: Productivity Effects Across Generations of AI Coding Tools</cite>NBER, 2026 · 500,000+ developers</a>
       </div>
-      <div class="stat3 rv d1">
-        <div class="n" data-count="50" data-suffix="%">50%</div>
+      <div class="stat3">
+        <div class="n" data-to="50">50%</div>
         <p>comprehension when learning with AI, <b>vs 67% without.</b></p>
         <a class="study" href="https://www.anthropic.com/research/AI-assistance-coding-skills" target="_blank" rel="noopener"><cite>How AI assistance impacts the formation of coding skills</cite>Anthropic, 2026 · 52 developers</a>
       </div>
-      <div class="stat3 rv d2">
-        <div class="n warm">65–86%</div>
+      <div class="stat3">
+        <div class="n warm" data-to="65" data-to2="86">65–86%</div>
         <p>for those who used AI <b>to ask questions.</b></p>
         <a class="study" href="https://www.anthropic.com/research/AI-assistance-coding-skills" target="_blank" rel="noopener"><cite>How AI assistance impacts the formation of coding skills</cite>Anthropic, 2026 · same study</a>
       </div>
     </div>
+  </div>
   </div>
 </section>
 
@@ -728,21 +737,14 @@ const flatMQ = matchMedia("(max-width: 699px)");   // phones: no pinned scenes, 
 let flat = flatMQ.matches;
 const progress = el => window.__P?.[el.id] ?? clamp(-el.getBoundingClientRect().top / (el.offsetHeight - innerHeight));  // __P: preview hook, {sceneId: 0..1}
 
-/* reveal on scroll, plus count-ups and the typed question */
+/* reveal on scroll, plus the typed question */
 const io = new IntersectionObserver(es => es.forEach(e => {
   if (!e.isIntersecting) return;
   const el = e.target; el.classList.add("in"); io.unobserve(el);
-  el.querySelectorAll("[data-count]").forEach(countUp);
   if (el.id === "askPill") typeQuestion();
 }), { threshold: .2, rootMargin: "0px 0px -8% 0px" });
 document.querySelectorAll(".rv").forEach(el => io.observe(el));
 
-function countUp(el) {
-  const to = +el.dataset.count, suf = el.dataset.suffix || "", t0 = performance.now();
-  if (still) return;
-  const step = t => { const k = ease(clamp((t - t0) / 1400)); el.textContent = Math.round(to * k) + suf; if (k < 1) requestAnimationFrame(step); };
-  requestAnimationFrame(step);
-}
 function typeQuestion() {
   const q = "Why did you change this?", out = $("#askText");
   if (still) { out.textContent = q; return; }
@@ -750,40 +752,40 @@ function typeQuestion() {
 }
 
 /* ---------- hero story (an illustration, not product data) ----------
-   Three agents doing three kinds of work: code, research on the web, a video edit. One agent's line
-   draws on white while the camera follows it; two more join and run side by side ("Three, you can't"),
-   then they separate into the map and work: reads are dashed lines of sight, edits ripple, the video
-   agent cuts a talk, makes a teaser, then reads the ffmpeg docs. Then the camera pulls back to the whole map.
-   Everything is driven by p (0..1), which follows the scroll through the hero (s, 0..1): the title holds
-   the first screen alone, and the agents start once it begins to dissolve. Phones show p = 1. */
+   Three agents doing three kinds of work: code, research on the web, a video edit. The lead comes in from the
+   left as a band as tall as the screen that narrows to a line, and runs alone; two more fall in beside it
+   ("Three, you can't"), then each keeps to its own band of the map: files as dots, as on Rundown's own map,
+   linked inside their folder. Reads are dashed lines of sight, an edit ripples and turns the file the agent's
+   colour. Then the camera pulls back to the whole map. Everything is driven by p (0..1), which follows the scroll
+   through the hero (s, 0..1): the title holds the first screen alone, and the agents start once it begins to
+   dissolve. Phones show p = 1. */
 const hero = (() => {
   const cv = $("#map"), ctx = cv.getContext("2d");
-  const COOL = [180, 194, 212], WARM = [255, 159, 10], HOT = [255, 55, 95];
-  // The three agents wear the logo's three steps: the lead (orange) runs alone first, blue and teal join it.
+  const DOT = [199, 204, 214];                      // a file nobody touched, as on the app's map
+  // The three agents wear the logo's three steps: the lead (orange) runs alone first, cobalt and ink join it.
   const AG = [
-    { name: "Coding agent", col: [255, 91, 31], end: .8 },
-    { name: "Research agent", col: [47, 107, 255], from: .09, end: .82 },
-    { name: "Video agent", col: [19, 168, 158], from: .08, end: .84 },
+    { name: "Coding agent", col: [255, 91, 31], end: .76 },
+    { name: "Research agent", col: [37, 99, 235], from: .09, end: .78 },
+    { name: "Video agent", col: [18, 18, 20], from: .08, end: .8 },
   ];
-  const T0 = .05;                                   // the lead sets off, still off screen to the left
-  const PD = .52;                                   // the end of the side-by-side run: they split up into the map
-  let PS = .38;                                     // when the other two fall in beside it (set in build: where the lead is then)
+  const T0 = .04;                                   // the lead sets off, still off screen to the left
+  const PD = .4;                                    // the end of the side-by-side run: they split up into the map
+  let PS = .3;                                      // when the other two fall in beside it (set in build: where the lead is then)
   let V = 1;                                        // the lead's speed, path length per unit of p, from T0 to PD
-  const MAP_IN = .56;                               // about when they reach the map
-  // This repo, roughly: the web app's map is the core, the server's listener next to it, smaller modules around,
-  // plus the web pages and videos the agents worked with.
-  // [name, kind, x, y as a fraction of the map, how many places]. Kinds: code files, docs, web pages, videos.
+  const MAP_IN = .44;                               // about when they reach the map
+  // This repo, roughly: the web app's map is the core, the server's listener beside it, smaller folders around,
+  // and the web pages the agents read. [id, name, x, y as a fraction of the map, how many files]
   const MODS = [
-    ["web/map", "file", .05, -.03, 15], ["server/listener", "file", -.13, .06, 12], ["web/lib", "file", -.02, .28, 10],
-    ["plugin", "file", .16, -.27, 8], ["web/follow", "file", .2, .22, 7], ["server/mapper", "file", -.31, .1, 6],
-    ["server/core", "file", -.27, -.2, 6], ["the web", "page", -.09, -.33, 6], ["the web", "page", .36, -.01, 5],
-    ["docs", "doc", .34, -.3, 5], ["video", "video", -.37, .31, 5], ["site", "file", .34, .28, 5],
+    ["map", "web/map", .05, -.03, 15], ["listener", "server/listener", -.13, .06, 12], ["lib", "web/lib", -.02, .28, 10],
+    ["plugin", "plugin", .16, -.27, 8], ["follow", "web/follow", .2, .22, 7], ["mapper", "server/mapper", -.31, .1, 6],
+    ["core", "server/core", -.27, -.2, 6], ["webA", "the web", -.09, -.33, 6], ["webB", "the web", .36, -.01, 5],
+    ["docs", "docs", .34, -.3, 5], ["video", "video", -.37, .31, 5], ["site", "site", .34, .28, 5],
   ];
-  // Where each agent works: [x, y as a fraction of the map, kind of place, what it did]
+  // Where each agent works, left to right, each in its own band (top, middle, bottom): [folder, what it did]
   const STOPS = [
-    [[-.12, .02, "file", "Edit listener.service.ts"], [.12, -.02, "file", "Edit map/themes.ts"], [.13, -.33, "file", "Edit scripts/launch.mjs"]],
-    [[-.13, -.33, "page", "Read the Claude Code docs"], [.37, .02, "page", "Read a changelog"], [.37, -.33, "doc", "Write docs/rename.md"]],
-    [[-.41, .31, "video", "Cut demo.mp4"], [-.33, .34, "video", "Make teaser.mp4"], [-.1, -.3, "page", "Read ffmpeg.org"]],
+    [["listener", "Edit listener.service.ts"], ["map", "Edit map/themes.ts"], ["webB", "Read a changelog"]],
+    [["webA", "Read the Claude Code docs"], ["plugin", "Edit the plugin's README"], ["docs", "Write docs/rename.md"]],
+    [["video", "Cut demo.mp4"], ["lib", "Read lib/share.ts"], ["site", "Put the teaser on the site"]],
   ];
   let W, H, dpr, S, nodes = [], edges = [], clusters = [], seed;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -791,12 +793,21 @@ const hero = (() => {
   const mixN = (a, b, t) => a + (b - a) * t;
   const mixC = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 
-  /* Catmull-Rom through waypoints -> dense polyline with cumulative length */
+  /* centripetal Catmull-Rom through waypoints -> dense polyline with cumulative length. Centripetal: no overshoot,
+     no loops, so a turn reads as one smooth curve. Waypoint j sits at sample j * n. */
   function spline(pts, n = 28) {
-    const out = [], P = [pts[0], ...pts, pts[pts.length - 1]];
-    for (let i = 1; i < P.length - 2; i++) for (let k = 0; k < n; k++) {
-      const t = k / n, [p0, p1, p2, p3] = [P[i - 1], P[i], P[i + 1], P[i + 2]], t2 = t * t, t3 = t2 * t;
-      out.push([0, 1].map(j => .5 * (2 * p1[j] + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3)));
+    const out = [], ext = (a, b) => [2 * a[0] - b[0], 2 * a[1] - b[1]];
+    const P = [ext(pts[0], pts[1]), ...pts, ext(pts[pts.length - 1], pts[pts.length - 2])];
+    const gap = (a, b) => Math.max(1e-3, Math.sqrt(Math.hypot(b[0] - a[0], b[1] - a[1])));
+    for (let i = 1; i < P.length - 2; i++) {
+      const [p0, p1, p2, p3] = [P[i - 1], P[i], P[i + 1], P[i + 2]];
+      const t1 = gap(p0, p1), t2 = t1 + gap(p1, p2), t3 = t2 + gap(p2, p3);
+      for (let k = 0; k < n; k++) {
+        const t = t1 + (t2 - t1) * k / n;
+        const L = (a, b, ta, tb) => [0, 1].map(j => ((tb - t) * a[j] + (t - ta) * b[j]) / (tb - ta));
+        const A1 = L(p0, p1, 0, t1), A2 = L(p1, p2, t1, t2), A3 = L(p2, p3, t2, t3);
+        out.push(L(L(A1, A2, 0, t2), L(A2, A3, t1, t3), t1, t2));
+      }
     }
     out.push(pts[pts.length - 1]);
     const cum = [0];
@@ -825,38 +836,41 @@ const hero = (() => {
   function build() {
     dpr = Math.min(devicePixelRatio || 1, 2); W = cv.clientWidth; H = cv.clientHeight;
     cv.width = W * dpr; cv.height = H * dpr;
-    S = clamp(Math.min(W, H) / 800, .55, 1.2); seed = 11; nodes = []; edges = [];
+    S = clamp(Math.min(W, H) / 800, .55, 1.2); seed = 11; nodes = []; edges = []; clusters = [];
     const rx = W * .42, ry = H * .3;
-    clusters = [];
-    MODS.forEach(([name, kind, fx, fy, k]) => {
+    MODS.forEach(([id, name, fx, fy, k]) => {
       const cx = fx * 2 * rx + r(-12, 12) * S, cy = fy * 2 * ry + r(-10, 10) * S, first = nodes.length;
-      const reach = (18 + 13 * Math.sqrt(k)) * S, big = clamp((k - 5) / 10);  // bigger modules spread wider, with bigger places
-      for (let i = 0; i < k; i++) {
-        const ang = r(0, 6.28), d = Math.sqrt(r(.04, 1)) * reach;     // sqrt: even density, not a ring
-        nodes.push({ x: cx + Math.cos(ang) * d, y: cy + Math.sin(ang) * d, rad: r(3, 7) * S * (1 + .45 * big) * (kind === "page" || kind === "video" ? 1.25 : 1), ph: r(0, 6.28), kind, base: rnd() < .12 ? 1 : 0, rp: 1, touch: [] });
+      const reach = (18 + 13 * Math.sqrt(k)) * S, big = clamp((k - 5) / 10);  // bigger folders spread wider, with bigger files
+      const cl = { id, name, k, cx, cy, files: [] };
+      for (let tries = 0; cl.files.length < k && tries < 400; tries++) {
+        const ang = r(0, 6.28), d = Math.sqrt(r(.04, 1)) * reach, rad = r(3, 6.5) * S * (1 + .4 * big);   // sqrt: even, not a ring
+        const x = cx + Math.cos(ang) * d, y = cy + Math.sin(ang) * d;
+        if (cl.files.some(n => Math.hypot(n.x - x, n.y - y) < n.rad + rad + 2 * S)) continue;               // dots never overlap
+        const i = cl.files.length, n = { x, y, rad, ph: r(0, 6.28), cl, rp: 1, touch: [] };
+        nodes.push(n); cl.files.push(n);
         if (i) edges.push([first + i, first + Math.floor(r(0, i))]);
       }
-      for (let e = 0; e < Math.floor(k / 5); e++) edges.push([first + Math.floor(r(0, k)), first + Math.floor(r(0, k))]);
-      clusters.push({ first, k, name, cx, cy });
+      for (let e = 0; e < Math.floor(k / 5); e++) edges.push([first + Math.floor(r(0, cl.files.length)), first + Math.floor(r(0, cl.files.length))]);
+      clusters.push(cl);
     });
-    /* the modules hold together: each links to its nearest neighbours (never across the map), and the ones near the core into src/lib */
-    const pick = cl => cl.first + Math.floor(r(0, cl.k)), linked = new Set();
-    const link = (a, b) => { const key = [a, b].sort().join(); if (a === b || linked.has(key)) return; linked.add(key); edges.push([pick(clusters[a]), pick(clusters[b])]); };
+    /* the folders hold together: each links to its nearest neighbours (never across the map), and the ones near the core into it */
+    const anyOf = cl => nodes.indexOf(cl.files[Math.floor(r(0, cl.files.length))]), linked = new Set();
+    const link = (a, b) => { const key = [a, b].sort().join(); if (a === b || linked.has(key)) return; linked.add(key); edges.push([anyOf(clusters[a]), anyOf(clusters[b])]); };
     clusters.forEach((cl, i) => {
       clusters.map((o, j) => [Math.hypot(o.cx - cl.cx, (o.cy - cl.cy) * 1.2), j]).filter(([, j]) => j !== i).sort((x, y) => x[0] - y[0]).slice(0, 2).filter(([d]) => d < W * .26).forEach(([, j]) => link(i, j));
       if (i && Math.hypot(cl.cx - clusters[0].cx, cl.cy - clusters[0].cy) < W * .3) link(i, 0);
     });
-    const near = (fx, fy, kind, used) => {
-      let best = -1, bd = 1e9;
-      nodes.forEach((n, i) => { if (used.has(i) || n.kind !== kind) return; const d = Math.hypot(n.x - fx * 2 * rx, n.y - fy * 2 * ry); if (d < bd) { bd = d; best = i; } });
+    const byId = Object.fromEntries(clusters.map(c => [c.id, c])), used = new Set(), lane = 46 * S;
+    const pick = (cl, fx, fy) => {                                      // the file nearest where the agent comes from, once each
+      let best = null, bd = 1e9;
+      cl.files.forEach(n => { if (used.has(n)) return; const d = Math.hypot(n.x - fx, n.y - fy); if (d < bd) { bd = d; best = n; } });
       used.add(best); return best;
     };
-    const used = new Set(), lane = 46 * S;
-    // The approach (a parabola that meets the lane flat, so nothing overshoots and wobbles), the lane point (sync, index
-    // SYNC), straight side by side to the split point (index SPLIT), one more straight step, then each into the map.
+    // The approach (a parabola that meets the lane flat), the lane point (sync, index SYNC), straight side by side
+    // to the split point (index SPLIT), then one easy curve to each stop in turn: no in-between points, no detours.
     const X = f => -W * f, T = [1, .72, .48, .28, .12, 0];
     const approach = (x0, y0, y1) => T.map(t => [X(.72 + (x0 - .72) * t), y1 + (y0 - y1) * t * t]);
-    const lanes = y => [[X(.62), y], [X(.52), y], [X(.46), y], [X(.38), y]];
+    const lanes = y => [[X(.62), y], [X(.52), y]];
     const starts = [
       [...approach(1.2, 0, 0), ...lanes(0)],
       [...approach(1.02, -H * .42, -lane), ...lanes(-lane)],
@@ -864,50 +878,25 @@ const hero = (() => {
     ];
     const SYNC = T.length - 1, SPLIT = SYNC + 2;
     AG.forEach((a, k) => {
-      a.stops = STOPS[k].map(([fx, fy, kind, label]) => ({ node: near(fx, fy, kind, used), label }));
-      const first = nodes[a.stops[0].node];                             // come in level with the first stop: no dip into it
-      const lead = starts[k].map((q, i, all) => (i === all.length - 1 ? [q[0], mixN(q[1], first.y, .6)] : q)) // already heading its way
-        .filter((q, i) => i <= SPLIT || q[0] < first.x - 100 * S);      // a first stop near the lanes: no running past it and back
-      // Inside the map, long legs get in-between points: a far next stop would otherwise swing the curve wide at this one.
-      const pts = [...lead, [first.x - 80 * S, first.y]], at = [];
-      a.stops.forEach(st => {
-        const q = [nodes[st.node].x, nodes[st.node].y], prev = pts[pts.length - 1], m = Math.floor(Math.hypot(q[0] - prev[0], q[1] - prev[1]) / (120 * S));
-        for (let i = 1; i < m; i++) pts.push([mixN(prev[0], q[0], i / m), mixN(prev[1], q[1], i / m)]);
-        pts.push(q); at.push(pts.length - 1);
-      });
+      let from = starts[k][SPLIT];
+      a.stops = STOPS[k].map(([id, label]) => { const n = pick(byId[id], from[0], from[1]); from = [n.x, n.y]; return { node: n, label }; });
+      const pts = [...starts[k]];
+      a.stops.forEach(st => { pts.push([st.node.x, st.node.y]); st.at = pts.length - 1; });
       a.path = spline(pts);
       a.sync = a.path.cum[SYNC * a.path.n];                            // arclength at the lane point
       a.split = a.path.cum[SPLIT * a.path.n];                          // and where the lanes end
-      a.stops.forEach((s, j) => { s.len = a.path.cum[at[j] * a.path.n] ?? a.path.L; });
+      a.stops.forEach(st => { st.len = a.path.cum[st.at * a.path.n] ?? a.path.L; });
     });
     V = AG[0].split / (PD - T0);
     PS = T0 + AG[0].sync / V;                                          // the lead is at the lane point then
-    /* precompute when each node is revealed (an agent passes nearby) and when each stop is reached */
+    /* precompute when each file shows (an agent passes nearby) and when each stop is reached */
     const R = 150 * S;
     for (let p = 0; p <= .9; p += .002) AG.forEach(a => {
       const L = lenAt(a, p), h = at(a.path, L);
       nodes.forEach(n => { if (n.rp === 1 && Math.hypot(n.x - h.x, n.y - h.y) < R) n.rp = p; });
-      a.stops.forEach(s => {
-        if (s.p === undefined && L >= s.len - 1) { s.p = p; nodes[s.node].touch.push({ a, p }); }
-      });
+      a.stops.forEach(s => { if (s.p === undefined && L >= s.len - 1) { s.p = p; s.node.touch.push({ a, p }); } });
     });
-    nodes.forEach(n => { n.rp = Math.min(n.rp, .66 + r(0, .16)); });
-  }
-
-  /* a place on the map: files and docs are dots, web pages small cards, videos small frames */
-  function shape(n, rad, col, a) {
-    ctx.globalAlpha = a; ctx.fillStyle = `rgb(${col})`;
-    if (n.kind === "page") {
-      const w = rad * 2.6, h = rad * 2;
-      ctx.beginPath(); ctx.roundRect(n.x - w / 2, n.y - h / 2, w, h, rad * .35); ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,.75)"; ctx.fillRect(n.x - w / 2 + rad * .3, n.y - h / 2 + rad * .35, w - rad * .6, rad * .28);
-    } else if (n.kind === "video") {
-      const w = rad * 2.8, h = rad * 1.9;
-      ctx.beginPath(); ctx.roundRect(n.x - w / 2, n.y - h / 2, w, h, rad * .3); ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.beginPath();
-      ctx.moveTo(n.x - rad * .35, n.y - rad * .5); ctx.lineTo(n.x + rad * .55, n.y); ctx.lineTo(n.x - rad * .35, n.y + rad * .5); ctx.fill();
-    } else { ctx.beginPath(); ctx.arc(n.x, n.y, rad, 0, 7); ctx.fill(); }
-    ctx.globalAlpha = 1;
+    nodes.forEach(n => { n.rp = Math.min(n.rp, .64 + r(0, .12)); });
   }
 
   let p = 0, s = 0, visible = true, frame = { top: 104, bottom: 520, intro: 620 }, fit = { z: 1, x: 0, y: 0, sy: 300 };
@@ -915,25 +904,24 @@ const hero = (() => {
   function fitMap() {
     let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
     nodes.forEach(n => { x0 = Math.min(x0, n.x - n.rad * 1.5); x1 = Math.max(x1, n.x + n.rad * 1.5); y0 = Math.min(y0, n.y - n.rad * 1.3); y1 = Math.max(y1, n.y + n.rad * 1.3); });
-    const top = frame.top + 26, bottom = frame.bottom;                  // 26: room for the module names over the top row
+    const top = frame.top + 26, bottom = frame.bottom;                  // 26: room for a folder name over the top row
     const z = Math.min((W - 32) / (x1 - x0), (bottom - top) / (y1 - y0), 1.15);
     fit = { z, x: (x0 + x1) / 2, y: (y0 + y1) / 2, sy: (top + bottom) / 2 };
   }
   function story(t) {
     if (window.__P?.story != null) return window.__P.story;
     if (flat) return 1;
-    return win(s, .03, .88);                                          // the title holds the first screen; the agents start when you scroll
+    return win(s, .03, .9);                                           // the title holds the first screen; the agents start when you scroll
   }
   function draw(t) {
     if (!W || !H) return;
     p = story(t); hook(p, s);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
     ctx.save(); ctx.beginPath(); ctx.rect(0, frame.clip || 0, W, H); ctx.clip();  // nothing slides under the band and the nav
-    const pa = p, lift = 0;                                              // (no self-playing opening under the title any more)
-    const heads = AG.map(a => { const L = lenAt(a, pa); return { a, L, ...at(a.path, L) }; });
+    const heads = AG.map(a => { const L = lenAt(a, p); return { a, L, ...at(a.path, L) }; });
 
     /* camera: wait for the lead to come in from the left, follow it, widen to fit all three, then pull back to the whole map */
-    const zo = ease(win(p, .66, .84));
+    const zo = ease(win(p, .7, .86));
     const cen = { x: heads.reduce((s, h) => s + h.x, 0) / 3, y: heads.reduce((s, h) => s + h.y, 0) / 3 };
     const fk = ease(win(p, PS - .04, PS + .1));
     const z0 = 3 * (W < 700 ? .8 : 1), ax0 = W / 2 + W * .06;
@@ -941,31 +929,34 @@ const hero = (() => {
     const hold = AG[0].path.pts[0][0] + (ax0 + H * .5 + 24) / z0, soft = W * .04;
     const lx = (heads[0].x + hold + Math.hypot(heads[0].x - hold, soft)) / 2;
     const fx = mixN(lx, cen.x, fk), fy = mixN(heads[0].y, cen.y, fk);
-    const zf = mixN(z0, z0 * .7, fk) * mixN(1, .5, lift);
+    const zf = mixN(z0, z0 * .7, fk);
     const z = mixN(zf, fit.z, zo), camX = mixN(fx, fit.x, zo), camY = mixN(fy, fit.y, zo);
-    const ax = W / 2 + W * .06 * (1 - zo) * (1 - lift), ay = mixN(mixN(H * .46, frame.intro, lift), fit.sy, zo);
+    const ax = W / 2 + W * .06 * (1 - zo), ay = mixN(H * .46, fit.sy, zo);
     ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * (ax - camX * z), dpr * (ay - camY * z));
     const px = 1 / z;                                                    // one screen pixel in world units
-    const LINE = 3.6 * px, wide = H / z0;                                // the lines' width; the lead's line where it starts
+    // the lines' width; the lead's line where it starts, as tall as the screen, settling to a line as the camera pulls back
+    const LINE = 3.6 * px, wide = mixN(H / z0, LINE, zo);
 
-    nodes.forEach(n => { n.a = ease(win(p, n.rp, n.rp + .05)); });
-    ctx.lineWidth = 1.2 * px;
+    nodes.forEach(n => { n.a = ease(win(p, n.rp, n.rp + .05)); const tk = n.touch.filter(tc => p >= tc.p); n.by = tk.length ? tk[tk.length - 1] : null; });
+
+    /* links inside and between folders: thin and light, as on the app's map */
+    ctx.lineWidth = 1 * px;
     edges.forEach(([i, j]) => {
       const A = nodes[i], B = nodes[j]; if (!A || !B) return;
       const al = Math.min(A.a, B.a); if (al <= 0) return;
-      ctx.strokeStyle = `rgba(160,170,190,${.4 * al})`;
+      ctx.strokeStyle = `rgba(170,176,192,${.35 * al})`;
       ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(mixN(A.x, B.x, al), mixN(A.y, B.y, al)); ctx.stroke();
     });
 
-    /* reads: dashed lines of sight from each agent to the nearest places it passes */
-    if (pa > MAP_IN - .03) heads.forEach(h => {
+    /* reads: dashed lines of sight from each agent to the nearest files it passes */
+    if (p > MAP_IN - .03) heads.forEach(h => {
       if (h.L <= 0) return;
-      const R = 120 * S, seen = [];
+      const R = 110 * S, seen = [];
       nodes.forEach(n => { if (n.a <= 0) return; const d = Math.hypot(n.x - h.x, n.y - h.y); if (d > 6 * S && d < R) seen.push([d, n]); });
       seen.sort((x, y) => x[0] - y[0]);
       ctx.setLineDash([4 * px, 5 * px]); ctx.lineWidth = 1.3 * px;
       seen.slice(0, 2).forEach(([d, n]) => {
-        ctx.strokeStyle = `rgba(${h.a.col},${.55 * (1 - d / R) * n.a})`;
+        ctx.strokeStyle = `rgba(${h.a.col},${.5 * (1 - d / R) * n.a})`;
         ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.lineTo(n.x, n.y); ctx.stroke();
       });
       ctx.setLineDash([]);
@@ -995,44 +986,73 @@ const hero = (() => {
       ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
       for (let i = 1; i < h.i; i++) ctx.lineTo(pts[i][0], pts[i][1]);
       ctx.lineTo(h.x, h.y); ctx.stroke();
-      const tip = lead ? thick(h.L, wide, LINE) : LINE;
-      ctx.beginPath(); ctx.arc(h.x, h.y, Math.max(tip / 2, 6.5 * px), 0, 7); ctx.fill();
     });
 
-    /* places */
+    /* files: grey dots with a white rim; a changed file wears its agent's colour, the one an agent is on now pulses in it */
     nodes.forEach(n => {
-      const tk = n.touch.filter(tc => pa >= tc.p);
-      if (n.a <= 0 && !tk.length) return;
-      const touched = tk.length ? win(pa, tk[0].p, tk[0].p + .03) : 0;
-      const current = tk.some(tc => heads.find(h => h.a === tc.a && Math.hypot(h.x - n.x, h.y - n.y) < 2));
-      const heat = Math.max(touched, n.base * win(p, .7, .84));
-      const col = current ? HOT : mixC(COOL, WARM, heat);
-      if (current) {                                         // a thin ring that pulses out every 1.6 s
+      if (n.a <= 0 && !n.by) return;
+      const tk = n.touch.filter(tc => p >= tc.p);
+      const here = tk.find(tc => heads.some(h => h.a === tc.a && Math.hypot(h.x - n.x, h.y - n.y) < 2));
+      if (here) {                                                        // a thin ring that pulses out every 1.6 s
         const k = still ? .35 : (t / 1600 + n.ph) % 1;
-        ctx.strokeStyle = `rgba(255,55,95,${.4 * (1 - k)})`; ctx.lineWidth = 1.5 * px;
-        ctx.beginPath(); ctx.arc(n.x, n.y, n.rad * 1.25 + (3 + 20 * ease(k)) * px, 0, 7); ctx.stroke();
+        ctx.strokeStyle = `rgba(${here.a.col},${.45 * (1 - k)})`; ctx.lineWidth = 1.5 * px;
+        ctx.beginPath(); ctx.arc(n.x, n.y, n.rad * 1.4 + (3 + 20 * ease(k)) * px, 0, 7); ctx.stroke();
       }
       tk.forEach(tc => {                                                 // a ripple on each edit
-        const k = win(pa, tc.p, tc.p + .05); if (k <= 0 || k >= 1) return;
+        const k = win(p, tc.p, tc.p + .05); if (k <= 0 || k >= 1) return;
         ctx.strokeStyle = `rgba(${tc.a.col},${1 - k})`; ctx.lineWidth = 2 * px;
         ctx.beginPath(); ctx.arc(n.x, n.y, n.rad + 36 * k * px + 4 * px, 0, 7); ctx.stroke();
       });
-      shape(n, n.rad * (current ? 1.25 : 1), col, Math.max(n.a, tk.length ? 1 : 0));
+      const col = n.by ? mixC(DOT, n.by.a.col, win(p, n.by.p, n.by.p + .02)) : DOT, rad = n.rad * (n.by ? 1.3 : 1);
+      ctx.globalAlpha = n.by ? 1 : n.a;
+      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(n.x, n.y, rad + 1.5 * px, 0, 7); ctx.fill();
+      ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(n.x, n.y, rad, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+    });
+    heads.forEach(h => {                                                 // the agents: plain dots, the lead's as wide as its line
+      if (h.L <= 0) return;
+      const tip = h.a === AG[0] ? thick(h.L, wide, LINE) : LINE;
+      ctx.fillStyle = `rgb(${h.a.col})`; ctx.beginPath(); ctx.arc(h.x, h.y, Math.max(tip / 2, 6.5 * px), 0, 7); ctx.fill();
     });
 
-    /* module names above each cluster, at screen size */
+    /* names, at screen size: only the folders an agent is in or near, and the agents once they split up */
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.font = "500 12px ui-monospace, 'SF Mono', Menlo, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    const scr = (x, y) => [ax + (x - camX) * z, ay + (y - camY) * z];
+    const na = flat ? 1 : ease(win(p, PD + .02, PD + .07)), pills = [];
+    if (na > 0) {
+      ctx.font = "600 13px Satoshi, system-ui, sans-serif";
+      heads.forEach(h => {                                               // name pills never sit on each other (narrow screens)
+        if (h.L <= 0) return;
+        const [sx, sy] = scr(h.x, h.y), name = h.a.name;
+        const bw = ctx.measureText(name).width + 30, bh = 26;
+        const spots = [[sx + 14, sy - 32], [sx - 14 - bw, sy - 32], [sx + 14, sy + 8], [sx - 14 - bw, sy + 8], [sx - bw / 2, sy + 16], [sx - bw / 2, sy - 46]];
+        const fits = ([x, y]) => x >= 8 && x + bw <= W - 8 && !pills.some(o => x < o.x + o.w + 4 && x + bw + 4 > o.x && y < o.y + bh + 4 && y + bh + 4 > o.y);
+        const [bx, by] = spots.find(fits) ?? spots.find(([x]) => x >= 8 && x + bw <= W - 8) ?? spots[0];
+        pills.push({ x: bx, y: by, w: bw, h: bh, name, col: h.a.col });
+      });
+    }
+    ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     clusters.forEach(cl => {
-      let a = 0, top = 1e9, cx = 0;
-      for (let i = cl.first; i < cl.first + cl.k; i++) { a = Math.max(a, nodes[i].a); top = Math.min(top, nodes[i].y - nodes[i].rad * 1.3); cx += nodes[i].x; }
+      let a = 0, top = 1e9, cx = 0, reach = 0;
+      cl.files.forEach(n => { a = Math.max(a, n.a); top = Math.min(top, n.y - n.rad * 1.3); cx += n.x; reach = Math.max(reach, Math.hypot(n.x - cl.cx, n.y - cl.cy)); });
       if (a <= 0) return;
-      const w = clamp((cl.k - 5) / 10);                                  // the core reads first, the outskirts quieter
-      ctx.font = `500 ${11 + 2 * w}px ui-monospace, 'SF Mono', Menlo, monospace`;
-      ctx.fillStyle = `rgba(110,110,115,${(.55 + .4 * w) * a})`;
-      ctx.fillText(cl.name, ax + (cx / cl.k - camX) * z, ay + (top - camY) * z - 12);
+      const focus = Math.max(0, ...heads.filter(h => h.L > 0).map(h => clamp(1 - (Math.hypot(h.x - cl.cx, h.y - cl.cy) - reach) / (reach + 60 * S))));
+      if (focus * a <= .02) return;
+      const [sx, sy] = scr(cx / cl.files.length, top);
+      ctx.font = "600 12.5px Satoshi, system-ui, sans-serif";
+      const tw = ctx.measureText(cl.name).width, lx = sx - tw / 2, ly = sy - 24;
+      if (pills.some(o => lx < o.x + o.w + 4 && lx + tw + 4 > o.x && ly < o.y + o.h && ly + 18 > o.y)) return;   // under a pill: leave it out
+      ctx.fillStyle = `rgba(80,80,88,${focus * a})`; ctx.fillText(cl.name, sx, sy - 10);
     });
-    ctx.textAlign = "left";
+    ctx.font = "600 13px Satoshi, system-ui, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    pills.forEach(({ x: bx, y: by, w: bw, h: bh, name, col }) => {
+        ctx.globalAlpha = na;
+        ctx.save(); ctx.shadowColor = "rgba(0,0,0,.12)"; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3;
+        ctx.fillStyle = "rgba(255,255,255,.96)"; ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 13); ctx.fill(); ctx.restore();
+        ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(bx + 13, by + bh / 2, 4, 0, 7); ctx.fill();
+        ctx.fillStyle = "#121214"; ctx.fillText(name, bx + 22, by + bh / 2 + .5);
+        ctx.globalAlpha = 1;
+    });
     ctx.restore();
   }
   let hook = () => {};
@@ -1083,6 +1103,21 @@ const tasks = (() => {
   if (!still) setInterval(() => { if (vis) cores.forEach(c => c.classList.toggle("on", Math.random() < .3)); }, 450);
 })();
 
+/* ---------- the research: each number comes in on its own stretch of the scroll and counts up with it ---------- */
+const stats = (() => {
+  const items = [...document.querySelectorAll("#stats .stat3")];
+  const fmt = n => n.dataset.to2 ? (k => `${Math.round(+n.dataset.to * k)}–${Math.round(+n.dataset.to2 * k)}%`) : (k => Math.round(+n.dataset.to * k) + "%");
+  return { set(p) {
+    items.forEach((it, i) => {
+      const a = .1 + i * .27, n = it.querySelector(".n");
+      if (flat || still) { it.style.opacity = ""; it.style.transform = ""; n.textContent = fmt(n)(1); return; }
+      const k = ease(win(p, a, a + .08));                              // in
+      it.style.opacity = k; it.style.transform = `translateY(${(1 - k) * 36}px)`;
+      n.textContent = fmt(n)(ease(win(p, a, a + .2)));                  // and counting
+    });
+  } };
+})();
+
 /* ---------- scroll-driven scenes ---------- */
 const tasksEl = $("#tasks");
 const heroEl = $("#hero"), heroType = $("#heroType"), heroEnd = $("#heroEnd"), heroBtns = $("#heroBtns");
@@ -1120,6 +1155,7 @@ hero.onFrame((p, s) => {
 function onScroll() {
   hero.set(progress(heroEl));
   tasks.set(progress(tasksEl));        /* beyond code: one stop per slice of the scroll */
+  stats.set(progress($("#stats")));
 }
 let ticking = false;
 addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(() => { onScroll(); ticking = false; }); } }, { passive: true });

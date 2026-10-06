@@ -57,6 +57,9 @@ test("mappable files: source extensions outside ignored folders, no lockfiles", 
   assert.equal(isMappableRel("src/logo.png"), false);
   assert.equal(isMappableRel("app.vue"), true);
   assert.equal(isMappableRel("Sources/App/ContentView.swift"), true);
+  for (const f of ["Dockerfile", "docker/Dockerfile.dev", "Makefile", "CMakeLists.txt", "src/a.cxx", "include/a.hh", "Cargo.toml", "docker-compose.yml", "kernels/add.cu"]) assert.equal(isMappableRel(f), true, f);
+  assert.equal(isMappableRel("pnpm-lock.yaml"), false);
+  assert.equal(isMappableRel("notes.txt"), false);
   assert.equal(isMappableRel("../outside.ts"), false);
 });
 
@@ -332,6 +335,40 @@ test("the map cache keeps a bounded number of roots", async () => {
   } finally {
     svc.onModuleDestroy();
     for (const r of roots) rmSync(r, { recursive: true, force: true });
+    rmSync(projects, { recursive: true, force: true });
+  }
+});
+
+test("imports: C/C++ includes (next to the file, then by path suffix, not system headers) and Vue/Svelte script imports", async () => {
+  const root = tempRepo({
+    "src/main.cpp": '#include "net/socket.h"\n#include "util.hpp"\n#include <stdio.h>\n#include <engine/core.h>\nint main() {}\n',
+    "src/util.hpp": "#pragma once\n",
+    "include/net/socket.h": "#pragma once\n",
+    "include/engine/core.h": "#pragma once\n",
+    "kernels/add.cu": '#include "../src/util.hpp"\n',
+    "app.vue": "<template><Hero /></template>\n<script setup>\nimport Hero from './components/Hero.vue'\nimport { data } from './lib/site'\n</script>\n",
+    "components/Hero.vue": "<template><h1/></template>\n",
+    "lib/site.ts": "export const data = 1;\n",
+    "Dockerfile": "FROM node:22\n",
+  }, false);
+  const projects = mkdtempSync(join(tmpdir(), "bs-projects-"));
+  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { defaultRoot: root, claudeProjectsDir: projects } as never);
+  try {
+    const map = await svc.getMapAsync(root);
+    const rel = (p: string) => p.slice(root.length + 1);
+    const edges = map.edges.map((e) => `${rel(e.from)} -> ${rel(e.to)}`).sort();
+    assert.deepEqual(edges, [
+      "app.vue -> components/Hero.vue",
+      "app.vue -> lib/site.ts",
+      "kernels/add.cu -> src/util.hpp",
+      "src/main.cpp -> include/engine/core.h",
+      "src/main.cpp -> include/net/socket.h",
+      "src/main.cpp -> src/util.hpp",
+    ]);
+    assert.ok(map.files.some((f) => rel(f.path) === "Dockerfile"));
+  } finally {
+    svc.onModuleDestroy?.();
+    rmSync(root, { recursive: true, force: true });
     rmSync(projects, { recursive: true, force: true });
   }
 });

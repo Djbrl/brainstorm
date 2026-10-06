@@ -15,6 +15,10 @@ import { gitLastCommitTimes } from "./git-times";
 import { Batcher, ProjectWatcher, foldersToWatch } from "./watch";
 
 const JS_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
+/** Components whose <script> imports like JavaScript does. */
+const COMPONENT_EXT = new Set([".vue", ".svelte", ".astro"]);
+/** C and C++ (and CUDA, Arduino): their `#include`s. */
+const C_EXT = new Set([".c", ".h", ".cc", ".cpp", ".cxx", ".hh", ".hpp", ".hxx", ".ipp", ".inl", ".ino", ".cu", ".cuh", ".m", ".mm"]);
 /** Maps kept in memory, one per project root (the active one is never dropped). */
 const MAX_ROOTS = 4;
 /** Live changes are applied together, at most this long after the first one. */
@@ -88,7 +92,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
   private cache = new Map<string, Cached>();
   private inflight = new Map<string, Promise<Cached>>();
   /** Per file set: Java files by package path ("com/acme/Foo.java" → abs paths), Go files by folder. Dropped when the set changes. */
-  private indexes = new WeakMap<Set<string>, { java: Map<string, string[]>; goDirs: Map<string, string[]> }>();
+  private indexes = new WeakMap<Set<string>, { java: Map<string, string[]>; goDirs: Map<string, string[]>; headers: Map<string, string[]> }>();
   private goModules = new Map<string, { dir: string; module: string } | null>(); // folder → nearest go.mod
   private live?: Live;
   private activeClearTimers = new Map<string, NodeJS.Timeout>();
@@ -369,7 +373,15 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
       while ((m = re.exec(content))) specs.push(m[1]);
       return specs;
     }
-    if (JS_EXT.has(ext)) {
+    if (C_EXT.has(ext)) {
+      // #include "local.h" (searched from this file's folder first); #include <lib/x.h> only when it names a folder,
+      // so <stdio.h> isn't matched to a project file by chance. #import (Objective-C) the same.
+      const re = /^\s*#\s*(?:include|import)\s*(?:"([^"]+)"|<([^>]+\/[^>]+)>)/gm;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(content))) specs.push(m[1] !== undefined ? `q:${m[1]}` : `a:${m[2]}`);
+      return specs;
+    }
+    if (JS_EXT.has(ext) || COMPONENT_EXT.has(ext)) {
       const patterns = [
         /import\s+[^'"]*?from\s+['"]([^'"]+)['"]/g,
         /export\s+[^'"]*?from\s+['"]([^'"]+)['"]/g,
@@ -398,6 +410,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     if (ext === ".go") return this.resolveGo(fromFile, spec, fileSet);
     if (ext === ".rs") return this.resolveRust(fromFile, spec, fileSet);
     if (ext === ".java") return this.resolveJava(spec, fileSet);
+    if (C_EXT.has(ext)) return this.resolveInclude(fromFile, spec, fileSet);
     const one = this.resolveOne(fromFile, spec, fileSet);
     return one ? [one] : [];
   }
@@ -420,7 +433,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     const base = resolve(dirname(fromFile), spec);
     const candidates = [
       base,
-      `${base}.ts`, `${base}.tsx`, `${base}.js`, `${base}.jsx`, `${base}.mjs`, `${base}.cjs`,
+      `${base}.ts`, `${base}.tsx`, `${base}.js`, `${base}.jsx`, `${base}.mjs`, `${base}.cjs`, `${base}.vue`, `${base}.svelte`,
       join(base, "index.ts"), join(base, "index.tsx"), join(base, "index.js"), join(base, "index.jsx"),
     ];
     for (const cand of candidates) if (fileSet.has(cand)) return cand;
@@ -430,9 +443,18 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
   private index(fileSet: Set<string>) {
     let idx = this.indexes.get(fileSet);
     if (idx) return idx;
-    idx = { java: new Map(), goDirs: new Map() };
+    idx = { java: new Map(), goDirs: new Map(), headers: new Map() };
     for (const f of fileSet) {
-      if (f.endsWith(".java")) {
+      if (C_EXT.has(extname(f))) {
+        // Every suffix path too: "net/socket.h" finds src/net/socket.h whatever the include folders are.
+        const parts = f.split(sep);
+        for (let i = parts.length - 1; i >= 1; i--) {
+          const key = parts.slice(i).join("/");
+          const list = idx.headers.get(key) ?? [];
+          list.push(f);
+          idx.headers.set(key, list);
+        }
+      } else if (f.endsWith(".java")) {
         // Index every suffix path, so "com/acme/Foo.java" finds src/main/java/com/acme/Foo.java.
         const parts = f.split(sep);
         for (let i = parts.length - 1; i >= 1; i--) {
@@ -449,6 +471,22 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     }
     this.indexes.set(fileSet, idx);
     return idx;
+  }
+
+  /** C/C++: next to the including file first, else a project file ending with that path (the nearest one). */
+  private resolveInclude(fromFile: string, spec: string, fileSet: Set<string>): string[] {
+    const quoted = spec.startsWith("q:");
+    const path = spec.slice(2);
+    if (quoted) {
+      const local = resolve(dirname(fromFile), path);
+      if (fileSet.has(local)) return [local];
+    }
+    const found = this.index(fileSet).headers.get(path.replace(/^(\.\.?\/)+/, ""));
+    if (!found?.length) return [];
+    if (found.length === 1) return [found[0]];
+    // Several (include/x.h and vendor/x.h): the one sharing the longest folder prefix with the includer.
+    const score = (f: string) => { let i = 0; while (i < f.length && f[i] === fromFile[i]) i++; return i; };
+    return [found.reduce((a, b) => (score(b) > score(a) ? b : a))];
   }
 
   /** Go: an import inside this module ("<module path>/pkg/x") links to every file of that package folder. */

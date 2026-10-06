@@ -19,6 +19,16 @@ export const SOURCE_EXT = new Set([
   ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py", ".go", ".rs", ".java", ".md", ".json", ".css", ".html",
   ".vue", ".svelte", ".astro", ".scss", ".sass", ".less", ".swift", ".kt", ".kts", ".rb", ".php", ".c", ".h", ".cc", ".cpp",
   ".hpp", ".cs", ".m", ".mm", ".dart", ".scala", ".ex", ".exs", ".lua", ".sh", ".sql",
+  // More C and C++ (CUDA, Arduino, inline headers), other languages, build and config files (6 Oct 2026).
+  ".cxx", ".hh", ".hxx", ".ipp", ".inl", ".ino", ".cu", ".cuh", ".zig", ".nim", ".hs", ".ml", ".mli", ".clj", ".cljs",
+  ".erl", ".hrl", ".r", ".jl", ".pl", ".pm", ".ps1", ".bash", ".zsh", ".fish", ".toml", ".yml", ".yaml", ".proto",
+  ".graphql", ".gql", ".tf", ".hcl", ".nix", ".cmake", ".gradle", ".groovy", ".mk", ".dockerfile",
+]);
+/** Files known by their name, with no extension to go by: build, container and task files. */
+export const SOURCE_NAMES = new Set([
+  "Dockerfile", "Containerfile", "Makefile", "makefile", "GNUmakefile", "CMakeLists.txt", "Justfile", "justfile",
+  "Rakefile", "Gemfile", "Procfile", "Vagrantfile", "Jenkinsfile", "Brewfile", "BUILD", "BUILD.bazel", "WORKSPACE",
+  "meson.build", "Tiltfile", "Caddyfile",
 ]);
 /**
  * At most this many files on the map: the first scan picks them (see select.ts), new files may add a few more (see
@@ -38,7 +48,9 @@ export function isIgnoredDirName(name: string): boolean {
 
 /** A file name the map can show: a source extension, not a lockfile. */
 export function isSourceName(name: string): boolean {
-  return SOURCE_EXT.has(extname(name)) && !LOCKFILES.has(name);
+  if (LOCKFILES.has(name)) return false;
+  // Dockerfile.dev, Dockerfile.prod: still a Dockerfile.
+  return SOURCE_EXT.has(extname(name)) || SOURCE_NAMES.has(name) || /^(Dockerfile|Containerfile)\./.test(name);
 }
 
 const parts = (rel: string) => rel.split(/[\\/]/).filter((p) => p && p !== ".");

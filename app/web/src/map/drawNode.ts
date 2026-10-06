@@ -60,6 +60,8 @@ export type Frame = {
   tokens: Tokens; epoch: number; recorded: boolean; since: number;
   /** The replay layer's look for a file; the hovered or selected file (its import lines show); a thread is being traced. */
   look: (id: string) => Look | null; linkFocus: string | null; tracing: boolean;
+  /** The Git view's filter (gitFilter.ts): the files it shows, each with its ring colour, and the folders they're in; null: off. */
+  only: Map<string, string> | null; onlyDirs: Set<string> | null;
 };
 export type Dots = Map<string, { css: string; a: number; xyr: number[] }>;
 /** What lives as long as the map: ripples under way, the batches and buffers reused from frame to frame. */
@@ -243,7 +245,9 @@ export function drawFile(ctx: CanvasRenderingContext2D, n: GNode, scale: number,
   const look = lookOf(n, F);   // an open thread: its own footprint, the rest dimmed back
   if (look) { F.anyLook = true; F.lookSum += look.alpha * 3 + look.tone; }
   // Fading in as its folder opens, dimmed back by an open thread; the one you point at or picked shows in full.
-  const alpha = isHover || isSel ? 1 : (look?.alpha ?? 1) * shown;
+  // A git filter on: its files stay bright with a ring in its colour, the rest steps well back.
+  const ring = F.only?.get(n.id);
+  const alpha = isHover || isSel ? 1 : ring ? shown : (look?.alpha ?? 1) * shown * (F.only ? 0.18 : 1);
   ctx.globalAlpha = alpha;
   const plain = st.node !== "dot"; // themed files stay plain: no ripple or outlines, one mark where an agent is
 
@@ -321,17 +325,24 @@ export function drawFile(ctx: CanvasRenderingContext2D, n: GNode, scale: number,
     ctx.strokeStyle = active ? tokens.accent : tokens.ink;
     ctx.stroke();
   }
+  if (ring) {
+    ctx.beginPath();
+    ctx.arc(x, y, (st.node === "dot" ? r : r * 1.35) + 3.5 / scale, 0, TAU);
+    ctx.globalAlpha = shown; ctx.lineWidth = 2 / scale; ctx.strokeStyle = ring; ctx.stroke();
+    ctx.globalAlpha = alpha;
+  }
 
   // THE LABEL HOOK for the focus: the files in an open thread's recent window are named whatever their size (edits
   // first), every other file only when selected or pointed at; another thread's edit doesn't pull a dimmed file forward.
   const focusing = !!look && look.tone > 0.5, inFocus = focusing && !!look.named && look.alpha > 0.3;
-  const forced = isSel || isHover || (active && !focusing);
+  const named = !!ring && F.only!.size <= 80;   // a short git list: every file of it named
+  const forced = isSel || isHover || (active && !focusing) || named;
   if (forced || inFocus || (alpha >= 1 && (r * scale > 9 || scale > 3.2))) {
     // Queued (the label is built in labelFor for the most important ones only), drawn after every file: a
     // neighbour's circle never covers a name. The one you point at wins, then the selected one, then where an
     // agent works, then the focus (its edits first), then the biggest.
     F.labN.push(n);
-    F.labP.push((isHover ? 4e6 : 0) + (isSel ? 2e6 : 0) + (active && !focusing ? 1e6 : 0) + (inFocus ? (look!.edited ? 6e5 : 5e5) : 0) + r);
+    F.labP.push((isHover ? 4e6 : 0) + (isSel ? 2e6 : 0) + (active && !focusing ? 1e6 : 0) + (named ? 8e5 : 0) + (inFocus ? (look!.edited ? 6e5 : 5e5) : 0) + r);
   }
 }
 
@@ -350,7 +361,7 @@ function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: F
   const look = lookOf(n, F);
   if (look) { F.anyLook = true; F.lookSum += look.alpha * 3 + look.tone; }
   // A thread's focus dims folders less than files: they're the lay of the land around what it did.
-  const dim = look ? 0.5 + 0.5 * look.alpha : 1, alpha = dim * shown;
+  const dim = (look ? 0.5 + 0.5 * look.alpha : 1) * (F.only && !F.onlyDirs?.has(n.id) ? 0.25 : 1), alpha = dim * shown;
   // Open: the outline, and a breath of fill so folders inside folders read as levels.
   if (open > 0) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, TAU);
@@ -425,7 +436,7 @@ export function labelFor(n: GNode, prio: number, F: Frame): QueuedLabel {
   const ringR = n.dir ? r : Math.max(reachOf(r, active, st), isSel || isHover ? (st.node === "dot" ? r : r * 1.35 + 2 / scale) : 0);
   return {
     text: (n.bn ??= n.dir ? folderName(n) : baseName(n.id)), x, y: y + ringR + 3 / scale, size: fs, scale,
-    alpha: isSel || isHover ? 1 : (inFocus ? Math.max(alpha, 0.8) : alpha) * (n.said ?? 1) * (n.dir ? Math.max(0, 1 - (n.open ?? 0) * 3) : 1),
+    alpha: isSel || isHover || F.only?.has(n.id) ? 1 : (inFocus ? Math.max(alpha, 0.8) : alpha) * (n.said ?? 1) * (n.dir ? Math.max(0, 1 - (n.open ?? 0) * 3) : 1),
     at: { id: n.id, x, y, r: ringR }, must: isSel || isHover,
     weight: isSel || (active && !focusing) ? 600 : 500, family: st.labelFont ?? tokens.body,
     ink: isSel || (active && !focusing) || isHover || (inFocus && look!.edited) ? st.fileInk : st.fileInkQuiet, halo: st.halo,

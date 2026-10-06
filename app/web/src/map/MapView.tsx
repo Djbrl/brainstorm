@@ -22,7 +22,7 @@ import { useSelectedFile } from "./useSelectedFile";
 import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
 import { makeFileResolver } from "../lib/paths";
 import { clearTextWidths, drawQueuedLabels, LabelSpace, type QueuedLabel } from "./labels";
-import { useCamera, type Camera } from "./camera";
+import { boxOf, useCamera, type Camera } from "./camera";
 import { FitButton } from "./FitButton";
 import { useTheme } from "../lib/theme";
 import { mapStyle, settleLandings } from "./themes";
@@ -31,6 +31,7 @@ import { createRedraw, Motion } from "./redraw";
 import { css, readTokens } from "./color";
 import { hitAt, nodeReach, shownLinks, stepTween, useGraph, type GLink, type GNode } from "./graph";
 import { foldFrame, openAround, useFoldOn } from "./fold";
+import { filterFiles, filterName, setGitFilter, useGitFilter } from "./gitFilter";
 import { drawFile, drawFocusLinks, drawFolderNames, drawLinks, FILE_LABELS_MAX, flushDots, labelFor, lookOf, moreMotion, newCaches, RIPPLE_MS, type Frame } from "./drawNode";
 import { useMapCamera } from "./useMapCamera";
 import { useLiveAgents } from "./useLiveAgents";
@@ -184,11 +185,34 @@ export function MapView() {
 
   // The folders that show open at any zoom: around the selected file, the one a link focuses, what the thread showed
   // and where a followed agent worked (agents at work are added per frame).
+  // ---- the Git view's filter (gitFilter.ts, sidebar/GitPanel.tsx): its files by id, their ring colours and folders ----
+  const gitState = state.git, gitFilter = useGitFilter();
+  const only = useMemo(() => {
+    const byRel = filterFiles(gitState, gitFilter);
+    if (!byRel || !map) return { files: null, dirs: null, nodes: [] as GNode[] };
+    const base = map.root.replace(/\/+$/, ""), files = new Map<string, string>(), dirs = new Set<string>(), nodes: GNode[] = [];
+    for (const [rel, colour] of byRel) {
+      const n = nodeIndex.get(`${base}/${rel}`);
+      if (!n) continue;
+      files.set(n.id, colour); nodes.push(n);
+      for (let u = n.up; u; u = u.up) dirs.add(u.id);
+    }
+    return { files, dirs, nodes };
+  }, [gitState, gitFilter, map?.root, nodeIndex]);
+  const onlyRef = useRef(only); onlyRef.current = only;
+  // Turning one on frames its files (their folders open: pinned below).
+  useEffect(() => {
+    if (!only.nodes.length) return;
+    const b = boxOf(only.nodes);
+    if (b) camRef.current.frame(b, { pad: 60, maxZoom: 2.4 }, 700);
+  }, [gitFilter]);   // eslint-disable-line react-hooks/exhaustive-deps
+
   const pinned = useMemo(() => {
     const set = new Set<GNode>();
     for (const f of [selected, focusFile, ...watched.files]) if (f) openAround(nodeIndex.get(f), set);
+    if (only.nodes.length <= 400) for (const n of only.nodes) openAround(n, set);
     return set;
-  }, [nodeIndex, selected, focusFile, watched.files]);
+  }, [nodeIndex, selected, focusFile, watched.files, only]);
   const pinnedRef = useRef(pinned); pinnedRef.current = pinned;
 
   // ---- what drawing keeps between frames (drawNode.ts) ----
@@ -230,7 +254,7 @@ export function MapView() {
   // ---- the frame ----
   const frame = useRef<Frame>({ id: 0, scale: 1, x0: -Infinity, y0: -Infinity, x1: Infinity, y1: Infinity, now: 0, t: 0, st: style,
     sel: null, hover: null, coolCss: "", looks: true, anyLook: false, lookSum: 0, motion: Motion.None, linksDone: false, labN: [], labP: [],
-    tokens, epoch: 0, recorded: recorded(), since: sinceMs, look: () => null, linkFocus: null, tracing: false });
+    tokens, epoch: 0, recorded: recorded(), since: sinceMs, look: () => null, linkFocus: null, tracing: false, only: null, onlyDirs: null });
   const lastLookSum = useRef(0);
   const vis = useRef({ sig: 0, ver: 0 });   // what's open (fold.ts), and a counter bumped when it or the positions change
   const linkCache = useRef<{ key: string; links: GLink[]; g: typeof graph | null }>({ key: "", links: [], g: null });
@@ -241,6 +265,7 @@ export function MapView() {
     F.sel = selectedRef.current; F.hover = hoverRef.current; F.coolCss = css(tokensRef.current.cool);
     F.tokens = tokensRef.current; F.epoch = epoch.current; F.look = replayRef.current.look;
     F.linkFocus = linkFocusRef.current; F.tracing = replayRef.current.tracing;
+    F.only = onlyRef.current.files; F.onlyDirs = onlyRef.current.dirs;
     spriteFrame();
     // Off-screen files aren't drawn: the part of the map the camera shows, in graph units.
     const a = g?.screen2GraphCoords(0, 0), b = g?.screen2GraphCoords(w, h);
@@ -355,7 +380,7 @@ export function MapView() {
   const footprintKey = fp ? `${fp.length}|${fp[0] ?? ""}|${fp[fp.length - 1] ?? ""}` : "";
   // Anything that changes the picture: one frame (the frame itself says if more must follow).
   useEffect(() => { redraw.kick(); }, [redraw, graph, map?.files, drawnAgents, waiting, followId, hover, selected, tokens, theme, replay,
-    replayLayer.active, replayLayer.tracing, replayLayer.footprintMode, showReads, stepWindow, footprintKey, size.w, size.h]);
+    replayLayer.active, replayLayer.tracing, replayLayer.footprintMode, showReads, stepWindow, footprintKey, size.w, size.h, only]);
   // A replay step: the tracer glides, a read flashes, an edit pulses (up to about a second).
   useEffect(() => { redraw.kick(1300); }, [redraw, replay?.index, replay?.sessionId, replay?.mode]);
   // A new agent position, error or activity: its glide, flash or pulse plays out (drawAgents), the frame keeps them coming.
@@ -451,6 +476,12 @@ export function MapView() {
       <LensSwitch />
       {graph.nodes.length > 0 && <FitButton onFit={fitNow} label={replay ? "Fit the thread's files" : "Fit the whole project"} />}
 
+      {gitFilter && (
+        <div className="map-gitpill" role="status">
+          <span>{filterName(gitState, gitFilter)}: {only.nodes.length.toLocaleString()} {only.nodes.length === 1 ? "file" : "files"} on the map</span>
+          <button onClick={() => setGitFilter(null)}>Show everything</button>
+        </div>
+      )}
       <MapKey thread={!!replay} reads={showReads} imports={sel ? style.imports : null} />
       <Peek />
       <Dock>

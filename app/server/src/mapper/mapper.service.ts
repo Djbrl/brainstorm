@@ -555,7 +555,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     const folders = foldersToWatch(root, c.byPath.keys());
     const live: Live = {
       root, folders, pending: new Set(), running: false,
-      batch: new Batcher<string>(BATCH_MS, (paths) => this.enqueue(live, paths)),
+      batch: new Batcher<string>(BATCH_MS, (paths) => { this.enqueue(live, paths); this.bus.emit("files-changed", { root }); }),
       watcher: new ProjectWatcher(root, (p) => live.batch.add(p), (m) => this.log.warn(m)),
     };
     live.watcher.start(folders);

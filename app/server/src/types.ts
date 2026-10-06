@@ -30,7 +30,21 @@ export type WsMessage =
   | { type: "map"; map: ProjectMap }
   | { type: "agent"; agent: AgentPresence }
   | { type: "attention"; attention: Attention }
-  | { type: "setup"; status: SetupStatus };
+  | { type: "setup"; status: SetupStatus }
+  | { type: "git"; git: GitState | null };
+
+/**
+ * The project's git state (GET /api/git + ws "git"); null when the project isn't in a git repo. Paths are relative to
+ * the map's root, "/"-separated.
+ * - `uncommitted`: files changed and not committed in the project's checkout (staged or not), and untracked new files.
+ * - `unpushed`: files changed by commits not on the upstream branch yet (`ahead` of them); null with no upstream.
+ * - `worktrees`: the repo's other checkouts (where agents usually work), each on its branch: what it committed that the
+ *   checkout's branch doesn't have (`committed`, `ahead` commits; `merged` once there are none) and what it hasn't
+ *   committed yet; `threads`, the threads working in it (newest first).
+ */
+export type GitFileState = "modified" | "added" | "deleted" | "renamed" | "untracked" | "conflict";
+export type GitWorktree = { path: string; branch: string; ahead: number; merged: boolean; committed: string[]; uncommitted: Record<string, GitFileState>; threads: string[]; lastCommitAt?: string };
+export type GitState = { root: string; branch: string | null; upstream?: string; ahead: number; behind: number; uncommitted: Record<string, GitFileState>; unpushed: string[] | null; worktrees: GitWorktree[]; at: string };
 
 /** Workspace setup (local app). GET /api/workspace, GET /api/workspace/suggestions, POST /api/workspace {root}. */
 export type SetupStepState = "pending" | "running" | "done" | "warn" | "error";

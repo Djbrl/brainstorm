@@ -37,6 +37,8 @@ Everything runs on the user's machine. The only network calls are to the two mod
 | Failures | `failures/` | `GET /api/failures`: finds failing tool calls, groups them, ranks them, has Nemotron name each group |
 | Replay | `replay/` | `GET /api/replay`: exports sessions, steps, the map, saved answers and failures as one JSON file for the hosted demo |
 | Shots | `shots/` | `GET /api/tasks/shot/:stepId/:idx`: screenshots that tools returned, read from the session logs into the database, for the step panel. Never part of a replay |
+| Git | `git/` | `GET /api/git` + ws `git`: the project's branch, ahead/behind its upstream, files not committed and not pushed, and the repo's other checkouts (worktrees) with what each has committed that your branch doesn't, what it hasn't committed, and the threads working there. Plain git commands (a status is 20–40 ms), worked out again a moment after the mapper sees files change, a step arrives or the repo's refs change; `git status` runs without optional locks so it never wakes its own watch |
+| Open | `open/` | `POST /api/open`: opens a file in the app the computer uses for it (Settings, "Open files in"). JSON from a local origin only; text and code files inside the project or a thread's folder; never a file a default app would run |
 
 Modules talk through the bus and a few public service methods, such as `ListenerService.getStep`, `stepsBefore`, `updateStep` and `unlabeledSteps`, and `ReaderService.getFileSummary`. That split let four agents build them in parallel.
 

@@ -17,7 +17,7 @@
 // (layout, path resolvers, the file tree) key memos on `state.structureVersion` instead.
 import { installSetupShim, startAgentPlayback } from "./preview";
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
-import type { AgentPresence, Attention, AskRequest, AskResponse, Edge, FileNode, SetupStatus, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
+import type { AgentPresence, Attention, AskRequest, AskResponse, Edge, FileNode, GitState, SetupStatus, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
 import { listeners, shallowEqual, useStoreSelector } from "./store";
 
 export { shallowEqual };
@@ -40,6 +40,7 @@ export type LiveState = {
   shared: Replay["shared"] | null;       // a replay file someone shared from their Brainstorm
   attention: Record<string, Attention>;  // by sessionId: is a thread waiting on you (local app only)
   sessionsLoaded: boolean;               // the thread list has arrived (so a thread missing from it really is missing)
+  git: GitState | null;                  // the project's branch, uncommitted and unpushed files, worktrees (null: not a repo, or not loaded)
 };
 
 type Action =
@@ -54,7 +55,7 @@ type Action =
   | { type: "replay"; data: Replay }
   | WsMessage;
 
-const initial: LiveState = { connected: false, replay: false, sessions: [], steps: {}, map: null, structureVersion: 0, agents: {}, setup: null, preview: false, shared: null, attention: {}, sessionsLoaded: false };
+const initial: LiveState = { connected: false, replay: false, sessions: [], steps: {}, map: null, structureVersion: 0, agents: {}, setup: null, preview: false, shared: null, attention: {}, sessionsLoaded: false, git: null };
 
 /** Lookups kept beside the state, always for the store's current state. */
 type Indexes = {
@@ -163,8 +164,9 @@ function applyBatch(base: LiveState, actions: Action[], ix: Indexes): LiveState 
       case "attention-all": st().attention = Object.fromEntries(a.list.map((x) => [x.sessionId, x])); owned.add(s.attention); break;
       case "attention": (st().attention = own(s.attention, (o) => ({ ...o })))[a.attention.sessionId] = a.attention; break;
       case "setup-status": case "setup": st().setup = a.status; break;
+      case "git": st().git = a.git; break;
       case "reset":
-        Object.assign(st(), { sessions: [], steps: {}, map: null, agents: {}, attention: {}, sessionsLoaded: false, structureVersion: s.structureVersion + 1 });
+        Object.assign(st(), { sessions: [], steps: {}, map: null, agents: {}, attention: {}, sessionsLoaded: false, git: null, structureVersion: s.structureVersion + 1 });
         reindex(ix, s); sortNeeded = false; changedFrom.clear(); removed.clear();
         break;
       case "replay": {
@@ -300,6 +302,7 @@ function loadAll(dispatch: (a: Action) => void) {
   fetch("/api/map").then((r) => r.json()).then((map) => dispatch({ type: "map", map })).catch(() => {});
   fetch("/api/agents").then((r) => r.json()).then((agents) => dispatch({ type: "agents", agents })).catch(() => {});
   fetch("/api/attention").then((r) => r.json()).then((list) => Array.isArray(list) && dispatch({ type: "attention-all", list })).catch(() => {});
+  fetch("/api/git").then((r) => r.text()).then((t) => dispatch({ type: "git", git: t ? JSON.parse(t) : null })).catch(() => {});
 }
 
 const Ctx = createContext<LiveStore | null>(null);

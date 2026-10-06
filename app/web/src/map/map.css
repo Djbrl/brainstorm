@@ -109,3 +109,10 @@
   .map-fit { right: 12px; bottom: 84px; }
   .map-wrap:has(.map-panel.open) .map-fit { display: none; }
 }
+
+/* The Git view's filter on the map (MapView.tsx): what it shows, and the way back to everything. */
+.map-gitpill { position: absolute; top: 132px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 10px;
+  padding: 6px 6px 6px 14px; border-radius: 18px; border: 1px solid var(--line); background: var(--sheet, rgba(255,255,255,.92)); backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.07); font: 500 13px/1 var(--font-body); color: var(--ink); white-space: nowrap; }
+.map-gitpill button { border: 0; border-radius: 13px; padding: 6px 10px; background: var(--hover, rgba(0,0,0,.06)); color: var(--ink); font: inherit; cursor: pointer; }
+@media (max-width: 1100px) { .map-gitpill { top: 120px; } }

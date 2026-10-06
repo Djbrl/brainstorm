@@ -208,7 +208,7 @@ test("past the cap (BRAINSTORM_MAX_FILES): a spread of files, totalFiles counts 
   const before = process.env.BRAINSTORM_MAX_FILES;
   process.env.BRAINSTORM_MAX_FILES = "8";
   const svc = new MapperService(
-    { on: (ev: string, fn: (p: unknown) => void) => { handlers[ev] = fn; } } as never,
+    { on: (ev: string, fn: (p: unknown) => void) => { handlers[ev] = fn; }, emit() {} } as never,
     { broadcast: (m: WsMessage) => sent.push(m) } as never,
     { defaultRoot: root, claudeProjectsDir: projects } as never,
   );
@@ -259,7 +259,7 @@ test("live: changes are batched, imports re-resolve once, new and deleted files 
   const projects = mkdtempSync(join(tmpdir(), "bs-projects-"));
   const sent: WsMessage[] = [];
   const svc = new MapperService(
-    { on() {} } as never,
+    { on() {}, emit() {} } as never,
     { broadcast: (m: WsMessage) => sent.push(m) } as never,
     { defaultRoot: root, claudeProjectsDir: projects } as never,
   );
@@ -321,7 +321,7 @@ test("live: changes are batched, imports re-resolve once, new and deleted files 
 test("the map cache keeps a bounded number of roots", async () => {
   const projects = mkdtempSync(join(tmpdir(), "bs-projects-"));
   const roots = Array.from({ length: 6 }, (_, i) => tempRepo({ [`f${i}.ts`]: "" }, false));
-  const svc = new MapperService({ on() {} } as never, { broadcast() {} } as never, { defaultRoot: roots[0], claudeProjectsDir: projects } as never);
+  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { defaultRoot: roots[0], claudeProjectsDir: projects } as never);
   try {
     for (const r of roots) svc.getMap(r);
     const kept = roots.filter((r) => svc.getCached(r));

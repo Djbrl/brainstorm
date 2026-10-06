@@ -1,0 +1,8 @@
+{
+  "name": "landing",
+  "private": true,
+  "description": "The landing page, served as static files for local preview (Multiprise: rundown/landing). Vercel deploys this folder as is: no build.",
+  "scripts": {
+    "dev": "python3 -m http.server ${PORT:-4321}"
+  }
+}

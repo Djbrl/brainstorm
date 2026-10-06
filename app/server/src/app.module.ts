@@ -15,8 +15,9 @@ import { ShotsModule } from "./shots/shots.module";
 import { AttentionModule } from "./attention/attention.module";
 import { OpenModule } from "./open/open.module";
 import { GitModule } from "./git/git.module";
+import { ImageModule } from "./image/image.module";
 
 // Owned by the lead. Agents: don't edit; ask in docs/build-log.md "Requests".
 import { UsageModule } from "./usage/usage.module";
-@Module({ imports: [CoreModule, UsageModule, LlmModule, ListenerModule, MapperModule, ReaderModule, AskModule, ReplayModule, FailuresModule, WorkspaceModule, AgentsModule, CoworkModule, ShotsModule, AttentionModule, OpenModule, GitModule], controllers: [HealthController] })
+@Module({ imports: [CoreModule, UsageModule, LlmModule, ListenerModule, MapperModule, ReaderModule, AskModule, ReplayModule, FailuresModule, WorkspaceModule, AgentsModule, CoworkModule, ShotsModule, AttentionModule, OpenModule, GitModule, ImageModule], controllers: [HealthController] })
 export class AppModule {}

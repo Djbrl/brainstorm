@@ -101,7 +101,7 @@ function Body({ step, result }: { step: Step; result?: Step }) {
   if (numbered) return <Code key={step.id} start={numbered.start} lines={numbered.lines} path={step.filePath} />;
   if (text) return <Code key={step.id} start={1} lines={lines(text)} path={step.filePath} />;
   // An image or a PDF comes back as a picture for the model, not text: nothing to show here, but it isn't empty.
-  if (IMAGE.test(step.filePath ?? "")) return <div className="peek-image"><Shots key={result.id} resultId={result.id} label="Image" /></div>;
+  if (IMAGE.test(step.filePath ?? "")) return <div className="peek-image"><Shots key={result.id} resultId={result.id} label="Image" path={step.filePath} /></div>;
   return <p className="peek-muted">{/\.pdf$/i.test(step.filePath ?? "") ? "A PDF: open the step to see what was read." : "Empty file."}</p>;
 }
 

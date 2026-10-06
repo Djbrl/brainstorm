@@ -182,6 +182,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 08:30 (6 Oct) [mapper, listener] More of a project on the map: C/C++ variants (cxx, hh, CUDA, Arduino), Zig, Haskell, OCaml, Clojure, Erlang, R, Julia, Perl, PowerShell, shells, TOML/YAML, protobuf, GraphQL, Terraform, Nix, Gradle, and Dockerfile, Makefile, CMakeLists.txt and other files known by name; C/C++ `#include` lines and Vue/Svelte/Astro script imports are import lines. Files an agent changes through a shell command (sed -i, a Python script, a redirect, mv, rm) are edits of its thread now, for Claude Code and Codex: from the command in history, with the diff the mapper saw live (`listener/command-writes.ts`, `command-edits.ts`, `line-diff.ts`; the mapper keeps compressed copies of the files it maps). On the real Codex logs: the dev_portfolio refactor thread went from "Changed no files" to 2. 119/119 server tests.
 
+- 09:20 (6 Oct) [codex] A subagent Codex starts is part of its parent's thread (its steps as a subagent's, like Claude Code's); a command answered after a restart keeps its call (the file is scanned once); log sources have a version, and a new Codex reader reads Codex's threads again from the start. On this machine almost every Codex "subagent" is an approval reviewer (hidden); 3 real ones. 122/122 server tests.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

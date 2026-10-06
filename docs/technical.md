@@ -86,7 +86,7 @@ Codex's actions are stored under Claude Code's tool names, so every view works u
 | `view_image` / `ImageView` | `Read` of the image |
 | `event_msg task_complete` | not a step: a live "turn-ended" on the bus, which attention reads like Claude Code's Stop hook |
 
-Codex logs each finished item once (`event_msg item_completed`); before 0.149 commands were only in the model's records (`response_item` function calls, or `tools.exec_command(...)` inside `exec` scripts), so those fill in what no item covers, without duplicates. Codex's approval-reviewer threads ("guardian") are left out. The workspace picker lists Codex's projects too (`CodexSource.projects`).
+Codex logs each finished item once (`event_msg item_completed`); before 0.149 commands were only in the model's records (`response_item` function calls, or `tools.exec_command(...)` inside `exec` scripts), so those fill in what no item covers, without duplicates. Codex's approval-reviewer threads ("guardian") are left out. A subagent Codex starts (`thread_source: "subagent"`, `parent_thread_id`) is part of its parent's thread: its steps are stored there as a subagent's (`isSubagent`, `agentId` = its own thread id), like Claude Code's, and its task never titles the thread. A file read from the middle after a restart finds a call made before by one scan of the file when its answer arrives. Each source has a `version`: when what a line becomes changes, the threads stored from that source are dropped and its logs read again (`source_versions`). The workspace picker lists Codex's projects too (`CodexSource.projects`).
 - **Which logs are read:** only project folders whose name contains `SESSION_FILTER`, and only files changed in the last 24 hours.
 
 ## Contract

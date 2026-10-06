@@ -145,6 +145,11 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     db.exec(`UPDATE steps SET kind = 'text' WHERE kind = 'prompt' AND text LIKE 'This session is being continued from a previous conversation%'`);
     this.st = this.prepare();
 
+    const warn = (e: Error) => this.log.warn(`watcher error: ${e.message}`);
+    this.codex = new CodexSource(this.cfg.codexDir, warn);
+    this.sources = [new ClaudeSource(this.cfg.claudeProjectsDir, warn), this.codex];
+    this.rereadChangedSources();
+
     for (const row of db.prepare(`SELECT file, offset FROM listener_offsets`).all() as { file: string; offset: number }[]) {
       this.offsets.set(row.file, row.offset);
     }
@@ -160,9 +165,6 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     this.bus.on("workspace", ({ root }) => this.onWorkspaceChanged(root));
     this.bus.on("file-content", (c) => this.commandEdits.fileChanged(c));
 
-    const warn = (e: Error) => this.log.warn(`watcher error: ${e.message}`);
-    this.codex = new CodexSource(this.cfg.codexDir, warn);
-    this.sources = [new ClaudeSource(this.cfg.claudeProjectsDir, warn), this.codex];
     let waiting = this.sources.length;
     for (const source of this.sources) {
       source.watch(this.scope(), {
@@ -175,6 +177,33 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
           this.log.log(`watching ${this.cfg.claudeProjectsDir} and ${this.cfg.codexDir} live (${this.sessionFilterOverride ? `filter="${this.sessionFilterOverride}"` : `roots: ${this.roots.join(", ")}`})`);
         },
       });
+    }
+  }
+
+  /** A source whose reading changed since its threads were stored (its `version`) has them read again: its threads and
+   * steps are dropped and its files read from the start (in the background, like any history). */
+  private rereadChangedSources() {
+    const db = this.dbs.db;
+    db.exec(`CREATE TABLE IF NOT EXISTS source_versions (harness TEXT PRIMARY KEY, version INTEGER NOT NULL)`);
+    for (const source of this.sources) {
+      if (source.version === undefined) continue;
+      const row = db.prepare(`SELECT version FROM source_versions WHERE harness = ?`).get(source.harness) as { version: number } | undefined;
+      if (row?.version === source.version) continue;
+      const files = (db.prepare(`SELECT file FROM listener_offsets`).all() as { file: string }[]).map((r) => r.file).filter((f) => source.owns(f));
+      const ids = (db.prepare(`SELECT id FROM sessions WHERE harness = ?`).all(source.harness) as { id: string }[]).map((r) => r.id);
+      db.exec("BEGIN");
+      try {
+        db.prepare(`DELETE FROM steps WHERE session_id IN (SELECT id FROM sessions WHERE harness = ?)`).run(source.harness);
+        const gone = db.prepare(`DELETE FROM sessions WHERE harness = ?`).run(source.harness).changes;
+        const del = db.prepare(`DELETE FROM listener_offsets WHERE file = ?`);
+        for (const f of files) del.run(f);
+        db.prepare(`INSERT INTO source_versions (harness, version) VALUES (?, ?) ON CONFLICT(harness) DO UPDATE SET version = excluded.version`).run(source.harness, source.version);
+        db.exec("COMMIT");
+        for (const id of ids) this.nextSeq.delete(id);
+        for (const f of files) this.offsets.delete(f);
+        this.sessionsCache = null;
+        if (gone) this.log.log(`${source.harness}: its logs are read differently now: ${gone} thread(s) read again`);
+      } catch (e) { db.exec("ROLLBACK"); throw e; }
     }
   }
 

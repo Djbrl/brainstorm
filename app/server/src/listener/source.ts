@@ -39,6 +39,8 @@ export interface WatchEvents {
 
 export interface LogSource {
   readonly harness: Harness;
+  /** Bumped when what a line becomes changes: the threads stored from this source's logs are read again. */
+  readonly version?: number;
   /** Start watching the logs of `scope`. */
   watch(scope: Scope, on: WatchEvents): void;
   /** The project changed: watch its logs from now on (the listener backfills them right after). */

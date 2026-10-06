@@ -436,3 +436,58 @@ test("the workspace picker's Codex projects: a Codex worktree counts as its repo
   rmSync(repo, { recursive: true, force: true });
   await t.close();
 });
+
+test("a subagent Codex starts is part of its parent's thread, as a subagent's steps; its task doesn't title the thread", async () => {
+  const t = await makeListener();
+  const parent = uuid(), child = uuid();
+  const p = codex(parent);
+  file(t, parent, [p.meta(), ...p.turn(), p.item({ type: "UserMessage", id: uuid(), content: [{ type: "text", text: "audit the repo" }] })]);
+  const c = codex(child, { extra: { parent_thread_id: parent, thread_source: "subagent", session_id: parent } });
+  const cf = file(t, child, [c.meta(), ...c.turn(), c.item({ type: "UserMessage", id: uuid(), content: [{ type: "text", text: "check the auth module" }] }),
+    c.item({ type: "AgentMessage", id: uuid(), content: [{ type: "Text", text: "Auth looks fine." }] }), c.raw("event_msg", { type: "task_complete", turn_id: "turn-1" })]);
+  // The child first (newest first in history): it mustn't title the parent.
+  await t.readNow(cf, true);
+  await t.readNow(join(t.cfg.codexDir, "sessions", "2026", "10", "01", `rollout-2026-10-01T12-00-00-${parent}.jsonl`), true);
+  const threads = t.listener.listSessions();
+  assert.deepEqual(threads.map((s) => s.id), [parent]);
+  assert.equal(threads[0].title, "audit the repo");
+  const subs = t.listener.listSteps(parent).filter((s) => s.isSubagent);
+  assert.deepEqual(subs.map((s) => [s.kind, s.agentId]), [["prompt", child], ["text", child]]);
+  assert.deepEqual([...t.listener.codexProjects().values()][0].map((x) => x.id), [parent, parent]);
+  await t.close();
+});
+
+test("after a restart mid-call, a command's output still finds its call (one scan of the file)", async () => {
+  const t = await makeListener();
+  const id = uuid();
+  const c = codex(id, { version: "0.140.0" });
+  const f = file(t, id, [c.meta(), ...c.turn(), c.ri({ type: "function_call", call_id: "call_r1", name: "shell_command", arguments: JSON.stringify({ command: "npm run build", workdir: ROOT }) })]);
+  await t.readNow(f, true);
+  t.listener.codex.states.clear(); // as after a restart: nothing remembered of the file
+  appendFileSync(f, jsonl([c.ri({ type: "function_call_output", call_id: "call_r1", output: "Exit code: 0\nWall time: 3 seconds\nOutput:\nbuilt\n" })]));
+  await t.readNow(f, true);
+  const steps = t.listener.listSteps(id);
+  const call = steps.find((s) => s.kind === "tool_call" && s.tool === "Bash");
+  assert.ok(call, "the command is stored");
+  assert.equal(call.input.command, "npm run build");
+  assert.ok(steps.some((s) => s.kind === "tool_result" && s.toolUseId === call.toolUseId && /built/.test(s.text)));
+  await t.close();
+});
+
+test("when the Codex reader's version changes, its threads are read again from the start; Claude's stay", async () => {
+  const t = await makeListener();
+  const id = uuid();
+  const c = codex(id);
+  const f = file(t, id, [c.meta(), ...c.turn(), c.item({ type: "UserMessage", id: uuid(), content: [{ type: "text", text: "hello codex" }] })]);
+  await t.readNow(f, true);
+  writeFileSync(join(t.projectDir, "s1.jsonl"), jsonl([line("prompt", { sessionId: "s1", cwd: ROOT, i: 0, text: "hello claude" })]));
+  await t.readNow(join(t.projectDir, "s1.jsonl"), true);
+  assert.equal(t.listener.listSessions().length, 2);
+  t.dbs.db.prepare("UPDATE source_versions SET version = 1 WHERE harness = 'codex'").run();
+  t.listener.rereadChangedSources();
+  assert.deepEqual(t.listener.listSessions().map((s) => s.harness), ["claude"]);
+  assert.equal(t.dbs.db.prepare("SELECT COUNT(*) AS n FROM listener_offsets WHERE file = ?").get(f).n, 0, "read again from the start");
+  await t.readNow(f, true);
+  assert.equal(t.listener.listSessions().length, 2);
+  await t.close();
+});

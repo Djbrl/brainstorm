@@ -34,6 +34,8 @@ type Meta = {
   version: number;
   /** Codex's approval reviewer ("guardian"): a subagent judging another thread's commands, not work to show. */
   reviewer: boolean;
+  /** A subagent's thread: the thread that started it. Its steps go in that thread, as a subagent's (like Claude Code's). */
+  parent?: string;
 };
 
 type Call = { name: string; args: any; ts: string; turnId?: string };
@@ -64,6 +66,9 @@ type FileState = {
   ceScanned?: boolean;
   /** The last question asked, for an answer that doesn't say which. */
   lastAsk?: string;
+  /** Read from the middle after a restart: the calls made before, found by one scan of the file when an answer to one
+   * arrives (else that step would be lost). */
+  earlier?: Map<string, Call>;
 };
 
 const ITEMS_SINCE = 94;
@@ -78,6 +83,8 @@ const within = (p: string, root: string) => p === root || p.startsWith(root.ends
 
 export class CodexSource implements LogSource {
   readonly harness = "codex" as const;
+  /** 2 (6 Oct 2026): subagents inside their parent's thread; calls answered after a restart kept. */
+  readonly version = 2;
   private watcher?: FSWatcher;
   private scope: Scope = { roots: [] };
   /** First lines, per file (they never change). Null: unreadable or not a rollout. */
@@ -141,7 +148,7 @@ export class CodexSource implements LogSource {
         root = main;
       }
       const list = out.get(root) ?? out.set(root, []).get(root)!;
-      list.push({ id: meta.id, mtimeMs: f.mtimeMs });
+      list.push({ id: meta.parent ?? meta.id, mtimeMs: f.mtimeMs }); // a subagent is part of its parent's thread
     }
     return out;
   }
@@ -188,8 +195,12 @@ export class CodexSource implements LogSource {
       const o = JSON.parse(line) as { type?: string; payload?: any };
       const p = o.payload ?? {};
       if (o.type === "session_meta") {
+        const id = str(p.id) ?? str(p.session_id) ?? UUID.exec(file)?.[1] ?? basename(file, ".jsonl");
+        const parent = str(p.parent_thread_id);
+        const spawned = p.thread_source === "subagent" || (!!p.source?.subagent && p.source.subagent.other !== "guardian");
         meta = {
-          id: str(p.id) ?? str(p.session_id) ?? UUID.exec(file)?.[1] ?? basename(file, ".jsonl"),
+          id,
+          ...(spawned && parent && parent !== id ? { parent } : {}),
           cwd: str(p.cwd) ?? "",
           roots: Array.isArray(p.runtime_workspace_roots) ? p.runtime_workspace_roots.filter((r: unknown) => typeof r === "string") : [],
           repoUrl: str(p.git?.repository_url),
@@ -259,7 +270,7 @@ export class CodexSource implements LogSource {
     const meta = this.metaOf(file);
     if (!meta) return null;
     const fileId = UUID.exec(file)?.[1] ?? meta.id;
-    st = { file, meta, sessionId: meta.id, fileId, fromStart: line.type === "session_meta", cwd: meta.cwd, calls: new Map(), patched: new Set() };
+    st = { file, meta, sessionId: meta.parent ?? meta.id, fileId, fromStart: line.type === "session_meta", cwd: meta.cwd, calls: new Map(), patched: new Set() };
     this.states.set(file, st);
     return st;
   }
@@ -278,7 +289,7 @@ export class CodexSource implements LogSource {
         return;
       case "event_msg":
         if (p.type === "task_started") { st.turnId = str(p.turn_id); st.turnStart = ts; }
-        else if (p.type === "task_complete") sink.turnEnded(st.meta.id); // "Your turn" (attention), live only
+        else if (p.type === "task_complete" && !st.meta.parent) sink.turnEnded(st.sessionId); // "Your turn" (attention), live only; a subagent finishing isn't
         else if (p.type === "item_completed" && p.item && typeof p.item === "object") { st.items = true; this.item(at, p.item, str(p.turn_id)); }
         return;
       case "response_item":
@@ -435,8 +446,14 @@ export class CodexSource implements LogSource {
     }
     if (p.type === "function_call_output" || p.type === "custom_tool_call_output") {
       const callId = str(p.call_id);
-      const call = callId ? st.calls.get(callId) : undefined;
-      if (!callId || !call) return; // a call stored by an item, or made before a restart
+      let call = callId ? st.calls.get(callId) : undefined;
+      if (callId && !call && !st.fromStart) {
+        // Read from the middle after a restart: the call may be before where reading resumed.
+        st.earlier ??= earlierCalls(st.file, (name) => !items || OWN_CALLS.has(name));
+        call = st.earlier.get(callId);
+        st.earlier.delete(callId);
+      }
+      if (!callId || !call) return; // a call stored by an item
       st.calls.delete(callId);
       return this.finish(at, callId, call, p.output);
     }
@@ -582,8 +599,10 @@ export class CodexSource implements LogSource {
 
   private emit(at: At, s: { id: string; kind: StepKind } & Partial<NewStep>, title?: string) {
     const st = at.st;
-    const step = { ...s, sessionId: st.sessionId, ts: at.ts, isSubagent: false } as NewStep;
-    at.sink.step(step, { cwd: this.threadCwd(st), ...(s.kind === "prompt" && title ? { promptTitle: title } : {}) });
+    const sub = st.meta.parent ? { isSubagent: true, agentId: st.meta.id } : { isSubagent: false };
+    const step = { ...s, sessionId: st.sessionId, ts: at.ts, ...sub } as NewStep;
+    // A subagent's task never titles its parent's thread.
+    at.sink.step(step, { cwd: this.threadCwd(st), ...(s.kind === "prompt" && title && !st.meta.parent ? { promptTitle: title } : {}) });
   }
 
   /** Where the thread works, for its row: the folder of this turn (in the repo's main checkout), else the first of the
@@ -644,6 +663,42 @@ function fileHas(file: string, needle: string): boolean {
       pos += got - n.length; // a match across the cut
     }
   } catch { return false; } finally { if (fd !== undefined) closeSync(fd); }
+}
+
+/** Every call a file makes that a model record answers (by call id), for a file read from the middle: one pass, a
+ * chunk at a time, keeping only the calls `keep` wants (their arguments as logged). */
+function earlierCalls(file: string, keep: (name: string) => boolean): Map<string, Call> {
+  const out = new Map<string, Call>();
+  let fd: number | undefined;
+  try {
+    fd = openSync(file, "r");
+    const buf = Buffer.allocUnsafe(4 * 1024 * 1024);
+    let pos = 0, rest = "";
+    for (;;) {
+      const got = readSync(fd, buf, 0, buf.length, pos);
+      if (got <= 0) break;
+      pos += got;
+      const text = rest + buf.toString("utf8", 0, got);
+      const lines = text.split("\n");
+      rest = lines.pop() ?? "";
+      if (rest.length > 64 * 1024 * 1024) rest = ""; // a giant line: not a call
+      for (const l of lines) {
+        if (!l.includes('"call_id"') || !/"type":"(function_call|custom_tool_call|local_shell_call)"/.test(l)) continue;
+        try {
+          const o = JSON.parse(l) as { timestamp?: string; payload?: any };
+          const p = o.payload ?? {};
+          const name = p.type === "local_shell_call" ? "local_shell" : String(p.name ?? "");
+          const callId = str(p.call_id) ?? str(p.id);
+          if (!callId || !keep(name)) continue;
+          let args: any = p.type === "custom_tool_call" ? p.input : p.type === "local_shell_call" ? p.action : p.arguments;
+          if (p.type === "function_call" && typeof args === "string") { try { args = JSON.parse(args); } catch { /* kept as text */ } }
+          out.set(callId, { name, args, ts: o.timestamp ?? "", turnId: str(p.internal_chat_message_metadata_passthrough?.turn_id) });
+        } catch { /* not a whole line */ }
+      }
+      if (got < buf.length) break;
+    }
+  } catch { /* unreadable: nothing found */ } finally { if (fd !== undefined) closeSync(fd); }
+  return out;
 }
 
 /** The first command item in a file, and the start of its turn (for a file read from the middle after a restart). */

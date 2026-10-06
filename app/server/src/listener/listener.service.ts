@@ -141,6 +141,8 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     if (!stepCols.includes("agent_id")) db.exec(`ALTER TABLE steps ADD COLUMN agent_id TEXT`);
     db.exec(`CREATE INDEX IF NOT EXISTS steps_session_seq ON steps(session_id, seq)`);
     db.exec(`CREATE INDEX IF NOT EXISTS steps_label ON steps(kind, label)`);
+    // Added 6 Oct 2026: "was this file touched by a step?" for the picture endpoint (image/).
+    db.exec(`CREATE INDEX IF NOT EXISTS steps_file ON steps(file_path)`);
     // Added 3 Oct 2026: compacted-conversation recaps were stored as prompts; they read as the agent's text.
     db.exec(`UPDATE steps SET kind = 'text' WHERE kind = 'prompt' AND text LIKE 'This session is being continued from a previous conversation%'`);
     this.st = this.prepare();
@@ -227,6 +229,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       stepsAfter: db.prepare(`SELECT * FROM steps WHERE session_id = ? AND seq > ? ORDER BY seq ASC`),
       stepsJson: db.prepare(stepsJsonSql(`session_id = ?`)),
       stepsJsonAfter: db.prepare(stepsJsonSql(`session_id = ? AND seq > ?`)),
+      stepTouches: db.prepare(`SELECT 1 FROM steps WHERE file_path = ? LIMIT 1`),
       stepPos: db.prepare(`SELECT session_id, seq FROM steps WHERE id = ?`),
       stepsBefore: db.prepare(`SELECT * FROM steps WHERE session_id = ? AND seq < ? ORDER BY seq DESC LIMIT ?`),
       stepLabel: db.prepare(`SELECT label, risk FROM steps WHERE id = ?`),
@@ -715,6 +718,11 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   listStepsJson(sessionId: string, afterSeq?: number): string {
     const row = (afterSeq === undefined ? this.st.stepsJson.get(sessionId) : this.st.stepsJsonAfter.get(sessionId, afterSeq)) as { out: string };
     return row.out;
+  }
+
+  /** Whether some thread's step referenced this file (an agent read or changed it): the only files the picture endpoint serves. */
+  stepTouches(path: string): boolean {
+    return !!this.st.stepTouches.get(path);
   }
 
   /** The n steps immediately before `stepId` in the same session, chronological order. */

@@ -179,7 +179,7 @@ function ReadView({ input, result }: { input: Input; result?: Step }) {
         : page && view === "page" ? <HtmlPreview html={numbered!.lines.join("\n")} />
         : numbered ? <Code start={numbered.start} lines={numbered.lines} path={path} />
         : text ? <Clip text={text} className="cv-code" lang={langOf(path)} />
-        : IMAGE.test(path) ? <Shots resultId={result.id} label="Image" />
+        : IMAGE.test(path) ? <Shots resultId={result.id} label="Image" path={path} />
         : <p className="cv-muted">Empty file.</p>}
     </Block>
   );
@@ -289,9 +289,10 @@ export const IMAGE = /\.(png|jpe?g|gif|webp|bmp)$/i;
 
 /**
  * The pictures a tool returned (screenshots, an image read), loaded from the local server only when shown, one after
- * the other (a probe asks for the next until there's none).
+ * the other (a probe asks for the next until there's none). With a `path` (an image read) and no picture in the log
+ * (Codex keeps only the path), a button loads it from the person's disk.
  */
-export function Shots({ resultId, label = "Screenshot" }: { resultId: string; label?: string }) {
+export function Shots({ resultId, label = "Screenshot", path }: { resultId: string; label?: string; path?: string }) {
   const [count, setCount] = useState(0);
   const [done, setDone] = useState(false);
   const [big, setBig] = useState<number | null>(null);   // the picture open large (Lightbox), if any
@@ -309,7 +310,26 @@ export function Shots({ resultId, label = "Screenshot" }: { resultId: string; la
       {big !== null && big < count && (
         <Lightbox srcs={Array.from({ length: count }, (_, i) => src(i))} at={big} label={label} onAt={setBig} onClose={() => setBig(null)} />
       )}
+      {done && count === 0 && path && IMAGE.test(path) && <DiskPicture key={path} path={path} label={label} />}
       {!done && count < 12 && <img className="cv-probe" src={src(count)} alt="" onLoad={() => setCount((c) => c + 1)} onError={() => setDone(true)} />}
+    </>
+  );
+}
+
+/** An image read whose picture the log doesn't hold: nothing is fetched until the click. The server only serves pictures a thread read. */
+function DiskPicture({ path, label }: { path: string; label: string }) {
+  const [asked, setAsked] = useState(false);
+  const [gone, setGone] = useState(false);
+  const [big, setBig] = useState<number | null>(null);
+  const src = `/api/image?path=${encodeURIComponent(path)}`;
+  if (gone) return <p className="cv-muted">The picture isn't on this computer any more.</p>;
+  if (!asked) return <button className="cv-more" onClick={() => setAsked(true)}>Show the picture</button>;
+  return (
+    <>
+      <div className="cv-shots">
+        <button className="cv-shot" onClick={() => setBig(0)} title="Open large"><img src={src} alt={label} decoding="async" onError={() => setGone(true)} /></button>
+      </div>
+      {big !== null && <Lightbox srcs={[src]} at={big} label={label} onAt={setBig} onClose={() => setBig(null)} />}
     </>
   );
 }

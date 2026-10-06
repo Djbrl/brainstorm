@@ -28,6 +28,9 @@ const say = (msg) => { if (!BACKGROUND) console.log(msg); };
 
 const PLUGIN = process.env.CLAUDE_PLUGIN_ROOT || resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = process.env.CLAUDE_PLUGIN_DATA || join(homedir(), ".rundown");
+// The marketplace it came from, as Claude Code named it here (…/plugins/cache/<marketplace>/<plugin>/<version>): "rundown",
+// or "brainstorm" for someone who installed before the rename. The update command needs that name.
+const MARKET = /[\\/]plugins[\\/]cache[\\/]([^\\/]+)[\\/]/.exec(PLUGIN)?.[1] ?? "rundown";
 const PROJECT = resolve(opt("--project") || process.env.CLAUDE_PROJECT_DIR || process.cwd());
 const KEY = process.env.CLAUDE_PLUGIN_OPTION_ANTHROPIC_API_KEY || "";
 const VERSION = JSON.parse(readFileSync(join(PLUGIN, ".claude-plugin", "plugin.json"), "utf8")).version;
@@ -143,7 +146,7 @@ async function notices(port) {
     try {
       const latest = (await (await fetch(LATEST_URL, { signal: AbortSignal.timeout(1500) })).json()).version;
       if (latest && newer(latest, VERSION)) {
-        out.push(`Rundown ${latest} is available (you have ${VERSION}). To update, run \`claude plugin update rundown@rundown\` in a terminal, or choose Update now in /plugin → Installed.`);
+        out.push(`Rundown ${latest} is available (you have ${VERSION}). To update, run \`claude plugin update rundown@${MARKET}\` in a terminal, or choose Update now in /plugin → Installed.`);
       }
     } catch { /* offline: try again tomorrow */ }
   }

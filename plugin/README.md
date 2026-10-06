@@ -26,11 +26,11 @@ Then start a new session. You need Node.js 22.13 or later (`node -v`). If Node i
 
 ## Moving from Brainstorm (0.4 and older)
 
-Until 0.4 the plugin was called `brainstorm`. Claude Code sees Rundown as a new plugin, so install it once and remove the old one:
+Until 0.4 the plugin was called `brainstorm`. Claude Code sees Rundown as a new plugin from the same marketplace, which keeps its old name on your machine:
 
 ```
 /plugin marketplace update brainstorm
-/plugin install rundown@rundown
+/plugin install rundown@brainstorm
 ```
 
 Start a new session: Rundown takes over the old plugin's data (your history and settings) and stops its server. Then remove the old plugin:
@@ -39,11 +39,11 @@ Start a new session: Rundown takes over the old plugin's data (your history and 
 /plugin uninstall brainstorm@brainstorm
 ```
 
-If `/plugin marketplace update brainstorm` complains, remove and re-add the marketplace: `/plugin marketplace remove brainstorm`, then `/plugin marketplace add Djbrl/brainstorm`.
+From then on, update with `claude plugin update rundown@brainstorm`.
 
 ## Updates
 
-When a newer version is on GitHub, Rundown tells you at the start of a session (it checks at most once a day). To update, run `claude plugin update rundown@rundown` in a terminal, or choose **Update now** in `/plugin` → **Installed**, then start a new session. The running server restarts on the new version by itself.
+When a newer version is on GitHub, Rundown tells you at the start of a session (it checks at most once a day). To update, run `claude plugin update rundown@rundown` in a terminal (`rundown@brainstorm` if you had it before the rename), or choose **Update now** in `/plugin` → **Installed**, then start a new session. The running server restarts on the new version by itself.
 
 To update automatically instead, turn on auto-update for the `rundown` marketplace in `/plugin` → **Marketplaces**.
 

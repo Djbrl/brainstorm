@@ -7,6 +7,7 @@ import { ListenerService } from "../listener/listener.service";
 import { ReplayService } from "./replay.service";
 import { threadMarkdown } from "./markdown";
 import { forSharing, slug } from "./privacy";
+import { UsageService } from "../usage/usage.service";
 
 const PLACEHOLDER = "<!--brainstorm:replay-->";
 
@@ -27,7 +28,7 @@ const escHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<":
 // Owned by the lead. Sharing a thread: GET /api/share (one .html file anyone can open) and GET /api/export.md (a report).
 @Controller()
 export class ShareController {
-  constructor(private listener: ListenerService, private replays: ReplayService) {}
+  constructor(private listener: ListenerService, private replays: ReplayService, private usage: UsageService) {}
 
   /** The thread to share: the one asked for, or the newest one in the workspace. */
   private pick(sessionId?: string): Session {
@@ -50,6 +51,7 @@ export class ShareController {
   @Get("share") share(@Query("sessionId") sessionId: string | undefined, @Query("format") format: string | undefined, @Res() res: Response) {
     const session = this.pick(sessionId);
     const replay = this.sharedReplay(session);
+    this.usage.bump("sh");
     const name = `brainstorm-${slug(session.title)}-${session.startedAt.slice(0, 10)}`;
     if (format === "json") {
       res.setHeader("Content-Disposition", `attachment; filename="${name}.json"`);
@@ -70,6 +72,7 @@ export class ShareController {
   @Get("export.md") exportMarkdown(@Query("sessionId") sessionId: string | undefined, @Res() res: Response) {
     const session = this.pick(sessionId);
     const replay = this.sharedReplay(session);
+    this.usage.bump("sh");
     const steps: Step[] = replay.steps;
     const md = threadMarkdown(replay.sessions[0] ?? session, steps, replay.map, replay.failures ?? []);
     res.setHeader("Content-Type", "text/markdown; charset=utf-8");

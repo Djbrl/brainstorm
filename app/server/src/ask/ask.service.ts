@@ -10,6 +10,7 @@ import { ReaderService } from "../reader/reader.service";
 import { ClaudeService } from "../llm/claude.service";
 import { NemotronService } from "../llm/nemotron.service";
 import { maskSecrets } from "../privacy/mask";
+import { UsageService } from "../usage/usage.service";
 
 // Owner: D.
 const SYSTEM = `You are Rundown, a guide to a codebase that AI coding agents are editing live.
@@ -46,6 +47,7 @@ export class AskService implements OnModuleInit {
     private reader: ReaderService,
     private claude: ClaudeService,
     private nemotron: NemotronService,
+    private usage: UsageService,
   ) {}
 
   onModuleInit() {
@@ -59,6 +61,7 @@ export class AskService implements OnModuleInit {
   async ask(req: AskRequest): Promise<AskResponse> {
     const question = (req.question ?? "").trim();
     if (!question) return { answer: "Ask a question about this code.", model: "none", tokensIn: 0, tokensOut: 0, costUsd: 0, fallback: false };
+    this.usage.bump("ak");
 
     const step: Step | undefined = req.stepId ? this.safe(() => this.listener.getStep(req.stepId!)) : undefined;
     let filePath = req.filePath ?? step?.filePath;

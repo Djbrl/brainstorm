@@ -11,6 +11,7 @@ import { Welcome } from "./map/Welcome";
 import { SettingsButton } from "./settings/Settings";
 import { useAttentionAlerts } from "./lib/attention";
 import { Logo } from "./Logo";
+import { track } from "./lib/usage";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import "./boot.css";
 
@@ -53,6 +54,7 @@ function AttentionAlerts() {
 }
 
 function Shell() {
+  useEffect(() => { track("op"); }, []); // one "app opened" for the usage stats (counts nothing in a replay)
   const { reload } = useLiveActions();
   const { lens, replay } = useNavState();
   const { back, stopReplay, selectFile } = useNavActions();

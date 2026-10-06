@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import type { AgentPresence, Session } from "@contract";
 import { clock, useLive } from "../../lib/live";
 import { END, useNav } from "../../lib/nav";
+import { track } from "../../lib/usage";
 import { relTime } from "../../follow/format";
 import { agentColor, baseName, initial, shortName, verbIng } from "../agents";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
@@ -56,6 +57,7 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }
     if (replay?.sessionId === s.id) { stopReplay(); return; } // clicking the open thread closes it
     const running = s.status === "running";
     startReplay(s.id, running ? 0 : END, { live: running });
+    track("th");
   };
   // The most recent few; the rest behind "Show all" (the open thread always shows).
   const SHORT = 5;

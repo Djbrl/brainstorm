@@ -48,6 +48,7 @@ Summaries of files and labels written by a model are off in this release. They'l
 
 - Data: `~/.claude/plugins/data/brainstorm-brainstorm/` (a SQLite database, the server log, `server.json`, `notices.json`). Uninstalling the plugin deletes it.
 - Once a day, Rundown fetches its own version number from GitHub to tell you about updates. That request carries nothing about you or your code.
+- Once a day, it sends anonymous usage stats (a random install id, version, OS, map theme and counts of what you used; never code, paths, prompts or names). See [Usage stats](../README.md#usage-stats) for exactly what. Turn it off in Settings, or with `DO_NOT_TRACK=1`.
 - The server listens on `127.0.0.1` only (port 4747, or the next free one). It refuses requests addressed to other host names, and WebSocket connections from other websites.
 - To show when a thread is waiting for you, the plugin's hooks tell the local server when Claude Code asks for a permission, shows a notification, finishes a turn or gets a new message (the tool's name and input, never the conversation). They only talk to `127.0.0.1`.
 - Nothing else is sent anywhere, except your questions to Claude if you set a key. Sharing only saves files on your computer; you decide where they go.

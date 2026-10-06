@@ -36,6 +36,8 @@ Breaks existing installs (only the author has one). Do it in one release, with a
 - [ ] GitHub repo `Djbrl/brainstorm` (GitHub redirects old links; test the plugin install and update check)
 - [ ] Vercel: `brainstorm-landing` and `brainstorm-next` (new domains; old links in the jury submission and waitlist
       emails keep pointing at the old ones, so keep them up or redirect)
+- [ ] The usage stats endpoint (`ENDPOINT` in `app/server/src/usage/usage.service.ts`, on the landing project): move it
+      with the domain, and keep the old one answering until no release points at it
 - [ ] The update check URL in `plugin/scripts/launch.mjs`, links in the app (`App.tsx`), landing (`site/index.html`),
       READMEs and the Markdown export
 

@@ -59,3 +59,5 @@
 .view-opt { padding: 7px 10px; }
 .view-opt b { font-weight: 500; }
 .view-opt.on b { font-weight: 600; }
+.usage-more { display: inline-block; margin: 0 6px 4px 31px; font-size: 12px; color: var(--accent); text-decoration: none; }
+.usage-more:hover { text-decoration: underline; }

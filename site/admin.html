@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Rundown usage</title>
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<style>
+:root {
+  --bg: #ffffff; --alt: #f5f5f7; --ink: #1d1d1f; --muted: #6e6e73; --line: #e3e3e8; --blue: #0071e3; --bar: #0071e3; --bar-2: #8fbcf0;
+  --body: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #111113; --alt: #1c1c1f; --ink: #f2f2f4; --muted: #a1a1a6; --line: #2c2c31; --blue: #3b9bff; --bar: #3b9bff; --bar-2: #2f5f99; }
+}
+:root[data-theme="dark"] { --bg: #111113; --alt: #1c1c1f; --ink: #f2f2f4; --muted: #a1a1a6; --line: #2c2c31; --blue: #3b9bff; --bar: #3b9bff; --bar-2: #2f5f99; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 32px 16px 64px; }
+header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+header img { height: 22px; display: block; }
+header h1 { font-size: 15px; font-weight: 600; color: var(--muted); margin: 0; }
+header .right { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+input, button, select { font: inherit; }
+input[type=password] { width: 220px; max-width: 100%; height: 34px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--ink); }
+button, select { height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--alt); color: var(--ink); cursor: pointer; }
+button.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+.msg { margin: 28px 0 0; color: var(--muted); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 28px; }
+.tile { background: var(--alt); border-radius: 16px; padding: 16px; }
+.tile b { display: block; font-size: 34px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tile span { font-size: 13px; color: var(--muted); }
+h2 { font-size: 17px; margin: 40px 0 4px; }
+.sub { margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart .axis { fill: var(--muted); font: 11px var(--body); }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .hit { fill: transparent; cursor: default; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12.5px; padding: 6px 10px; border-radius: 8px; white-space: nowrap; transform: translate(-50%, -100%); margin-top: -8px; display: none; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 7px 4px; border-bottom: 1px solid var(--line); }
+th { font-size: 12px; font-weight: 600; color: var(--muted); }
+td.n { text-align: right; font-variant-numeric: tabular-nums; }
+.links { margin-top: 40px; font-size: 13px; color: var(--muted); }
+a { color: var(--blue); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <picture><source srcset="img/rundown-logo-white.svg" media="(prefers-color-scheme: dark)"><img src="img/rundown-logo.svg" alt="Rundown"></picture>
+    <h1>Usage</h1>
+    <form class="right" id="auth">
+      <label for="token" class="sr" style="position:absolute;left:-9999px">Stats token</label>
+      <input id="token" type="password" placeholder="Stats token" autocomplete="current-password">
+      <select id="days" aria-label="Period"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option></select>
+      <button class="primary" type="submit">Show</button>
+    </form>
+  </header>
+
+  <p class="msg" id="msg">Enter the stats token (STATS_TOKEN in the Vercel project) to see the numbers.</p>
+  <div id="out" hidden>
+    <div class="tiles" id="tiles"></div>
+    <h2>Active installs per day</h2>
+    <p class="sub">Installs that reported that day (the app reports once a day while it runs).</p>
+    <div class="chart" id="activeChart"></div>
+    <h2>New installs per day</h2>
+    <div class="chart" id="newChart"></div>
+    <div class="grid2">
+      <div><h2>Countries</h2><p class="sub" data-period>Installs active in the period</p><table id="countries"></table></div>
+      <div><h2>What people use</h2><p class="sub" data-period>Totals over the period</p><table id="uses"></table></div>
+      <div><h2>Versions</h2><table id="versions"></table></div>
+      <div><h2>Systems and themes</h2><table id="os"></table><table id="themes" style="margin-top:16px"></table></div>
+    </div>
+    <p class="links">Website visits: Vercel → project → Analytics. What the app sends: <a href="https://github.com/Djbrl/brainstorm#usage-stats">README, Usage stats</a>.</p>
+  </div>
+</div>
+<script>
+const USE_NAMES = { op: "App opened", th: "Threads opened", rp: "Replays played", lv: "Live follows", sh: "Threads shared", ak: "Questions asked", pj: "Projects opened", se: "Agent sessions seen", st: "Agent steps seen" };
+const OS_NAMES = { darwin: "macOS", linux: "Linux", win32: "Windows", other: "Other" };
+const regionName = (() => { try { const d = new Intl.DisplayNames(["en"], { type: "region" }); return (cc) => (cc === "XX" ? "Unknown" : d.of(cc) || cc); } catch { return (cc) => cc; } })();
+const fmt = (n) => n.toLocaleString("en");
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+let token = ""; try { token = localStorage.getItem("rundown-stats-token") || ""; } catch {}
+$("token").value = token;
+
+$("auth").addEventListener("submit", (e) => { e.preventDefault(); token = $("token").value.trim(); try { localStorage.setItem("rundown-stats-token", token); } catch {} load(); });
+
+async function load() {
+  if (!token) return;
+  $("msg").textContent = "Loading…"; $("msg").hidden = false;
+  try {
+    const r = await fetch(`/api/usage-stats?days=${$("days").value}`, { headers: { authorization: `Bearer ${token}` } });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || `Error ${r.status}`);
+    render(d);
+    $("msg").hidden = true; $("out").hidden = false;
+  } catch (e) { $("msg").textContent = e.message; $("out").hidden = true; }
+}
+
+function render(d) {
+  document.querySelectorAll("[data-period]").forEach((el) => { el.textContent = el.textContent.replace(/the period|the last \d+ days/, `the last ${d.days} days`); });
+  const back = d.cameBackWithinAWeek;
+  const tiles = [
+    [fmt(d.installs), "Installs, all time"],
+    [fmt(d.active.day), "Active today"],
+    [fmt(d.active.week), "Active this week"],
+    [fmt(d.active.month), "Active in 30 days"],
+    [back ? `${Math.round(back.share * 100)}%` : "—", back ? `Came back within a week (of ${fmt(back.installs)})` : "Came back within a week (none a week old yet)"],
+  ];
+  $("tiles").innerHTML = tiles.map(([n, l]) => `<div class="tile"><b>${n}</b><span>${esc(l)}</span></div>`).join("");
+  bars($("activeChart"), d.series.map((s) => ({ day: s.day, v: s.active })), "var(--bar)", "active");
+  bars($("newChart"), d.series.map((s) => ({ day: s.day, v: s.newInstalls })), "var(--bar-2)", "new");
+  table($("countries"), ["Country", "Installs"], d.countries.map((c) => [regionName(c.key), c.installs]));
+  table($("uses"), ["", "Count"], Object.entries(d.uses).sort((a, b) => b[1] - a[1]).map(([k, n]) => [USE_NAMES[k] || k, n]));
+  table($("versions"), ["Version", "Installs"], d.versions.map((v) => [v.key, v.installs]));
+  table($("os"), ["System", "Installs"], d.os.map((v) => [OS_NAMES[v.key] || v.key, v.installs]));
+  table($("themes"), ["Map theme", "Installs"], d.themes.map((v) => [v.key === "none" ? "Not reported" : v.key, v.installs]));
+}
+
+function table(el, head, rows) {
+  el.innerHTML = `<thead><tr><th>${esc(head[0])}</th><th style="text-align:right">${esc(head[1])}</th></tr></thead><tbody>`
+    + (rows.length ? rows.map(([k, n]) => `<tr><td>${esc(k)}</td><td class="n">${fmt(n)}</td></tr>`).join("") : `<tr><td colspan="2" style="color:var(--muted)">Nothing yet</td></tr>`) + "</tbody>";
+}
+
+/** One series of daily bars: thin rounded bars on a baseline, a recessive grid, a tooltip per day. */
+function bars(el, data, color, noun) {
+  const W = 1000, H = 220, L = 34, B = 24, T = 8;
+  const max = Math.max(1, ...data.map((p) => p.v));
+  const step = Math.max(1, Math.ceil(max / 4)), top = step * Math.ceil(max / step);
+  const n = data.length, slot = (W - L) / n, bw = Math.max(3, Math.min(22, slot - 2));
+  const y = (v) => T + (H - T - B) * (1 - v / top);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${noun} installs per day">`;
+  for (let v = 0; v <= top; v += step) svg += `<line class="grid" x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}"></line><text class="axis" x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  data.forEach((p, i) => {
+    const x = L + i * slot + (slot - bw) / 2, h = y(0) - y(p.v), r = Math.min(4, bw / 2, h);
+    if (p.v > 0) svg += `<path d="M${x},${y(0)} V${y(p.v) + r} Q${x},${y(p.v)} ${x + r},${y(p.v)} H${x + bw - r} Q${x + bw},${y(p.v)} ${x + bw},${y(p.v) + r} V${y(0)} Z" fill="${color}"></path>`;
+    if (i === 0 || i === n - 1 || i % Math.ceil(n / 6) === 0) svg += `<text class="axis" x="${L + i * slot + slot / 2}" y="${H - 6}" text-anchor="middle">${p.day.slice(5)}</text>`;
+    svg += `<rect class="hit" x="${L + i * slot}" y="${T}" width="${slot}" height="${H - T - B}" data-i="${i}"></rect>`;
+  });
+  svg += "</svg>";
+  el.innerHTML = svg + `<div class="tip"></div>`;
+  const tip = el.querySelector(".tip"), sv = el.querySelector("svg");
+  sv.addEventListener("pointermove", (e) => {
+    const i = e.target.dataset?.i; if (i === undefined) { tip.style.display = "none"; return; }
+    const p = data[+i], box = sv.getBoundingClientRect(), k = box.width / W;
+    tip.textContent = `${new Date(p.day + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })}: ${fmt(p.v)} ${noun}`;
+    tip.style.left = `${(L + (+i + 0.5) * slot) * k}px`; tip.style.top = `${y(p.v) * k}px`; tip.style.display = "block";
+  });
+  sv.addEventListener("pointerleave", () => { tip.style.display = "none"; });
+}
+
+$("days").addEventListener("change", load);
+if (token) load();
+</script>
+</body>
+</html>

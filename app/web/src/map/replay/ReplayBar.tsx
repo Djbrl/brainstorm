@@ -6,6 +6,7 @@
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNav, useNavState, type ReplaySpeed } from "../../lib/nav";
 import { isReplay, useLive, useLiveSelector } from "../../lib/live";
+import { track } from "../../lib/usage";
 import { useThread, type Thread } from "../../lib/thread";
 import { chaptersOf } from "../../lib/chapters";
 import { togglePlay } from "./layer";
@@ -120,6 +121,7 @@ export function Dock({ children }: { children: ReactNode }) {
   const on = replay?.mode === "play";
   const toggle = () => {
     if (on) { setThreadMode("steps"); return; }
+    track("rp");
     setReplayIndex(0); // a replay starts from the first moment and plays, at the speed set in the player
     setReplayPlaying(true);
   };
@@ -128,7 +130,7 @@ export function Dock({ children }: { children: ReactNode }) {
       {on && <Player />}
       <div className="dock-pill">
         {replay && running && !on && (
-          <button className={`dock-replay live${replay.live ? " on" : ""}`} onClick={() => setReplayLive(!replay.live)} aria-pressed={!!replay.live}
+          <button className={`dock-replay live${replay.live ? " on" : ""}`} onClick={() => { if (!replay.live) track("lv"); setReplayLive(!replay.live); }} aria-pressed={!!replay.live}
             title={replay.live ? "Following its newest step. Click to stop" : "Jump to its newest step and follow it"}>
             <i className="dock-live-dot" aria-hidden="true" />{replay.live ? "Live" : "Follow live"}
           </button>

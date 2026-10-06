@@ -591,7 +591,7 @@ footer a:hover { text-decoration: underline; }
 <section class="block" id="privacy">
   <div class="wrap center">
     <h2 class="h2 rv">Your code<br>stays yours.</h2>
-    <p class="sub rv d1">It runs on your machine and reads your agents' logs where they are. No account, no cloud. Secrets are masked before anything is stored, and nothing goes to Claude unless you ask.</p>
+    <p class="sub rv d1">It runs on your machine and reads your agents' logs where they are. No account, no cloud. Secrets are masked before anything is stored, and nothing goes to Claude unless you ask. Once a day it sends anonymous usage counts, never your code; one click in Settings turns that off.</p>
   </div>
 </section>
 
@@ -1126,5 +1126,6 @@ flatMQ.addEventListener("change", e => { flat = e.matches; lastKey = ""; dispatc
 measureHero(); onScroll();
 document.fonts && document.fonts.ready.then(measureHero);
 </script>
+<script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>

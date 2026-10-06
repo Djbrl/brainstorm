@@ -75,6 +75,22 @@ That was the hackathon setup. The Brev instance is shut down now, so the plugin 
 
 Local-first. Session logs are read from `~/.claude/projects` on your machine and stored in a local SQLite file. API keys, tokens and passwords are masked before anything is stored or sent. Only small, masked context packages go to a model.
 
+### Usage stats
+
+To know how many people use Rundown, roughly where, and which parts matter, the plugin sends one anonymous report a day. It never contains code, file paths, prompts, thread titles, names or anything you typed. Exactly what it sends:
+
+| Field | What it is |
+| --- | --- |
+| `id` | A random install id, made on your machine the first time (not derived from anything about it) |
+| `kind` | `new` the first time, then `day` |
+| `v`, `os` | Rundown's version, and `darwin`, `linux` or `win32` |
+| `tm` | The map theme in use |
+| `c` | Counts since the last report: app opened, threads opened, replays played, live follows, threads shared, questions asked, projects opened, agent sessions seen working, agent steps seen |
+
+The landing site that receives it adds the country from the request (two letters) and keeps no IP address. Reports are kept as empty files whose names hold the fields above, in a private store only the maintainer can read.
+
+**To turn it off:** Settings → Usage stats, or set `DO_NOT_TRACK=1` or `RUNDOWN_USAGE=off` in your environment (that also locks the setting off). Turned off, nothing is counted or sent. A development build (`npm run dev`) never sends anything. The code: [`app/server/src/usage/`](app/server/src/usage/) and [`site/api/usage.js`](site/api/usage.js).
+
 ## Documentation
 
 | | |

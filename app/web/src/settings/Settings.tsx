@@ -6,6 +6,7 @@ import { setTheme, THEMES, useTheme } from "../lib/theme";
 import { setStepWindow, STEP_WINDOWS, useStepWindow } from "../map/prefs";
 import { setFoldOn, useFoldOn } from "../map/fold";
 import { EDITORS, setEditor, useEditor } from "../lib/editor";
+import { useUsageSetting } from "../lib/usage";
 import "./settings.css";
 
 export function SettingsButton() {
@@ -41,6 +42,7 @@ export function SettingsButton() {
           <FoldSetting />
           <EditorSetting />
           <NotifySetting />
+          <UsageSetting />
         </div>
       )}
     </div>
@@ -107,6 +109,25 @@ function NotifySetting() {
         <input type="checkbox" checked={on} disabled={blocked} onChange={toggle} />
         <span><b>Tell me when an agent needs me</b><small>{blocked ? "Blocked in this browser's site settings" : "A permission, a question, a plan to approve, or a finished turn, while this tab is in the background"}</small></span>
       </label>
+    </>
+  );
+}
+
+/** Anonymous usage stats (lib/usage.ts, server usage/usage.service.ts): on by default, one click turns them off. */
+function UsageSetting() {
+  const { status, toggle } = useUsageSetting();
+  if (!status || isReplay()) return null;
+  const note = status.locked ? `Off: ${status.locked}`
+    : !status.sends ? "Nothing is sent from a development build"
+    : "Once a day: how much you used Rundown (counts only), its version, your OS and country. Never code, paths, prompts or names.";
+  return (
+    <>
+      <h3>Usage stats</h3>
+      <label className="notify-opt">
+        <input type="checkbox" checked={status.enabled} disabled={!!status.locked} onChange={toggle} />
+        <span><b>Share anonymous usage stats</b><small>{note}</small></span>
+      </label>
+      <a className="usage-more" href="https://github.com/Djbrl/brainstorm#usage-stats" target="_blank" rel="noopener">Exactly what's sent</a>
     </>
   );
 }

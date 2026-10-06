@@ -2,7 +2,7 @@
 //
 // force-graph redraws a frame only when it has to (the layout engine is ticking, the camera moved, the canvas resized):
 // its autoPauseRedraw. Everything else that changes the picture comes from us: an agent gliding, a replay step, a file
-// fading into a thread's focus, a ripple, a PS2 cube turning, a hover, new data. This keeps frames coming for exactly
+// fading into a thread's focus, a ripple, a Prism cube turning, a hover, new data. This keeps frames coming for exactly
 // as long as one of those runs, and lets the canvas rest (no work at all) when nothing moves.
 //
 // How a frame is asked for: zoom(zoom()), a camera move that goes nowhere, is force-graph's public way to mark it dirty.

@@ -40,7 +40,7 @@
 @media (max-width: 1439px) { .map-peek { bottom: 150px; } }
 @media (max-width: 1000px) { .map-peek { display: none; } }
 
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .map-peek { background: var(--sheet); box-shadow: 0 18px 50px rgba(0,0,0,.35); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .map-peek { background: var(--sheet); box-shadow: 0 18px 50px rgba(0,0,0,.35); }
 
 /* An image read: the picture itself, fitted to the window (follow/content Shots). */
 .peek-image { padding: 10px 12px; }

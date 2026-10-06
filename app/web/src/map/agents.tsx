@@ -43,7 +43,7 @@ export type AgentAnim = {
   flashes: { file: string; t0: number }[];      // recent reads to draw as lines of sight
   lastTs: string; pulseT0: number;              // activity without a new file → pulse
   lastErr?: string; errT0: number;              // a failed tool call → the marker flashes red
-  landedT0?: number;                            // the trip whose landing was announced (PS2: the cube flashes)
+  landedT0?: number;                            // the trip whose landing was announced (Prism: the cube flashes)
 };
 type Pt = { x: number; y: number; r: number };
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -56,7 +56,7 @@ const ERR_PULSE_MS = 1100;  // one red ring
 const WAIT_MS = 1800;       // the amber ring's breath while an agent waits on you
 const WAIT_AMBER = "#f59e0b";
 const WAIT_TEXT = "#9a5800";      // on a light outline
-const WAIT_TEXT_DARK = "#ffc56b"; // on a dark one (PS2, Dead Space)
+const WAIT_TEXT_DARK = "#ffc56b"; // on a dark one (Prism, Hologram)
 /** A dark theme draws labels on a dark outline (its halo). */
 const darkHalo = (halo: string) => Number(/\d+/.exec(halo)?.[0] ?? 255) < 128;
 export const isWrite = (action?: string) => action === "edit" || action === "write";
@@ -200,7 +200,7 @@ export function drawAgents(opts: {
         ctx.strokeStyle = ERROR_RED; ctx.lineWidth = 2.4 / scale; ctx.stroke();
       }
 
-      // The trip under way: Dead Space's locator line ahead, PS2's afterimages behind.
+      // The trip under way: Hologram's locator line ahead, Prism's afterimages behind.
       if (trip) drawTrip(ctx, style.route, trip, p, e, color, 9 / scale, st.alpha, scale);
 
       // Waiting on you: an amber ring that breathes, as long as it waits.

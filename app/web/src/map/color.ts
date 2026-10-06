@@ -18,8 +18,8 @@ export function readTokens() {
   const cs = getComputedStyle(document.documentElement);
   const v = (name: string, fb: string) => cs.getPropertyValue(name).trim() || fb;
   return {
-    hot: hex(v("--hot", "#ff6a3d")), warm: hex(v("--warm", "#ffb547")), cool: hex(v("--cool", "#c7cbd6")),
-    accent: v("--accent", "#5b5bd6"), ink: v("--ink", "#1d1d1f"),
+    hot: hex(v("--hot", "#ff5b1f")), warm: hex(v("--warm", "#ffa66e")), cool: hex(v("--cool", "#c7cbd6")),
+    accent: v("--accent", "#2563eb"), ink: v("--ink", "#121214"),
     display: v("--font-display", "-apple-system, sans-serif"), body: v("--font-body", "-apple-system, sans-serif"),
   };
 }

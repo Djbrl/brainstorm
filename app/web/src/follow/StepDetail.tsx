@@ -20,7 +20,7 @@ const RISK_LEVEL: Record<string, "high" | "mid"> = {
   "touches auth": "mid", "touches payment": "mid", "large deletion": "mid",
 };
 
-/** The dark themes' diff colours (PS2, Dead Space): tints over the panel, the theme's own ink. */
+/** The dark themes' diff colours (Prism, Hologram): tints over the panel, the theme's own ink. */
 const darkDiff = {
   diffViewerBackground: "transparent",
   diffViewerColor: "var(--ink)",

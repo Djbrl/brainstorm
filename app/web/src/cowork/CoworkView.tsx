@@ -70,7 +70,7 @@ export function PlacesView() {
         <WorldMap key={replay?.sessionId} data={data} areas={ALL} selected={selected} highlight={highlight} leftInset={380} rightInset={step ? 440 : 0}
           onSelect={(id) => selectPlace(id)} />
       )}
-      <MapSidebar agents={Object.values(state.agents)} accent="#5b5bd6" followId={null} onFollow={() => setLens("map")} onFocusFile={() => setLens("map")} map={state.map} />
+      <MapSidebar agents={Object.values(state.agents)} accent="#2563eb" followId={null} onFollow={() => setLens("map")} onFocusFile={() => setLens("map")} map={state.map} />
       <MapStats />
       <LensSwitch />
       {!replay && <p className="cw-note">Pick a thread to see where it went outside the code.</p>}

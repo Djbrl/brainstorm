@@ -457,7 +457,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
         ctx.textAlign = "center"; ctx.textBaseline = "bottom";
         const ly = n.y - n.r - 8 / scale;
         ctx.globalAlpha = 1;
-        ctx.lineWidth = 3.5 / scale; ctx.strokeStyle = mapStyle().halo; ctx.strokeText(label, n.x, ly); // the theme's outline: light, or dark in PS2 / Dead Space
+        ctx.lineWidth = 3.5 / scale; ctx.strokeStyle = mapStyle().halo; ctx.strokeText(label, n.x, ly); // the theme's outline: light, or dark in Prism / Hologram
         ctx.fillStyle = line; ctx.fillText(label, n.x, ly);
       }
     }
@@ -572,7 +572,7 @@ export function togglePlay(index: number, len: number, playing: boolean,
 
 function hexA(c: string, alpha: number) {
   const h = c.trim().replace("#", "");
-  if (!/^[0-9a-f]{3}([0-9a-f]{3})?$/i.test(h)) return `rgba(91,91,214,${alpha})`;
+  if (!/^[0-9a-f]{3}([0-9a-f]{3})?$/i.test(h)) return `rgba(37,99,235,${alpha})`;
   const n = parseInt(h.length === 3 ? h.split("").map((x) => x + x).join("") : h, 16);
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
 }

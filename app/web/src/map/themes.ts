@@ -7,14 +7,12 @@ import { bucket, faded, sprite, stamp, type Sprite, type StampMemo } from "./spr
 export type RGB = [number, number, number];
 
 export type MapStyle = {
-  /** How a file is drawn: a dot, a turning glass cube, a hologram floor plate or a metro station. */
+  /** How a file is drawn: a dot, a turning glass cube, a hologram floor tile or a metro station. */
   node: "dot" | "cube" | "plate" | "station";
-  /** Imports: plain lines, or metro lines (horizontal, vertical and 45°, coloured by folder). */
+  /** Imports (the hovered or selected file's): plain lines, or metro lines (horizontal, vertical and 45°). */
   link: "line" | "metro";
   halo: string; fileInk: string; fileInkQuiet: string;
   moduleInk: string; moduleInkLively: string; moduleFont?: string; labelFont?: string;
-  /** Metro: folder names in their line's colour. */
-  moduleColored?: boolean;
   linkIdle: string; imports: string; usedBy: string;
   markerStroke: string; markerText: string; glow: boolean;
   /** How an agent travels between files, and the shape of the trail it leaves (see routePoints):
@@ -31,10 +29,10 @@ export type MapStyle = {
 
 const BASE: MapStyle = {
   node: "dot", link: "line",
-  halo: "rgba(251,251,253,0.9)", fileInk: "#1d1d1f", fileInkQuiet: "rgba(29,29,31,0.62)",
+  halo: "rgba(249,249,247,0.9)", fileInk: "#121214", fileInkQuiet: "rgba(18,18,20,0.62)",
   moduleInk: "rgba(29,29,31,0.2)", moduleInkLively: "rgba(29,29,31,0.34)",
   linkIdle: "rgba(29,29,31,0.08)",
-  imports: "rgba(91,91,214,0.7)", usedBy: "rgba(15,157,138,0.7)",
+  imports: "rgba(37,99,235,0.7)", usedBy: "rgba(15,157,138,0.7)",
   markerStroke: "#fff", markerText: "#fff", glow: false, route: "glide",
   palette: ["#2f7ae5", "#0f9d8a", "#c2409a", "#7c4dde", "#2e9e4f", "#0b8fb3", "#b5487a", "#4a6fa5"],
   reach: [1, 1.2],                       // a dot; the active outline sits 3.5px out
@@ -43,11 +41,12 @@ const BASE: MapStyle = {
 const STYLES: Record<ThemeId, MapStyle> = {
   default: BASE,
   metro: {
-    ...BASE, node: "station", link: "metro", moduleColored: true, route: "metro", track: "#1d1d1f",
+    ...BASE, node: "station", link: "metro", route: "metro", track: "#1d1d1f",
+    imports: "rgba(37,99,235,0.95)", usedBy: "rgba(15,157,138,0.95)",   // shown only around the file you point at or pick: near full strength
     halo: "rgba(255,255,255,0.95)", moduleInk: "rgba(29,29,31,0.55)", moduleInkLively: "rgba(29,29,31,0.8)",
     reach: [0.72, 1.1],                  // a station is 0.6r plus its ring; an agent adds one more ring
   },
-  ps2: {
+  prism: {
     ...BASE, node: "cube", route: "hop",
     halo: "rgba(22,22,52,0.85)", fileInk: "#f0f2ff", fileInkQuiet: "rgba(215,222,255,0.62)",
     moduleInk: "rgba(205,210,255,0.26)", moduleInkLively: "rgba(242,227,106,0.75)",
@@ -58,7 +57,7 @@ const STYLES: Record<ThemeId, MapStyle> = {
     palette: ["#8fb4ff", "#7ee0ff", "#ff9ff3", "#c7a6ff", "#9dffb0", "#ffe08a", "#ffb38a", "#a6f0ff"],
     reach: [1.25, 1.95],                 // a turning cube's corners (0.78r, tilted); active: 1.3x and the floor ring
   },
-  deadspace: {
+  hologram: {
     ...BASE, node: "plate", route: "elbow",
     halo: "rgba(8,14,16,0.9)", fileInk: "#dcf6f8", fileInkQuiet: "rgba(160,205,215,0.6)",
     moduleInk: "rgba(143,233,240,0.28)", moduleInkLively: "rgba(143,233,240,0.7)",
@@ -67,7 +66,7 @@ const STYLES: Record<ThemeId, MapStyle> = {
     imports: "rgba(95,227,224,0.9)", usedBy: "rgba(57,231,95,0.85)",
     markerStroke: "#0b1214", markerText: "#0b1214", glow: true,
     palette: ["#5fe3e0", "#7cc8ff", "#b6f0ff", "#9ef7c8", "#3fc1c9", "#8fe9f0", "#6fd3a8", "#a3d8ff"],
-    reach: [1.2, 2.05],                  // a plate is 1.17r wide; active: the projected square around it
+    reach: [1.35, 2.05],                 // a tile is 2.4r by 1.24r (its corners 1.35r out); active: the rectangle around it
   },
 };
 
@@ -75,18 +74,6 @@ export const mapStyle = (): MapStyle => STYLES[getTheme()];
 
 /** How far a file of radius r reaches on the canvas in this theme (graph units, never under 4: the smallest station). */
 export const reachOf = (r: number, active = false, st = mapStyle()) => Math.max(4, r * st.reach[active ? 1 : 0]);
-
-/** A folder's line colour (Metro): stable per folder name (memoized: it's asked for by every import line, every frame). */
-const moduleColors = new Map<string, string>();
-export function moduleColor(m: string): string {
-  let c = moduleColors.get(m);
-  if (c) return c;
-  let h = 0;
-  for (let i = 0; i < m.length; i++) h = (h * 31 + m.charCodeAt(i)) >>> 0;
-  c = `hsl(${(h * 137.508) % 360}, 68%, 46%)`;
-  moduleColors.set(m, c);
-  return c;
-}
 
 const TAU = Math.PI * 2;
 const rgba = ([r, g, b]: RGB, a: number) => `rgba(${r},${g},${b},${a})`;
@@ -100,7 +87,7 @@ const rgbaOf = (r: number, g: number, b: number, a: number) => {
 };
 const q = (v: number) => Math.round(v * 100) / 100;   // alphas to 1/100: fewer distinct strings, the same picture
 
-// ---------- PS2: a glass cube, turning slowly ----------
+// ---------- Prism: a glass cube, turning slowly ----------
 const CUBE_V = [-1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1, -1, -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1];
 const CUBE_F = [0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 5, 4, 2, 3, 7, 6, 1, 2, 6, 5, 0, 3, 7, 4];
 const TILT_C = Math.cos(0.55), TILT_S = Math.sin(0.55);
@@ -151,7 +138,7 @@ const CUBE_STAMP_PX = 12;    // up to here a cube is stamped at one of ANGLES an
 const ANGLES = 32;           // per quarter turn (a cube looks the same a quarter turn on): 2.8° apart
 const QUARTER = Math.PI / 2;
 /**
- * A PS2 cube, the quick way: a stamp of its glow and one of its body at the nearest of 32 angles, for every cube up to
+ * A Prism cube, the quick way: a stamp of its glow and one of its body at the nearest of 32 angles, for every cube up to
  * CUBE_STAMP_PX on screen (all of them on a big map); false when it's bigger (drawCube draws it then). Looks like drawCube.
  * `css`: its colour as a string, the stamp's key.
  */
@@ -177,40 +164,40 @@ export function stampCube(ctx: CanvasRenderingContext2D, x: number, y: number, s
   return true;
 }
 
-// ---------- Dead Space: a floor plate, seen from above at an angle ----------
+// ---------- Hologram: a floor tile, a low slab seen from above ----------
+const TILE_W = 1.2, TILE_H = 0.62;   // half its width and half its height, in radii
 function plateBody(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: RGB, lit: boolean, scale: number) {
-  const rx = r * 1.3, ry = r * 0.72, depth = Math.max(r * 0.35, 2.5 / scale);
-  ctx.fillStyle = "rgba(16,24,26,0.95)";
-  ctx.beginPath(); ctx.ellipse(x, y + depth, rx, ry, 0, 0, TAU); ctx.fill();
-  ctx.fillRect(x - rx, y, rx * 2, depth);
+  const hx = r * TILE_W, hy = r * TILE_H, depth = Math.max(r * 0.35, 2.5 / scale), cr = hy * 0.28;
+  ctx.fillStyle = "rgba(16,24,26,0.95)";   // the slab's edge, showing under its top
+  ctx.beginPath(); ctx.roundRect(x - hx, y - hy + depth, hx * 2, hy * 2, cr); ctx.fill();
   ctx.fillStyle = lit ? rgba(c, 0.85) : "rgba(92,108,112,0.92)";
-  ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(x - hx, y - hy, hx * 2, hy * 2, cr); ctx.fill();
   ctx.strokeStyle = lit ? rgba(c, 1) : "rgba(150,190,198,0.35)"; ctx.lineWidth = 1 / scale; ctx.stroke();
   if (lit) {
-    const g = ctx.createRadialGradient(x, y, 0, x, y, rx * 2.2);
+    const g = ctx.createRadialGradient(x, y, 0, x, y, hx * 2.2);
     g.addColorStop(0, rgba(c, 0.28)); g.addColorStop(1, rgba(c, 0));
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rx * 2.2, 0, TAU); ctx.fill();
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, hx * 2.2, 0, TAU); ctx.fill();
   }
 }
 export function drawPlate(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: RGB, lit: boolean, scale: number, here: string | null = null) {
-  if (here) { // where an agent is: one holographic square projected on the floor around the plate
-    const qx = r * 1.3 * 1.75 + 5 / scale, qy = r * 0.72 * 1.75 + 3 / scale;
+  if (here) { // where an agent is: one holographic rectangle projected on the floor around the tile
+    const qx = r * TILE_W * 1.45 + 5 / scale, qy = r * TILE_H * 1.6 + 4 / scale;
     ctx.save();
-    ctx.beginPath(); ctx.moveTo(x - qx, y); ctx.lineTo(x, y - qy); ctx.lineTo(x + qx, y); ctx.lineTo(x, y + qy); ctx.closePath();
+    ctx.beginPath(); ctx.roundRect(x - qx, y - qy, qx * 2, qy * 2, 3 / scale);
     ctx.strokeStyle = here; ctx.lineWidth = 1.5 / scale; ctx.shadowColor = here; ctx.shadowBlur = 10; ctx.stroke();
     ctx.restore();
   }
   plateBody(ctx, x, y, r, c, lit, scale);
 }
 const PLATE_STAMP_PX = 40;
-/** A Dead Space plate as a stamp (up to PLATE_STAMP_PX on screen, no agent square); false when drawPlate must draw it. */
+/** A Hologram tile as a stamp (up to PLATE_STAMP_PX on screen, no agent rectangle); false when drawPlate must draw it. */
 export function stampPlate(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: RGB, css: string, lit: boolean, scale: number, memo: StampMemo = {}, alpha = 1): boolean {
   const R = r * scale;
   if (R > PLATE_STAMP_PX) return false;
   const b = bucket(R), key = lit ? css : "", fa = faded(alpha);
   let sp: Sprite | null | undefined = memo.s;
   if (!sp || memo.a !== key || memo.c !== b || memo.e !== fa) {
-    const rx = b * 1.3, ry = b * 0.72, depth = Math.max(b * 0.35, 2.5);
+    const rx = b * TILE_W, ry = b * TILE_H, depth = Math.max(b * 0.35, 2.5);
     const half = lit ? rx * 2.2 : rx + 1, top = lit ? rx * 2.2 : ry + 1, h = top + Math.max(lit ? rx * 2.2 : 0, depth + ry + 1);
     sp = memo.s = sprite("p|" + key + "|" + b + "|" + fa, half * 2, h, half, top, (cx) => { cx.globalAlpha = fa; plateBody(cx, half, top, b, c, lit, 1); });
     memo.a = key; memo.c = b; memo.e = fa;
@@ -277,21 +264,6 @@ export function metroPoints(x1: number, y1: number, x2: number, y2: number): Pt2
 }
 export type Pt2 = [number, number];
 
-/** Starts a path along a metro track (the caller strokes it). */
-export function metroPath(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
-  ctx.beginPath();
-  metroSegment(ctx, x1, y1, x2, y2);
-}
-
-/** Adds a metro track to the current path, the corners of metroPoints without building them: many tracks share one stroke. */
-export function metroSegment(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
-  const dx = x2 - x1, dy = y2 - y1, ax = Math.abs(dx), ay = Math.abs(dy);
-  ctx.moveTo(x1, y1);
-  if (ax >= ay) { const h = ((ax - ay) / 2) * Math.sign(dx); ctx.lineTo(x1 + h, y1); ctx.lineTo(x2 - h, y2); }
-  else { const v = ((ay - ax) / 2) * Math.sign(dy); ctx.lineTo(x1, y1 + v); ctx.lineTo(x2, y2 - v); }
-  ctx.lineTo(x2, y2);
-}
-
 /** The point a fraction k (0..1) of the way along a polyline, by length: an agent riding the track. */
 export function along(pts: Pt2[], k: number): { x: number; y: number } {
   const seg: number[] = []; let total = 0;
@@ -337,7 +309,7 @@ export function upTo(pts: Pt2[], k: number): Pt2[] {
   return out;
 }
 
-/** Files a marker just landed on (PS2: the cube spins up and flashes). Set by the agent and replay layers, read by the map. */
+/** Files a marker just landed on (Prism: the cube spins up and flashes). Set by the agent and replay layers, read by the map. */
 export const landings = new Map<string, number>();
 export const LAND_MS = 520;
 /** Forget landings that are over (the map only clears the ones it draws, and it doesn't draw files off screen). */
@@ -347,8 +319,8 @@ export function settleLandings(now = performance.now()) {
 
 /**
  * The trip itself, drawn under the marker while it travels (p: 0..1 of the trip, e: the eased position on it).
- * Dead Space: a dashed locator line projects ahead to the destination, then the marker follows it.
- * PS2: fading afterimages of the marker along the arc behind it.
+ * Hologram: a dashed locator line projects ahead to the destination, then the marker follows it.
+ * Prism: fading afterimages of the marker along the arc behind it.
  */
 export function drawTrip(ctx: CanvasRenderingContext2D, route: MapStyle["route"], pts: Pt2[], p: number, e: number, color: string, r: number, alpha: number, scale: number) {
   if (p >= 1) return;

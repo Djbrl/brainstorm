@@ -85,16 +85,16 @@
 .sidebar-file-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--cool); }
 .sidebar-file-dot.hot { background: var(--hot); }
 .sidebar-file-dot.warm { background: var(--warm); }
-.sidebar-file-active { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; box-shadow: 0 0 0 0 rgba(91,91,214,.5); animation: sidebar-pulse 1.6s infinite; }
+.sidebar-file-active { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; box-shadow: 0 0 0 0 rgba(37,99,235,.5); animation: sidebar-pulse 1.6s infinite; }
 .sidebar-tree-touched { flex: none; font-size: 11px; color: var(--accent); white-space: nowrap; }
-@keyframes sidebar-pulse { 0% { box-shadow: 0 0 0 0 rgba(91,91,214,.5); } 100% { box-shadow: 0 0 0 8px rgba(91,91,214,0); } }
+@keyframes sidebar-pulse { 0% { box-shadow: 0 0 0 0 rgba(37,99,235,.5); } 100% { box-shadow: 0 0 0 8px rgba(37,99,235,0); } }
 
 
 /* Threads: click to open (its Track). The open one is a pill; a running one pulses blue. */
 button.sidebar-thread-head { width: calc(100% + 16px); border: 0; background: transparent; padding: 7px 8px; margin: -7px -8px; border-radius: 10px; text-align: left; color: var(--ink); cursor: pointer; box-sizing: border-box; }
 button.sidebar-thread-head:hover { background: #f4f4f7; }
 .sidebar-thread.selected button.sidebar-thread-head { background: var(--accent-soft); cursor: default; }
-.sidebar-thread-status.running { background: var(--accent); box-shadow: 0 0 0 0 rgba(91,91,214,.55); animation: sidebar-pulse 1.6s infinite; }
+.sidebar-thread-status.running { background: var(--accent); box-shadow: 0 0 0 0 rgba(37,99,235,.55); animation: sidebar-pulse 1.6s infinite; }
 .sidebar-thread-head time { font-variant-numeric: tabular-nums; }
 
 /* The stats line sits just above the sidebar. */
@@ -138,14 +138,14 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 
 /* Under the open thread: what it waits on you for (the full row, with "Show the step", ends its Track). */
 .sidebar-thread-note { margin: 12px 0 0 16px; font-size: 13px; line-height: 1.4; color: #9a5800; font-weight: 600; }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .sidebar-thread-note.blocked { color: #f5b544; }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .sidebar-thread-attn.turn { background: var(--hover); color: var(--ink-2); }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .sidebar-thread-attn.blocked { background: rgba(245,158,11,.18); color: #f5c06a; }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .sidebar-thread-note.blocked { color: #f5b544; }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .sidebar-thread-attn.turn { background: var(--hover); color: var(--ink-2); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .sidebar-thread-attn.blocked { background: rgba(245,158,11,.18); color: #f5c06a; }
 /* The open thread's places on the Places lens (PlaceSteps): the one list that stays in the sidebar. */
 .sidebar-thread-steps { flex: 1; min-height: 0; margin: 10px -2px 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
 
 /* Dark themes: the amber badge glows on the dark sheet instead of a light chip. */
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .sidebar-thread-attn.blocked { background: rgba(245,158,11,.2); color: #ffc56b; }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .sidebar-thread-attn.blocked { background: rgba(245,158,11,.2); color: #ffc56b; }
 
 /* Narrow (tablet and phone): the sidebar starts folded and opens over the content, with a light scrim behind it
    (tap it, ‹ or Esc to fold). The folded tab stays put underneath, so nothing behind the sheet moves. */
@@ -195,7 +195,7 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .file-view-git { display: flex; align-items: center; gap: 10px; margin: 10px 0 0; color: var(--ink-2); font-size: 13.5px; }
 .file-view-git i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .file-view-live { display: flex; align-items: center; gap: 10px; margin: 14px 0 0; color: var(--accent); font-weight: 500; font-size: 14px; }
-.file-view-live i { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--accent); box-shadow: 0 0 0 0 rgba(91,91,214,.5); animation: sidebar-pulse 1.6s infinite; }
+.file-view-live i { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--accent); box-shadow: 0 0 0 0 rgba(37,99,235,.5); animation: sidebar-pulse 1.6s infinite; }
 .file-view section { margin-top: 28px; }
 .file-view h3 { font-size: 15.5px; font-weight: 700; margin: 0 0 9px; }
 .file-view-summary { margin: 0; font-size: 15px; line-height: 1.55; color: var(--ink); }

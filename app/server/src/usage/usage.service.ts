@@ -19,7 +19,7 @@ export const USAGE_KEYS = ["op", "th", "rp", "lv", "sh", "ak", "pj", "se", "st"]
 export type UsageKey = (typeof USAGE_KEYS)[number];
 /** Counts the web app reports (the server counts the rest itself). */
 export const WEB_KEYS = new Set<string>(["op", "th", "rp", "lv"]);
-export const THEMES = new Set(["default", "metro", "ps2", "deadspace"]);
+export const THEMES = new Set(["default", "metro", "prism", "hologram"]);
 
 const ENDPOINT = process.env.RUNDOWN_USAGE_URL ?? "https://brainstorm-landing.vercel.app/api/usage";
 const FIRST_TRY_MS = 60_000;          // after start, so a crash loop doesn't report

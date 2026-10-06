@@ -182,7 +182,7 @@ Numbers are each branch's own measurements, mostly on a machine loaded by the ot
 
 | Branch | What | Result |
 | --- | --- | --- |
-| `perf/canvas` | The map pauses when nothing moves; off-screen files skipped; colours, text widths and folder labels cached; theme shapes from cached pictures; idle import lines batched and hidden when zoomed out on big maps; no full layout restart on live updates; positions saved per project and theme (IndexedDB). `MapView.tsx` split from 1,237 to 413 lines (`graph.ts`, `color.ts`, `drawNode.ts`, `useMapCamera.ts`, `useLiveAgents.ts`) | 20k files at rest: 3–11 → 58–60 fps, main thread 86–89% → 3–4% busy (PS2 45%). 20k files at 4× CPU: the page used to stop answering for 4 minutes; now 58–59 fps at rest, 14–22 fps panning |
+| `perf/canvas` | The map pauses when nothing moves; off-screen files skipped; colours, text widths and folder labels cached; theme shapes from cached pictures; idle import lines batched and hidden when zoomed out on big maps; no full layout restart on live updates; positions saved per project and theme (IndexedDB). `MapView.tsx` split from 1,237 to 413 lines (`graph.ts`, `color.ts`, `drawNode.ts`, `useMapCamera.ts`, `useLiveAgents.ts`) | 20k files at rest: 3–11 → 58–60 fps, main thread 86–89% → 3–4% busy (Prism 45%). 20k files at 4× CPU: the page used to stop answering for 4 minutes; now 58–59 fps at rest, 14–22 fps panning |
 | `perf/replay-lists` | Replay trail cached in layers, per-cursor caches, binary search, the camera loop stops when settled; windowed Track list and file tree | 10k-step thread at 4× CPU: "Show every step" 1.8 → 0.7 s; scrolling Track 5–7 → 23–28 fps; full-detail replay 10–12 → 29–34 fps; Files search on 19k files 1.9 s → 37 ms |
 | `perf/web-store` | Websocket messages applied once per frame; selector hooks; O(1) reducer updates; `structureVersion`; nav split into actions, state and cursor; the unused failures poll removed; one steps download per thread; the map chunk prefetched | 1,000 messages at 250/s: renders 556 → 229 (project) and 674 → 225 (thread open); 4 s of messages handled in 6.5 s and 4.9 s (was 13.9 s and 13.6 s); header renders ~600 → 0–1 |
 | `perf/web-thread` | One shared thread build and file resolver for all components, incremental for live threads; cached chapters and timestamps | A "file" message across 8 views 115–294 → 0.4–2 ms; one new step 197–268 → 2.6–6.7 ms; identical output in 16,524 checks (`node app/web/scripts/perf-thread.mjs`) |
@@ -203,7 +203,7 @@ mapper, bus), `node app/web/scripts/perf-thread.mjs` (thread model equivalence).
 - **Narrow hooks everywhere:** the map, replay and sidebar still read the whole store with `useLive()`/`useNav()`; moving
   them to `useLiveSelector`, `useNavState`, `useNavActions` and `useReplayCursor` is the biggest remaining front-end
   win, especially for the Track list.
-- **Live agents in PS2 and Dead Space** stay slow at 4× CPU (about 7 fps at 5k files): a file with an agent on it still
+- **Live agents in Prism and Hologram (then called PS2 and Dead Space)** stay slow at 4× CPU (about 7 fps at 5k files): a file with an agent on it still
   uses the old glow drawing.
 - **Agent labels** ("Subagent · … · Editing") don't use the label space, so they can overlap file names.
 - **Server:** light step payloads (fetch the full step when opened); coalesced file and summary broadcasts; the

@@ -16,7 +16,7 @@ type GNode = NodeObject & {
 };
 type GLink = { source: string | GNode; target: string | GNode };
 
-export const AREA_COLOR: Record<CoworkArea, string> = { web: "#5b5bd6", local: "#7d8597", services: "#1f9d55", apps: "#c2410c" };
+export const AREA_COLOR: Record<CoworkArea, string> = { web: "#2563eb", local: "#7d8597", services: "#1f9d55", apps: "#c2410c" };
 const HOT = "#ff6a3d";
 const RISK = "#d93025";
 const ANCHOR: Record<CoworkArea, [number, number]> = { web: [-330, 60], local: [330, 60], services: [0, -230], apps: [0, 330] };

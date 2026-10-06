@@ -7,7 +7,8 @@
 
 const KEYS = ["op", "th", "rp", "lv", "sh", "ak", "pj", "se", "st"];
 const OS = new Set(["darwin", "linux", "win32", "other"]);
-const THEMES = new Set(["default", "metro", "ps2", "deadspace", "none"]);
+const THEMES = new Set(["default", "metro", "prism", "hologram", "none"]);
+const RENAMED = { ps2: "prism", deadspace: "hologram" };   // 0.5 and older report the themes' old names
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const VERSION = /^\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 
@@ -29,7 +30,8 @@ function validate(body) {
   if (kind !== "new" && kind !== "day") return null;
   if (typeof v !== "string" || !VERSION.test(v)) return null;
   if (typeof os !== "string" || !OS.has(os)) return null;
-  const theme = typeof tm === "string" && THEMES.has(tm) ? tm : "none";
+  const named = typeof tm === "string" ? RENAMED[tm] ?? tm : "";
+  const theme = THEMES.has(named) ? named : "none";
   if (!c || typeof c !== "object" || Array.isArray(c)) return null;
   const counts = {};
   for (const [k, n] of Object.entries(c)) {

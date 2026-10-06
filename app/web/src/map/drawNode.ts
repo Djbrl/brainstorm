@@ -5,7 +5,7 @@ import type { Look } from "./replay/layer";
 import { drawName, textWidth, type LabelSpace, type QueuedLabel } from "./labels";
 import { Motion } from "./redraw";
 import {
-  CUBE_STILL_PX, drawCube, drawPlate, drawStation, LAND_MS, landings, metroPath, metroPoints, metroSegment, moduleColor, polyPath, reachOf, upTo, type Pt2,
+  CUBE_STILL_PX, drawCube, drawPlate, drawStation, LAND_MS, landings, metroPoints, polyPath, reachOf, upTo, type Pt2,
   stampCube, stampPlate, stampStation, type MapStyle, type RGB,
 } from "./themes";
 import { css, mixRGB, recencyRGB, same, steps, type Tokens } from "./color";
@@ -21,11 +21,8 @@ const baseName = (p: string) => p.split("/").pop() || p;
 
 // ---------- import links ----------
 // Their colours (imports, used by) belong to the map theme: see themes.ts.
-// Outside Metro only the hovered or selected file's lines are drawn. Metro's lines are the theme itself: there,
-const HIDE_LINKS_FROM = 4000;   // a map with more import lines than this...
-const HIDE_LINKS_BELOW = 0.4;   // ...hides the idle ones below this zoom (a haze over the stations); the focused file's stay
+// Only the hovered or selected file's lines are drawn, in every theme (Metro draws them as transit lines).
 const ARROW = 3.5, ARROW_AT = 0.92;
-const METRO_ONE_BY_ONE = 2500;  // Metro lines on screen up to which each is its own stroke (crossings darken); beyond, batched
 function linkRole(l: GLink, focus: string | null): "imports" | "usedBy" | null {
   if (!focus) return null;
   if (l.source.id === focus) return "imports";
@@ -54,7 +51,7 @@ export const FILE_LABELS_MAX = 500;    // file names placed per frame at most (t
 export type Frame = {
   id: number; scale: number; x0: number; y0: number; x1: number; y1: number;
   now: number; t: number; st: MapStyle; sel: string | null; hover: string | null; coolCss: string;
-  looks: boolean; anyLook: boolean; lookSum: number; motion: Motion; linksDone: boolean;
+  looks: boolean; anyLook: boolean; lookSum: number; motion: Motion;
   labN: GNode[]; labP: number[];
   /** The theme's colours, the colour epoch (bumped every few seconds: recency fades), and what recencyRGB needs. */
   tokens: Tokens; epoch: number; recorded: boolean; since: number;
@@ -68,12 +65,11 @@ export type Dots = Map<string, { css: string; a: number; xyr: number[] }>;
 export type Caches = {
   ripples: Map<string, number>; dots: Dots;
   focusColours: Map<string, { rgb: RGB; css: string; ep: number }>;
-  linkBatches: Map<string, { c: string; a: number; ls: GLink[] }>; metroVisible: GLink[]; metroAlpha: number[];
   /** The focused file's lines (drawFocusLinks): which file and since when, and the one before, fading out. */
   /** How far each file's lines are drawn (drawFocusLinks): the focused one's, and any still drawing back. */
   lines: Map<string, LineLevel>;
 };
-export const newCaches = (): Caches => ({ ripples: new Map(), dots: new Map(), focusColours: new Map(), linkBatches: new Map(), metroVisible: [], metroAlpha: [],
+export const newCaches = (): Caches => ({ ripples: new Map(), dots: new Map(), focusColours: new Map(),
   lines: new Map() });
 
 export const moreMotion = (F: Frame, m: Motion) => { if (m === Motion.Smooth || F.motion === Motion.None) F.motion = m; };
@@ -106,65 +102,6 @@ const focusColour = (edited: string | undefined, F: Frame, m: Caches["focusColou
   }
   return c;
 };
-
-/**
- * Metro's import lines, under the files: all of them are its transit lines, batched per colour and strength (the other
- * themes draw only the hovered or selected file's, over the files: drawFocusLinks).
- */
-export function drawLinks(ctx: CanvasRenderingContext2D, scale: number, links: GLink[], F: Frame, c: Caches) {
-  const st = F.st;
-  if (!links.length || st.link !== "metro") return;
-  const focus = F.linkFocus, tracing = F.tracing;
-  const hideIdle = links.length > HIDE_LINKS_FROM && scale < HIDE_LINKS_BELOW;
-  const { x0, x1, y0, y1 } = F;
-  const off = (s: GNode, t: GNode) => {
-    const sx = s.x!, sy = s.y!, tx = t.x!, ty = t.y!;
-    return (sx < x0 && tx < x0) || (sx > x1 && tx > x1) || (sy < y0 && ty < y0) || (sy > y1 && ty > y1);
-  };
-  {
-    // Metro: imports as transit lines (horizontal, vertical and 45°), coloured by the importing file's folder.
-    // While a thread plays, the import lines step back so the thread's own line reads over them.
-    const base = focus ? 0.12 : tracing ? 0.18 : 0.55;
-    const vis = c.metroVisible, va = c.metroAlpha;
-    vis.length = 0; va.length = 0;
-    for (const l of links) {
-      const s = l.source, t = l.target;
-      if (s.x === undefined || t.x === undefined || off(s, t)) continue;
-      if (focus && (s.id === focus || t.id === focus)) continue;   // drawn over the files (drawFocusLinks)
-      if (hideIdle) continue;
-      vis.push(l); va.push(base * Math.min(lookOf(s, F)?.alpha ?? 1, lookOf(t, F)?.alpha ?? 1));
-    }
-    ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.lineWidth = Math.max(1.6 / scale, 2.2);
-    if (vis.length <= METRO_ONE_BY_ONE) {
-      // As many lines as a project usually shows: one stroke each, so where two cross they darken as they always did.
-      for (let i = 0; i < vis.length; i++) {
-        const l = vis[i];
-        ctx.globalAlpha = va[i]; ctx.strokeStyle = moduleColor(l.source.file.module);
-        metroPath(ctx, l.source.x!, l.source.y!, l.target.x!, l.target.y!);
-        ctx.stroke();
-      }
-    } else {
-      // Thousands on screen: one stroke per folder colour and strength.
-      const batches = c.linkBatches;
-      for (const b of batches.values()) b.ls.length = 0;
-      for (let i = 0; i < vis.length; i++) {
-        const l = vis[i], a = Math.round(va[i] * 100) / 100, col = moduleColor(l.source.file.module), k = col + "|" + a;
-        let b = batches.get(k);
-        if (!b) { if (batches.size > 3000) batches.clear(); batches.set(k, (b = { c: col, a, ls: [] })); }
-        b.ls.push(l);
-      }
-      for (const b of batches.values()) {
-        if (!b.ls.length) continue;
-        ctx.globalAlpha = b.a; ctx.strokeStyle = b.c;
-        ctx.beginPath();
-        for (const l of b.ls) metroSegment(ctx, l.source.x!, l.source.y!, l.target.x!, l.target.y!);
-        ctx.stroke();
-      }
-    }
-    ctx.lineCap = "butt"; ctx.lineJoin = "miter";
-  }
-}
 
 // ---------- the hovered or selected file's import lines ----------
 const LINES_GROW_MS = 320;   // lines growing out of the file, or a stub running out to the whole line

@@ -103,7 +103,7 @@ const LIGHT: Palette = {
   inserted: "#22863a", operator: "#d73a49", entity: "#22863a", url: "#032f62", "attr-value": "#032f62", keyword: "#d73a49",
   atrule: "#d73a49", "class-name": "#6f42c1", function: "#6f42c1", regex: "#032f62", important: "#d73a49", variable: "#e36209",
 };
-/** Dark themes (PS2, Dead Space): softer than the diff viewer's Dracula, readable on navy and on near-black green. */
+/** Dark themes (Prism, Hologram): softer than the diff viewer's Dracula, readable on navy and on near-black green. */
 const DARK: Palette = {
   default: "inherit", comment: "#7d8aa6", prolog: "#7d8aa6", doctype: "#7d8aa6", cdata: "#7d8aa6", punctuation: "#b8c0d4",
   property: "#7fd4f5", tag: "#ff8ecf", boolean: "#c9a7ff", number: "#c9a7ff", constant: "#c9a7ff", symbol: "#c9a7ff",

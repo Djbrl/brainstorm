@@ -111,8 +111,13 @@ function Shell() {
             </button>
           )}
           <SettingsButton />
-          <span className={`dot ${state.connected ? "live" : ""}`} />
-          <span className="status-text">{state.shared ? "Shared replay" : state.replay ? "Recorded demo" : state.connected ? "Live" : "Connecting…"}</span>
+          {/* No "Live" pill: being live is the normal state. Only what isn't is said: a replay, or the server out of reach. */}
+          {(state.shared || state.replay || !state.connected) && (
+            <>
+              <span className="dot" />
+              <span className="status-text">{state.shared ? "Shared replay" : state.replay ? "Recorded demo" : "Connecting…"}</span>
+            </>
+          )}
         </div>
       </header>
       {state.preview && (

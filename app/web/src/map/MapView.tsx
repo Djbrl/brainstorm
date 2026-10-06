@@ -31,7 +31,7 @@ import { css, readTokens } from "./color";
 import { hitAt, nodeReach, shownLinks, stepTween, useGraph, type GLink, type GNode } from "./graph";
 import { foldFrame, openAround, useFoldOn } from "./fold";
 import { GIT_COLOURS, gitFiles, useShowGit, worktreeOf } from "./gitFilter";
-import { drawFile, drawFocusLinks, drawFolderNames, drawLinks, FILE_LABELS_MAX, flushDots, labelFor, lookOf, moreMotion, newCaches, RIPPLE_MS, type Frame } from "./drawNode";
+import { drawFile, drawFocusLinks, drawFolderNames, FILE_LABELS_MAX, flushDots, labelFor, lookOf, moreMotion, newCaches, RIPPLE_MS, type Frame } from "./drawNode";
 import { useMapCamera } from "./useMapCamera";
 import { useLiveAgents } from "./useLiveAgents";
 import "./map.css";
@@ -178,7 +178,7 @@ export function MapView() {
     w.sid = sid; w.playing = playing; w.root = root || w.root;
   }, [sid, playing, map?.root, replayLayer.active, replayLayer.touches, setSelected]);
 
-  // Import lines show only around the file under the pointer, or else the selected one (Metro keeps all its lines).
+  // Import lines show only around the file under the pointer, or else the selected one, in every theme.
   const linkFocus = hover ?? selected;
   const linkFocusRef = useRef(linkFocus); linkFocusRef.current = linkFocus;
 
@@ -248,7 +248,7 @@ export function MapView() {
 
   // ---- the frame ----
   const frame = useRef<Frame>({ id: 0, scale: 1, x0: -Infinity, y0: -Infinity, x1: Infinity, y1: Infinity, now: 0, t: 0, st: style,
-    sel: null, hover: null, coolCss: "", looks: true, anyLook: false, lookSum: 0, motion: Motion.None, linksDone: false, labN: [], labP: [],
+    sel: null, hover: null, coolCss: "", looks: true, anyLook: false, lookSum: 0, motion: Motion.None, labN: [], labP: [],
     tokens, epoch: 0, recorded: recorded(), since: sinceMs, look: () => null, linkFocus: null, tracing: false, only: null, onlyDirs: null });
   const lastLookSum = useRef(0);
   const vis = useRef({ sig: 0, ver: 0 });   // what's open (fold.ts), and a counter bumped when it or the positions change
@@ -267,7 +267,7 @@ export function MapView() {
     if (a && b) { F.x0 = Math.min(a.x, b.x); F.x1 = Math.max(a.x, b.x); F.y0 = Math.min(a.y, b.y); F.y1 = Math.max(a.y, b.y); }
     // The focus is asked about every file only while a thread is open, or its fade back hasn't finished.
     F.looks = replayRef.current.active || F.anyLook;
-    F.anyLook = false; F.lookSum = 0; F.motion = Motion.None; F.linksDone = false;
+    F.anyLook = false; F.lookSum = 0; F.motion = Motion.None;
     F.labN.length = 0; F.labP.length = 0;
     for (const d of caches.current.dots.values()) d.xyr.length = 0;
     settleLandings(F.t);
@@ -288,12 +288,6 @@ export function MapView() {
 
   const drawNode = useCallback((node: NodeObject, ctx: CanvasRenderingContext2D, scale: number) => {
     const F = frame.current;
-    // The import lines first, under everything (a line into a closed folder ends on its circle).
-    // Metro's lines, under everything (worked out only there; the focused file's are drawn over the files, endFrame).
-    if (!F.linksDone) {
-      F.linksDone = true;
-      if (F.st.link === "metro") drawLinks(ctx, scale, shownLinks(graphRef.current, linkCache.current, `${vis.current.sig}`), F, caches.current);
-    }
     drawFile(ctx, node as GNode, scale, F, caches.current);
   }, []);
 

@@ -29,7 +29,7 @@
   background: #fff; border: 2px solid var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,.18); }
 .rp-slider input::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 2px solid var(--accent); }
 .rp-slider input:focus-visible { outline: none; }
-.rp-slider input:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(91,91,214,.3); }
+.rp-slider input:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(37,99,235,.3); }
 
 .rp-speed { display: flex; background: #f0f0f3; border-radius: 999px; padding: 2px; }
 .rp-speed button { border: 0; background: transparent; color: var(--ink-2); font-size: 12.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
@@ -173,8 +173,8 @@
 .rp-waiting-hint { font-size: 12px; opacity: .8; }
 .rp-waiting-open { justify-self: start; border: 0; background: transparent; padding: 2px 0 0; color: var(--accent); font-size: 12px; font-weight: 600; }
 /* Dark themes: the light amber and grey sheets would glare (and the grey one left its pale text at 1.5:1). */
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .rp-waiting.blocked { background: rgba(245,158,11,.14); color: #f5c06a; }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .rp-waiting.turn { background: var(--hover); color: var(--ink-2); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .rp-waiting.blocked { background: rgba(245,158,11,.14); color: #f5c06a; }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .rp-waiting.turn { background: var(--hover); color: var(--ink-2); }
 @keyframes attn-breathe { 0% { box-shadow: 0 0 0 0 rgba(245,158,11,.55); } 70% { box-shadow: 0 0 0 7px rgba(245,158,11,0); } 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); } }
 
 /* Narrow (tablet and phone): the footer and the player fit the width they have. */

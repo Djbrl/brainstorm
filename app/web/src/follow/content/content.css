@@ -126,29 +126,29 @@
 .cv-returned code { font-family: var(--font-mono); color: var(--ink-2); background: #f2f2f6; border-radius: 5px; padding: 1px 5px; }
 .sh-ref { color: #8e8e93; font-style: italic; }
 
-/* Dark themes (PS2, Dead Space): the light boxes above become a shade darker than the panel, their text the theme's
+/* Dark themes (Prism, Hologram): the light boxes above become a shade darker than the panel, their text the theme's
    inks, and the JSON colours lighter. Text in the boxes stays at 7:1 or more (line numbers and chevrons excepted). */
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) :is(.cv-plain, .cv-code, .jv) { background: rgba(0,0,0,.22); border-color: var(--line); }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) :is(.cv-code, .jv) { color: var(--ink); }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .cv-plain { color: var(--ink-2); }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .cv-ln { color: var(--ink-3); }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) :is(.jv-key, .jv-count) { color: var(--ink-2); }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .jv-toggle:hover .jv-key { color: var(--accent); }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .jv-kids { border-left-color: var(--line); }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) :is(.jv-str, .jv-block pre) { color: #86e3a4; }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .jv-num { color: #a4c8ff; }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) :is(.jv-lit, .cv-lit) { color: #d4b6ff; }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .cv-returned { color: var(--ink-2); }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .cv-returned code { background: var(--hover-2); color: var(--ink); }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .cv-chip { background: var(--hover-2); color: var(--ink-2); }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .cv-chip.fail { background: rgba(255,105,97,.16); color: #ff9a92; }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .cv-err { color: #ff9a92; }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .cv-action { border-bottom-color: var(--line); }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .cv-action::before { background: var(--hover-2); color: var(--ink-2); }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .cv-action.failed::before { background: rgba(255,105,97,.16); color: #ff9a92; }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .cv-page:hover { border-color: var(--ink-3); }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .cv-shots img { background: var(--hover); }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .cv-todos .box { border-color: var(--ink-3); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) :is(.cv-plain, .cv-code, .jv) { background: rgba(0,0,0,.22); border-color: var(--line); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) :is(.cv-code, .jv) { color: var(--ink); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .cv-plain { color: var(--ink-2); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .cv-ln { color: var(--ink-3); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) :is(.jv-key, .jv-count) { color: var(--ink-2); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .jv-toggle:hover .jv-key { color: var(--accent); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .jv-kids { border-left-color: var(--line); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) :is(.jv-str, .jv-block pre) { color: #86e3a4; }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .jv-num { color: #a4c8ff; }
+:root:is([data-theme="prism"], [data-theme="hologram"]) :is(.jv-lit, .cv-lit) { color: #d4b6ff; }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .cv-returned { color: var(--ink-2); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .cv-returned code { background: var(--hover-2); color: var(--ink); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .cv-chip { background: var(--hover-2); color: var(--ink-2); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .cv-chip.fail { background: rgba(255,105,97,.16); color: #ff9a92; }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .cv-err { color: #ff9a92; }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .cv-action { border-bottom-color: var(--line); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .cv-action::before { background: var(--hover-2); color: var(--ink-2); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .cv-action.failed::before { background: rgba(255,105,97,.16); color: #ff9a92; }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .cv-page:hover { border-color: var(--ink-3); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .cv-shots img { background: var(--hover); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .cv-todos .box { border-color: var(--ink-3); }
 
 /* An HTML file shown as a page (HtmlPreview.tsx): a scaled-down desktop page in a quiet frame. */
 .cv-html-frame { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: #fff; }

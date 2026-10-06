@@ -54,7 +54,7 @@
 .su-btn:not(:disabled):hover { transform: translateY(-1px); }
 .su-btn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--accent-soft); }
 .su-btn.big { font-family: var(--font-display); font-size: 19px; font-weight: 700; height: 56px; padding: 0 32px; border-radius: 16px; }
-.su-btn.big:not(:disabled) { animation: su-ready .5s cubic-bezier(.2,.7,.2,1); box-shadow: 0 8px 24px rgba(91,91,214,.25); }
+.su-btn.big:not(:disabled) { animation: su-ready .5s cubic-bezier(.2,.7,.2,1); box-shadow: 0 8px 24px rgba(37,99,235,.25); }
 .su-error { margin: 10px 0 0; color: var(--risk); font-size: 14.5px; }
 
 /* Checklist */
@@ -80,7 +80,7 @@
 .su-glyph.warn { background: #fff4e0; color: #c77a00; animation: su-pop .35s cubic-bezier(.2,.9,.3,1.4); }
 .su-glyph.error { background: #fdecea; color: var(--risk); animation: su-pop .35s cubic-bezier(.2,.9,.3,1.4); }
 .su-draw { stroke-dasharray: 16; stroke-dashoffset: 16; animation: su-draw .4s .05s ease forwards; }
-.su-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(91,91,214,.25); border-top-color: var(--accent); animation: su-spin .8s linear infinite; display: inline-block; }
+.su-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(37,99,235,.25); border-top-color: var(--accent); animation: su-spin .8s linear infinite; display: inline-block; }
 .su-spin.light { border-color: rgba(255,255,255,.4); border-top-color: #fff; }
 
 .su-actions { display: flex; align-items: center; gap: 24px; margin-top: 40px; }

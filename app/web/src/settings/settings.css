@@ -1,16 +1,29 @@
-/* Owned by the lead. The settings button and its menu. */
+/* Owned by the lead. The settings button and its window. */
 .settings { position: relative; margin-right: 10px; }
 /* The header is its own layer (backdrop-filter): lift it above the banner and the map so the menu can open over them. */
 .topbar { position: relative; z-index: 30; }
 /* The settings button is a word, like "Change project" next to it (a gear was hard to read). */
 .settings-btn:hover, .settings-btn[aria-expanded="true"] { border-color: var(--ink-3); }
 
-.settings-pop { position: absolute; right: -8px; top: calc(100% + 10px); z-index: 50; width: 340px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px;
-  box-shadow: 0 24px 60px rgba(0,0,0,.18); color: var(--ink); animation: settings-in .16s ease-out; }
-@keyframes settings-in { from { opacity: 0; transform: translateY(-4px); } }
-.settings-pop h3 { font-size: 15px; font-weight: 700; margin: 2px 4px 10px; }
+/* The window: centred over the page, as tall as it needs up to the screen, scrolling inside (never the page behind). */
+.settings-pop { position: fixed; inset: 0; margin: auto; z-index: 60; width: min(760px, calc(100vw - 32px));
+  height: fit-content; max-height: min(720px, calc(100vh - 48px)); display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 20px; overflow: hidden;
+  color: var(--ink); animation: settings-in .18s ease-out; }
+@keyframes settings-in { from { opacity: 0; transform: translateY(6px) scale(.985); } }
+.settings-head { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 14px 24px; border-bottom: 1px solid var(--line); }
+.settings-head h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.settings-close { width: 32px; height: 32px; border-radius: 50%; border: 0; background: none; display: grid; place-items: center; color: var(--ink-2); cursor: pointer; }
+.settings-close:hover { background: var(--accent-soft); color: var(--ink); }
+.settings-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.settings-close svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; fill: none; }
+.settings-body { overflow-y: auto; overscroll-behavior: contain; padding: 18px 24px 24px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 32px; align-content: start; }
+.set-sec { min-width: 0; }
+.set-sec.wide { grid-column: 1 / -1; }
+.settings-pop h3 { font-size: 13px; font-weight: 600; color: var(--ink-3); margin: 0 4px 8px; }
 .theme-list { display: grid; gap: 6px; }
+.theme-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 640px) { .settings-body, .theme-grid { grid-template-columns: 1fr; } }
 .theme-opt { display: flex; align-items: center; gap: 12px; text-align: left; padding: 8px; border-radius: 12px; border: 1px solid transparent; background: none; }
 .theme-opt:hover { background: var(--accent-soft); }
 .theme-opt.on { border-color: var(--accent); background: var(--accent-soft); }
@@ -22,25 +35,23 @@
 /* small previews of each theme */
 .theme-swatch { flex: none; width: 64px; height: 44px; border-radius: 9px; border: 1px solid rgba(0,0,0,.12); position: relative; overflow: hidden; }
 .sw-default { background:
-  radial-gradient(circle at 24% 38%, #ff6a3d 0 4px, transparent 4.5px),
-  radial-gradient(circle at 62% 30%, #ffb547 0 3.5px, transparent 4px),
+  radial-gradient(circle at 24% 38%, #ff5b1f 0 4px, transparent 4.5px),
+  radial-gradient(circle at 62% 30%, #ffa66e 0 3.5px, transparent 4px),
   radial-gradient(circle at 44% 70%, #c7cbd6 0 4px, transparent 4.5px),
-  radial-gradient(circle at 80% 66%, #c7cbd6 0 3px, transparent 3.5px), #fbfbfd; }
+  radial-gradient(circle at 80% 66%, #c7cbd6 0 3px, transparent 3.5px), #f9f9f7; }
 .sw-metro { background:
   linear-gradient(transparent 46%, #2f7ae5 46% 56%, transparent 56%),
   linear-gradient(45deg, transparent 47%, #c2409a 47% 55%, transparent 55%),
   linear-gradient(90deg, transparent 66%, #2e9e4f 66% 74%, transparent 74%), #fbfaf6; }
 .sw-metro::after { content: ""; position: absolute; left: 44%; top: 39%; width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 2px solid #1d1d1f; }
-.sw-ps2 { background:
-  repeating-conic-gradient(from 0deg at 50% 50%, rgba(80,130,255,.45) 0 6deg, transparent 6deg 30deg),
-  radial-gradient(circle at 50% 50%, #4a4a86, #15153a 70%); }
-.sw-ps2::after { content: ""; position: absolute; left: 50%; top: 50%; width: 13px; height: 13px; transform: translate(-50%,-50%) rotate(30deg);
+.sw-prism { background: radial-gradient(circle at 50% 50%, #4a4a86, #15153a 70%); }
+.sw-prism::after { content: ""; position: absolute; left: 50%; top: 50%; width: 13px; height: 13px; transform: translate(-50%,-50%) rotate(30deg);
   border: 1.5px solid rgba(235,242,255,.9); background: rgba(255,214,110,.35); box-shadow: 0 0 10px rgba(255,214,110,.6); }
-.sw-deadspace { background:
+.sw-hologram { background:
   linear-gradient(rgba(143,233,240,.08) 1px, transparent 1px) 0 0 / 8px 8px,
   linear-gradient(90deg, rgba(143,233,240,.08) 1px, transparent 1px) 0 0 / 8px 8px, #0c1012; }
-.sw-deadspace::before { content: ""; position: absolute; left: 14%; top: 30%; width: 44%; height: 32%; border-left: 2px solid #5fe3e0; border-bottom: 2px solid #5fe3e0; box-shadow: -2px 2px 8px rgba(95,227,224,.5); }
-.sw-deadspace::after { content: ""; position: absolute; left: 58%; top: 56%; width: 8px; height: 8px; transform: rotate(45deg); background: #39e75f; box-shadow: 0 0 8px #39e75f; }
+.sw-hologram::before { content: ""; position: absolute; left: 14%; top: 30%; width: 44%; height: 32%; border-left: 2px solid #5fe3e0; border-bottom: 2px solid #5fe3e0; box-shadow: -2px 2px 8px rgba(95,227,224,.5); }
+.sw-hologram::after { content: ""; position: absolute; left: 58%; top: 56%; width: 8px; height: 8px; transform: rotate(45deg); background: #39e75f; box-shadow: 0 0 8px #39e75f; }
 .notify-opt { display: flex; gap: 10px; align-items: flex-start; padding: 8px 6px; border-radius: 10px; cursor: pointer; }
 .notify-opt:hover { background: rgba(0,0,0,.03); }
 .notify-opt input { margin: 3px 0 0; accent-color: var(--accent); width: 15px; height: 15px; flex: none; }
@@ -52,8 +63,7 @@
 /* Open, the menu sits on a light veil over everything behind it (its own spread shadow, so no extra layer): a panel or
    a chip under its edge reads as behind it instead of peeking out. A click on the veil closes it, as before. */
 .settings-pop { box-shadow: 0 24px 60px rgba(0,0,0,.18), 0 0 0 200vmax rgba(24,24,36,.12); }
-:root:is([data-theme="ps2"], [data-theme="deadspace"]) .settings-pop { box-shadow: 0 24px 60px rgba(0,0,0,.45), 0 0 0 200vmax rgba(0,0,0,.32); }
-.theme-list + h3 { margin-top: 18px; }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .settings-pop { box-shadow: 0 24px 60px rgba(0,0,0,.45), 0 0 0 200vmax rgba(0,0,0,.32); }
 /* "On the map, show": the same rows as the themes, text only, one line each. */
 .view-list { gap: 2px; }
 .view-opt { padding: 7px 10px; }

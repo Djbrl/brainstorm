@@ -21,8 +21,10 @@
   --muted: #6e6e73;
   --faint: #a1a1a6;
   --line: #e4e4de;
-  --blue: #2563eb;     /* cobalt: links and focus */
-  --orange: #ff5b1f;   /* signal: the lead step, highlights and the main button */
+  --teal: #13a89e;     /* the first step */
+  --teal-ink: #0b7f78; /* teal under white text (4.8:1; the logo teal is 3:1) */
+  --blue: #2f6bff;     /* the second step: highlighted words, links, focus */
+  --orange: #ff5b1f;   /* the lead step: what is happening now */
   --cool: #b4c2d4;   /* unchanged file */
   --warm: #ff9f0a;   /* changed recently */
   --hot: #ff375f;    /* agent editing now */
@@ -66,8 +68,8 @@ nav .links a:hover { color: var(--text); }
 
 /* ---------- buttons ---------- */
 .btns { display: flex; justify-content: center; flex-wrap: wrap; gap: 14px 28px; align-items: center; margin-top: 40px; }
-.btn { background: var(--orange); color: var(--text); padding: 12px 24px; border-radius: 999px; font-weight: 600; font-size: 17px; transition: background .2s; }
-.btn:hover { background: #ff7440; }
+.btn { background: var(--teal-ink); color: #fff; padding: 12px 24px; border-radius: 999px; font-weight: 600; font-size: 17px; transition: background .2s; }
+.btn:hover { background: #096b65; }
 .btn.small { padding: 5px 14px; font-size: 13px; margin-left: 4px; }
 .more { color: var(--blue); font-size: 17px; font-weight: 500; }
 .more::after { content: " ›"; }
@@ -79,7 +81,7 @@ nav .links a:hover { color: var(--text); }
 .stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; }
 
 /* hero */
-#hero { height: 250vh; }
+#hero { height: 330vh; }
 #hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero-type {
   position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -90,7 +92,7 @@ nav .links a:hover { color: var(--text); }
 .hero-type h1 .line { display: block; overflow: hidden; padding-bottom: .06em; }
 .hero-type h1 .line span { display: inline-block; transform: translateY(105%); animation: rise 1.2s var(--ease) forwards; }
 .hero-type h1 .line:nth-child(2) span { animation-delay: .12s; }
-.hero-type h1 .grad { color: var(--orange); }
+.hero-type h1 .grad { color: var(--blue); }
 .hero-type p { font: 500 clamp(20px, 2.4vw, 28px)/1.3 var(--body); color: var(--muted); margin-top: 28px; opacity: 0; animation: fade 1s .6s var(--ease) forwards; }
 @keyframes rise { to { transform: none; } }
 @keyframes fade { to { opacity: 1; } }
@@ -105,15 +107,13 @@ nav .links a:hover { color: var(--text); }
   font: 900 clamp(30px, 4.6vw, 60px)/1.05 var(--display); letter-spacing: -0.035em; text-wrap: balance;
   text-shadow: 0 0 18px #fff, 0 0 36px #fff, 0 0 8px #fff; will-change: opacity, transform;
 }
-.legend { display: flex; justify-content: center; gap: 22px; margin-top: 22px; font-size: 14px; color: var(--muted); font-weight: 500; flex-wrap: wrap; }
-.legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; vertical-align: 0; }
 
 /* stats: a static row, the numbers count up once in view */
 #stats { padding: 88px 0 80px; text-align: center; }
 .stats-head { font-size: clamp(34px, 4.8vw, 64px); line-height: 1; }
 .stats3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 52px; }
 .stat3 .n { font: 900 clamp(56px, 6.4vw, 84px)/1 var(--display); letter-spacing: -0.045em; white-space: nowrap; }
-.stat3 .n.warm { color: var(--orange); }
+.stat3 .n.warm { color: var(--blue); }
 .stat3 p { color: var(--muted); font-size: 19px; font-weight: 500; margin: 14px auto 0; max-width: 22ch; }
 .stat3 p b { color: var(--text); font-weight: 500; }
 .study { display: block; margin: 20px auto 0; padding-top: 14px; border-top: 1px solid var(--line); max-width: 30ch; font-size: 13.5px; line-height: 1.4; color: var(--muted); font-weight: 500; }
@@ -158,7 +158,7 @@ nav .links a:hover { color: var(--text); }
 .tk-line li.fail b { color: var(--risk); }
 .tk-line li.fail.on::before { background: var(--risk); animation: tk-err 1.4s ease-out 1; }
 @keyframes tk-err { 0% { box-shadow: 0 0 0 0 rgba(217,48,37,.55); } 100% { box-shadow: 0 0 0 14px rgba(217,48,37,0); } }
-.tk-agent { position: absolute; left: 6px; top: 0; width: 16px; height: 16px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 5px rgba(37,99,235,.18); transition: top .5s var(--ease), background .3s, box-shadow .3s; z-index: 1; pointer-events: none; }
+.tk-agent { position: absolute; left: 6px; top: 0; width: 16px; height: 16px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 5px rgba(47,107,255,.18); transition: top .5s var(--ease), background .3s, box-shadow .3s; z-index: 1; pointer-events: none; }
 .tk-agent.err { background: var(--risk); box-shadow: 0 0 0 5px rgba(217,48,37,.2); }
 
 .tk-win { background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 30px 80px -30px rgba(0,0,0,.22); transition: box-shadow .3s; }
@@ -277,7 +277,7 @@ html { scroll-padding-top: 96px; }
 .wl-mini { display: flex; align-items: center; gap: 8px; }
 .wl-mini input { width: 190px; height: 26px; border: 1px solid #d2d2d7; border-radius: 999px; padding: 0 12px; background: #fff; color: var(--text); font: 500 13px var(--body); outline: none; transition: border-color .2s, box-shadow .2s; }
 .wl-mini input::placeholder { color: var(--faint); }
-.wl-mini input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+.wl-mini input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(47,107,255,.15); }
 .wl-mini button { border: 0; background: none; padding: 0; color: var(--blue); font: 600 13.5px var(--body); cursor: pointer; white-space: nowrap; }
 .wl-mini button::after { content: " ›"; }
 .wl-mini button:hover { text-decoration: underline; }
@@ -291,14 +291,14 @@ nav { top: 40px; }
 
 /* roadmap */
 .road { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 72px; text-align: left; }
-.road::before { content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 2px; background: linear-gradient(90deg, var(--text) 0 20%, var(--blue) 42%, var(--orange) 62%, var(--line) 85%); }
+.road::before { content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 2px; background: linear-gradient(90deg, var(--teal) 0 22%, var(--blue) 42%, var(--orange) 62%, var(--line) 85%); }
 .road > div { position: relative; }
 .road .dot { display: block; position: relative; z-index: 1; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid var(--line); box-sizing: border-box; }
-.road .now .dot { background: var(--text); border-color: var(--text); }
+.road .now .dot { background: var(--teal); border-color: var(--teal); }
 .road .next .dot { background: var(--orange); border-color: var(--orange); animation: road-pulse 2.2s ease-out infinite; }
 @keyframes road-pulse { 0% { box-shadow: 0 0 0 0 rgba(255,91,31,.45); } 100% { box-shadow: 0 0 0 16px rgba(255,91,31,0); } }
 .road h3 { font-size: clamp(28px, 3vw, 38px); margin-top: 26px; letter-spacing: -0.03em; }
-.road .next h3 { color: var(--orange); }
+.road .next h3 { color: var(--blue); }
 .road .when { color: var(--muted); font-weight: 500; margin-top: 4px; }
 .road ul { list-style: none; margin: 22px 0 0; padding: 0; }
 .road li { padding: 12px 0; border-top: 1px solid var(--line); font-weight: 500; line-height: 1.4; }
@@ -308,8 +308,8 @@ nav { top: 40px; }
 .road li small a::after { content: " ›"; }
 .wl-big { display: flex; justify-content: center; gap: 10px; margin: 96px auto 0; max-width: 520px; }
 .wl-big input { flex: 1; min-width: 0; height: 52px; border: 1px solid var(--line); border-radius: 999px; padding: 0 22px; font: 500 17px var(--body); background: #fff; outline: none; transition: border-color .2s, box-shadow .2s; }
-.wl-big input:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(37,99,235,.15); }
-.wl-big .btn { border: 0; cursor: pointer; font-family: var(--body); background: var(--orange); }
+.wl-big input:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(47,107,255,.15); }
+.wl-big .btn { border: 0; cursor: pointer; font-family: var(--body); background: var(--teal-ink); }
 .wl-note { margin-top: 16px; color: var(--muted); font-size: 14px; font-weight: 500; }
 .wl-big + .wl-note:empty { display: none; }
 
@@ -320,7 +320,7 @@ nav { top: 40px; }
 .closing { padding: 160px 0 150px; }
 .closing h2 { font-size: clamp(52px, 9vw, 140px); line-height: .92; letter-spacing: -0.05em; }
 .closing h2 span { display: block; }
-.closing h2 .grad { color: var(--orange); }
+.closing h2 .grad { color: var(--blue); }
 .closing .btns { margin-top: 56px; }
 .btn.big { font-size: 20px; padding: 17px 36px; }
 .btn.pending { opacity: .5; pointer-events: none; }
@@ -348,7 +348,7 @@ footer a:hover { text-decoration: underline; }
   .wl-mini, .has-waitlist .band .dim { display: none; }
   .has-waitlist .band-link { display: inline; }
   .road { grid-template-columns: 1fr; gap: 40px; margin-top: 64px; padding-left: 36px; }
-  .road::before { left: 7px; right: auto; top: 8px; bottom: 0; width: 2px; height: auto; background: linear-gradient(180deg, var(--text) 0 20%, var(--blue) 40%, var(--orange) 60%, var(--line) 85%); }
+  .road::before { left: 7px; right: auto; top: 8px; bottom: 0; width: 2px; height: auto; background: linear-gradient(180deg, var(--teal) 0 22%, var(--blue) 40%, var(--orange) 60%, var(--line) 85%); }
   .road .dot { position: absolute; left: -36px; top: 8px; }
   .road h3 { margin-top: 0; }
   .wl-big { flex-direction: column; margin-top: 64px; }
@@ -448,7 +448,7 @@ footer a:hover { text-decoration: underline; }
 <nav>
   <div class="wrap">
     <a class="logo" href="#hero" aria-label="Rundown">
-      <svg class="mark" viewBox="0 0 473.78 67.50" height="22" role="img" aria-label="Rundown"><g transform="translate(-15.00 -22.50) scale(0.9374)"><rect x="16" y="24" width="58" height="16" rx="8" fill="currentColor"/><rect x="31" y="52" width="58" height="16" rx="8" fill="#2563EB"/><rect x="46" y="80" width="58" height="16" rx="8" fill="#FF5B1F"/></g><path transform="translate(93.27 66.35)" fill="currentColor" d="M21.032 0.0H6.776V-65.11999999999999H31.944Q43.824 -65.11999999999999 50.292 -59.61999999999999Q56.76 -54.12 56.76 -44.0Q56.76 -31.415999999999997 45.936 -25.872L57.376 0.0H41.8L32.032 -22.791999999999998H21.032ZM21.032 -52.448V-35.288H31.855999999999998Q36.519999999999996 -35.288 39.116 -37.57599999999999Q41.711999999999996 -39.864 41.711999999999996 -44.0Q41.711999999999996 -48.135999999999996 39.20399999999999 -50.292Q36.696 -52.448 31.944 -52.448ZM91.78399999999999 -44.0H105.336V0.0H92.576L91.696 -4.928Q89.672 -2.1999999999999997 85.93199999999999 -0.5279999999999999Q82.192 1.144 78.232 1.144Q70.752 1.144 66.396 -3.564Q62.04 -8.272 62.04 -16.368V-44.0H75.592V-21.296Q75.592 -15.927999999999999 77.52799999999999 -13.419999999999998Q79.464 -10.911999999999999 83.6 -10.911999999999999Q87.91199999999999 -10.911999999999999 89.84799999999998 -13.288Q91.78399999999999 -15.664 91.78399999999999 -21.119999999999997ZM126.01599999999999 0.0H112.464V-44.0H125.22399999999999L126.104 -39.424Q130.416 -45.407999999999994 139.56799999999998 -45.407999999999994Q147.4 -45.407999999999994 151.756 -40.611999999999995Q156.112 -35.815999999999995 156.112 -27.192V0.0H142.56V-23.936Q142.56 -28.072 140.448 -30.58Q138.336 -33.088 134.816 -33.088Q130.768 -33.088 128.392 -30.668Q126.01599999999999 -28.247999999999998 126.01599999999999 -24.112ZM181.192 1.144Q171.688 1.144 166.012 -5.103999999999999Q160.336 -11.351999999999999 160.336 -21.735999999999997Q160.336 -32.296 166.23200000000003 -38.852Q172.12800000000001 -45.407999999999994 182.072 -45.407999999999994Q186.12 -45.407999999999994 189.728 -43.91199999999999Q193.336 -42.416 195.272 -39.952V-66.35199999999999H208.824V0.0H196.064L195.36 -5.632Q193.6 -2.552 189.728 -0.7040000000000001Q185.856 1.144 181.192 1.144ZM176.836 -14.299999999999999Q179.696 -11.264 184.44799999999998 -11.264Q189.2 -11.264 192.192 -14.299999999999999Q195.184 -17.336 195.184 -22.264Q195.184 -27.192 192.192 -30.227999999999998Q189.2 -33.263999999999996 184.44799999999998 -33.263999999999996Q179.696 -33.263999999999996 176.836 -30.227999999999998Q173.976 -27.192 173.976 -22.264Q173.976 -17.336 176.836 -14.299999999999999ZM237.864 -45.32Q248.424 -45.32 255.24400000000003 -38.896Q262.064 -32.472 262.064 -22.087999999999997Q262.064 -11.792 255.24400000000003 -5.368Q248.424 1.056 237.864 1.056Q227.216 1.056 220.39600000000002 -5.324Q213.57600000000002 -11.703999999999999 213.57600000000002 -22.088Q213.57600000000002 -32.472 220.39600000000002 -38.896Q227.216 -45.32 237.864 -45.32ZM227.216 -22.176Q227.216 -17.16 230.16400000000002 -14.123999999999999Q233.11200000000002 -11.088 237.864 -11.088Q242.52800000000002 -11.088 245.476 -14.123999999999999Q248.424 -17.16 248.424 -22.176Q248.424 -27.104 245.476 -30.139999999999997Q242.52800000000002 -33.175999999999995 237.864 -33.175999999999995Q233.11200000000002 -33.175999999999995 230.16400000000002 -30.139999999999997Q227.216 -27.104 227.216 -22.176ZM276.76 0.0 262.592 -44.0H276.848L280.89599999999996 -29.656Q282.568 -23.496 283.62399999999997 -17.16Q284.50399999999996 -22.439999999999998 286.792 -29.656L291.28 -44.0H305.18399999999997L309.32 -29.656Q311.52 -22.087999999999997 312.312 -17.16Q312.928 -20.68 315.392 -29.656L319.616 -44.0H333.96L318.56 0.0H305.976L301.752 -13.991999999999999Q298.76 -23.671999999999997 298.144 -28.247999999999998Q297.352 -24.2 294.18399999999997 -13.728L289.96 0.0ZM350.416 0.0H336.864V-44.0H349.62399999999997L350.504 -39.424Q354.816 -45.407999999999994 363.96799999999996 -45.407999999999994Q371.8 -45.407999999999994 376.156 -40.611999999999995Q380.512 -35.815999999999995 380.512 -27.192V0.0H366.96V-23.936Q366.96 -28.072 364.84799999999996 -30.58Q362.736 -33.088 359.216 -33.088Q355.168 -33.088 352.79200000000003 -30.668Q350.416 -28.247999999999998 350.416 -24.112Z"/></svg>
+      <svg class="mark" viewBox="0 0 473.78 67.50" height="22" role="img" aria-label="Rundown"><g transform="translate(-15.00 -22.50) scale(0.9374)"><rect x="16" y="24" width="58" height="16" rx="8" fill="#13A89E"/><rect x="31" y="52" width="58" height="16" rx="8" fill="#2F6BFF"/><rect x="46" y="80" width="58" height="16" rx="8" fill="#FF5B1F"/></g><path transform="translate(93.27 66.35)" fill="currentColor" d="M21.032 0.0H6.776V-65.11999999999999H31.944Q43.824 -65.11999999999999 50.292 -59.61999999999999Q56.76 -54.12 56.76 -44.0Q56.76 -31.415999999999997 45.936 -25.872L57.376 0.0H41.8L32.032 -22.791999999999998H21.032ZM21.032 -52.448V-35.288H31.855999999999998Q36.519999999999996 -35.288 39.116 -37.57599999999999Q41.711999999999996 -39.864 41.711999999999996 -44.0Q41.711999999999996 -48.135999999999996 39.20399999999999 -50.292Q36.696 -52.448 31.944 -52.448ZM91.78399999999999 -44.0H105.336V0.0H92.576L91.696 -4.928Q89.672 -2.1999999999999997 85.93199999999999 -0.5279999999999999Q82.192 1.144 78.232 1.144Q70.752 1.144 66.396 -3.564Q62.04 -8.272 62.04 -16.368V-44.0H75.592V-21.296Q75.592 -15.927999999999999 77.52799999999999 -13.419999999999998Q79.464 -10.911999999999999 83.6 -10.911999999999999Q87.91199999999999 -10.911999999999999 89.84799999999998 -13.288Q91.78399999999999 -15.664 91.78399999999999 -21.119999999999997ZM126.01599999999999 0.0H112.464V-44.0H125.22399999999999L126.104 -39.424Q130.416 -45.407999999999994 139.56799999999998 -45.407999999999994Q147.4 -45.407999999999994 151.756 -40.611999999999995Q156.112 -35.815999999999995 156.112 -27.192V0.0H142.56V-23.936Q142.56 -28.072 140.448 -30.58Q138.336 -33.088 134.816 -33.088Q130.768 -33.088 128.392 -30.668Q126.01599999999999 -28.247999999999998 126.01599999999999 -24.112ZM181.192 1.144Q171.688 1.144 166.012 -5.103999999999999Q160.336 -11.351999999999999 160.336 -21.735999999999997Q160.336 -32.296 166.23200000000003 -38.852Q172.12800000000001 -45.407999999999994 182.072 -45.407999999999994Q186.12 -45.407999999999994 189.728 -43.91199999999999Q193.336 -42.416 195.272 -39.952V-66.35199999999999H208.824V0.0H196.064L195.36 -5.632Q193.6 -2.552 189.728 -0.7040000000000001Q185.856 1.144 181.192 1.144ZM176.836 -14.299999999999999Q179.696 -11.264 184.44799999999998 -11.264Q189.2 -11.264 192.192 -14.299999999999999Q195.184 -17.336 195.184 -22.264Q195.184 -27.192 192.192 -30.227999999999998Q189.2 -33.263999999999996 184.44799999999998 -33.263999999999996Q179.696 -33.263999999999996 176.836 -30.227999999999998Q173.976 -27.192 173.976 -22.264Q173.976 -17.336 176.836 -14.299999999999999ZM237.864 -45.32Q248.424 -45.32 255.24400000000003 -38.896Q262.064 -32.472 262.064 -22.087999999999997Q262.064 -11.792 255.24400000000003 -5.368Q248.424 1.056 237.864 1.056Q227.216 1.056 220.39600000000002 -5.324Q213.57600000000002 -11.703999999999999 213.57600000000002 -22.088Q213.57600000000002 -32.472 220.39600000000002 -38.896Q227.216 -45.32 237.864 -45.32ZM227.216 -22.176Q227.216 -17.16 230.16400000000002 -14.123999999999999Q233.11200000000002 -11.088 237.864 -11.088Q242.52800000000002 -11.088 245.476 -14.123999999999999Q248.424 -17.16 248.424 -22.176Q248.424 -27.104 245.476 -30.139999999999997Q242.52800000000002 -33.175999999999995 237.864 -33.175999999999995Q233.11200000000002 -33.175999999999995 230.16400000000002 -30.139999999999997Q227.216 -27.104 227.216 -22.176ZM276.76 0.0 262.592 -44.0H276.848L280.89599999999996 -29.656Q282.568 -23.496 283.62399999999997 -17.16Q284.50399999999996 -22.439999999999998 286.792 -29.656L291.28 -44.0H305.18399999999997L309.32 -29.656Q311.52 -22.087999999999997 312.312 -17.16Q312.928 -20.68 315.392 -29.656L319.616 -44.0H333.96L318.56 0.0H305.976L301.752 -13.991999999999999Q298.76 -23.671999999999997 298.144 -28.247999999999998Q297.352 -24.2 294.18399999999997 -13.728L289.96 0.0ZM350.416 0.0H336.864V-44.0H349.62399999999997L350.504 -39.424Q354.816 -45.407999999999994 363.96799999999996 -45.407999999999994Q371.8 -45.407999999999994 376.156 -40.611999999999995Q380.512 -35.815999999999995 380.512 -27.192V0.0H366.96V-23.936Q366.96 -28.072 364.84799999999996 -30.58Q362.736 -33.088 359.216 -33.088Q355.168 -33.088 352.79200000000003 -30.668Q350.416 -28.247999999999998 350.416 -24.112Z"/></svg>
     </a>
     <div class="links">
       <a href="#tasks">Beyond code</a>
@@ -474,17 +474,12 @@ footer a:hover { text-decoration: underline; }
         <a class="more" data-wl-link href="#waitlist">Join the waitlist</a>
       </div>
     </div>
-    <p class="hcap" data-in=".1" data-out=".25">One agent, you can follow.</p>
-    <p class="hcap" data-in=".29" data-out=".47">Three, you can't.</p>
-    <p class="hcap" data-in=".5" data-out=".64">Each one is somewhere in your work.</p>
+    <p class="hcap" data-in=".1" data-out=".37">One agent, you can follow.</p>
+    <p class="hcap" data-in=".4" data-out=".54">Three, you can't.</p>
+    <p class="hcap" data-in=".57" data-out=".68">Each one is somewhere in your work.</p>
     <div class="hero-end" id="heroEnd">
-      <h2>Rundown shows you where.</h2>
+      <h2>We give you the rundown.</h2>
       <p class="said">Nobody reads a list of 47 changed files. You look at a map.</p>
-      <div class="legend">
-        <span><i style="background:var(--cool)"></i>unchanged</span>
-        <span><i style="background:var(--warm)"></i>changed recently</span>
-        <span><i style="background:var(--hot)"></i>agent working now</span>
-      </div>
       <div class="btns" style="margin-top:24px">
         <a class="btn" data-link="demo" href="#">Try the live demo</a>
         <a class="more" data-link="install" href="#">Install for Claude Code</a>
@@ -522,7 +517,7 @@ footer a:hover { text-decoration: underline; }
   <div class="stage">
     <div class="tasks-head">
       <h2 class="h2">Not just code.</h2>
-      <p class="sub">Agents cut videos, write reports and research the web. Rundown follows them there too, and shows you how it was done.</p>
+      <p class="sub">Agents cut videos, write reports and research the web. Rundown follows them there too. Places puts every website and app they visited on a map, and the track shows how the work was done.</p>
     </div>
     <div class="tk">
       <div class="tk-track">
@@ -764,26 +759,31 @@ function typeQuestion() {
 const hero = (() => {
   const cv = $("#map"), ctx = cv.getContext("2d");
   const COOL = [180, 194, 212], WARM = [255, 159, 10], HOT = [255, 55, 95];
+  // The three agents wear the logo's three steps: the lead (orange) runs alone first, blue and teal join it.
   const AG = [
-    { name: "Coding agent", col: [255, 91, 31], swoop: [.06, .34], end: .74 },
-    { name: "Research agent", col: [37, 99, 235], swoop: [.24, .34], end: .76 },
-    { name: "Video agent", col: [18, 18, 20], swoop: [.255, .34], end: .78 },
+    { name: "Coding agent", col: [255, 91, 31], end: .8 },
+    { name: "Research agent", col: [47, 107, 255], from: .09, end: .82 },
+    { name: "Video agent", col: [19, 168, 158], from: .08, end: .84 },
   ];
-  const PS = .34;                                   // the moment all three run side by side
-  const MAP_IN = .42;                               // about when they reach the map
-  // One project, not a grid of equal islands: a big core (src/lib, src/api, src/ui) with smaller modules around it.
+  const T0 = .05;                                   // the lead sets off, still off screen to the left
+  const PD = .52;                                   // the end of the side-by-side run: they split up into the map
+  let PS = .38;                                     // when the other two fall in beside it (set in build: where the lead is then)
+  let V = 1;                                        // the lead's speed, path length per unit of p, from T0 to PD
+  const MAP_IN = .56;                               // about when they reach the map
+  // This repo, roughly: the web app's map is the core, the server's listener next to it, smaller modules around,
+  // plus the web pages and videos the agents worked with.
   // [name, kind, x, y as a fraction of the map, how many places]. Kinds: code files, docs, web pages, videos.
   const MODS = [
-    ["src/lib", "file", .05, -.03, 15], ["src/api", "file", -.13, .06, 12], ["src/ui", "file", -.02, .28, 10],
-    ["src/billing", "file", .16, -.27, 8], ["tests", "file", .2, .22, 7], ["src/db", "file", -.31, .1, 6],
-    ["src/auth", "file", -.27, -.2, 6], ["the web", "page", -.09, -.33, 6], ["the web", "page", .36, -.01, 5],
-    ["docs", "doc", .34, -.3, 5], ["videos", "video", -.37, .31, 5], ["src/pages", "file", .34, .28, 5],
+    ["web/map", "file", .05, -.03, 15], ["server/listener", "file", -.13, .06, 12], ["web/lib", "file", -.02, .28, 10],
+    ["plugin", "file", .16, -.27, 8], ["web/follow", "file", .2, .22, 7], ["server/mapper", "file", -.31, .1, 6],
+    ["server/core", "file", -.27, -.2, 6], ["the web", "page", -.09, -.33, 6], ["the web", "page", .36, -.01, 5],
+    ["docs", "doc", .34, -.3, 5], ["video", "video", -.37, .31, 5], ["site", "file", .34, .28, 5],
   ];
   // Where each agent works: [x, y as a fraction of the map, kind of place, what it did]
   const STOPS = [
-    [[-.12, .02, "file", "Edit api/users.ts"], [.12, -.02, "file", "Edit lib/cache.ts"], [.13, -.33, "file", "Edit billing/invoice.ts"]],
-    [[-.13, -.33, "page", "Read a pricing page"], [.37, .02, "page", "Read a changelog"], [.37, -.33, "doc", "Write notes.md"]],
-    [[-.41, .31, "video", "Cut talk.mp4"], [-.33, .34, "video", "Make teaser.mp4"], [-.1, -.3, "page", "Read ffmpeg.org"]],
+    [[-.12, .02, "file", "Edit listener.service.ts"], [.12, -.02, "file", "Edit map/themes.ts"], [.13, -.33, "file", "Edit scripts/launch.mjs"]],
+    [[-.13, -.33, "page", "Read the Claude Code docs"], [.37, .02, "page", "Read a changelog"], [.37, -.33, "doc", "Write docs/rename.md"]],
+    [[-.41, .31, "video", "Cut demo.mp4"], [-.33, .34, "video", "Make teaser.mp4"], [-.1, -.3, "page", "Read ffmpeg.org"]],
   ];
   let W, H, dpr, S, nodes = [], edges = [], clusters = [], seed;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -809,12 +809,18 @@ const hero = (() => {
     const k = clamp((len - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1));
     return { x: mixN(pts[i - 1][0], pts[i][0], k), y: mixN(pts[i - 1][1], pts[i][1], k), i };
   }
-  /* how far along its path each agent is at (agent) progress p */
+  /* how far along its path each agent is at (agent) progress p. The lead runs at one speed until PD. The other two
+     swoop in and reach their lane at PS going exactly that speed, so the three run side by side, then split up. */
   function lenAt(a, p) {
-    const sy = a.sync;
-    if (p < PS) return sy * (a === AG[0] ? win(p, a.swoop[0], a.swoop[1]) : ease(win(p, a.swoop[0], a.swoop[1])));
-    return sy + (a.path.L - sy) * win(p, PS, a.end);
+    if (p >= PD) return a.split + (a.path.L - a.split) * win(p, PD, a.end);
+    if (a === AG[0]) return a.split * win(p, T0, PD);
+    if (p >= PS) return a.sync + (a.split - a.sync) * win(p, PS, PD);
+    const t = win(p, PS - a.from, PS), k = clamp(2 - V * a.from / a.sync, 0, 2);  // fast in, easing to the lead's speed
+    return a.sync * (k * t + (1 - k) * t * t);
   }
+  /* the lead's line: as tall as the screen where it comes in, narrowing to a line over its first stretch */
+  const TAPER = () => W * .3;
+  const thick = (d, wide, thin) => { const t = clamp(d / TAPER()); return mixN(wide, thin, t * t * (3 - 2 * t)); };
 
   function build() {
     dpr = Math.min(devicePixelRatio || 1, 2); W = cv.clientWidth; H = cv.clientHeight;
@@ -846,17 +852,22 @@ const hero = (() => {
       used.add(best); return best;
     };
     const used = new Set(), lane = 46 * S;
-    // Entry, approach, lane point (sync), then side by side in their own lanes into the map.
-    const X = f => -W * f;
+    // The approach (a parabola that meets the lane flat, so nothing overshoots and wobbles), the lane point (sync, index
+    // SYNC), straight side by side to the split point (index SPLIT), one more straight step, then each into the map.
+    const X = f => -W * f, T = [1, .72, .48, .28, .12, 0];
+    const approach = (x0, y0, y1) => T.map(t => [X(.72 + (x0 - .72) * t), y1 + (y0 - y1) * t * t]);
+    const lanes = y => [[X(.62), y], [X(.52), y], [X(.46), y], [X(.38), y]];
     const starts = [
-      [[X(.95), 0], [X(.8), 0], [X(.68), 0], [X(.56), 0], [X(.46), 0]],
-      [[X(.9), -H * .34], [X(.78), -lane * 1.1], [X(.68), -lane], [X(.56), -lane], [X(.46), -lane * 1.1]],
-      [[X(.9), H * .34], [X(.78), lane * 1.1], [X(.68), lane], [X(.56), lane], [X(.46), lane * 1.1]],
+      [...approach(1.2, 0, 0), ...lanes(0)],
+      [...approach(1.02, -H * .42, -lane), ...lanes(-lane)],
+      [...approach(1.02, H * .42, lane), ...lanes(lane)],
     ];
+    const SYNC = T.length - 1, SPLIT = SYNC + 2;
     AG.forEach((a, k) => {
       a.stops = STOPS[k].map(([fx, fy, kind, label]) => ({ node: near(fx, fy, kind, used), label }));
       const first = nodes[a.stops[0].node];                             // come in level with the first stop: no dip into it
-      const lead = starts[k].map((q, i, all) => (i === all.length - 1 ? [q[0], mixN(q[1], first.y, .6)] : q)); // already heading its way
+      const lead = starts[k].map((q, i, all) => (i === all.length - 1 ? [q[0], mixN(q[1], first.y, .6)] : q)) // already heading its way
+        .filter((q, i) => i <= SPLIT || q[0] < first.x - 100 * S);      // a first stop near the lanes: no running past it and back
       // Inside the map, long legs get in-between points: a far next stop would otherwise swing the curve wide at this one.
       const pts = [...lead, [first.x - 80 * S, first.y]], at = [];
       a.stops.forEach(st => {
@@ -865,9 +876,12 @@ const hero = (() => {
         pts.push(q); at.push(pts.length - 1);
       });
       a.path = spline(pts);
-      a.sync = a.path.cum[2 * a.path.n];                               // arclength at the lane point
+      a.sync = a.path.cum[SYNC * a.path.n];                            // arclength at the lane point
+      a.split = a.path.cum[SPLIT * a.path.n];                          // and where the lanes end
       a.stops.forEach((s, j) => { s.len = a.path.cum[at[j] * a.path.n] ?? a.path.L; });
     });
+    V = AG[0].split / (PD - T0);
+    PS = T0 + AG[0].sync / V;                                          // the lead is at the lane point then
     /* precompute when each node is revealed (an agent passes nearby) and when each stop is reached */
     const R = 150 * S;
     for (let p = 0; p <= .9; p += .002) AG.forEach(a => {
@@ -877,7 +891,7 @@ const hero = (() => {
         if (s.p === undefined && L >= s.len - 1) { s.p = p; nodes[s.node].touch.push({ a, p }); }
       });
     });
-    nodes.forEach(n => { n.rp = Math.min(n.rp, .6 + r(0, .16)); });
+    nodes.forEach(n => { n.rp = Math.min(n.rp, .66 + r(0, .16)); });
   }
 
   /* a place on the map: files and docs are dots, web pages small cards, videos small frames */
@@ -908,7 +922,7 @@ const hero = (() => {
   function story(t) {
     if (window.__P?.story != null) return window.__P.story;
     if (flat) return 1;
-    return win(s, .04, .86);                                          // the title holds the first screen; the agents start when you scroll
+    return win(s, .03, .88);                                          // the title holds the first screen; the agents start when you scroll
   }
   function draw(t) {
     if (!W || !H) return;
@@ -917,18 +931,22 @@ const hero = (() => {
     ctx.save(); ctx.beginPath(); ctx.rect(0, frame.clip || 0, W, H); ctx.clip();  // nothing slides under the band and the nav
     const pa = p, lift = 0;                                              // (no self-playing opening under the title any more)
     const heads = AG.map(a => { const L = lenAt(a, pa); return { a, L, ...at(a.path, L) }; });
-    const live = heads.filter(h => h.L > 0);
 
-    /* camera: follow agent 1, widen to fit all three, then pull back to the whole map */
-    const zo = ease(win(p, .6, .8));
-    const cen = { x: live.reduce((s, h) => s + h.x, 0) / (live.length || 1), y: live.reduce((s, h) => s + h.y, 0) / (live.length || 1) };
-    const fk = ease(win(p, .23, .36));
-    const fx = mixN(heads[0].x, cen.x, fk), fy = mixN(heads[0].y, cen.y, fk);
-    const zf = mixN(3, 2.1, fk) * (W < 700 ? .8 : 1) * mixN(1, .5, lift);
+    /* camera: wait for the lead to come in from the left, follow it, widen to fit all three, then pull back to the whole map */
+    const zo = ease(win(p, .66, .84));
+    const cen = { x: heads.reduce((s, h) => s + h.x, 0) / 3, y: heads.reduce((s, h) => s + h.y, 0) / 3 };
+    const fk = ease(win(p, PS - .04, PS + .1));
+    const z0 = 3 * (W < 700 ? .8 : 1), ax0 = W / 2 + W * .06;
+    // Hold still until the lead reaches the middle (it starts off screen, its wide front too), then follow it; a soft max, no jolt.
+    const hold = AG[0].path.pts[0][0] + (ax0 + H * .5 + 24) / z0, soft = W * .04;
+    const lx = (heads[0].x + hold + Math.hypot(heads[0].x - hold, soft)) / 2;
+    const fx = mixN(lx, cen.x, fk), fy = mixN(heads[0].y, cen.y, fk);
+    const zf = mixN(z0, z0 * .7, fk) * mixN(1, .5, lift);
     const z = mixN(zf, fit.z, zo), camX = mixN(fx, fit.x, zo), camY = mixN(fy, fit.y, zo);
     const ax = W / 2 + W * .06 * (1 - zo) * (1 - lift), ay = mixN(mixN(H * .46, frame.intro, lift), fit.sy, zo);
     ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * (ax - camX * z), dpr * (ay - camY * z));
     const px = 1 / z;                                                    // one screen pixel in world units
+    const LINE = 3.6 * px, wide = H / z0;                                // the lines' width; the lead's line where it starts
 
     nodes.forEach(n => { n.a = ease(win(p, n.rp, n.rp + .05)); });
     ctx.lineWidth = 1.2 * px;
@@ -953,24 +971,32 @@ const hero = (() => {
       ctx.setLineDash([]);
     });
 
-    /* trails: the whole route faint, the last stretch as a bright comet tail */
+    /* lines: solid, the whole way, ending in a plain dot. The lead's starts as tall as the screen and narrows to a line. */
     ctx.lineCap = "round"; ctx.lineJoin = "round";
-    heads.forEach(h => {
+    [...heads].reverse().forEach(h => {                                 // the lead on top
       if (h.L <= 0) return;
-      const pts = h.a.path.pts, cum = h.a.path.cum;
-      ctx.strokeStyle = `rgba(${h.a.col},.16)`; ctx.lineWidth = 2 * px;
+      const pts = h.a.path.pts, cum = h.a.path.cum, lead = h.a === AG[0];
+      ctx.strokeStyle = ctx.fillStyle = `rgb(${h.a.col})`;
+      if (lead) {                                                        // the wide stretch: one outline, offset either side
+        const top = [], bot = [];
+        for (let i = 0; i <= h.i; i++) {
+          const q = i === h.i ? [h.x, h.y] : pts[i], d = i === h.i ? h.L : cum[i];
+          const b = pts[Math.max(0, i - 1)], f = pts[Math.min(pts.length - 1, i + 1)];
+          const m = Math.hypot(f[0] - b[0], f[1] - b[1]) || 1, nx = -(f[1] - b[1]) / m, ny = (f[0] - b[0]) / m;
+          const w = thick(d, wide, LINE) / 2;
+          top.push([q[0] + nx * w, q[1] + ny * w]); bot.push([q[0] - nx * w, q[1] - ny * w]);
+          if (d > TAPER()) break;
+        }
+        ctx.beginPath(); ctx.moveTo(top[0][0], top[0][1]);
+        top.forEach(q => ctx.lineTo(q[0], q[1])); bot.reverse().forEach(q => ctx.lineTo(q[0], q[1]));
+        ctx.fill();
+      }
+      ctx.lineWidth = LINE;
       ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
       for (let i = 1; i < h.i; i++) ctx.lineTo(pts[i][0], pts[i][1]);
       ctx.lineTo(h.x, h.y); ctx.stroke();
-      const TAIL = 340 * px;
-      let prev = [h.x, h.y];
-      ctx.lineWidth = 2.8 * px;
-      for (let i = h.i - 1; i >= 0; i--) {
-        const back = h.L - cum[i]; if (back > TAIL) break;
-        ctx.strokeStyle = `rgba(${h.a.col},${.95 * (1 - back / TAIL)})`;
-        ctx.beginPath(); ctx.moveTo(prev[0], prev[1]); ctx.lineTo(pts[i][0], pts[i][1]); ctx.stroke();
-        prev = pts[i];
-      }
+      const tip = lead ? thick(h.L, wide, LINE) : LINE;
+      ctx.beginPath(); ctx.arc(h.x, h.y, Math.max(tip / 2, 6.5 * px), 0, 7); ctx.fill();
     });
 
     /* places */
@@ -979,7 +1005,7 @@ const hero = (() => {
       if (n.a <= 0 && !tk.length) return;
       const touched = tk.length ? win(pa, tk[0].p, tk[0].p + .03) : 0;
       const current = tk.some(tc => heads.find(h => h.a === tc.a && Math.hypot(h.x - n.x, h.y - n.y) < 2));
-      const heat = Math.max(touched, n.base * win(p, .66, .8));
+      const heat = Math.max(touched, n.base * win(p, .7, .84));
       const col = current ? HOT : mixC(COOL, WARM, heat);
       if (current) {                                         // a thin ring that pulses out every 1.6 s
         const k = still ? .35 : (t / 1600 + n.ph) % 1;
@@ -1007,30 +1033,6 @@ const hero = (() => {
       ctx.fillText(cl.name, ax + (cx / cl.k - camX) * z, ay + (top - camY) * z - 12);
     });
     ctx.textAlign = "left";
-
-    /* heads and their labels, drawn at screen size */
-    ctx.font = "600 13px Satoshi, system-ui, sans-serif"; ctx.textBaseline = "middle";
-    const taken = [];                                                    // name pills never sit on each other (narrow screens)
-    heads.forEach(h => {
-      if (h.L <= 0) return;
-      const col = h.a.col;
-      const sx = ax + (h.x - camX) * z, sy = ay + (h.y - camY) * z;
-      const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, 12);
-      g.addColorStop(0, `rgba(${col},.22)`); g.addColorStop(1, `rgba(${col},0)`);
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, 12, 0, 7); ctx.fill();
-      ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 7); ctx.fill();
-      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(sx, sy, 2, 0, 7); ctx.fill();
-      const name = h.a.name;
-      const tw = ctx.measureText(name).width, bw = tw + 30, bh = 26;
-      const spots = [[sx + 12, sy - 30], [sx - 12 - bw, sy - 30], [sx + 12, sy + 6], [sx - 12 - bw, sy + 6], [sx - bw / 2, sy + 14], [sx - bw / 2, sy - 44]];
-      const fits = ([x, y]) => x >= 8 && x + bw <= W - 8 && !taken.some(o => x < o[0] + o[2] + 4 && x + bw + 4 > o[0] && y < o[1] + bh + 4 && y + bh + 4 > o[1]);
-      const [bx, by] = spots.find(fits) ?? spots.find(([x]) => x >= 8 && x + bw <= W - 8) ?? spots[0];
-      taken.push([bx, by, bw]);
-      ctx.save(); ctx.shadowColor = "rgba(0,0,0,.12)"; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3;
-      ctx.fillStyle = "rgba(255,255,255,.96)"; ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 13); ctx.fill(); ctx.restore();
-      ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(bx + 13, by + bh / 2, 4, 0, 7); ctx.fill();
-      ctx.fillStyle = "#1d1d1f"; ctx.fillText(name, bx + 22, by + bh / 2 + .5);
-    });
     ctx.restore();
   }
   let hook = () => {};
@@ -1110,7 +1112,7 @@ hero.onFrame((p, s) => {
     const k = (win(p, +c.dataset.in, +c.dataset.in + .03) - win(p, +c.dataset.out - .03, +c.dataset.out)) * tp;
     c.style.opacity = k; c.style.transform = `translateY(${(1 - k) * 16}px)`;
   });
-  const ep = ease(win(p, .8, .86));
+  const ep = ease(win(p, .86, .92));
   heroEnd.style.opacity = ep; heroEnd.style.transform = `translateY(${(1 - ep) * 40}px)`;
   heroEnd.style.pointerEvents = ep > .5 ? "" : "none";
 });

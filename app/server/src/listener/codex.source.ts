@@ -21,7 +21,7 @@ import { createHash } from "node:crypto";
 import type { StepKind } from "../types";
 import type { LogFile, LogSource, NewStep, Scope, Sink, WatchEvents } from "./source";
 import { sanitizeDeep, sanitizeText, TEXT_LIMIT, TOOL_RESULT_LIMIT } from "./text";
-import { codexPrompt, commandString, diffToBeforeAfter, execCalls, isInjected, outputText, parsePatch, questionReply, shellResult, todoStatus, type ShellResult } from "./codex.map";
+import { codexPrompt, commandString, diffToBeforeAfter, execCalls, isInjected, outputText, parsePatch, questionReply, readsOf, shellResult, todoStatus, type ShellResult } from "./codex.map";
 
 /** The first line of a rollout file, as far as Rundown needs it. */
 type Meta = {
@@ -456,17 +456,19 @@ export class CodexSource implements LogSource {
     switch (call.name) {
       case "exec_command": case "shell_command": case "shell": case "local_shell": case "container.exec": {
         const command = str(args.cmd) ?? (typeof args.command === "string" ? args.command : commandString(args.command));
-        return this.callAndResult(at, id, "Bash", { command }, undefined, shellResult(raw));
+        return this.command(at, id, command, str(args.workdir), shellResult(raw));
       }
       case "exec": { // a script calling Codex's tools
         const code = typeof args === "string" ? args : str(args.code) ?? str(args.input) ?? "";
         for (const [k, plan] of execCalls(code, "update_plan").entries()) this.plan(at, `${id}#plan${k}`, plan);
         if (this.commandsFromItems(st, call)) return;
-        const cmds = execCalls(code, "exec_command").filter((c) => typeof c.cmd === "string");
+        let cmds = execCalls(code, "exec_command").filter((c) => typeof c.cmd === "string");
+        // Commands built in the script (a variable, a loop): the script itself is the command.
+        if (!cmds.length && /tools\.exec_command\s*\(/.test(code)) cmds = [{ cmd: code }];
         const res = shellResult(raw);
         cmds.forEach((c, k) => {
           const last = k === cmds.length - 1;
-          this.callAndResult(at, cmds.length > 1 ? `${id}#${k}` : id, "Bash", { command: c.cmd }, undefined, last ? res : { text: "Its output is with the script's last command.", failed: false });
+          this.command(at, cmds.length > 1 ? `${id}#${k}` : id, String(c.cmd), str(c.workdir), last ? res : { text: "Its output is with the script's last command.", failed: false });
         });
         return;
       }
@@ -494,6 +496,16 @@ export class CodexSource implements LogSource {
       default: // a file without items: any other tool, as it is
         return this.callAndResult(at, id, call.name, typeof args === "object" && args ? args : { input: args }, undefined, { text: raw, failed: false });
     }
+  }
+
+  /** A command Codex logged without saying what it did: a plain read of files lands on the map as Read, else Bash. */
+  private command(at: At, id: string, command: string, workdir: string | undefined, res: { text: string; failed: boolean }) {
+    const reads = readsOf(command);
+    if (!reads) return this.callAndResult(at, id, "Bash", { command }, undefined, res);
+    reads.forEach((f, k) => {
+      const path = this.abs(at.st, f, workdir);
+      this.callAndResult(at, reads.length > 1 ? `${id}#r${k}` : id, "Read", { file_path: path, command }, path, res);
+    });
   }
 
   private plan(at: At, id: string, args: any, result = "Plan updated") {

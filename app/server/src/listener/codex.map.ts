@@ -138,9 +138,15 @@ export function execCalls(code: string, tool: string): Record<string, unknown>[]
     const lit = end === -1 ? code.slice(start, start + 20_000) : code.slice(start, end + 1);
     let args: Record<string, unknown> | undefined;
     try { args = JSON.parse(lit); } catch {
-      const str = (k: string) => { const v = new RegExp(`["']?${k}["']?\\s*:\\s*("(?:[^"\\\\]|\\\\.)*")`).exec(lit)?.[1]; try { return v ? (JSON.parse(v) as string) : undefined; } catch { return undefined; } };
-      const cmd = str("cmd");
-      args = cmd ? { cmd, ...(str("workdir") ? { workdir: str("workdir") } : {}) } : undefined;
+      // A JavaScript object literal: `cmd: "…"`, `cmd: '…'` or `cmd: \`…\`` (a template's ${…} kept as written).
+      const val = (k: string): string | undefined => {
+        const hit = new RegExp(`["']?${k}["']?\\s*:\\s*("(?:[^"\\\\]|\\\\.)*"|'(?:[^'\\\\]|\\\\.)*'|\`(?:[^\`\\\\]|\\\\.)*\`)`).exec(lit)?.[1];
+        if (!hit) return undefined;
+        if (hit[0] === '"') { try { return JSON.parse(hit) as string; } catch { return undefined; } }
+        return hit.slice(1, -1).replace(/\\(.)/g, "$1");
+      };
+      const cmd = val("cmd");
+      args = cmd ? { cmd, ...(val("workdir") ? { workdir: val("workdir") } : {}) } : undefined;
     }
     if (args && typeof args === "object") out.push(args);
   }
@@ -211,4 +217,46 @@ export function codexPrompt(text: string): { text: string; title: string } {
 /** Codex's plan statuses as TodoWrite's. */
 export function todoStatus(s: unknown): string {
   return s === "in_progress" || s === "completed" ? s : "pending";
+}
+
+/** Shell words, quotes removed; null if the command has anything beyond plain words (pipes, redirects, variables). */
+function words(cmd: string): string[] | null {
+  const out: string[] = [];
+  const re = /\s*(?:'([^']*)'|"((?:[^"\\$`]|\\.)*)"|([^\s'"|&;<>$`()*?]+))/y;
+  let i = 0;
+  const s = cmd.trim();
+  while (i < s.length) {
+    re.lastIndex = i;
+    const m = re.exec(s);
+    if (!m || re.lastIndex === i) return null;
+    out.push(m[1] ?? (m[2] !== undefined ? m[2].replace(/\\(.)/g, "$1") : m[3]));
+    i = re.lastIndex;
+    while (s[i] === " " || s[i] === "\t") i++;
+  }
+  return out;
+}
+
+/**
+ * The files a command only reads, when that's all it does: `sed -n '1,80p' f`, `cat f`, `nl -ba f`, `head -n 40 f`,
+ * `tail f`, several joined by `&&`. What Codex itself works out for a command since 0.149 (parsed_cmd), for the
+ * commands it logged without it. Null for anything else.
+ */
+export function readsOf(cmd: string): string[] | null {
+  const files: string[] = [];
+  for (const part of cmd.split(/\s*&&\s*/)) {
+    const w = words(part);
+    if (!w || w.length < 2) return null;
+    const [prog, ...args] = w;
+    let rest: string[];
+    if (prog === "sed" && args[0] === "-n" && /^\d+(,\d+)?p$/.test(args[1] ?? "")) rest = args.slice(2);
+    else if (prog === "cat") rest = args;
+    else if (prog === "nl" && /^-ba$/.test(args[0] ?? "")) rest = args.slice(1);
+    else if ((prog === "head" || prog === "tail") && args[0] === "-n" && /^\d+$/.test(args[1] ?? "")) rest = args.slice(2);
+    else if ((prog === "head" || prog === "tail") && /^-\d+$/.test(args[0] ?? "")) rest = args.slice(1);
+    else if (prog === "head" || prog === "tail") rest = args;
+    else return null;
+    if (!rest.length || rest.some((a) => a.startsWith("-"))) return null;
+    files.push(...rest);
+  }
+  return files.length ? files : null;
 }

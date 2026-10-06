@@ -239,6 +239,8 @@ test("before Codex logged commands as items: commands from its scripts and calls
     c.ri({ type: "custom_tool_call_output", call_id: "call_x1", output: [{ type: "input_text", text: "Script failed\nWall time 0.2 seconds\nOutput:\n" }, { type: "input_text", text: "fatal: not a git repository" }] }),
     c.ri({ type: "function_call", call_id: "call_x2", name: "exec_command", arguments: JSON.stringify({ cmd: "pwd", workdir: ROOT }) }),
     c.ri({ type: "function_call_output", call_id: "call_x2", output: "Chunk ID: ab12cd\nWall time: 0.1 seconds\nProcess exited with code 0\nOriginal token count: 3\nOutput:\n/work/demo-repo\n" }),
+    c.ri({ type: "function_call", call_id: "call_x2b", name: "shell_command", arguments: JSON.stringify({ command: "sed -n '1,40p' src/app.ts && cat 'docs/read me.md'", workdir: ROOT }) }),
+    c.ri({ type: "function_call_output", call_id: "call_x2b", output: "Exit code: 0\nWall time: 0.1 seconds\nOutput:\nexport {}\n" }),
     // apply_patch with no FileChange item (as some early-2026 Codex versions logged): the patch is the edit.
     c.ri({ type: "custom_tool_call", call_id: "call_x3", name: "apply_patch", input: "*** Begin Patch\n*** Update File: README.md\n@@\n # Demo\n-old line\n+new line\n*** Add File: docs/new.md\n+hello\n+world\n*** Delete File: junk.txt\n*** End Patch\n" }),
     c.ri({ type: "custom_tool_call_output", call_id: "call_x3", output: JSON.stringify({ output: "Success. Updated the following files:\nM README.md\n", metadata: { exit_code: 0 } }) }),
@@ -258,6 +260,7 @@ test("before Codex logged commands as items: commands from its scripts and calls
   const ss = steps(t, id);
   assert.deepEqual(calls(ss).map((x) => [x.tool, x.input.command ?? x.filePath ?? ""]), [
     ["TodoWrite", ""], ["Bash", "ls -la"], ["Bash", "git status"], ["Bash", "pwd"],
+    ["Read", "sed -n '1,40p' src/app.ts && cat 'docs/read me.md'"], ["Read", "sed -n '1,40p' src/app.ts && cat 'docs/read me.md'"],
     ["Edit", "/work/demo-repo/README.md"], ["Write", "/work/demo-repo/docs/new.md"], ["Edit", "/work/demo-repo/junk.txt"],
     ["Bash", "npm run build"], ["Bash", "npm test"],
   ]);
@@ -265,10 +268,11 @@ test("before Codex logged commands as items: commands from its scripts and calls
   const gitStatus = resultOf(ss, calls(ss)[2]);
   assert.equal(gitStatus.input?.isError, true, "the failed script's last command is marked failed");
   assert.equal(resultOf(ss, calls(ss)[3]).text, "/work/demo-repo\n");
-  const readme = calls(ss)[4];
+  assert.deepEqual(calls(ss).filter((x) => x.tool === "Read").map((x) => x.filePath), ["/work/demo-repo/src/app.ts", "/work/demo-repo/docs/read me.md"], "a plain read lands on the map");
+  const readme = calls(ss)[6];
   assert.deepEqual(readme.diff, { before: "# Demo\nold line", after: "# Demo\nnew line" });
-  assert.deepEqual(calls(ss)[5].diff, { before: "", after: "hello\nworld" });
-  assert.equal(calls(ss)[6].input.deleted, true);
+  assert.deepEqual(calls(ss)[7].diff, { before: "", after: "hello\nworld" });
+  assert.equal(calls(ss)[8].input.deleted, true);
   for (const c of calls(ss)) assert.ok(resultOf(ss, c), `${c.tool} has a result`);
 
   // The same file read again from the middle of turn 3 (after a restart): turn 3's command still isn't doubled.

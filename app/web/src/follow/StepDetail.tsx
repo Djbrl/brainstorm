@@ -4,9 +4,9 @@ import { Diff } from "../lib/Diff";
 import type { Step } from "@contract";
 import { AskBox } from "../ask/AskBox";
 import { Markdown } from "../ask/Markdown";
-import { useNav } from "../lib/nav";
 import { FileIcon, Glyph, RiskIcon } from "./Glyph";
 import { ToolView } from "./content/ToolView";
+import { editorLink, editorName, openInEditor, useEditor } from "../lib/editor";
 import { HtmlPreview, isHtml, PAGE_MARKUP, ViewSwitch } from "./content/HtmlPreview";
 import { basename, displayLabel, stepFile, timeIn, toolName, unwrapPastes } from "./format";
 
@@ -108,9 +108,18 @@ function EditBody({ step }: { step: Step }) {
   );
 }
 
+/** The step's file, opened in your editor (Settings, "Open files in"); its name in the body shows it on the map. */
+function OpenFile({ path }: { path: string }) {
+  const editor = useEditor();
+  const link = editorLink(editor, path);
+  const title = `${path}\nOpen in ${editorName(editor)}`;
+  return link
+    ? <a className="chip" href={link} title={title}><FileIcon />{basename(path)}</a>
+    : <button className="chip" onClick={() => openInEditor(editor, path)} title={title}><FileIcon />{basename(path)}</button>;
+}
+
 /** One step in full. No close button: a click outside the panel, Esc or Back closes it (see StepPanel). */
 export function StepDetail({ step, result }: { step: Step; result?: Step; onClose?: () => void }) {
-  const { openFile } = useNav();
   const file = stepFile(step);
   const label = displayLabel(step);
 
@@ -125,11 +134,7 @@ export function StepDetail({ step, result }: { step: Step; result?: Step; onClos
           <span>{timeIn(step.ts, false, { seconds: true })}</span>
           {step.tool && step.kind !== "edit" && <><span className="sep">·</span><span>{toolName(step.tool)}</span></>}
           {step.isSubagent && <><span className="sep">·</span><span>Subagent</span></>}
-          {file && (
-            <button className="chip" onClick={() => openFile(file)} title={`${file}\nOpen on the map`}>
-              <FileIcon />{basename(file)}
-            </button>
-          )}
+          {file && <OpenFile path={file} />}
         </div>
         {step.risk && step.risk.length > 0 && (
           <div className="sd-risks">

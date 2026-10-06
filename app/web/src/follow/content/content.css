@@ -85,6 +85,7 @@
 .cv-page .u { color: var(--ink-3); white-space: nowrap; }
 .cv-shots { display: grid; gap: 8px; }
 .cv-shots.many { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cv-shot { display: block; padding: 0; border: 0; background: none; cursor: zoom-in; width: 100%; }
 .cv-shots img { display: block; width: 100%; border-radius: 8px; border: 1px solid var(--line); background: #f7f7fa; }
 .cv-probe { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
@@ -155,3 +156,13 @@
 .cv-switch { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--hover, rgba(0,0,0,.05)); }
 .cv-switch button { border: 0; background: none; font: 500 12px/1 var(--font-body); color: var(--ink-2); padding: 5px 9px; border-radius: 6px; cursor: pointer; }
 .cv-switch button.on { background: var(--sheet, #fff); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+/* A picture opened large (Lightbox.tsx): over everything, fitted to the window, a quiet bar under it. */
+.lightbox { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; grid-template-rows: 1fr auto; gap: 14px; padding: 32px 32px 20px;
+  background: rgba(10,10,14,.82); backdrop-filter: blur(6px); cursor: zoom-out; animation: lightbox-in .16s ease-out; }
+.lightbox img { max-width: min(92vw, 1800px); max-height: calc(100vh - 110px); object-fit: contain; border-radius: 10px; box-shadow: 0 24px 80px rgba(0,0,0,.45); background: #fff; cursor: default; }
+.lightbox-bar { display: flex; align-items: center; gap: 10px; color: #f2f2f7; font: 500 13px/1 var(--font-body); cursor: default; }
+.lightbox-bar button, .lightbox-bar a { color: #f2f2f7; background: rgba(255,255,255,.12); border: 0; border-radius: 16px; padding: 8px 14px; font: inherit; text-decoration: none; cursor: pointer; }
+.lightbox-bar button:hover, .lightbox-bar a:hover { background: rgba(255,255,255,.2); }
+@keyframes lightbox-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .lightbox { animation: none; } }

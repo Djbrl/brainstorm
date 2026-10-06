@@ -1,6 +1,6 @@
 // The body of a tool step in the step panel, shaped per tool: a terminal for commands, numbered code for
 // reads, one row per browser action with its screenshots, links for searches, and fields or a JSON tree for the rest.
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Step } from "@contract";
 import { Markdown } from "../../ask/Markdown";
 import { useNav } from "../../lib/nav";
@@ -8,6 +8,7 @@ import { highlightLines, langOf, renderPieces, useGrammar, usePalette } from "..
 import { basename, displayLabel } from "../format";
 import { JsonView } from "./JsonView";
 import { HtmlPreview, isHtml, PAGE_MARKUP, ViewSwitch } from "./HtmlPreview";
+import { Lightbox } from "./Lightbox";
 import { cleanResult, formatCommand, hostOf, humanKey, parseJson, parseNumbered, parseSearch, parseShell, splitBatch, splitTabContext, type Tab } from "./parse";
 import "./content.css";
 
@@ -16,14 +17,20 @@ const obj = (v: unknown): Input => (v && typeof v === "object" && !Array.isArray
 const str = (v: unknown) => (typeof v === "string" ? v : undefined);
 const MARKDOWN = /(^|\n)(#{1,4} |[-*] |\d+\. |> )|\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\)/;
 
-/** Show at most `max` lines, with a button for the rest. */
-function Clip({ text, max = 40, className }: { text: string; max?: number; className?: string }) {
+/**
+ * Show at most `max` lines, with a button for the rest; colour-coded when `lang` names a grammar (lib/highlight.ts):
+ * a script a browser step ran, the script inside a command, a file read without line numbers.
+ */
+function Clip({ text, max = 40, className, lang }: { text: string; max?: number; className?: string; lang?: string }) {
   const [all, setAll] = useState(false);
   const lines = text.split("\n");
   const shown = all || lines.length <= max ? text : lines.slice(0, max).join("\n");
+  const hasGrammar = useGrammar(shown.length < 200_000 ? lang : undefined);
+  const { palette } = usePalette();
+  const coloured = useMemo(() => (hasGrammar ? highlightLines(shown, lang) : null), [hasGrammar, shown, lang]);
   return (
     <>
-      <pre className={className}>{shown}</pre>
+      <pre className={className}>{coloured ? coloured.map((l, i) => <Fragment key={i}>{renderPieces(l, palette)}{i < coloured.length - 1 ? "\n" : ""}</Fragment>) : shown}</pre>
       {!all && lines.length > max && <button className="cv-more" onClick={() => setAll(true)}>Show all {lines.length.toLocaleString()} lines</button>}
     </>
   );
@@ -75,6 +82,9 @@ export function Fields({ input, skip = [] }: { input: unknown; skip?: string[] }
 
 // ---------- terminal ----------
 
+/** The grammar for a script inside a command (formatCommand's names). */
+const SCRIPT_LANG: Record<string, string> = { Python: "python", JavaScript: "javascript", Shell: "bash" };
+
 function Command({ command }: { command: string }) {
   const { lines, scripts } = formatCommand(command);
   return (
@@ -92,7 +102,7 @@ function Command({ command }: { command: string }) {
       </pre>
       {scripts.map((s, i) => (
         <Block key={i} title={scripts.length > 1 ? `${s.lang} (script ${i + 1})` : s.lang}>
-          <Clip text={s.body} max={30} className="cv-code" />
+          <Clip text={s.body} max={30} className="cv-code" lang={SCRIPT_LANG[s.lang]} />
         </Block>
       ))}
     </>
@@ -167,7 +177,7 @@ function ReadView({ input, result }: { input: Input; result?: Step }) {
       {!result ? <p className="cv-muted">Reading…</p>
         : page && view === "page" ? <HtmlPreview html={numbered!.lines.join("\n")} />
         : numbered ? <Code start={numbered.start} lines={numbered.lines} path={path} />
-        : text ? <Clip text={text} className="cv-code" />
+        : text ? <Clip text={text} className="cv-code" lang={langOf(path)} />
         : IMAGE.test(path) ? <Shots resultId={result.id} label="Image" />
         : <p className="cv-muted">Empty file.</p>}
     </Block>
@@ -283,16 +293,20 @@ export const IMAGE = /\.(png|jpe?g|gif|webp|bmp)$/i;
 export function Shots({ resultId, label = "Screenshot" }: { resultId: string; label?: string }) {
   const [count, setCount] = useState(0);
   const [done, setDone] = useState(false);
-  useEffect(() => { setCount(0); setDone(false); }, [resultId]);
+  const [big, setBig] = useState<number | null>(null);   // the picture open large (Lightbox), if any
+  useEffect(() => { setCount(0); setDone(false); setBig(null); }, [resultId]);
   const src = (i: number) => `/api/tasks/shot/${encodeURIComponent(resultId)}/${i}`;
   return (
     <>
       {count > 0 && (
         <div className={`cv-shots${count > 1 ? " many" : ""}`}>
           {Array.from({ length: count }, (_, i) => (
-            <a key={i} href={src(i)} target="_blank" rel="noreferrer noopener" title="Open full size"><img src={src(i)} alt={`${label} ${i + 1}`} decoding="async" /></a>
+            <button key={i} className="cv-shot" onClick={() => setBig(i)} title="Open large"><img src={src(i)} alt={`${label} ${i + 1}`} decoding="async" /></button>
           ))}
         </div>
+      )}
+      {big !== null && big < count && (
+        <Lightbox srcs={Array.from({ length: count }, (_, i) => src(i))} at={big} label={label} onAt={setBig} onClose={() => setBig(null)} />
       )}
       {!done && count < 12 && <img className="cv-probe" src={src(count)} alt="" onLoad={() => setCount((c) => c + 1)} onError={() => setDone(true)} />}
     </>
@@ -347,7 +361,7 @@ function BrowserView({ tool, input, result }: { tool: string; input: Input; resu
           return (
             <li key={i} className={`cv-action${part?.failed ? " failed" : ""}${skipped ? " skipped" : ""}`}>
               <div className="cv-act"><b>{d.verb}</b>{d.detail && <span className="cv-act-detail">{d.detail}</span>}{skipped && <span className="cv-chip">didn't run</span>}</div>
-              {d.code && <Clip text={d.code} max={12} className="cv-code small" />}
+              {d.code && <Clip text={d.code} max={12} className="cv-code small" lang="javascript" />}
               {result && part && <ActionResult text={body} failed={part.failed} />}
             </li>
           );

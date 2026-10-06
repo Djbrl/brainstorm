@@ -5,6 +5,7 @@ import { isReplay } from "../lib/live";
 import { setTheme, THEMES, useTheme } from "../lib/theme";
 import { setStepWindow, STEP_WINDOWS, useStepWindow } from "../map/prefs";
 import { setFoldOn, useFoldOn } from "../map/fold";
+import { EDITORS, setEditor, useEditor } from "../lib/editor";
 import "./settings.css";
 
 export function SettingsButton() {
@@ -38,6 +39,7 @@ export function SettingsButton() {
           </div>
           <WindowSetting />
           <FoldSetting />
+          <EditorSetting />
           <NotifySetting />
         </div>
       )}
@@ -72,6 +74,23 @@ function FoldSetting() {
         <input type="checkbox" checked={on} onChange={() => setFoldOn(!on)} />
         <span><b>Group files into folders</b><small>A folder shows as one circle until you zoom in or click it, or an agent works in it</small></span>
       </label>
+    </>
+  );
+}
+
+/** Where a step's file opens (lib/editor.ts). */
+function EditorSetting() {
+  const editor = useEditor();
+  return (
+    <>
+      <h3>Open files in</h3>
+      <div className="theme-list view-list" role="radiogroup" aria-label="Open files in">
+        {EDITORS.map((e) => (
+          <button key={e.id} role="radio" aria-checked={editor === e.id} className={`theme-opt view-opt ${editor === e.id ? "on" : ""}`} onClick={() => setEditor(e.id)}>
+            <span className="theme-text"><b>{e.name}</b></span>
+          </button>
+        ))}
+      </div>
     </>
   );
 }

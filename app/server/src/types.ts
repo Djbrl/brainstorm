@@ -1,6 +1,9 @@
 // THE CONTRACT. Shared by server and web. Change only by ADDING fields, and log it in docs/build-log.md.
 
-export type Session = { id: string; cwd: string; title: string; startedAt: string; lastEventAt: string; status: "running" | "idle" };
+/** The coding agent a thread ran in (its logs: listener/claude.source.ts, listener/codex.source.ts). */
+export type Harness = "claude" | "codex";
+/** `harness`: added 6 Oct 2026 ("claude" for every thread stored before). */
+export type Session = { id: string; cwd: string; title: string; startedAt: string; lastEventAt: string; status: "running" | "idle"; harness: Harness };
 export type StepKind = "prompt" | "text" | "thinking" | "tool_call" | "tool_result" | "edit";
 export type Step = {
   id: string; sessionId: string; seq: number; ts: string; kind: StepKind;

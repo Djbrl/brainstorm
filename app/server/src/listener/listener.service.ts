@@ -1,81 +1,29 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from "@nestjs/common";
 import { HttpAdapterHost } from "@nestjs/core";
-import chokidar, { type FSWatcher } from "chokidar";
-import { closeSync, existsSync, openSync, readdirSync, readSync, statSync } from "node:fs";
-import { basename, join, relative, resolve, sep } from "node:path";
-import { homedir } from "node:os";
-import type { Session, Step, StepKind } from "../types";
+import { closeSync, openSync, readSync, statSync } from "node:fs";
+import { resolve, sep } from "node:path";
+import type { Harness, Session, Step } from "../types";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";
 import { ConfigService } from "../core/config.service";
-import { maskSecrets } from "../privacy/mask";
-import { encodeRoot, formerRoots, repoBase, underPrefix } from "./moved";
+import { formerRoots, repoBase } from "./moved";
+import { ClaudeSource } from "./claude.source";
+import { CodexSource } from "./codex.source";
+import type { LogFile, LogSource, NewStep, Scope, Sink } from "./source";
+import { promptTitle } from "./text";
 import { backfillAgentIds } from "./agent-ids";
 
-// Owner: A. Tail ~/.claude/projects/**/*.jsonl, parse into Steps, store, emit on bus, broadcast over ws.
+// Owner: A. Tail the coding agents' session logs (log sources: claude.source.ts for ~/.claude/projects, codex.source.ts
+// for ~/.codex/sessions), store the Steps they parse, emit them on the bus and broadcast them over ws.
+
+export { sanitizeText, promptTitle, withoutPastes } from "./text";
 
 // All of a project's history is loaded: the last two weeks first (the first screen), then older threads a file at a time.
 const RECENT_MS = 14 * 24 * 60 * 60 * 1000;
 const IDLE_AFTER_MS = 2 * 60 * 1000;
-const TEXT_LIMIT = 20_000;
-const TOOL_RESULT_LIMIT = 2_000;
-/** How far past the limit a long text is cut before masking (see sanitizeText). */
-const MASK_MARGIN = 1024;
-
-/** Recursively mask string leaves and clip them to `limit` chars, keeping JSON-shaped values intact. */
-function sanitizeDeep(v: unknown, limit = TEXT_LIMIT): unknown {
-  if (typeof v === "string") return sanitizeText(v, limit);
-  if (Array.isArray(v)) return v.map((x) => sanitizeDeep(x, limit));
-  if (v && typeof v === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [k, val] of Object.entries(v as Record<string, unknown>)) out[k] = sanitizeDeep(val, limit);
-    return out;
-  }
-  return v;
-}
-/** Mask, then clip to `limit` chars. A long text (a 5 MB tool output kept to 2,000 chars) is cut first, a margin past
- * the limit, so the masking runs on what is kept rather than on all of it. The cut lands on a line break (else a
- * space): no key, token or connection string spans one, and a PEM block cut short is still masked to its end. If
- * masking shortens the kept part a lot (big keys replaced), text near the cut could move inside the limit: then the
- * whole text is masked, as before. */
-export function sanitizeText(s: string, limit = TEXT_LIMIT): string {
-  let masked: string | undefined;
-  if (s.length > limit + MASK_MARGIN) {
-    const cut = safeCut(s, limit + MASK_MARGIN);
-    if (cut > 0) {
-      const head = s.slice(0, cut);
-      const m = maskSecrets(head);
-      if (head.length - m.length <= MASK_MARGIN / 4) masked = m;
-    }
-  }
-  masked ??= maskSecrets(s);
-  return masked.length > limit ? masked.slice(0, limit) + "\n…(truncated)" : masked;
-}
-/** Where to cut `s` at or after `from`: the next line break, else the next space or tab, within 16k chars; -1 if none. */
-function safeCut(s: string, from: number): number {
-  const to = Math.min(s.length, from + 16_384);
-  const nl = s.indexOf("\n", from);
-  if (nl !== -1 && nl < to) return nl;
-  for (let i = from; i < to; i++) { const c = s.charCodeAt(i); if (c === 32 || c === 9 || c === 13) return i; }
-  return -1;
-}
-
-type RawLine = {
-  type?: string;
-  uuid?: string;
-  sessionId?: string;
-  cwd?: string;
-  timestamp?: string;
-  isSidechain?: boolean;
-  /** Claude Code's recap of a conversation it compacted: the agent's context, not something the person wrote. */
-  isCompactSummary?: boolean;
-  customTitle?: string;
-  message?: { role?: string; content?: unknown };
-};
-
 /** `worked`: an agent called a tool or edited a file in the thread (one that only answered a slash command didn't). */
-type SessionRow = { id: string; cwd: string; title: string; started_at: string; last_event_at: string; custom_title: number; title_set: number; worked: number };
+type SessionRow = { id: string; cwd: string; title: string; started_at: string; last_event_at: string; custom_title: number; title_set: number; worked: number; harness: string | null };
 type BatchSession = SessionRow & { isNew: boolean; dirty: boolean };
 
 /** One chunk of a file being stored: passed down the parse, so reads of several files can interleave. */
@@ -103,34 +51,26 @@ const NL = 0x0a;
 const yieldToLoop = () => new Promise<void>((r) => setImmediate(r));
 const isSqliteError = (e: unknown) => String((e as { code?: unknown })?.code ?? "").startsWith("ERR_SQLITE");
 
-/** Threads deleted in Claude's desktop app: it leaves a `deleted_<sessionId>` file per thread. Re-read at most once a minute. */
-let deletedCache: { at: number; ids: Set<string> } | null = null;
-function deletedThreads(): Set<string> {
-  if (deletedCache && Date.now() - deletedCache.at < 60_000) return deletedCache.ids;
-  const ids = new Set<string>();
-  const root = join(homedir(), "Library", "Application Support", "Claude", "claude-code-sessions"); // macOS; elsewhere nothing is found
-  const list = (dir: string) => { try { return readdirSync(dir); } catch { return []; } }; // no desktop app, or a file
-  for (const a of list(root)) for (const b of list(join(root, a))) for (const f of list(join(root, a, b))) {
-    if (f.startsWith("deleted_")) ids.add(f.slice("deleted_".length));
-  }
-  deletedCache = { at: Date.now(), ids };
-  return ids;
-}
-
 @Injectable()
 export class ListenerService implements OnModuleInit, OnModuleDestroy {
   private log = new Logger("Listener");
-  // SESSION_FILTER env is a permanent override (substring match, old behavior). Otherwise the
-  // active workspace's Claude Code project folder prefix is used (set on "workspace", owner: S).
+  // SESSION_FILTER env is a permanent override (substring of Claude Code's project folder names, old behavior).
+  // Otherwise the active workspace's roots scope every source (set on "workspace", owner: S).
   private readonly sessionFilterOverride = process.env.SESSION_FILTER || undefined;
-  private projectFilterPrefixes: string[] = [];
   private activeRoot: string | null = null;
   /** The active root and the folders the repo lived in before it moved (see moved.ts). */
   private roots: string[] = [];
   private offsets = new Map<string, number>();
   private nextSeq = new Map<string, number>();
   private ready = false;
-  private watcher?: FSWatcher;
+  /** Where the agents' logs come from: Claude Code's, then Codex's. Built in onModuleInit (it needs the config). */
+  private sources: LogSource[] = [];
+  /** Closes every source's watcher (tests read files themselves). */
+  readonly watcher = {
+    close: async () => { await Promise.all(this.sources.map((s) => s.close())); },
+    /** Every folder the sources watch (chokidar's getWatched, for tests). */
+    getWatched: (): Record<string, string[]> => Object.assign({}, ...this.sources.map((s) => s.getWatched?.() ?? {})),
+  };
   /** Bytes read per chunk, stored per transaction, and the longest line kept. Fields so tests can make them small. */
   chunkBytes = CHUNK_BYTES;
   batchBytes = BATCH_BYTES;
@@ -145,14 +85,10 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   /** SESSION_FILTER's first scan reads files one at a time. */
   private historyChain: Promise<void> = Promise.resolve();
   private backfillGen = 0;
-  /** Top-level project folders chokidar watches (only the active workspace's are descended into). */
-  private watchedTop = new Set<string>();
   private st!: ReturnType<ListenerService["prepare"]>;
   /** listSessions' rows: filtered, titles cleaned, newest first. Dropped when a session row is written or the
    * workspace changes; status and deleted threads are worked out on each call. */
   private sessionsCache: SessionRow[] | null = null;
-  /** Thread id → its transcript files (<project>/<sessionId>.jsonl), from the files read. Dropped when one is added. */
-  private transcripts: Map<string, string[]> | null = null;
   private destroyed = false;
   /** The one-time pass that gives older subagent steps their agent id (see agent-ids.ts); resolves when it's over. */
   agentIdsDone?: Promise<void>;
@@ -189,6 +125,8 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     }
     // Added 30 Sep 2026: pairs a tool result with its call exactly (older rows are paired by order).
     const stepCols = (db.prepare(`PRAGMA table_info(steps)`).all() as { name: string }[]).map((c) => c.name);
+    // Added 6 Oct 2026: which coding agent a thread ran in (null: Claude Code, every thread stored before).
+    if (!(db.prepare(`PRAGMA table_info(sessions)`).all() as { name: string }[]).some((c) => c.name === "harness")) db.exec(`ALTER TABLE sessions ADD COLUMN harness TEXT`);
     if (!stepCols.includes("tool_use_id")) db.exec(`ALTER TABLE steps ADD COLUMN tool_use_id TEXT`);
     // Added 5 Oct 2026: which subagent a step comes from, so parallel subagents stay apart after a reload. Steps stored
     // before then get theirs from their logs, once (see agent-ids.ts).
@@ -213,37 +151,28 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     this.setRoot(this.cfg.defaultRoot);
     this.bus.on("workspace", ({ root }) => this.onWorkspaceChanged(root));
 
-    const projects = this.cfg.claudeProjectsDir;
-    this.watcher = chokidar.watch(projects, {
-      ignoreInitial: false,
-      depth: 4,
-      // Only the active workspace's project folders are descended into (a workspace change adds its own, see
-      // watchMatching): other projects' gigabytes of logs aren't stat'ed or watched.
-      ignored: (path: string, stats?: { isFile(): boolean }) => {
-        const rel = relative(projects, path);
-        if (rel && !rel.startsWith("..") && !this.matchesFilter(rel.split(sep)[0])) return true;
-        return stats?.isFile() ? !path.endsWith(".jsonl") : false;
-      },
-    });
-    this.watcher.on("addDir", (d) => {
-      const rel = relative(projects, d);
-      if (rel && !rel.startsWith("..") && !rel.includes(sep)) this.watchedTop.add(rel);
-    });
-    this.watcher.on("add", (f) => this.onAdd(f));
-    this.watcher.on("change", (f) => void this.runFile(f, this.historyEnd.get(f) ?? 0));
-    this.watcher.on("error", (e) => this.log.warn(`watcher error: ${(e as Error).message}`));
-    this.watcher.on("ready", () => {
-      this.ready = true;
-      if (!this.sessionFilterOverride) this.backfillForNewFilter(); // the whole history, once the server is up
-      this.log.log(`watching ${projects} live (filter="${this.sessionFilterOverride ?? this.projectFilterPrefixes.join(", ")}")`);
-    });
+    const warn = (e: Error) => this.log.warn(`watcher error: ${e.message}`);
+    this.sources = [new ClaudeSource(this.cfg.claudeProjectsDir, warn), new CodexSource(this.cfg.codexDir, warn)];
+    let waiting = this.sources.length;
+    for (const source of this.sources) {
+      source.watch(this.scope(), {
+        add: (f) => this.onAdd(f),
+        change: (f) => void this.runFile(f, this.historyEnd.get(f) ?? 0),
+        ready: () => {
+          if (--waiting > 0) return;
+          this.ready = true;
+          if (!this.sessionFilterOverride) this.backfillForNewFilter(); // the whole history, once the server is up
+          this.log.log(`watching ${this.cfg.claudeProjectsDir} and ${this.cfg.codexDir} live (${this.sessionFilterOverride ? `filter="${this.sessionFilterOverride}"` : `roots: ${this.roots.join(", ")}`})`);
+        },
+      });
+    }
   }
 
   async onModuleDestroy() {
     this.backfillGen++; // stops a backfill between files
     this.destroyed = true;
     await this.agentIdsDone;
-    await this.watcher?.close();
+    await this.watcher.close();
   }
 
   /** Once the server is up, in the background: subagent steps stored before agent_id was kept get it from their logs. */
@@ -278,7 +207,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
          VALUES (@id, @session_id, @seq, @ts, @kind, @text, @tool, @input, @file_path, @diff, @label, @risk, @is_subagent, @tool_use_id, @agent_id)`,
       ),
       sessionRow: db.prepare(`SELECT * FROM sessions WHERE id = ?`),
-      insertSession: db.prepare(`INSERT INTO sessions (id, cwd, title, started_at, last_event_at, custom_title, title_set, worked) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`),
+      insertSession: db.prepare(`INSERT INTO sessions (id, cwd, title, started_at, last_event_at, custom_title, title_set, worked, harness) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`),
       updateSession: db.prepare(`UPDATE sessions SET cwd = ?, title = ?, last_event_at = ?, title_set = ?, custom_title = ?, worked = ? WHERE id = ?`),
       allSessions: db.prepare(`SELECT * FROM sessions ORDER BY last_event_at DESC`),
       saveOffset: db.prepare(`INSERT INTO listener_offsets (file, offset) VALUES (?, ?) ON CONFLICT(file) DO UPDATE SET offset = excluded.offset`),
@@ -302,41 +231,38 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     // Opened from a worktree: the whole repo's threads (its main checkout and every worktree), not just this one's.
     const base = repoBase(this.activeRoot);
     this.roots = [...new Set([this.activeRoot, base, ...formerRoots(this.cfg.claudeProjectsDir, this.activeRoot)])];
-    this.projectFilterPrefixes = this.sessionFilterOverride ? [] : this.roots.map(encodeRoot);
     this.sessionsCache = null;
   }
 
-  /** True if `projectDir` (a top-level folder name under claudeProjectsDir) belongs to the active workspace. */
-  private matchesFilter(projectDir: string): boolean {
-    if (this.sessionFilterOverride) return projectDir.includes(this.sessionFilterOverride);
-    return this.projectFilterPrefixes.some((p) => underPrefix(projectDir, p));
+  private scope(): Scope {
+    return { roots: this.roots, override: this.sessionFilterOverride };
+  }
+
+  private sourceOf(file: string): LogSource | undefined {
+    return this.sources.find((s) => s.owns(file));
   }
 
   private onWorkspaceChanged(root: string) {
     this.setRoot(root);
     if (this.sessionFilterOverride) return; // permanent override, ignore workspace changes
-    this.log.log(`workspace changed: now filtering Claude Code projects by prefix "${this.projectFilterPrefixes.join(", ")}"`);
+    this.log.log(`workspace changed: now reading the agents' logs for ${this.roots.join(", ")}`);
     this.backfillForNewFilter();
   }
 
-  /** Read every thread of the project folders now matching the filter, newest first, once the server is up: a chunk
-   * at a time, so the app stays responsive and live steps keep flowing. Quietly: history isn't live activity (no
-   * step broadcasts, map touches, agent markers or labels), only new threads are announced. What a file had when it
-   * was listed is history; whatever it gains after is live. Reuses the offset bookkeeping, so nothing duplicates. */
+  /** Read every thread of the open project, from every source, newest first, once the server is up: a chunk at a
+   * time, so the app stays responsive and live steps keep flowing. Quietly: history isn't live activity (no step
+   * broadcasts, map touches, agent markers or labels), only new threads are announced. What a file had when it was
+   * listed is history; whatever it gains after is live. Reuses the offset bookkeeping, so nothing duplicates. */
   private backfillForNewFilter() {
-    const projects = this.cfg.claudeProjectsDir;
-    let dirs: string[];
-    try { dirs = readdirSync(projects); } catch (e) {
-      this.log.warn(`backfill: cannot read ${projects}: ${(e as Error).message}`);
-      return;
+    const scope = this.scope();
+    const files: LogFile[] = [];
+    for (const source of this.sources) {
+      files.push(...source.list(scope));
+      if (this.ready) source.rescope(scope);
     }
-    const matching = dirs.filter((d) => this.matchesFilter(d));
-    const files: { path: string; mtimeMs: number; size: number }[] = [];
-    for (const d of matching) this.collectJsonl(join(projects, d), files);
     files.sort((a, b) => b.mtimeMs - a.mtimeMs);
     this.historyEnd.clear();
     for (const f of files) if ((this.offsets.get(f.path) ?? 0) < f.size) this.historyEnd.set(f.path, f.size);
-    if (this.ready) this.watchMatching(matching);
     void this.readHistory(++this.backfillGen, files);
   }
 
@@ -355,26 +281,6 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       await yieldToLoop();
     }
     this.log.log(`backfill: finished ${todo.length} file(s) in ${Date.now() - started} ms`);
-  }
-
-  /** Watch the matching project folders chokidar skipped (they didn't match before), stop watching the others. */
-  private watchMatching(matching: string[]) {
-    if (!this.watcher) return;
-    const projects = this.cfg.claudeProjectsDir;
-    for (const d of matching) if (!this.watchedTop.has(d)) { this.watchedTop.add(d); this.watcher.add(join(projects, d)); }
-    for (const d of [...this.watchedTop]) if (!this.matchesFilter(d)) { this.watchedTop.delete(d); this.watcher.unwatch(join(projects, d)); }
-  }
-
-  private collectJsonl(dir: string, out: { path: string; mtimeMs: number; size: number }[]) {
-    let entries: string[];
-    try { entries = readdirSync(dir); } catch { return; }
-    for (const name of entries) {
-      const p = join(dir, name);
-      let st;
-      try { st = statSync(p); } catch { continue; }
-      if (st.isDirectory()) { this.collectJsonl(p, out); continue; } // e.g. <session>/subagents/
-      if (name.endsWith(".jsonl")) out.push({ path: p, mtimeMs: st.mtimeMs, size: st.size });
-    }
   }
 
   // ---- file tailing ----
@@ -426,11 +332,8 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
    * never spans one), and store the complete lines about batchBytes per transaction, each with the byte offset after
    * its last line, yielding in between. A partial last line waits for the next change. */
   private async readFile(file: string, quietUntil: number): Promise<void> {
-    // Session files live at <projectsDir>/<project>/<sessionId>.jsonl, and subagent
-    // transcripts one level deeper at <projectsDir>/<project>/<sessionId>/subagents/agent-*.jsonl.
-    // Filter on the top-level project folder name either way.
-    const projectDir = relative(this.cfg.claudeProjectsDir, file).split(sep)[0] ?? "";
-    if (!this.matchesFilter(projectDir)) return;
+    const source = this.sourceOf(file);
+    if (!source || !source.inScope(file, this.scope())) return;
     let fd: number | undefined;
     try {
       const size = statSync(file).size;
@@ -496,7 +399,10 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
    * unchanged), so the file's next change retries it; returns false then. */
   private commitChunk(file: string, buf: Buffer, bufStart: number, start: number, end: number, quietUntil: number): boolean {
     const db = this.dbs.db;
+    const source = this.sourceOf(file);
+    if (!source) return true;
     const batch: Batch = { quietUntil, quiet: true, sessions: new Map(), events: [], announced: new Set(), seqBefore: new Map() };
+    const sink = this.sinkFor(batch, source.harness);
     db.exec("BEGIN");
     try {
       for (let s = start; s < end;) {
@@ -506,14 +412,14 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
           this.log.warn(`skipping a line over ${Math.round(this.maxLineBytes / 1048576)} MB in ${file} (byte ${bufStart + s})`);
         } else if (e > s) {
           batch.quiet = bufStart + e + 1 <= quietUntil;
-          let obj: RawLine | undefined;
+          let obj: unknown;
           try {
-            obj = JSON.parse(buf.toString("utf8", s, e)) as RawLine;
+            obj = JSON.parse(buf.toString("utf8", s, e));
           } catch (err) {
             this.log.warn(`bad jsonl line in ${file}: ${(err as Error).message}`);
           }
           if (obj) {
-            try { this.ingestLine(obj, batch); } catch (err) {
+            try { source.parse(file, obj, sink); } catch (err) {
               if (isSqliteError(err)) throw err; // the database, not the line: roll the batch back
               this.log.warn(`bad jsonl line in ${file}: ${(err as Error).message}`);
             }
@@ -540,136 +446,16 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     this.setOffset(file, offset);
   }
   private setOffset(file: string, offset: number) {
-    if (!this.offsets.has(file)) this.transcripts = null;
     this.offsets.set(file, offset);
   }
 
-  // ---- parsing ----
+  // ---- what sources store ----
 
-  private ingestLine(o: RawLine, b: Batch) {
-    if (o.type === "custom-title") {
-      if (o.sessionId && o.customTitle) this.setCustomTitle(b, o.sessionId, o.customTitle);
-      return;
-    }
-    if (o.type === "user") {
-      this.ingestUser(o, b);
-      return;
-    }
-    if (o.type === "assistant") {
-      this.ingestAssistant(o, b);
-      return;
-    }
-    // Ignore attachment, system, queue-operation, agent-name, last-prompt, atis-latch, file-history-snapshot, etc.
-  }
-
-  private ingestUser(o: RawLine, b: Batch) {
-    const sessionId = o.sessionId;
-    if (!sessionId) return;
-    const content = o.message?.content;
-    const ts = o.timestamp ?? new Date().toISOString();
-    const isSubagent = o.isSidechain === true;
-
-    if (o.isCompactSummary) { // the recap Claude Code writes when it compacts a long conversation
-      const text = typeof content === "string" ? content : Array.isArray(content) ? content.filter((b: any) => b?.type === "text").map((b: any) => b.text).join("\n\n") : "";
-      if (text.trim()) this.storeStep(b, this.makeStep(b, o, sessionId, 0, ts, "text", text, isSubagent), { cwd: o.cwd });
-      return;
-    }
-
-    if (typeof content === "string") {
-      const step = this.makeStep(b, o, sessionId, 0, ts, "prompt", content, isSubagent);
-      this.storeStep(b, step, { cwd: o.cwd, promptTitle: content });
-      return;
-    }
-    if (!Array.isArray(content)) return;
-
-    const textBlocks: { i: number; text: string }[] = [];
-    content.forEach((b: any, i: number) => {
-      if (b && b.type === "text" && typeof b.text === "string" && b.text.trim()) textBlocks.push({ i, text: b.text });
-    });
-    if (textBlocks.length) {
-      const joined = textBlocks.map((b) => b.text).join("\n\n");
-      if (/^\s*\[Request interrupted by user/.test(joined)) return; // harness notice, not a human prompt
-      const step = this.makeStep(b, o, sessionId, textBlocks[0].i, ts, "prompt", joined, isSubagent);
-      this.storeStep(b, step, { cwd: o.cwd, promptTitle: joined });
-    }
-
-    content.forEach((block: any, i: number) => {
-      if (!block || block.type !== "tool_result") return;
-      let text: string;
-      if (typeof block.content === "string") text = block.content;
-      else if (Array.isArray(block.content)) text = block.content.filter((c: any) => c?.type === "text").map((c: any) => c.text).join("\n\n");
-      else text = JSON.stringify(block.content ?? "");
-      const step = this.makeStep(b, o, sessionId, i, ts, "tool_result", sanitizeText(text, TOOL_RESULT_LIMIT), isSubagent);
-      if (typeof block.tool_use_id === "string") step.toolUseId = block.tool_use_id;
-      if (block.is_error) step.input = { isError: true, toolUseId: block.tool_use_id }; // read by the failures module
-      this.storeStep(b, step, { cwd: o.cwd });
-    });
-  }
-
-  private ingestAssistant(o: RawLine, b: Batch) {
-    const sessionId = o.sessionId;
-    if (!sessionId) return;
-    const content = o.message?.content;
-    if (!Array.isArray(content)) return;
-    const ts = o.timestamp ?? new Date().toISOString();
-    const isSubagent = o.isSidechain === true;
-
-    content.forEach((block: any, i: number) => {
-      if (!block || typeof block !== "object") return;
-      if (block.type === "text" && typeof block.text === "string" && block.text.trim()) {
-        this.storeStep(b, this.makeStep(b, o, sessionId, i, ts, "text", block.text, isSubagent), { cwd: o.cwd });
-      } else if (block.type === "thinking" && typeof block.thinking === "string" && block.thinking.trim()) {
-        this.storeStep(b, this.makeStep(b, o, sessionId, i, ts, "thinking", block.thinking, isSubagent), { cwd: o.cwd });
-      } else if (block.type === "tool_use") {
-        this.ingestToolUse(b, o, sessionId, i, ts, isSubagent, block.name, block.input, typeof block.id === "string" ? block.id : undefined);
-      }
-    });
-  }
-
-  private ingestToolUse(b: Batch, o: RawLine, sessionId: string, i: number, ts: string, isSubagent: boolean, name: string, input: any, toolUseId?: string) {
-    const isEdit = name === "Edit" || name === "MultiEdit" || name === "Write";
-    const id = `${o.uuid ?? ""}:${i}`;
-    let filePath: string | undefined = typeof input?.file_path === "string" ? input.file_path : typeof input?.path === "string" ? input.path : undefined;
-
-    if (isEdit) {
-      let before = "";
-      let after = "";
-      if (name === "Edit") {
-        before = typeof input?.old_string === "string" ? input.old_string : "";
-        after = typeof input?.new_string === "string" ? input.new_string : "";
-      } else if (name === "Write") {
-        before = "";
-        after = typeof input?.content === "string" ? input.content : "";
-      } else if (name === "MultiEdit" && Array.isArray(input?.edits)) {
-        before = input.edits.map((e: any) => (typeof e?.old_string === "string" ? e.old_string : "")).join("\n---\n");
-        after = input.edits.map((e: any) => (typeof e?.new_string === "string" ? e.new_string : "")).join("\n---\n");
-      }
-      const step: Step = {
-        id, sessionId, seq: this.allocSeq(b, sessionId), ts, kind: "edit",
-        tool: name, input: sanitizeDeep(input) as unknown, filePath,
-        diff: { before: sanitizeText(before, TEXT_LIMIT), after: sanitizeText(after, TEXT_LIMIT) },
-        isSubagent, ...(isSubagent && (o as { agentId?: string }).agentId ? { agentId: (o as { agentId?: string }).agentId } : {}),
-        ...(toolUseId ? { toolUseId } : {}),
-      };
-      this.storeStep(b, step, { cwd: o.cwd });
-    } else {
-      const step: Step = {
-        id, sessionId, seq: this.allocSeq(b, sessionId), ts, kind: "tool_call",
-        tool: name, input: sanitizeDeep(input) as unknown, filePath, isSubagent,
-        ...(isSubagent && (o as { agentId?: string }).agentId ? { agentId: (o as { agentId?: string }).agentId } : {}),
-        ...(toolUseId ? { toolUseId } : {}),
-      };
-      this.storeStep(b, step, { cwd: o.cwd });
-    }
-  }
-
-  private makeStep(b: Batch, o: RawLine, sessionId: string, blockIndex: number, ts: string, kind: StepKind, text: string, isSubagent: boolean): Step {
+  /** What a source's parse stores into this chunk: steps numbered in order, threads created with its harness. */
+  private sinkFor(b: Batch, harness: Harness): Sink {
     return {
-      id: `${o.uuid ?? ""}:${blockIndex}`,
-      sessionId, seq: this.allocSeq(b, sessionId), ts, kind,
-      text: sanitizeText(text, kind === "tool_result" ? TOOL_RESULT_LIMIT : TEXT_LIMIT),
-      isSubagent,
-      ...(isSubagent && (o as { agentId?: string }).agentId ? { agentId: (o as { agentId?: string }).agentId } : {}),
+      step: (s: NewStep, opts) => this.storeStep(b, inStoredOrder(s, this.allocSeq(b, s.sessionId)), harness, opts),
+      customTitle: (sessionId, title) => this.setCustomTitle(b, sessionId, title, harness),
     };
   }
 
@@ -683,7 +469,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
 
   // ---- storage + broadcast ----
 
-  private storeStep(b: Batch, step: Step, opts?: { cwd?: string; promptTitle?: string }) {
+  private storeStep(b: Batch, step: Step, harness: Harness, opts?: { cwd?: string; promptTitle?: string }) {
     this.st.insertStep.run({
       id: step.id,
       session_id: step.sessionId,
@@ -701,7 +487,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       tool_use_id: step.toolUseId ?? null,
       agent_id: step.agentId ?? null,
     });
-    this.upsertSession(b, step.sessionId, opts?.cwd ?? "", step.ts, opts?.promptTitle, step.kind === "tool_call" || step.kind === "edit");
+    this.upsertSession(b, step.sessionId, harness, opts?.cwd ?? "", step.ts, opts?.promptTitle, step.kind === "tool_call" || step.kind === "edit");
     if (!b.quiet) b.events.push({ step });
   }
 
@@ -723,14 +509,14 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     b.events.push({ session: sessionId });
   }
 
-  private upsertSession(b: Batch, sessionId: string, cwd: string, ts: string, rawPrompt?: string, worked = false) {
+  private upsertSession(b: Batch, sessionId: string, harness: Harness, cwd: string, ts: string, rawPrompt?: string, worked = false) {
     const promptTextForTitle = rawPrompt ? promptTitle(rawPrompt) : undefined;
     const row = this.batchSession(b, sessionId);
     if (!row) {
       const title = promptTextForTitle ? promptTextForTitle.slice(0, 80) : "(untitled session)";
       b.sessions.set(sessionId, {
         id: sessionId, cwd, title, started_at: ts, last_event_at: ts, custom_title: 0, title_set: promptTextForTitle ? 1 : 0,
-        worked: worked ? 1 : 0, isNew: true, dirty: true,
+        worked: worked ? 1 : 0, harness: harness === "claude" ? null : harness, isNew: true, dirty: true,
       });
       this.announceSession(b, sessionId);
       return;
@@ -751,12 +537,13 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     if (titleOrCwdChanged) this.announceSession(b, sessionId);
   }
 
-  private setCustomTitle(b: Batch, sessionId: string, customTitle: string) {
+  private setCustomTitle(b: Batch, sessionId: string, customTitle: string, harness: Harness) {
     const row = this.batchSession(b, sessionId);
     const now = new Date().toISOString();
     if (!row) {
       b.sessions.set(sessionId, {
-        id: sessionId, cwd: "", title: customTitle, started_at: now, last_event_at: now, custom_title: 1, title_set: 1, worked: 0, isNew: true, dirty: true,
+        id: sessionId, cwd: "", title: customTitle, started_at: now, last_event_at: now, custom_title: 1, title_set: 1, worked: 0,
+        harness: harness === "claude" ? null : harness, isNew: true, dirty: true,
       });
     } else {
       Object.assign(row, { title: customTitle, custom_title: 1, title_set: 1, dirty: true });
@@ -768,7 +555,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   private flushSessions(b: Batch) {
     for (const r of b.sessions.values()) {
       if (!r.dirty) continue;
-      if (r.isNew) this.st.insertSession.run(r.id, r.cwd, r.title, r.started_at, r.last_event_at, r.custom_title, r.title_set, r.worked);
+      if (r.isNew) this.st.insertSession.run(r.id, r.cwd, r.title, r.started_at, r.last_event_at, r.custom_title, r.title_set, r.worked, r.harness);
       else this.st.updateSession.run(r.cwd, r.title, r.last_event_at, r.title_set, r.custom_title, r.worked, r.id);
       this.sessionsCache = null;
     }
@@ -807,7 +594,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
 
   private rowToSession(row: SessionRow): Session {
     const idle = Date.now() - Date.parse(row.last_event_at) > IDLE_AFTER_MS;
-    return { id: row.id, cwd: row.cwd, title: row.title, startedAt: row.started_at, lastEventAt: row.last_event_at, status: idle ? "idle" : "running" };
+    return { id: row.id, cwd: row.cwd, title: row.title, startedAt: row.started_at, lastEventAt: row.last_event_at, status: idle ? "idle" : "running", harness: row.harness === "codex" ? "codex" : "claude" };
   }
 
   getSession(id: string): Session | undefined {
@@ -819,14 +606,10 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
    * most endpoints: the filtered rows are cached, and only the time-dependent parts are recomputed. */
   listSessions(): Session[] {
     this.sessionsCache ??= this.shownSessionRows();
-    // A thread you deleted (in Claude's desktop app) isn't one any more: its transcript is gone and the app left a
-    // marker. One that Claude Code cleaned up on its own (after ~30 days) stays: Rundown keeps that history.
-    const deleted = deletedThreads();
     let rows = this.sessionsCache;
-    if (deleted.size) {
-      const transcripts = this.transcriptIndex();
-      const gone = (id: string) => { const files = transcripts.get(id); return deleted.has(id) && !!files && !files.some((f) => existsSync(f)); };
-      rows = rows.filter((r) => !gone(r.id));
+    for (const source of this.sources) {
+      const hidden = source.hidden?.(this.offsets.keys());
+      if (hidden) rows = rows.filter((r) => !hidden(r.id));
     }
     return rows.map((r) => this.rowToSession(r));
   }
@@ -840,18 +623,6 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     const shown = cleaned.filter((r) => !idle(r));
     if (!this.activeRoot) return shown;
     return shown.filter((r) => this.isWithinRoot(r.cwd));
-  }
-
-  private transcriptIndex(): Map<string, string[]> {
-    if (this.transcripts) return this.transcripts;
-    const transcripts = new Map<string, string[]>();
-    for (const file of this.offsets.keys()) {
-      const parts = relative(this.cfg.claudeProjectsDir, file).split(sep);
-      if (parts.length !== 2 || !file.endsWith(".jsonl")) continue; // <project>/<sessionId>.jsonl, not a subagent's
-      const id = basename(file, ".jsonl");
-      transcripts.set(id, [...(transcripts.get(id) ?? []), file]);
-    }
-    return (this.transcripts = transcripts);
   }
 
   private isWithinRoot(cwd: string): boolean {
@@ -919,6 +690,16 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   }
 }
 
+/** A step with its keys in the order rowToStep gives them: the object sent live serializes like the stored one. */
+function inStoredOrder(s: NewStep, seq: number): Step {
+  const out: Record<string, unknown> = { id: s.id, sessionId: s.sessionId, seq, ts: s.ts, kind: s.kind };
+  for (const k of ["text", "tool", "input", "filePath", "diff", "label", "risk"] as const) if (s[k] !== undefined) out[k] = s[k];
+  out.isSubagent = !!s.isSubagent;
+  if (s.agentId) out.agentId = s.agentId;
+  if (s.toolUseId) out.toolUseId = s.toolUseId;
+  return out as Step;
+}
+
 /** A text column as JSON, as JSON.stringify gives it for the value node:sqlite reads (which stops at a NUL char). */
 const jq = (c: string) => `CASE WHEN instr(${c}, char(0)) > 0 THEN json_quote(substr(${c}, 1, instr(${c}, char(0)) - 1)) ELSE json_quote(${c}) END`;
 /** A steps row as the JSON of rowToStep(row), built by SQLite: same keys, same order, same escapes; input, diff and
@@ -936,30 +717,3 @@ const STEP_JSON = `'{"id":' || ${jq("id")} || ',"sessionId":' || ${jq("session_i
   || CASE WHEN tool_use_id IS NOT NULL AND tool_use_id != '' THEN ',"toolUseId":' || ${jq("tool_use_id")} ELSE '' END || '}'`;
 const stepsJsonSql = (where: string) =>
   `SELECT '[' || coalesce(group_concat(j, ','), '') || ']' AS out FROM (SELECT ${STEP_JSON} AS j FROM steps WHERE ${where} ORDER BY seq ASC)`;
-
-const PASTE = /<pasted_content\b[^>]*>([\s\S]*?)(<\/pasted_content>|$)/g;
-
-/** Text pasted into a prompt arrives wrapped in `<pasted_content id="…">`. What the person typed around it makes the
- * better title ("help me draft it?"); with nothing typed around it, the pasted text itself. Same rule as the web's. */
-export function withoutPastes(text: string): string {
-  const typed = text.replace(PASTE, " ").trim();
-  return typed || text.replace(PASTE, "$1");
-}
-
-/**
- * A readable thread title from the first prompt. Claude Code wraps slash commands and local output in tags
- * (<command-name>, <local-command-caveat>, <local-command-stdout>...): keep the command, drop the rest.
- * Undefined when nothing readable is left, so a later prompt can title the thread.
- */
-export function promptTitle(text: string, max = 80): string | undefined {
-  const command = /<command-name>([^<]*)/.exec(text)?.[1]?.trim();
-  const args = /<command-args>([^<]*)<\/command-args>/.exec(text)?.[1]?.trim();
-  if (command) return `${command}${args ? " " + args : ""}`.slice(0, max);
-  const plain = withoutPastes(text)
-    .replace(/<bash-input>([\s\S]*?)(<\/bash-input>|$)/g, "$ $1") // a command run with ! in Claude Code
-    .replace(/<(bash-stdout|bash-stderr)>[\s\S]*?(<\/\1>|$)/g, "")
-    .replace(/<(local-command-caveat|local-command-stdout|local-command-stderr|system-reminder|command-message|command-args)>[\s\S]*?(<\/\1>|$)/g, "")
-    .replace(/<\/?[a-z_-]+(\s[^>]*)?>/g, "")
-    .trim();
-  return plain ? plain.slice(0, max) : undefined;
-}

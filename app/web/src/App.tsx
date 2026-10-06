@@ -1,7 +1,8 @@
 // Owned by the lead. The shell: the header with where you are (project › thread › step), and the view for that place.
 // Each part reads only the slices it shows (useLiveSelector, useNavState), so a live message or a replay cursor move
 // re-renders the parts that changed, not the whole app.
-import { isReplay, shallowEqual, useLiveActions, useLiveSelector, useLiveStep } from "./lib/live";
+import { isReplay, shallowEqual, useLiveActions, useLiveSelector, useHarness, useLiveStep } from "./lib/live";
+import { harnessName } from "./lib/harness";
 import { END, NavProvider, useNavActions, useNavState, useReplayCursor } from "./lib/nav";
 import { useThread, type ReplayDetail } from "./lib/thread";
 import { displayLabel } from "./follow/format";
@@ -29,6 +30,7 @@ function Crumbs({ project }: { project: string }) {
   const { stopReplay, closeStep, setThreadMode } = useNavActions();
   const sid = replay?.sessionId;
   const title = useLiveSelector((s) => (sid ? s.sessions.find((x) => x.id === sid)?.title : undefined));
+  const codex = useHarness(sid) === "codex";
   const st = useLiveStep(replay && step ? step : null);
   return (
     <nav className="crumbs" aria-label="Where you are">
@@ -37,6 +39,7 @@ function Crumbs({ project }: { project: string }) {
         <span className="sep" aria-hidden="true">›</span>
         {step ? <button onClick={closeStep}>{title || "Thread"}</button>
           : <button className="here" aria-current="page" onClick={() => setThreadMode("steps")}>{title || "Thread"}</button>}
+        {codex && <span className="crumb-harness" title="This thread ran in Codex">Codex</span>}
       </>}
       {replay && step && <>
         <span className="sep" aria-hidden="true">›</span>
@@ -61,6 +64,7 @@ function Shell() {
   const replayId = replay?.sessionId ?? null;
   const state = useLiveSelector((s) => ({
     replay: s.replay, preview: s.preview, shared: s.shared, connected: s.connected, setup: s.setup,
+    sharedBy: s.shared ? s.sessions[0]?.harness ?? "claude" : null, // a shared replay holds one thread
     missing: !!replayId && s.sessionsLoaded && !s.sessions.some((x) => x.id === replayId), // a thread this project doesn't have
   }), shallowEqual);
   const [setupOpen, setSetupOpen] = useState(false);
@@ -119,7 +123,7 @@ function Shell() {
       )}
       {state.shared && (
         <div className="preview-banner">
-          A Claude Code session, shared from Rundown on {new Date(state.shared.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}.
+          A {harnessName(state.sharedBy ?? "claude")} session, shared from Rundown on {new Date(state.shared.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}.
           {" "}Press Play to watch it on the map. To follow your own agents,{" "}
           <a href="https://github.com/Djbrl/brainstorm#install-claude-code-plugin-preview" target="_blank" rel="noopener">install Rundown</a>.
         </div>

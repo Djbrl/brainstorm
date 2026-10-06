@@ -80,7 +80,7 @@ export function PromptBody({ text }: { text: string }) {
           <div className="pb-chips">
             {p.blocks.map((b, i) => (
               <button key={i} className={`pb-chip${open.includes(i) ? " on" : ""}`} onClick={() => toggle(i)} aria-expanded={open.includes(i)}
-                title={b.tag === "command" || b.tag === "bash" || b.tag === "claude-md" ? undefined : `Added to your message by Claude Code or the app you use it in (<${b.tag}>)`}>
+                title={b.tag === "command" || b.tag === "bash" || b.tag === "claude-md" ? undefined : `Added to your message by the agent or the app you use it in (<${b.tag}>)`}>
                 <Chev /><span>{b.name}</span>
               </button>
             ))}

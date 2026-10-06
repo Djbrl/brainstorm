@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Attention, AttentionState } from "@contract";
 import { useLive } from "./live";
+import { isCodex } from "./harness";
 
 /** States where the agent can't go on without you. "done" (your turn) is softer: it finished, nothing is blocked. */
 export const BLOCKED: ReadonlySet<AttentionState> = new Set(["permission", "question", "plan", "stuck"]);
@@ -66,7 +67,7 @@ export function useAttentionAlerts(onOpen: (sessionId: string) => void) {
   }, [waiting.length]);
 
   useEffect(() => {
-    const titles = new Map(state.sessions.map((s) => [s.id, s.title || "A thread"]));
+    const titles = new Map(state.sessions.map((s) => [s.id, `${s.title || "A thread"}${isCodex(s) ? " (Codex)" : ""}`]));
     for (const a of Object.values(state.attention)) {
       const key = `${a.state}|${a.since}`;
       if (seen.current.get(a.sessionId) === key) continue;

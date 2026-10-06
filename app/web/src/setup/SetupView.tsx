@@ -81,7 +81,7 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
     <div className="su-col su-pick">
       {onCancel && <button className="su-back" onClick={onCancel}><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 3.5L5.5 8l4.5 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>Back</button>}
       <h1 className="su-title">Pick a workspace</h1>
-      <p className="su-lede">Rundown maps the code in a folder and follows the Claude Code agents working in it, live.</p>
+      <p className="su-lede">Rundown maps the code in a folder and follows the agents (Claude Code or Codex) working in it, live.</p>
 
       <form className="su-find" onSubmit={(e) => { e.preventDefault(); submit(); }}>
         <svg className="su-find-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.8" stroke="currentColor" strokeWidth="1.6" /><path d="M10.6 10.6L14 14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
@@ -95,7 +95,7 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
       {shown === null ? (
         <div className="su-list">{[0, 1, 2, 3].map((i) => <div key={i} className="su-skel" style={{ animationDelay: `${i * 90}ms` }}><span /><span /></div>)}</div>
       ) : shown.length > 0 ? (
-        <div className={`su-list ${intro ? "intro" : ""}`} ref={listRef} onKeyDown={onListKey} role="listbox" aria-label="Claude Code projects on this computer">
+        <div className={`su-list ${intro ? "intro" : ""}`} ref={listRef} onKeyDown={onListKey} role="listbox" aria-label="Projects on this computer">
           {shown.map((s, i) => (
             <button key={s.root} className={`su-ws ${s.exists ? "" : "gone"} ${busy === s.root ? "busy" : ""}`} disabled={!s.exists || !!busy} onClick={() => open(s.root)} style={{ animationDelay: `${Math.min(i, 10) * 35}ms` }} role="option" aria-selected={false}>
               <span className="su-ws-main">
@@ -110,9 +110,9 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
           ))}
         </div>
       ) : (
-        <p className="su-none">{isPath ? "Press Enter to open this folder." : list?.length ? `No project matches “${q}”. Paste its folder path to open it.` : "No Claude Code projects found on this computer yet. Paste a folder path above."}</p>
+        <p className="su-none">{isPath ? "Press Enter to open this folder." : list?.length ? `No project matches “${q}”. Paste its folder path to open it.` : "No projects found on this computer yet. Paste a folder path above."}</p>
       )}
-      {shown && shown.length > 0 && <p className="su-count">{q ? `${shown.length} of ${list!.length} Claude Code projects` : plural(list!.length, "Claude Code project")} on this computer</p>}
+      {shown && shown.length > 0 && <p className="su-count">{q ? `${shown.length} of ${list!.length} projects` : plural(list!.length, "project")} on this computer</p>}
     </div>
   );
 }

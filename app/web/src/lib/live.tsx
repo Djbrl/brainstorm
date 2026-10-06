@@ -17,7 +17,8 @@
 // (layout, path resolvers, the file tree) key memos on `state.structureVersion` instead.
 import { installSetupShim, startAgentPlayback } from "./preview";
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
-import type { AgentPresence, Attention, AskRequest, AskResponse, Edge, FileNode, GitState, SetupStatus, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
+import type { AgentPresence, Attention, AskRequest, AskResponse, Edge, FileNode, GitState, Harness, SetupStatus, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
+import { harnessOf, withHarness } from "./harness";
 import { listeners, shallowEqual, useStoreSelector } from "./store";
 
 export { shallowEqual };
@@ -78,7 +79,7 @@ function reindex(ix: Indexes, s: LiveState) {
 }
 
 const byRecency = (a: Session, b: Session) => b.lastEventAt.localeCompare(a.lastEventAt);
-const sortSessions = (l: Session[]) => [...l].sort(byRecency);
+const sortSessions = (l: Session[]) => l.map(withHarness).sort(byRecency);
 const sameEdges = (a: Edge[], b: Edge[]) => a.length === b.length && a.every((e, k) => e.to === b[k].to);
 
 /**
@@ -104,7 +105,7 @@ function applyBatch(base: LiveState, actions: Action[], ix: Indexes): LiveState 
         const list = st().sessions = own(s.sessions, (o) => o.slice());
         const i = list.findIndex((x) => x.id === a.session.id);
         if (i !== -1) list.splice(i, 1);
-        list.unshift(a.session);
+        list.unshift(withHarness(a.session));
         sortNeeded = true;
         break;
       }
@@ -349,6 +350,10 @@ function useStore(): LiveStore {
 export function useLiveSelector<T>(select: (s: LiveState) => T, eq?: (a: T, b: T) => boolean): T {
   return useStoreSelector(useStore(), select, eq);
 }
+
+/** Which agent ran a thread ("claude" when it isn't known). */
+export const useHarness = (sessionId?: string | null): Harness =>
+  useLiveSelector((s) => harnessOf(sessionId ? s.sessions.find((x) => x.id === sessionId) : undefined));
 
 /** `loadSteps` and `reload`; the same functions for the app's lifetime. */
 export function useLiveActions(): Pick<LiveStore, "loadSteps" | "reload"> {

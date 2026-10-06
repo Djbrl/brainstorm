@@ -7,7 +7,8 @@
 // around what you see and around the cursor (every row is one line, the same height), with empty space standing in
 // for the rest, so the scroll bar, the follow and the center line work as if they were all there.
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { isReplay, useLive } from "../../lib/live";
+import { isReplay, useHarness, useLive } from "../../lib/live";
+import { harnessName } from "../../lib/harness";
 import { useNav } from "../../lib/nav";
 import { beatLabel, useThread, type Beat, type Thread } from "../../lib/thread";
 import { chapterAt, chaptersOf, duration, injectedLabel, type Chapter } from "../../lib/chapters";
@@ -281,6 +282,7 @@ const TrackList = memo(function TrackList({ thread, sessionId, index, playing, f
 /** The live end of the list: the agent is waiting on you (or done and it's your turn). */
 function WaitingRow({ sessionId, onOpen }: { sessionId: string; onOpen: (stepId: string) => void }) {
   const a = useLive().state.attention[sessionId];
+  const harness = useHarness(sessionId);
   if (!a || !(needsYou(a) || yourTurn(a))) return null;
   const t = attentionText(a);
   const blocked = needsYou(a);
@@ -289,7 +291,7 @@ function WaitingRow({ sessionId, onOpen }: { sessionId: string; onOpen: (stepId:
       <b aria-hidden="true" />
       <span className="rp-waiting-line">{t.line}</span>
       {a.detail && <code className="rp-waiting-detail" title={a.detail}>{a.detail}</code>}
-      {blocked && <span className="rp-waiting-hint">{a.state === "stuck" ? "It may need a hint from you." : "Answer it in Claude Code."}</span>}
+      {blocked && <span className="rp-waiting-hint">{a.state === "stuck" ? "It may need a hint from you." : `Answer it in ${harnessName(harness)}.`}</span>}
       {a.stepId && <button className="rp-waiting-open" onClick={() => onOpen(a.stepId!)}>Show the step</button>}
     </div>
   );

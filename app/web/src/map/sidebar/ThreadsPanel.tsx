@@ -10,6 +10,7 @@ import { END, useNav } from "../../lib/nav";
 import { track } from "../../lib/usage";
 import { relTime } from "../../follow/format";
 import { agentColor, baseName, initial, shortName, verbIng } from "../agents";
+import { isCodex } from "../../lib/harness";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
 
 function useTick(ms: number) {
@@ -49,7 +50,7 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }
   });
 
   if (sessions.length === 0) {
-    return <p className="sidebar-empty">No agent threads yet. Start Claude Code in this project.</p>;
+    return <p className="sidebar-empty">No agent threads yet. Start Claude Code or Codex in this project.</p>;
   }
 
   // Clicking a thread opens it at the end, on the lens you're on, and a running one keeps following its newest step.
@@ -123,6 +124,7 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
         <button className="sidebar-thread-head" onClick={onSelect} aria-pressed={selected} title={selected ? "Close this thread" : running ? "Open this thread and follow it live" : "Open this thread"}>
           <span className={`sidebar-thread-status ${session.status}${blocked ? " waiting" : ""}`} aria-hidden="true" />
           <span className="sidebar-thread-title">{session.title || "Untitled thread"}</span>
+          {isCodex(session) && <span className="sidebar-thread-harness" title="This thread ran in Codex">Codex</span>}
           {say
             ? <span className={`sidebar-thread-attn ${blocked ? "blocked" : "turn"}`} title={`${say.line}${attention?.detail ? `\n${attention.detail}` : ""}`}>{say.badge}</span>
             : tree && <span className="sidebar-thread-tree" title={session.cwd}>{tree}</span>}

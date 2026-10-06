@@ -119,7 +119,7 @@ nav .links a:hover { color: var(--text); }
 .stats-head { font-size: clamp(34px, 4.8vw, 64px); line-height: 1; }
 .stats3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 52px; }
 .stat3 .n { font: 900 clamp(56px, 6.4vw, 84px)/1 var(--display); letter-spacing: -0.045em; white-space: nowrap; }
-.stat3 .n.warm { color: var(--red); }
+.stat3 .n.warm { color: var(--blue); }
 .stat3 p { color: var(--muted); font-size: 19px; font-weight: 500; margin: 14px auto 0; max-width: 22ch; }
 .stat3 p b { color: var(--text); font-weight: 500; }
 .study { display: block; margin: 20px auto 0; padding-top: 14px; border-top: 1px solid var(--line); max-width: 30ch; font-size: 13.5px; line-height: 1.4; color: var(--muted); font-weight: 500; }
@@ -138,7 +138,7 @@ nav .links a:hover { color: var(--text); }
 @keyframes blink { 50% { opacity: 0; } }
 
 /* tasks: one agent's work outside code, as a track of stops with a window */
-#tasks { height: 250vh; background: var(--alt); }
+#tasks { height: 300vh; background: var(--alt); }
 #tasks .stage { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 64px 24px 24px; }
 .tasks-head { text-align: center; }
 .tasks-head .h2 { font-size: clamp(36px, 5vw, 64px); }
@@ -159,7 +159,35 @@ nav .links a:hover { color: var(--text); }
 .tk-body { min-width: 0; color: var(--text); }
 .tk-body b { display: block; font-size: 15.5px; font-weight: 700; line-height: 1.3; }
 .tk-body small { display: block; font-size: 13px; color: var(--muted); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.c-cmd { color: #e0673a; } .c-file { color: #1f9d7a; } .c-web { color: #5b5bd6; }
+.f-track, .f-share { color: var(--blue); } .f-places { color: #5b5bd6; } .f-codex { color: var(--text); } .f-cmd { color: #e0673a; } .f-bell { color: var(--orange); }
+/* the pictures, one per feature */
+.ft-steps { list-style: none; margin: 0; padding: 18px 22px; flex: 1; background: #fff; display: flex; flex-direction: column; gap: 7px; font-size: 14px; font-weight: 500; }
+.ft-steps li { display: flex; align-items: center; gap: 10px; color: var(--text); }
+.ft-steps li::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+.ft-steps li.you { align-self: flex-end; padding: 7px 12px; border-radius: 14px 14px 4px 14px; background: #ededf2; font-weight: 600; }
+.ft-steps li.you::before { display: none; }
+.ft-steps li.rd::before { background: var(--blue); } .ft-steps li.ed::before { background: #ff9f0a; } .ft-steps li.ok::before { background: #1f9d7a; }
+.ft-steps li.bad { color: var(--risk); } .ft-steps li.bad::before { background: var(--risk); }
+.ft-steps code, .ft-places i, .ft-diff code { font: 12.5px var(--mono); }
+.ft-steps em { margin-left: auto; font-style: normal; font-size: 12.5px; color: var(--muted); } .ft-steps li.bad em { color: var(--risk); }
+.ft-places { flex: 1; background: #fff; padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; }
+.ft-places .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ft-places .grp b { width: 100%; font-size: 12px; color: var(--muted); font-weight: 600; text-transform: none; }
+.ft-places .pl { display: inline-flex; align-items: center; gap: 8px; padding: calc(5px + var(--n) * 1.2px) 12px; border-radius: 999px; background: #eeeefe; color: #3f3fb0; font-size: 13.5px; font-weight: 600; }
+.ft-places .pl.app { background: #e8f1ff; color: var(--blue); } .ft-places .pl.svc { background: #f3f0e8; color: #7a5b1f; }
+.ft-places .pl i { font-style: normal; font-size: 11.5px; opacity: .7; }
+.ft-threads { list-style: none; margin: 0; padding: 14px; flex: 1; background: #fff; display: flex; flex-direction: column; gap: 4px; }
+.ft-threads li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; font-size: 14px; }
+.ft-threads li.on { background: #eef3ff; }
+.ft-threads small { color: var(--muted); font-size: 12.5px; }
+.ft-threads .hx { font-size: 11.5px; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
+.ft-threads .hx.claude { background: #fbeee8; color: #b4532a; } .ft-threads .hx.codex { background: #ececef; color: var(--text); }
+.ft-diff { background: #fff; padding: 14px 22px 18px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.ft-diff span { color: var(--muted); font-size: 13px; margin-bottom: 6px; }
+.ft-diff .del { color: #b3261e; background: #fdecea; border-radius: 4px; padding: 2px 8px; } .ft-diff .add { color: #146c43; background: #e6f4ea; border-radius: 4px; padding: 2px 8px; }
+.ft-notes { flex: 1; background: linear-gradient(160deg, #dfe6f5, #f1ede6); padding: 22px; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.ft-notes .note { width: min(320px, 100%); background: rgba(255,255,255,.88); border-radius: 14px; padding: 12px 14px; box-shadow: 0 8px 24px -10px rgba(0,0,0,.25); display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; }
+.ft-notes .note span { color: var(--muted); font-size: 13px; }
 .tk-line li.fail { color: var(--risk); }
 .tk-line li.fail b { color: var(--risk); }
 .tk-line li.fail.on::before { background: var(--risk); animation: tk-err 1.4s ease-out 1; }
@@ -180,34 +208,6 @@ nav .links a:hover { color: var(--text); }
 .plain { list-style: none; margin: 0; padding: 14px 24px 18px; background: #fff; font-size: 14px; color: var(--muted); font-weight: 500; }
 .plain li { padding: 2px 0; }
 .plain code { font: 12.5px var(--mono); color: var(--text); background: #f0f0f3; border-radius: 5px; padding: 1px 6px; margin-right: 8px; }
-.film { flex: 1; position: relative; overflow: hidden; background: #08070c; display: flex; flex-direction: column; }
-.film .shot { position: relative; flex: 1; overflow: hidden; }
-.film .shot svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.film .shot::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 80% 70% at 50% 45%, transparent 55%, rgba(0,0,0,.55)); }
-.teaser .shot svg { transform: scale(1.3); transform-origin: 50% 22%; animation: kenburns 9s ease-in-out infinite alternate; }
-@keyframes kenburns { from { transform: scale(1.3); } to { transform: scale(1.4) translate(-1.5%, 0); } }
-.film .badge { position: absolute; top: 14px; left: 14px; z-index: 2; font: 700 12px var(--body); color: #fff; background: rgba(0,0,0,.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-radius: 999px; padding: 4px 11px; }
-.film .badge.new { background: #1f9d7a; }
-.film .capt { position: absolute; left: 50%; bottom: 9%; transform: translateX(-50%); z-index: 2; font: 700 clamp(13px, 1.6vw, 20px)/1.3 var(--body); color: #fff; background: rgba(0,0,0,.62); padding: 6px 14px; border-radius: 8px; white-space: nowrap; }
-.film .player { flex: none; display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: #121118; color: #c7c7cc; font: 600 12px var(--mono); }
-.film .player svg { width: 12px; height: 12px; fill: #fff; flex: none; }
-.film .player .bar { flex: 1; position: relative; height: 4px; border-radius: 2px; background: rgba(255,255,255,.16); }
-.film .player .bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 33%; border-radius: 2px; background: #fff; }
-.film .player .bar b { position: absolute; left: 33%; top: -3px; width: 7.5%; height: 10px; border-radius: 3px; background: rgba(255,159,10,.35); border: 1px solid #ff9f0a; }
-.film .strip { flex: none; position: relative; display: flex; gap: 3px; padding: 8px 14px 10px; background: #121118; }
-.film .strip svg { flex: 1; min-width: 0; aspect-ratio: 16 / 10; border-radius: 3px; display: block; }
-.film .strip .ph { position: absolute; top: 4px; bottom: 6px; left: 14px; width: 2px; background: #ff375f; box-shadow: 0 0 6px #ff375f; animation: playhead 7s linear infinite; }
-@keyframes playhead { from { left: 14px; } to { left: calc(100% - 16px); } }
-/* the scene's own motion */
-.sc-cone { animation: flicker 5s ease-in-out infinite alternate; }
-.sc-cone.b { animation-duration: 6.5s; animation-delay: -2s; }
-@keyframes flicker { 0% { opacity: .75; } 40% { opacity: 1; } 70% { opacity: .85; } 100% { opacity: .95; } }
-.sc-hot { transform-box: fill-box; transform-origin: center; animation: hotpulse 1.6s ease-out infinite; }
-@keyframes hotpulse { 0% { transform: scale(1); opacity: .9; } 100% { transform: scale(3.2); opacity: 0; } }
-.sc-trail { stroke-dasharray: 160; stroke-dashoffset: 160; animation: trail 4s var(--ease) infinite; }
-@keyframes trail { 0% { stroke-dashoffset: 160; } 60%, 100% { stroke-dashoffset: 0; } }
-.sc-speaker { transform-box: fill-box; transform-origin: 50% 100%; animation: sway 4.5s ease-in-out infinite alternate; }
-@keyframes sway { from { transform: rotate(-1.2deg); } to { transform: rotate(1.4deg); } }
 .web { flex: 1; background: #fff; display: flex; flex-direction: column; }
 .web .url { margin: 12px 14px 0; padding: 7px 14px; border-radius: 999px; background: #f0f0f3; font: 13px var(--mono); color: var(--muted); }
 .web .doc { padding: 22px 30px; }
@@ -395,6 +395,8 @@ footer a:hover { text-decoration: underline; }
   .hero-end .btns { display: none; }
   #tasks .stage { padding: 88px 16px 80px; }
   .tasks-head .sub { display: block; }
+  .tk-line li small { display: block; white-space: normal; }  /* the features list: each says what it is */
+  .tk-line li { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   .chip .pulse { animation: none; opacity: 0; }
@@ -402,48 +404,11 @@ footer a:hover { text-decoration: underline; }
   .cc-body > * { opacity: 1; transform: none; transition: none; }
   .cc-note .spark { animation: none; }
   .tk-line li, .tk-pane, .tk-agent { transition: none; }
-  .sc-cone, .sc-hot, .sc-trail, .sc-speaker, .teaser .shot svg, .film .strip .ph { animation: none; }
-  .sc-trail { stroke-dashoffset: 0; }
   .hero-type h1 .line span, .hero-type p, .hero-type .btns { animation: none; transform: none; opacity: 1; }
 }
 </style>
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <defs>
-    <linearGradient id="scBg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c1633"/><stop offset=".62" stop-color="#110e1d"/><stop offset="1" stop-color="#07060b"/></linearGradient>
-    <linearGradient id="scCone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd7a3" stop-opacity=".5"/><stop offset="1" stop-color="#ffd7a3" stop-opacity="0"/></linearGradient>
-    <linearGradient id="scConeB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b9c7ff" stop-opacity=".35"/><stop offset="1" stop-color="#b9c7ff" stop-opacity="0"/></linearGradient>
-    <radialGradient id="scGlow"><stop offset="0" stop-color="#dfe6ff" stop-opacity=".55"/><stop offset="1" stop-color="#dfe6ff" stop-opacity="0"/></radialGradient>
-    <linearGradient id="scRim" x1="0" y1="0" x2="1" y2="0"><stop offset=".55" stop-color="#1a1526"/><stop offset="1" stop-color="#6b4a3a"/></linearGradient>
-    <symbol id="stageScene" viewBox="0 0 560 350">
-      <rect width="560" height="350" fill="url(#scBg)"/>
-      <g stroke="#ffffff" stroke-opacity=".035"><path d="M70 0V250M140 0V250M420 0V250M490 0V250"/></g>
-      <ellipse cx="275" cy="120" rx="210" ry="120" fill="url(#scGlow)"/>
-      <rect x="140" y="38" width="270" height="160" rx="5" fill="#fbfbfd"/>
-      <text x="158" y="62" font-family="Satoshi, system-ui, sans-serif" font-weight="900" font-size="13" fill="#121214">A live map of your agents</text>
-      <g stroke="#c9ced9" stroke-width="1.2" fill="none"><path d="M180 110 214 94 250 120 292 100 330 132 366 112M214 94 226 150 270 164 330 132M180 110 196 158 226 150M292 100 302 150 270 164M366 112 380 160 330 132"/></g>
-      <path class="sc-trail" d="M196 158 C230 170 250 128 292 100 S350 126 366 112" fill="none" stroke="#ff5b1f" stroke-width="2.4" stroke-linecap="round"/>
-      <g fill="#b4c2d4"><circle cx="180" cy="110" r="5"/><circle cx="214" cy="94" r="4"/><circle cx="250" cy="120" r="5"/><circle cx="226" cy="150" r="4"/><circle cx="302" cy="150" r="4"/><circle cx="380" cy="160" r="5"/><circle cx="270" cy="164" r="4"/></g>
-      <g fill="#ff9f0a"><circle cx="196" cy="158" r="5"/><circle cx="292" cy="100" r="6"/><circle cx="330" cy="132" r="5"/></g>
-      <circle class="sc-hot" cx="366" cy="112" r="6" fill="#ff375f"/><circle cx="366" cy="112" r="6" fill="#ff375f"/>
-      <rect x="0" y="236" width="560" height="114" fill="#0b0912"/>
-      <path d="M0 236H560" stroke="#3a2f52" stroke-width="1.5"/>
-      <polygon class="sc-cone" points="200,0 232,0 330,300 150,300" fill="url(#scCone)"/>
-      <polygon class="sc-cone b" points="420,0 446,0 520,300 350,300" fill="url(#scConeB)"/>
-      <path d="M296 214h52l-6 64h-40z" fill="#241c35"/><rect x="292" y="208" width="60" height="8" rx="2" fill="#2e2542"/>
-      <g class="sc-speaker">
-        <path d="M398 300c1-40 11-58 29-60 18 2 28 20 29 60z" fill="url(#scRim)"/>
-        <circle cx="427" cy="222" r="15" fill="url(#scRim)"/>
-      </g>
-      <g fill="#050408">
-        <circle cx="40" cy="336" r="19"/><circle cx="96" cy="342" r="17"/><circle cx="150" cy="334" r="20"/><circle cx="214" cy="344" r="18"/><circle cx="276" cy="336" r="19"/>
-        <circle cx="334" cy="344" r="17"/><circle cx="392" cy="336" r="20"/><circle cx="452" cy="343" r="18"/><circle cx="512" cy="335" r="19"/>
-      </g>
-    </symbol>
-  </defs>
-</svg>
-
 <div class="band" id="band">
   <div class="wrap">
     <span><b>Rundown is a prototype.</b> <span class="dim">The full release lands in late October.</span></span>
@@ -458,7 +423,7 @@ footer a:hover { text-decoration: underline; }
       <svg class="mark" viewBox="0 0 473.78 67.50" height="22" role="img" aria-label="Rundown"><g transform="translate(-15.00 -22.50) scale(0.9374)"><rect x="16" y="24" width="58" height="16" rx="8" fill="currentColor"/><rect x="31" y="52" width="58" height="16" rx="8" fill="#2563EB"/><rect x="46" y="80" width="58" height="16" rx="8" fill="#FF5B1F"/></g><path transform="translate(93.27 66.35)" fill="currentColor" d="M21.032 0.0H6.776V-65.11999999999999H31.944Q43.824 -65.11999999999999 50.292 -59.61999999999999Q56.76 -54.12 56.76 -44.0Q56.76 -31.415999999999997 45.936 -25.872L57.376 0.0H41.8L32.032 -22.791999999999998H21.032ZM21.032 -52.448V-35.288H31.855999999999998Q36.519999999999996 -35.288 39.116 -37.57599999999999Q41.711999999999996 -39.864 41.711999999999996 -44.0Q41.711999999999996 -48.135999999999996 39.20399999999999 -50.292Q36.696 -52.448 31.944 -52.448ZM91.78399999999999 -44.0H105.336V0.0H92.576L91.696 -4.928Q89.672 -2.1999999999999997 85.93199999999999 -0.5279999999999999Q82.192 1.144 78.232 1.144Q70.752 1.144 66.396 -3.564Q62.04 -8.272 62.04 -16.368V-44.0H75.592V-21.296Q75.592 -15.927999999999999 77.52799999999999 -13.419999999999998Q79.464 -10.911999999999999 83.6 -10.911999999999999Q87.91199999999999 -10.911999999999999 89.84799999999998 -13.288Q91.78399999999999 -15.664 91.78399999999999 -21.119999999999997ZM126.01599999999999 0.0H112.464V-44.0H125.22399999999999L126.104 -39.424Q130.416 -45.407999999999994 139.56799999999998 -45.407999999999994Q147.4 -45.407999999999994 151.756 -40.611999999999995Q156.112 -35.815999999999995 156.112 -27.192V0.0H142.56V-23.936Q142.56 -28.072 140.448 -30.58Q138.336 -33.088 134.816 -33.088Q130.768 -33.088 128.392 -30.668Q126.01599999999999 -28.247999999999998 126.01599999999999 -24.112ZM181.192 1.144Q171.688 1.144 166.012 -5.103999999999999Q160.336 -11.351999999999999 160.336 -21.735999999999997Q160.336 -32.296 166.23200000000003 -38.852Q172.12800000000001 -45.407999999999994 182.072 -45.407999999999994Q186.12 -45.407999999999994 189.728 -43.91199999999999Q193.336 -42.416 195.272 -39.952V-66.35199999999999H208.824V0.0H196.064L195.36 -5.632Q193.6 -2.552 189.728 -0.7040000000000001Q185.856 1.144 181.192 1.144ZM176.836 -14.299999999999999Q179.696 -11.264 184.44799999999998 -11.264Q189.2 -11.264 192.192 -14.299999999999999Q195.184 -17.336 195.184 -22.264Q195.184 -27.192 192.192 -30.227999999999998Q189.2 -33.263999999999996 184.44799999999998 -33.263999999999996Q179.696 -33.263999999999996 176.836 -30.227999999999998Q173.976 -27.192 173.976 -22.264Q173.976 -17.336 176.836 -14.299999999999999ZM237.864 -45.32Q248.424 -45.32 255.24400000000003 -38.896Q262.064 -32.472 262.064 -22.087999999999997Q262.064 -11.792 255.24400000000003 -5.368Q248.424 1.056 237.864 1.056Q227.216 1.056 220.39600000000002 -5.324Q213.57600000000002 -11.703999999999999 213.57600000000002 -22.088Q213.57600000000002 -32.472 220.39600000000002 -38.896Q227.216 -45.32 237.864 -45.32ZM227.216 -22.176Q227.216 -17.16 230.16400000000002 -14.123999999999999Q233.11200000000002 -11.088 237.864 -11.088Q242.52800000000002 -11.088 245.476 -14.123999999999999Q248.424 -17.16 248.424 -22.176Q248.424 -27.104 245.476 -30.139999999999997Q242.52800000000002 -33.175999999999995 237.864 -33.175999999999995Q233.11200000000002 -33.175999999999995 230.16400000000002 -30.139999999999997Q227.216 -27.104 227.216 -22.176ZM276.76 0.0 262.592 -44.0H276.848L280.89599999999996 -29.656Q282.568 -23.496 283.62399999999997 -17.16Q284.50399999999996 -22.439999999999998 286.792 -29.656L291.28 -44.0H305.18399999999997L309.32 -29.656Q311.52 -22.087999999999997 312.312 -17.16Q312.928 -20.68 315.392 -29.656L319.616 -44.0H333.96L318.56 0.0H305.976L301.752 -13.991999999999999Q298.76 -23.671999999999997 298.144 -28.247999999999998Q297.352 -24.2 294.18399999999997 -13.728L289.96 0.0ZM350.416 0.0H336.864V-44.0H349.62399999999997L350.504 -39.424Q354.816 -45.407999999999994 363.96799999999996 -45.407999999999994Q371.8 -45.407999999999994 376.156 -40.611999999999995Q380.512 -35.815999999999995 380.512 -27.192V0.0H366.96V-23.936Q366.96 -28.072 364.84799999999996 -30.58Q362.736 -33.088 359.216 -33.088Q355.168 -33.088 352.79200000000003 -30.668Q350.416 -28.247999999999998 350.416 -24.112Z"/></svg>
     </a>
     <div class="links">
-      <a href="#tasks">Beyond code</a>
+      <a href="#tasks">Features</a>
       <a href="#roadmap">Roadmap</a>
       <a href="#brev">NVIDIA</a>
       <a data-link="demo" href="#">Live demo</a>
@@ -521,41 +486,56 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- 3. Beyond code: one agent editing a video, told as a track of stops (an illustration of the Track view) -->
+<!-- 3. What's in Rundown: the features, one per stretch of the scroll, each with a small picture of it -->
 <section class="scene" id="tasks">
   <div class="stage">
     <div class="tasks-head">
       <h2 class="h2">Not just code.</h2>
-      <p class="sub">Agents cut videos, write reports and research the web. Rundown follows them there too. Places puts every website and app they visited on a map, and the track shows how the work was done.</p>
+      <p class="sub">Your agents read the web, test your apps and run commands. Rundown follows all of it, in Claude Code and soon Codex.</p>
     </div>
     <div class="tk">
       <div class="tk-track">
       <span class="tk-agent" id="tkAgent" aria-hidden="true"></span>
       <ol class="tk-line" id="tkLine">
-        <li class="ask"><span class="tk-ico"><svg viewBox="0 0 16 16"><circle cx="8" cy="5.5" r="2.6"/><path d="M3 14c.6-2.6 2.6-4 5-4s4.4 1.4 5 4"/></svg></span><span class="tk-body"><b>Cut a 30-second teaser from talk.mp4</b><small>You asked · with captions</small></span></li>
-        <li class="c-cmd"><span class="tk-ico"><svg viewBox="0 0 16 16"><path d="M3 4.5 6.5 8 3 11.5M8.5 12H13"/></svg></span><span class="tk-body"><b>Cut the best 30 seconds</b><small>Ran ffmpeg · 4:12 to 4:42 · cut.mp4</small></span></li>
-        <li class="c-cmd fail"><span class="tk-ico"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M8 4.8v3.8M8 11.1v.1"/></svg></span><span class="tk-body"><b>Burn in the captions</b><small>Failed · no subtitles filter</small></span></li>
-        <li class="c-web"><span class="tk-ico"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c1.8 1.7 2.6 3.7 2.6 6S9.8 12.3 8 14M8 2C6.2 3.7 5.4 5.7 5.4 8s.8 4.3 2.6 6"/></svg></span><span class="tk-body"><b>Looked up another way</b><small>ffmpeg.org · drawtext filter</small></span></li>
-        <li class="c-cmd made"><span class="tk-ico"><svg viewBox="0 0 16 16"><rect x="2" y="3.5" width="12" height="9" rx="1.5"/><path d="m7 6.3 3 1.7-3 1.7z"/></svg></span><span class="tk-body"><b>Made teaser.mp4</b><small>Ran ffmpeg · captions with drawtext</small></span></li>
+        <li class="f-track"><span class="tk-ico"><svg viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><path d="M4 5.1v5.8M8 3.5h5M8 8h5M8 12.5h5"/></svg></span><span class="tk-body"><b>The Track</b><small>Every step beside the map, failures in red</small></span></li>
+        <li class="f-places"><span class="tk-ico"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c1.8 1.7 2.6 3.7 2.6 6S9.8 12.3 8 14M8 2C6.2 3.7 5.4 5.7 5.4 8s.8 4.3 2.6 6"/></svg></span><span class="tk-body"><b>Places</b><small>The websites and apps each thread used</small></span></li>
+        <li class="f-codex"><span class="tk-ico"><svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="m5 6.5 2 1.5-2 1.5M8.5 10H11"/></svg></span><span class="tk-body"><b>Codex</b><small>Coming soon · on the same map as Claude Code</small></span></li>
+        <li class="f-cmd"><span class="tk-ico"><svg viewBox="0 0 16 16"><path d="M3 4.5 6.5 8 3 11.5M8.5 12H13"/></svg></span><span class="tk-body"><b>Commands that change files</b><small>Coming soon · sed, scripts and redirects count as edits</small></span></li>
+        <li class="f-bell"><span class="tk-ico"><svg viewBox="0 0 16 16"><path d="M4 11V7.5a4 4 0 0 1 8 0V11l1 1.5H3zM6.5 14h3"/></svg></span><span class="tk-body"><b>Waiting for you</b><small>A nudge when a thread needs you</small></span></li>
+        <li class="f-share"><span class="tk-ico"><svg viewBox="0 0 16 16"><path d="M8 10V2.5M5 5.5 8 2.5l3 3M3 9.5V13h10V9.5"/></svg></span><span class="tk-body"><b>Share a thread</b><small>One page anyone can replay, or Markdown</small></span></li>
       </ol>
       </div>
       <div class="tk-win" id="tkWin">
-        <header><b id="tkTitle">talk.mp4</b><span id="tkTime">10:02</span></header>
+        <header><b id="tkTitle">The Track</b><span id="tkTime">Fix the replay bar</span></header>
         <div class="tk-screen">
-          <div class="tk-pane on"><div class="film"><div class="shot"><svg viewBox="0 0 560 350" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><span class="badge">talk.mp4 · 12:41</span></div>
-            <div class="player"><svg viewBox="0 0 12 12"><path d="M2 1l9 5-9 5z"/></svg><div class="bar"><i></i><b></b></div><span>04:12 / 12:41</span></div></div></div>
-          <div class="tk-pane"><pre class="term"><span class="pr">$</span> ffmpeg -ss 04:12 -t 30 -i talk.mp4 -c copy cut.mp4
-<span class="dim">Output #0, mp4, to 'cut.mp4'</span>
-<span class="ok">video:5.1MiB audio:470KiB</span></pre>
-            <ul class="plain"><li><code>-ss 04:12</code>start at 4:12</li><li><code>-t 30</code>keep 30 seconds</li><li><code>-c copy</code>don't re-encode, so it's instant</li></ul></div>
-          <div class="tk-pane"><pre class="term"><span class="pr">$</span> ffmpeg -i cut.mp4 -vf subtitles=teaser.srt teaser.mp4
-<span class="bad">No such filter: 'subtitles'</span>
-<span class="bad">Error opening output files: Filter not found</span>
-<span class="dim">exit 8</span></pre>
-            <ul class="plain"><li>This ffmpeg was built without subtitle support, so the agent looks for another way.</li></ul></div>
-          <div class="tk-pane"><div class="web"><div class="url">ffmpeg.org/ffmpeg-filters.html#drawtext</div><div class="doc"><h4>drawtext</h4><p>Draw a text string on top of a video, with the font, size and position you choose.</p><div class="hl">drawtext=text='Agents should show their work.'</div></div></div></div>
-          <div class="tk-pane"><div class="film teaser"><div class="shot"><svg viewBox="0 0 560 350" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><span class="badge new">New · teaser.mp4 · 0:30</span><span class="capt">Agents should show their work.</span></div>
-            <div class="strip"><svg viewBox="0 0 560 350" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><svg viewBox="130 30 290 181" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><svg viewBox="60 10 440 275" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><svg viewBox="130 30 290 181" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><svg viewBox="0 0 560 350" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><svg viewBox="100 20 360 225" preserveAspectRatio="xMidYMid slice"><use href="#stageScene" width="560" height="350"/></svg><span class="ph"></span></div></div></div>
+          <div class="tk-pane on"><ol class="ft-steps">
+            <li class="you">Make the replay bar follow the thread</li>
+            <li class="rd">Read <code>ReplayBar.tsx</code></li>
+            <li class="ed">Edit <code>ReplayBar.tsx</code></li>
+            <li class="bad">Run <code>npm test</code><em>2 tests failed</em></li>
+            <li class="rd">Read <code>replay.test.ts</code></li>
+            <li class="ed">Edit <code>ReplayBar.tsx</code></li>
+            <li class="ok">Run <code>npm test</code><em>passed</em></li>
+          </ol></div>
+          <div class="tk-pane"><div class="ft-places">
+            <div class="grp"><b>The web</b><span class="pl" style="--n:5">github.com<i>5</i></span><span class="pl" style="--n:3">ffmpeg.org<i>3</i></span><span class="pl" style="--n:2">code.claude.com<i>2</i></span><span class="pl" style="--n:1">npmjs.com<i>1</i></span></div>
+            <div class="grp"><b>Your apps</b><span class="pl app" style="--n:8">localhost:5173<i>8</i></span><span class="pl app" style="--n:2">api.test<i>2</i></span></div>
+            <div class="grp"><b>Services</b><span class="pl svc" style="--n:1">Calendar<i>1</i></span><span class="pl svc" style="--n:1">Docs<i>1</i></span></div>
+          </div></div>
+          <div class="tk-pane"><ul class="ft-threads">
+            <li class="on"><span class="hx claude">Claude Code</span><b>Landing page, new brand</b><small>live</small></li>
+            <li><span class="hx codex">Codex</span><b>Codex reader tests</b><small>12 min ago</small></li>
+            <li><span class="hx claude">Claude Code</span><b>Plugin 0.5.0</b><small>9 h ago</small></li>
+            <li><span class="hx codex">Codex</span><b>Map: more languages</b><small>yesterday</small></li>
+          </ul></div>
+          <div class="tk-pane"><pre class="term"><span class="pr">$</span> sed -i 's/4000/4747/' server/config.ts
+<span class="dim">(no output)</span></pre>
+            <div class="ft-diff"><b>Edit server/config.ts</b><span>by a command</span><code class="del">- const PORT = 4000;</code><code class="add">+ const PORT = 4747;</code></div></div>
+          <div class="tk-pane"><div class="ft-notes">
+            <div class="note"><b>Plugin 0.5.0 is waiting for you</b><span>Allow Bash: npm publish?</span></div>
+            <div class="note"><b>Landing page, new brand finished</b><span>12 files changed · 1 command failed</span></div>
+          </div></div>
+          <div class="tk-pane"><div class="web"><div class="url">Downloads/rundown-replay.html</div><div class="doc"><h4>Landing page, new brand</h4><p>A replay of the thread: every step on the map, the prompts, the diffs. Secrets, emails and other projects are masked before you send it.</p><div class="hl">Recorded with Rundown · 214 steps · 3 h 12 min</div></div></div></div>
         </div>
       </div>
     </div>
@@ -628,12 +608,12 @@ footer a:hover { text-decoration: underline; }
     <h2 class="h2 rv">What's next.</h2>
     <p class="sub rv d1">Rundown is a prototype today. The full release lands in late October.</p>
     <div class="road">
-      <div class="now rv"><span class="dot"></span><h3>Today</h3><p class="when">Prototype, version 0.3</p>
-        <ul><li>A live map of your agents, and a replay of every thread</li><li>The Track, for work beyond code</li><li>Places: the websites and apps each thread touched, on a map. Click one to see the step.</li><li>Share a thread as a web page or Markdown</li><li>Cleaner map labels</li><li>A plugin for Claude Code</li></ul></div>
+      <div class="now rv"><span class="dot"></span><h3>Today</h3><p class="when">Prototype, version 0.5</p>
+        <ul><li>A live map of your agents, and a replay of every thread</li><li>The Track: every step beside the map, failures in red</li><li>Places: the websites and apps each thread used, on a map. Click one to see the step.</li><li>Waiting for you: a notification when a thread needs you</li><li>Share a thread as a web page or Markdown</li><li>A plugin for Claude Code</li></ul></div>
       <div class="next rv d1"><span class="dot"></span><h3>Late October</h3><p class="when">Full release</p>
-        <ul><li>A first read on NVIDIA Nemotron: a short summary of every file and every step</li><li>A recap of what happened while you were away</li><li>Let your agents interact with Rundown through MCP and CLI</li></ul></div>
+        <ul><li>Codex threads on the same map as Claude Code</li><li>Files changed by commands (sed, scripts, redirects) count as edits</li><li>A first read on NVIDIA Nemotron: a short summary of every file and every step</li><li>A recap of what happened while you were away</li><li>Let your agents interact with Rundown through MCP and CLI</li></ul></div>
       <div class="later rv d2"><span class="dot"></span><h3>After</h3><p class="when">What we're building toward</p>
-        <ul><li>Support for Codex, Cursor and Gemini CLI</li><li>Replays on pull requests</li><li>Pause and steer an agent from the map</li></ul></div>
+        <ul><li>Support for Cursor and Gemini CLI</li><li>Agents that warn each other before editing the same file</li><li>Replays on pull requests</li><li>Pause and steer an agent from the map</li></ul></div>
     </div>
     <form class="wl-big rv" id="waitlist" data-waitlist hidden><input type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" class="hp"><input type="email" name="email" required placeholder="you@example.com" aria-label="Your email" autocomplete="email"><button class="btn" type="submit">Join the waitlist</button></form>
     <p class="wl-note rv" id="wlNote"></p>
@@ -1064,11 +1044,11 @@ const hero = (() => {
   return { set(v) { s = v; }, frame(f) { frame = f; fitMap(); }, onFrame(f) { hook = f; } };
 })();
 
-/* ---------- beyond code: the agent walks down the track, the window shows each stop ---------- */
+/* ---------- what's in Rundown: a dot walks down the features, the window shows each one ---------- */
 const tasks = (() => {
   const el = $("#tasks"), stops = [...document.querySelectorAll("#tkLine li")], panes = [...document.querySelectorAll(".tk-pane")];
   const agent = $("#tkAgent"), winEl = $("#tkWin"), title = $("#tkTitle"), time = $("#tkTime");
-  const META = [["talk.mp4", "10:02"], ["ffmpeg", "10:04"], ["ffmpeg · failed", "10:05"], ["ffmpeg.org", "10:05"], ["teaser.mp4", "10:06"]];
+  const META = [["The Track", "Fix the replay bar"], ["Places", "This week"], ["Threads", "Claude Code and Codex"], ["server/config.ts", "Edited by a command"], ["Notifications", "Now"], ["Share", "rundown-replay.html"]];
   let cur = -1;
   function show(i) {
     if (i === cur) return; cur = i;

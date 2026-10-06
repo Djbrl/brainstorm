@@ -184,6 +184,14 @@ nav .links a:hover { color: var(--text); }
 .ft-diff { background: #fff; padding: 14px 22px 18px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
 .ft-diff span { color: var(--muted); font-size: 13px; margin-bottom: 6px; }
 .ft-diff .del { color: #b3261e; background: #fdecea; border-radius: 4px; padding: 2px 8px; } .ft-diff .add { color: #146c43; background: #e6f4ea; border-radius: 4px; padding: 2px 8px; }
+.ft-share { flex: 1; background: #fff; padding: 22px; display: flex; flex-direction: column; gap: 10px; }
+.ft-share .opt { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line); }
+.ft-share .opt.on { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+.ft-share .fi { flex: none; width: 46px; height: 54px; border-radius: 8px; display: grid; place-items: end center; padding-bottom: 9px; box-sizing: border-box; background: #eef3ff; color: var(--blue); font-size: 12px; font-weight: 700; }
+.ft-share .fi.md { background: #f1f1f4; color: var(--muted); }
+.ft-share b { display: block; font-size: 15.5px; }
+.ft-share .opt span:not(.fi) { display: block; margin-top: 2px; color: var(--muted); font-size: 13.5px; line-height: 1.4; }
+.ft-share p { margin: auto 0 0; color: var(--muted); font-size: 13px; }
 .ft-notes { flex: 1; background: linear-gradient(160deg, #dfe6f5, #f1ede6); padding: 22px; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 .ft-notes .note { width: min(320px, 100%); background: rgba(255,255,255,.88); border-radius: 14px; padding: 12px 14px; box-shadow: 0 8px 24px -10px rgba(0,0,0,.25); display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; }
 .ft-notes .note span { color: var(--muted); font-size: 13px; }
@@ -207,12 +215,6 @@ nav .links a:hover { color: var(--text); }
 .plain { list-style: none; margin: 0; padding: 14px 24px 18px; background: #fff; font-size: 14px; color: var(--muted); font-weight: 500; }
 .plain li { padding: 2px 0; }
 .plain code { font: 12.5px var(--mono); color: var(--text); background: #f0f0f3; border-radius: 5px; padding: 1px 6px; margin-right: 8px; }
-.web { flex: 1; background: #fff; display: flex; flex-direction: column; }
-.web .url { margin: 12px 14px 0; padding: 7px 14px; border-radius: 999px; background: #f0f0f3; font: 13px var(--mono); color: var(--muted); }
-.web .doc { padding: 22px 30px; }
-.web h4 { margin: 0; font: 900 26px/1.1 var(--display); letter-spacing: -0.02em; }
-.web p { margin-top: 10px; color: var(--muted); font-size: 14.5px; max-width: 46ch; }
-.web .hl { background: #eeeefe; border-left: 3px solid #5b5bd6; padding: 10px 14px; margin-top: 14px; border-radius: 4px; color: var(--text); font: 13px/1.6 var(--mono); }
 
 /* install: in Claude's colors, one Claude Code window */
 #install { background: #1f1e1d; color: #faf9f5; position: relative; overflow: hidden; }
@@ -326,8 +328,10 @@ nav { top: 40px; }
 /* privacy: three lines */
 
 /* closing */
-.closing { padding: 110px 0 100px; }
-.closing .btns:first-child { margin-top: 0; }
+.closing { padding: 140px 0 130px; }
+.closing h2 { font-size: clamp(44px, 7vw, 112px); line-height: .95; letter-spacing: -0.05em; text-wrap: balance; }
+.closing h2 .grad { color: var(--red); }
+.closing .btns { margin-top: 48px; }
 .btn.big { font-size: 20px; padding: 17px 36px; }
 .btn.pending { opacity: .5; pointer-events: none; }
 .award { display: inline-block; margin-top: 28px; color: var(--muted); font-size: 15px; font-weight: 500; }
@@ -369,7 +373,6 @@ footer a:hover { text-decoration: underline; }
   .tk-win header { padding: 10px 14px; font-size: 13px; }
   .term { padding: 14px 16px; font-size: 11.5px; }
   .plain { display: none; }
-  .web .doc { padding: 12px 16px; } .web h4 { font-size: 20px; } .web p { display: none; }
   .tk-line li { padding: 5px 8px 5px 34px; }
   .tk-line li small { display: none; }
   .tk-ico { width: 26px; height: 26px; }
@@ -386,7 +389,7 @@ footer a:hover { text-decoration: underline; }
   .block { padding: 88px 0; }
   #stats { padding: 88px 0; height: auto; }
   #stats .stage { padding: 0; }
-  .closing { padding: 80px 0 72px; }
+  .closing { padding: 104px 0 96px; }
   .scene, #hero, #tasks { height: auto; }
   .scene .stage { position: relative; height: auto; overflow: visible; }
   #hero .stage { display: flex; flex-direction: column; }
@@ -537,7 +540,11 @@ footer a:hover { text-decoration: underline; }
             <div class="note"><b>Plugin 0.5.0 is waiting for you</b><span>Allow Bash: npm publish?</span></div>
             <div class="note"><b>Landing page, new brand finished</b><span>12 files changed · 1 command failed</span></div>
           </div></div>
-          <div class="tk-pane"><div class="web"><div class="url">Downloads/rundown-replay.html</div><div class="doc"><h4>Landing page, new brand</h4><p>A replay of the thread: every step on the map, the prompts, the diffs. Secrets, emails and other projects are masked before you send it.</p><div class="hl">Recorded with Rundown · 214 steps · 3 h 12 min</div></div></div></div>
+          <div class="tk-pane"><div class="ft-share">
+            <div class="opt on"><span class="fi">.html</span><div><b>Replay file</b><span>One page that opens in any browser, with the map, every step and the code changes.</span></div></div>
+            <div class="opt"><span class="fi md">.md</span><div><b>Summary</b><span>What was asked, the files changed, what failed.</span></div></div>
+            <p>Secrets are masked and your home folder is hidden.</p>
+          </div></div>
         </div>
       </div>
     </div>
@@ -617,6 +624,7 @@ footer a:hover { text-decoration: underline; }
 <!-- Closing -->
 <section class="closing alt">
   <div class="wrap center">
+    <h2 class="rv"><span class="grad">Keep your brain in the loop.</span></h2>
     <div class="btns rv d1">
       <a class="btn big" data-link="install" href="#">Install for Claude Code</a>
     </div>
@@ -1041,7 +1049,7 @@ const hero = (() => {
 const tasks = (() => {
   const el = $("#tasks"), stops = [...document.querySelectorAll("#tkLine li")], panes = [...document.querySelectorAll(".tk-pane")];
   const agent = $("#tkAgent"), winEl = $("#tkWin"), title = $("#tkTitle"), time = $("#tkTime");
-  const META = [["The Track", "Fix the replay bar"], ["Places", "This week"], ["Threads", "Claude Code and Codex"], ["server/config.ts", "Edited by a command"], ["Notifications", "Now"], ["Share", "rundown-replay.html"]];
+  const META = [["The Track", "Fix the replay bar"], ["Places", "This week"], ["Threads", "Claude Code and Codex"], ["server/config.ts", "Edited by a command"], ["Notifications", "Now"], ["Share this thread", "Landing page, new brand"]];
   let cur = -1;
   function show(i) {
     if (i === cur) return; cur = i;

@@ -3,7 +3,7 @@
 // "-Users-dsy-Documents-brainstorm"). Move the repo to ~/brainstorm and its whole history stays under the old name,
 // so the app would open on an empty sidebar. A former home is a project folder whose threads ran in a folder with
 // the repo's name that no longer exists, or that now leads here (a symlink left behind by the move).
-import { closeSync, existsSync, openSync, readSync, readdirSync, realpathSync } from "node:fs";
+import { closeSync, existsSync, openSync, readSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
 /** `root.replace(/[^A-Za-z0-9-]/g, "-")`, Claude Code's own project-folder naming. */
@@ -18,15 +18,15 @@ export const underPrefix = (projectDir: string, prefix: string) => projectDir ==
 
 /** Where a few of the folder's threads ran: every folder each one moved through, since a thread can start
  * elsewhere (a scratch space) and only later work in the repo. */
-function cwdsOf(dir: string, maxFiles = 5, maxBytes = 4 * 1024 * 1024): string[] {
+function cwdsOf(dir: string): string[] {
   let files: string[];
-  try { files = readdirSync(dir).filter((f) => f.endsWith(".jsonl")).slice(0, maxFiles); } catch { return []; }
+  try { files = readdirSync(dir).filter((f) => f.endsWith(".jsonl")).slice(0, 5); } catch { return []; }
   const out = new Set<string>();
   for (const f of files) {
     let fd: number | undefined;
     try {
       fd = openSync(join(dir, f), "r");
-      const buf = Buffer.alloc(maxBytes);
+      const buf = Buffer.alloc(4 * 1024 * 1024);
       const n = readSync(fd, buf, 0, buf.length, 0);
       for (const m of buf.toString("utf8", 0, n).matchAll(/"cwd":"((?:[^"\\]|\\.)*)"/g)) out.add(JSON.parse(`"${m[1]}"`) as string);
     } catch { /* unreadable, try the next */ } finally { if (fd !== undefined) closeSync(fd); }
@@ -35,6 +35,26 @@ function cwdsOf(dir: string, maxFiles = 5, maxBytes = 4 * 1024 * 1024): string[]
 }
 
 const real = (p: string) => { try { return realpathSync(p); } catch { return p; } };
+
+/** The path a Claude Code project folder name spells ("-Users-me-old-name" → /Users/me/old-name), found by walking the disk
+ * and following links (a rename leaves one behind). Null if no such path exists. */
+function linkedPath(name: string): string | null {
+  const walk = (dir: string, rest: string, depth: number): string | null => {
+    if (!rest) return dir;
+    if (depth > 12) return null;
+    let entries: string[];
+    try { entries = readdirSync(dir); } catch { return null; }
+    for (const e of entries) {
+      const enc = e.replace(/[^A-Za-z0-9-]/g, "-");
+      if (rest !== enc && !rest.startsWith(enc + "-")) continue;
+      try { if (!statSync(join(dir, e)).isDirectory()) continue; } catch { continue; }
+      const hit = rest === enc ? join(dir, e) : walk(join(dir, e), rest.slice(enc.length + 1), depth + 1);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  return name.startsWith("-") ? walk("/", name.slice(1), 0) : null;
+}
 
 const cache = new Map<string, string[]>();
 
@@ -59,14 +79,11 @@ export function formerRoots(projectsDir: string, root: string): string[] {
     }
   }
   // Renamed, not just moved (~/brainstorm → ~/rundown): the old folder has another name, so only the link the rename left
-  // behind tells. A project folder whose own path now leads here is a former home (a quick look: its first lines only).
+  // behind tells. A project folder whose name spells a path that now leads here is a former home.
   for (const d of dirs) {
     if (d.endsWith(tail) || d.includes("--claude-worktrees-") || d === encodeRoot(base)) continue;
-    for (const cwd of cwdsOf(join(projectsDir, d), 2, 256 * 1024)) {
-      const old = repoBase(cwd);
-      if (encodeRoot(old) !== d || old === base || found.includes(old)) continue;
-      if (existsSync(old) && real(old) === real(base)) found.push(old);
-    }
+    const old = linkedPath(d);
+    if (old && old !== base && !found.includes(old) && real(old) === real(base)) found.push(old);
   }
   cache.set(base, found);
   return found;

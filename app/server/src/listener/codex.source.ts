@@ -121,6 +121,31 @@ export class CodexSource implements LogSource {
     return files.filter((f) => this.inScope(f.path, scope));
   }
 
+  /** Every folder Codex worked in on this machine, a Codex worktree counted as its repo: for the workspace picker.
+   * Each thread's file with its last change. Codex Desktop's dated scratch folders (~/Documents/Codex/2026-09-23,
+   * where a chat with no project runs) aren't projects. */
+  projects(): Map<string, { id: string; mtimeMs: number }[]> {
+    const files: LogFile[] = [];
+    for (const d of [this.sessionsDir, this.archivedDir]) collectJsonl(d, files, 0);
+    const out = new Map<string, { id: string; mtimeMs: number }[]>();
+    for (const f of files) {
+      const meta = this.metaOf(f.path);
+      if (!meta || meta.reviewer || !meta.cwd) continue;
+      if (/\/Codex\/\d{4}-\d{2}-\d{2}(\/|$)/.test(meta.cwd)) continue;
+      let root = meta.cwd;
+      const rel = relative(this.worktreesDir, root);
+      if (rel && !rel.startsWith("..") && !isAbsolute(rel)) {
+        const [id, repo] = rel.split(sep);
+        const main = id && repo ? this.mainOf(join(this.worktreesDir, id, repo), repo, meta, false) : null;
+        if (!main) continue; // a Codex worktree that's gone: its repo is unknown here
+        root = main;
+      }
+      const list = out.get(root) ?? out.set(root, []).get(root)!;
+      list.push({ id: meta.id, mtimeMs: f.mtimeMs });
+    }
+    return out;
+  }
+
   owns(file: string) {
     const rel = relative(this.dir, file);
     return !!rel && !rel.startsWith("..") && !isAbsolute(rel);
@@ -190,7 +215,7 @@ export class CodexSource implements LogSource {
     return main ? { checkout, main } : null;
   }
 
-  private mainOf(checkout: string, repo: string, meta: Meta): string | null {
+  private mainOf(checkout: string, repo: string, meta: Meta, guess = true): string | null {
     let main = this.mains.get(checkout);
     if (main === undefined) {
       main = null;
@@ -201,7 +226,7 @@ export class CodexSource implements LogSource {
       } catch { /* the worktree is gone */ }
       if (main) this.mains.set(checkout, main);
     }
-    if (main) return main;
+    if (main || !guess) return main;
     // Gone (Codex removes them): the open project, if it has the same remote, else the same folder name.
     const url = meta.repoUrl && normalizeRemote(meta.repoUrl);
     if (url) for (const r of this.scope.roots) if (this.remotesOf(r).includes(url)) return r;
@@ -253,6 +278,7 @@ export class CodexSource implements LogSource {
         return;
       case "event_msg":
         if (p.type === "task_started") { st.turnId = str(p.turn_id); st.turnStart = ts; }
+        else if (p.type === "task_complete") sink.turnEnded(st.meta.id); // "Your turn" (attention), live only
         else if (p.type === "item_completed" && p.item && typeof p.item === "object") { st.items = true; this.item(at, p.item, str(p.turn_id)); }
         return;
       case "response_item":

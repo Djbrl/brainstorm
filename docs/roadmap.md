@@ -26,7 +26,7 @@ Shareable replays and replays on pull requests could be the main value of Brains
 Problems that affect every feature:
 
 - **Summaries and labels depend on Nemotron on a GPU we deleted.** We need a model setting: Claude Haiku with the user's own key, a local model through Ollama, or Nemotron through NVIDIA's hosted API. The last one keeps the NVIDIA story. Our measurement puts Haiku at about $0.75 to read a 300-file repo once (see `numbers.md`); later changes cost cents.
-- **Only Claude Code is supported.** The listener is the only part tied to Claude, so Codex, Gemini CLI and Cursor can each be a separate parser.
+- **Claude Code and Codex are supported** (Codex since 6 Oct 2026). Each agent is a log source (`app/server/src/listener/source.ts`), so Gemini CLI and Cursor can each be another one.
 - **There are no tests.** Claude Code's log format isn't documented and can change, so the parser needs tests first.
 
 ## 2. Packaging: no new habits

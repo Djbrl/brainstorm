@@ -35,7 +35,7 @@ type Batch = {
   /** Session rows this chunk touched, written once at its end. */
   sessions: Map<string, BatchSession>;
   /** Live steps and session announcements, in order, sent once the chunk is committed. */
-  events: ({ step: Step } | { session: string })[];
+  events: ({ step: Step } | { session: string } | { turnEnded: string })[];
   announced: Set<string>;
   /** Each touched session's next seq before the chunk, put back if it rolls back. */
   seqBefore: Map<string, number | undefined>;
@@ -65,6 +65,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   private ready = false;
   /** Where the agents' logs come from: Claude Code's, then Codex's. Built in onModuleInit (it needs the config). */
   private sources: LogSource[] = [];
+  private codex?: CodexSource;
   /** Closes every source's watcher (tests read files themselves). */
   readonly watcher = {
     close: async () => { await Promise.all(this.sources.map((s) => s.close())); },
@@ -152,7 +153,8 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     this.bus.on("workspace", ({ root }) => this.onWorkspaceChanged(root));
 
     const warn = (e: Error) => this.log.warn(`watcher error: ${e.message}`);
-    this.sources = [new ClaudeSource(this.cfg.claudeProjectsDir, warn), new CodexSource(this.cfg.codexDir, warn)];
+    this.codex = new CodexSource(this.cfg.codexDir, warn);
+    this.sources = [new ClaudeSource(this.cfg.claudeProjectsDir, warn), this.codex];
     let waiting = this.sources.length;
     for (const source of this.sources) {
       source.watch(this.scope(), {
@@ -456,6 +458,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     return {
       step: (s: NewStep, opts) => this.storeStep(b, inStoredOrder(s, this.allocSeq(b, s.sessionId)), harness, opts),
       customTitle: (sessionId, title) => this.setCustomTitle(b, sessionId, title, harness),
+      turnEnded: (sessionId) => { if (!b.quiet) b.events.push({ turnEnded: sessionId }); },
     };
   }
 
@@ -568,6 +571,8 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       try {
         if ("session" in ev) {
           if (this.ready || this.isListening) this.broadcastSession(ev.session);
+        } else if ("turnEnded" in ev) {
+          if (this.ready) this.bus.emit("turn-ended", { sessionId: ev.turnEnded });
         } else if (this.ready) {
           const step = ev.step;
           this.bus.emit("step", step);
@@ -591,6 +596,11 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ---- reads (public API) ----
+
+  /** Every folder Codex worked in, with its threads' files (the workspace picker; see CodexSource.projects). */
+  codexProjects(): Map<string, { id: string; mtimeMs: number }[]> {
+    return (this.codex ?? new CodexSource(this.cfg.codexDir)).projects();
+  }
 
   private rowToSession(row: SessionRow): Session {
     const idle = Date.now() - Date.parse(row.last_event_at) > IDLE_AFTER_MS;

@@ -55,6 +55,8 @@ test("mappable files: source extensions outside ignored folders, no lockfiles", 
   assert.equal(isMappableRel("target\\debug\\build.rs"), false);
   assert.equal(isMappableRel("package-lock.json"), false);
   assert.equal(isMappableRel("src/logo.png"), false);
+  assert.equal(isMappableRel("app.vue"), true);
+  assert.equal(isMappableRel("Sources/App/ContentView.swift"), true);
   assert.equal(isMappableRel("../outside.ts"), false);
 });
 

@@ -13,7 +13,13 @@ export const IGNORE_DIRS = new Set([
   "data",
 ]);
 export const LOCKFILES = new Set(["package-lock.json", "yarn.lock", "pnpm-lock.yaml", "Cargo.lock", "poetry.lock", "composer.lock"]);
-export const SOURCE_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py", ".go", ".rs", ".java", ".md", ".json", ".css", ".html"]);
+/** Code, styles and docs. Widened 6 Oct 2026 (Vue, Svelte, Swift, Kotlin, Ruby, PHP, C-family...): a Nuxt or iOS project's
+ * main files were missing from its map. Imports are read for JS/TS only. */
+export const SOURCE_EXT = new Set([
+  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py", ".go", ".rs", ".java", ".md", ".json", ".css", ".html",
+  ".vue", ".svelte", ".astro", ".scss", ".sass", ".less", ".swift", ".kt", ".kts", ".rb", ".php", ".c", ".h", ".cc", ".cpp",
+  ".hpp", ".cs", ".m", ".mm", ".dart", ".scala", ".ex", ".exs", ".lua", ".sh", ".sql",
+]);
 /**
  * At most this many files on the map: the first scan picks them (see select.ts), new files may add a few more (see
  * liveHeadroom), and files an agent edits always join. RUNDOWN_MAX_FILES overrides it.

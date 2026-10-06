@@ -9,7 +9,7 @@ We cut the items below to ship on time. Most of them already have a place in the
 | **History slider** | Scrub through how the codebase changed during a session | `GET /api/history` and the `Snapshot` type exist and return nothing; the map already updates live | Save a map snapshot after each finished agent turn (a `history` table), then a slider in the Map view that swaps in old snapshots | ½ day |
 | **Pause and steer** | Stop an agent before a risky edit, from the map | Risk flags are computed on every edit | A Claude Code `PreToolUse` hook that asks Brainstorm before Edit/Write/Bash runs; a Pause button and a "steer" note written back to the session | 1 day |
 | **Markdown export** | Done (30 Sep): `GET /api/export.md?sessionId=`, and Summary in the Share menu | | | |
-| **Codex support** | Brainstorm is only useful if it follows the harness you use | The listener is the only Claude-specific part | A second parser for Codex session logs, producing the same `Step` type | ½ day |
+| **Codex support** (done 6 Oct) | Brainstorm is only useful if it follows the harness you use | The listener is the only Claude-specific part | A second parser for Codex session logs, producing the same `Step` type | ½ day |
 | **Summary quality score** | Evidence that Nemotron summaries are good enough | Nemotron summaries and a Claude client | Claude grades 10 summaries against the file (planned in `numbers.md`) | 1 hour |
 
 ## Smaller improvements we know how to make

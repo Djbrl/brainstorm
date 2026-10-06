@@ -9,7 +9,7 @@ Brainstorm is a local web app that runs next to Claude Code. It reads Claude Cod
 ## Architecture
 
 ```
-~/.claude/projects/**/*.jsonl ──▶ Listener ──▶ SQLite ──▶ REST + WebSocket ──▶ Web (Follow, Map, Failures)
+~/.claude/projects, ~/.codex/sessions ──▶ Listener ──▶ SQLite ──▶ REST + WebSocket ──▶ Web (Follow, Map, Failures)
                                      │                          ▲
                                      ▼ bus: step, file-touched  │
 project folder + git ───────────▶ Mapper ──────────────────────┤
@@ -28,7 +28,7 @@ Everything runs on the user's machine. The only network calls are to the two mod
 | Module | Files | What it does |
 | --- | --- | --- |
 | Core | `core/` | `DbService` (one `node:sqlite` file at `server/data/brainstorm.db`), `BusService` (in-process events `session`, `step`, `file-touched`), `EventsGateway` (push-only WebSocket at `/ws`), `ConfigService` (env) |
-| Listener | `listener/` | Watches the workspace's folders in `~/.claude/projects/` with chokidar, remembers a byte offset per file, parses appended lines into `Step`s and `Session`s, stores them, emits them on the bus and broadcasts them over the socket. Files are read 4 MB at a time and stored about 1 MB per transaction; history is read after the server listens, newest first, without broadcasting it (what a file gains after it was listed is live) |
+| Listener | `listener/` | Reads the agents' session logs through log sources (`source.ts`): Claude Code's (`claude.source.ts`, the workspace's folders in `~/.claude/projects/`) and Codex's (`codex.source.ts`, `~/.codex/sessions` and `archived_sessions`). The listener itself watches what the sources point it to, remembers a byte offset per file, stores the `Step`s and `Session`s a source parses from each line (`Session.harness` says which agent), emits them on the bus and broadcasts them over the socket. Files are read 4 MB at a time and stored about 1 MB per transaction; history is read after the server listens, newest first, without broadcasting it (what a file gains after it was listed is live) |
 | Mapper | `mapper/` | Walks the project root, counts lines, resolves imports (TS/JS `import`/`require`, Python `import`/`from`) into edges, takes `lastChangedAt` from one `git log` call plus file mtimes, watches for changes, and marks files an agent is editing (`activeSessionId`, cleared after 60 s) |
 | Reader | `reader/` | Nemotron step labels (at most 8 words), two-sentence file summaries cached by content hash, module summaries, and rule-based risk flags |
 | LLM | `llm/` | `NemotronService` (OpenAI-compatible client, 6 requests in flight, 20 s timeout, 2 retries, output validation) and `ClaudeService` (`@anthropic-ai/sdk`, 30 s timeout) |
@@ -58,6 +58,27 @@ Claude Code writes one JSON object per line to `~/.claude/projects/<project path
 - **Step ids:** `<line uuid>:<block index>`.
 - **Order:** `seq` increases per session.
 - **Status:** a session is `running` while its last event is under 2 minutes old.
+
+## Reading Codex logs
+
+Codex writes one file per thread: `~/.codex/sessions/YYYY/MM/DD/rollout-<time>-<uuid>.jsonl` (older ones in `archived_sessions/`). Lines are `{timestamp, type, payload}` and don't carry the thread id: it's in the first line (`session_meta`: id, cwd, cli version, git remote) and in the file name, so reading can resume mid-file. A thread belongs to the open project when its starting folder (or a `runtime_workspace_roots` entry) is inside it; the first line of each file is read once and cached. Codex Desktop's own worktrees (`~/.codex/worktrees/<id>/<repo>`) count as their repo: the main checkout comes from the worktree's `.git` file (or the git remote once it's gone), and every path is rewritten onto the main checkout so the map places it.
+
+Codex's actions are stored under Claude Code's tool names, so every view works unchanged (`codex.source.ts`, shapes in `codex.map.ts`):
+
+| Codex | Becomes |
+| --- | --- |
+| `UserMessage` item | `prompt` (injected turns: environment context, AGENTS.md, instructions are skipped; Codex Desktop's "files mentioned" context becomes a chip) |
+| `AgentMessage` / `Reasoning` with a summary / `ContextCompaction` | `text` / `thinking` / a short `text` |
+| `CommandExecution` | Codex labels each command: reads → `Read` {file_path}, searches → `Grep`, listings → `Glob`, one step per part; anything else → `Bash` {command}. Result: the output, failed when the exit code isn't 0 |
+| `FileChange` (or an older `apply_patch`) | `edit` per file: `Edit` with before/after per hunk (joined by `---`, like MultiEdit), `Write` for a new file; a rename lands on the new path |
+| `McpToolCall` | `mcp__<server>__<tool>` and its result |
+| web search | `WebSearch` / `WebFetch` |
+| `update_plan` | `TodoWrite` |
+| `request_user_input` | `AskUserQuestion` (open until answered: "Your turn") |
+| `view_image` / `ImageView` | `Read` of the image |
+| `event_msg task_complete` | not a step: a live "turn-ended" on the bus, which attention reads like Claude Code's Stop hook |
+
+Codex logs each finished item once (`event_msg item_completed`); before 0.149 commands were only in the model's records (`response_item` function calls, or `tools.exec_command(...)` inside `exec` scripts), so those fill in what no item covers, without duplicates. Codex's approval-reviewer threads ("guardian") are left out. The workspace picker lists Codex's projects too (`CodexSource.projects`).
 - **Which logs are read:** only project folders whose name contains `SESSION_FILTER`, and only files changed in the last 24 hours.
 
 ## Contract

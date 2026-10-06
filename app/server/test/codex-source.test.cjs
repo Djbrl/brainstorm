@@ -401,3 +401,38 @@ test("watching: a new Codex thread is read live; no Codex folder at all is fine"
     rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test("a turn Codex finishes live tells attention it's your turn; one in history doesn't", async () => {
+  const t = await makeListener();
+  const id = uuid();
+  const c = codex(id);
+  const f = file(t, id, [c.meta(), ...c.turn(), c.item({ type: "UserMessage", id: uuid(), content: [{ type: "text", text: "rename it" }] }), c.raw("event_msg", { type: "task_complete", turn_id: "turn-1" })]);
+  const ended = [];
+  t.bus.on("turn-ended", (e) => ended.push(e.sessionId));
+  await t.readNow(f, true);
+  assert.deepEqual(ended, [], "history isn't news");
+  t.live();
+  appendFileSync(f, jsonl([...c.turn("turn-2"), c.item({ type: "AgentMessage", id: uuid(), content: [{ type: "Text", text: "Renamed." }] }), c.raw("event_msg", { type: "task_complete", turn_id: "turn-2" })]));
+  await t.readNow(f);
+  assert.deepEqual(ended, [id]);
+  await t.close();
+});
+
+test("the workspace picker's Codex projects: a Codex worktree counts as its repo, reviewers and dated scratch folders don't count", async () => {
+  const t = await makeListener();
+  const repo = mkdtempSync(join(tmpdir(), "codex-repo-"));
+  mkdirSync(join(repo, ".git", "worktrees", "repo"), { recursive: true });
+  const wt = join(t.cfg.codexDir, "worktrees", "ab12", "repo");
+  mkdirSync(wt, { recursive: true });
+  writeFileSync(join(wt, ".git"), `gitdir: ${join(repo, ".git", "worktrees", "repo")}\n`);
+  const a = uuid(), b = uuid(), r = uuid(), s = uuid();
+  file(t, a, [codex(a, { cwd: repo }).meta()]);
+  file(t, b, [codex(b, { cwd: wt }).meta()]);
+  file(t, r, [codex(r, { cwd: repo, source: { subagent: { other: "guardian" } } }).meta()]);
+  file(t, s, [codex(s, { cwd: "/Users/me/Documents/Codex/2026-09-23" }).meta()]);
+  const projects = t.listener.codexProjects();
+  assert.deepEqual([...projects.keys()], [repo]);
+  assert.deepEqual(projects.get(repo).map((x) => x.id).sort(), [a, b].sort());
+  rmSync(repo, { recursive: true, force: true });
+  await t.close();
+});

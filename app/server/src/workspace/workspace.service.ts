@@ -57,7 +57,7 @@ const POLL_TIMEOUT_MS = 5 * 60_000;
 export class WorkspaceService implements OnModuleInit {
   private log = new Logger("Workspace");
   private root: string | null = null;
-  private claudeStep: SetupStep = { id: "claude", label: "Connecting to Claude Code", state: "pending" };
+  private claudeStep: SetupStep = { id: "claude", label: "Connecting to your agents", state: "pending" };
   private nemotronStep: SetupStep = { id: "nemotron", label: "Nemotron on NVIDIA Brev", state: "pending" };
   private anthropicStep: SetupStep = { id: "anthropic", label: "Claude for questions", state: "pending" };
   private lastBroadcast = "";
@@ -106,17 +106,17 @@ export class WorkspaceService implements OnModuleInit {
   }
 
   /**
-   * Every Claude Code project on this machine, most recently active first (owner: S). Must stay fast (<300ms).
+   * Every project an agent worked in on this machine (Claude Code's and Codex's), most recently active first (owner: S). Must stay fast (<300ms).
    * One entry per repo: its worktrees count towards it (even when every thread ran in a worktree), and so do the
    * folders it lived in before it moved (a symlink left behind, or a folder of the same name that's gone).
    */
   suggestions(): WorkspaceSuggestion[] {
-    let dirs: string[];
+    let dirs: string[] = [];
     try {
       dirs = readdirSync(this.cfg.claudeProjectsDir);
     } catch (e) {
-      this.log.warn(`suggestions: cannot read ${this.cfg.claudeProjectsDir}: ${(e as Error).message}`);
-      return [];
+      // No Claude Code here (a Codex-only machine): its projects are still listed below.
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT") this.log.warn(`suggestions: cannot read ${this.cfg.claudeProjectsDir}: ${(e as Error).message}`);
     }
 
     const byRoot = new Map<string, WorkspaceSuggestion>();
@@ -167,6 +167,13 @@ export class WorkspaceService implements OnModuleInit {
       // A worktree (or a folder inside one) belongs to its repo; a folder reached through a symlink, to the real one.
       const threads = jsonlFiles.filter((f) => !f.idle);
       add(real(real(root).replace(/\/\.claude\/worktrees\/[^/]+(?:\/.*)?$/, "")), threads.map((f) => basename(f.path, ".jsonl")), new Date((threads[0] ?? jsonlFiles[0]).mtimeMs).toISOString());
+    }
+
+    // Codex's projects (its worktrees count as their repo; see CodexSource.projects).
+    for (const [root, threads] of this.listener.codexProjects()) {
+      if (/\/Library\/Application Support\//.test(root)) continue;
+      const last = Math.max(...threads.map((t) => t.mtimeMs));
+      add(real(real(root).replace(/\/\.claude\/worktrees\/[^/]+(?:\/.*)?$/, "")), threads.map((t) => t.id), new Date(last).toISOString());
     }
 
     // A repo that moved: its old folder is gone, and one of the same name has threads. Count them together.
@@ -224,7 +231,7 @@ export class WorkspaceService implements OnModuleInit {
   private activate(abs: string) {
     this.root = abs;
     this.cfg.defaultRoot = abs;
-    this.claudeStep = { id: "claude", label: "Connecting to Claude Code", state: "running" };
+    this.claudeStep = { id: "claude", label: "Connecting to your agents", state: "running" };
     this.nemotronStep = { id: "nemotron", label: "Nemotron on NVIDIA Brev", state: "running" };
     this.anthropicStep = { id: "anthropic", label: "Claude for questions", state: "running" };
 
@@ -271,8 +278,9 @@ export class WorkspaceService implements OnModuleInit {
 
   // ---- step: claude ----
 
+  /** Claude Code and Codex: which are here, and their threads in this project in the last day. */
   private async checkClaude(root: string): Promise<SetupStep> {
-    const label = "Connecting to Claude Code";
+    const label = "Connecting to your agents";
     let versionRaw = "";
     for (const bin of claudeCandidates()) {
       try {
@@ -281,18 +289,30 @@ export class WorkspaceService implements OnModuleInit {
         if (versionRaw) break;
       } catch { /* try the next location */ }
     }
-    if (!versionRaw) {
-      const found = this.countRecentSessions(root);
-      if (found > 0) return { id: "claude", label, state: "done", detail: `Claude Code logs found · ${found} thread${found === 1 ? "" : "s"} in the last day` };
-      return { id: "claude", label, state: "warn", detail: "Claude Code CLI not found, install it to follow agents live" };
-    }
-    const version = versionRaw.match(/\d+\.\d+(\.\d+)?/)?.[0] ?? (versionRaw || "?");
-    const sessions = this.countRecentSessions(root);
-    if (sessions === 0) {
-      return { id: "claude", label, state: "warn", detail: "No threads in the last day. Start `claude` in this folder and they will appear live" };
-    }
-    return { id: "claude", label, state: "done", detail: `Claude Code ${version} · ${sessions} thread${sessions === 1 ? "" : "s"} in the last day` };
+    const claude = this.countRecentSessions(root);
+    const codex = this.countRecentCodex(root);
+    const hasCodex = existsSync(join(this.cfg.codexDir, "sessions"));
+    const threads = (n: number) => `${n} thread${n === 1 ? "" : "s"} in the last day`;
+    const parts: string[] = [];
+    if (versionRaw || claude) parts.push(`Claude Code${versionRaw ? ` ${versionRaw.match(/\d+\.\d+(\.\d+)?/)?.[0] ?? ""}`.trimEnd() : ""} · ${threads(claude)}`);
+    if (hasCodex || codex) parts.push(`Codex · ${threads(codex)}`);
+    if (!parts.length) return { id: "claude", label, state: "warn", detail: "Neither Claude Code nor Codex found: install one to follow agents live" };
+    if (!claude && !codex) return { id: "claude", label, state: "warn", detail: `${parts.join(" · ").replace(/ · 0 threads in the last day/g, "")}. No threads in the last day: start an agent in this folder and they will appear live` };
+    return { id: "claude", label, state: "done", detail: parts.join(" · ") };
   }
+
+  /** Codex threads active in the last 24h in `root` (or its repo's checkouts, Codex worktrees included). */
+  private countRecentCodex(root: string): number {
+    const base = resolve(root).replace(/\/\.claude\/worktrees\/[^/]+$/, "");
+    const now = Date.now();
+    const ids = new Set<string>();
+    for (const [r, list] of this.listener.codexProjects()) {
+      if (r !== base && !r.startsWith(base + "/")) continue;
+      for (const t of list) if (now - t.mtimeMs <= ONE_DAY_MS) ids.add(t.id);
+    }
+    return ids.size;
+  }
+
 
   /** Threads (see threads.ts) active in the last 24h across the Claude Code project folders for `root` and its worktrees. */
   private countRecentSessions(root: string): number {

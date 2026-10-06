@@ -87,6 +87,8 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     this.bus.on("step", (s) => { try { this.onStep(s); } catch { /* never break the listener */ } });
+    // A turn an agent's log says is over (Codex's task_complete): what the plugin's Stop hook says for Claude Code.
+    this.bus.on("turn-ended", ({ sessionId }) => { try { this.signal({ event: "Stop", session_id: sessionId }); } catch { /* never break the listener */ } });
     this.bus.on("workspace", () => { this.trackers.clear(); this.last.clear(); this.scope = undefined; this.rechecked.clear(); });
     this.timer = setInterval(() => this.sweep(), 2_000);
     this.timer.unref?.();

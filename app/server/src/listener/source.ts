@@ -14,6 +14,9 @@ export interface Sink {
   step(step: NewStep, opts?: { cwd?: string; promptTitle?: string }): void;
   /** The person named the thread. */
   customTitle(sessionId: string, title: string): void;
+  /** The agent finished its turn (Codex logs it; Claude Code's Stop hook says the same through the plugin). Live only:
+   * a turn that ended in history isn't news. */
+  turnEnded(sessionId: string): void;
 }
 
 /** The open project: its root, the repo's main checkout and the folders it lived in before it moved. */

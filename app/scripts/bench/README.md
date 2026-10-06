@@ -34,7 +34,7 @@ measure your branch. A full run of the three sizes at two CPU rates takes about 
 
 The real `~/.claude/projects` is never read: the server only sees the scratch dir (`CLAUDE_PROJECTS_DIR` already
 existed in `app/server/src/core/config.service.ts`). The scratch dir defaults to `$TMPDIR/brainstorm-bench` and the
-script refuses one inside the repo, `~/brainstorm` or `~/.claude`.
+script refuses one inside the repo, `~/rundown` (or `~/brainstorm`) or `~/.claude`.
 
 ## Options
 

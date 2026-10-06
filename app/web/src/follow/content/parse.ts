@@ -1,5 +1,5 @@
 // Pure helpers that turn raw tool inputs and results into something readable in the step panel.
-import { stripInjected } from "../format";
+import { stripNoise } from "../format";
 
 export const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "").replace(/\x1b\][^\x07]*\x07/g, "");
 
@@ -12,7 +12,7 @@ export function parseJson(s: string | undefined): unknown | undefined {
 
 /** Notes harnesses add to results for the agent, not the reader. */
 export function cleanResult(s: string): string {
-  return stripInjected(stripAnsi(s))
+  return stripNoise(stripAnsi(s))
     .replace(/\(This tool result is internal metadata[^)]*\)/g, "")
     .replace(/^agentId: .*$/gm, "")
     .replace(/^The agent is working in the background\.[\s\S]*$/m, "")

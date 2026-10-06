@@ -5,6 +5,7 @@ import { isReplay, shallowEqual, useLiveActions, useLiveSelector, useLiveStep } 
 import { END, NavProvider, useNavActions, useNavState, useReplayCursor } from "./lib/nav";
 import { useThread, type ReplayDetail } from "./lib/thread";
 import { displayLabel } from "./follow/format";
+import { LinkedLabel } from "./lib/links";
 import { SetupView } from "./setup/SetupView";
 import { Welcome } from "./map/Welcome";
 import { SettingsButton } from "./settings/Settings";
@@ -37,7 +38,7 @@ function Crumbs({ project }: { project: string }) {
       </>}
       {replay && step && <>
         <span className="sep" aria-hidden="true">›</span>
-        <span className="here" aria-current="page">{st && st.sessionId === sid ? displayLabel(st) : "Step"}</span>
+        <span className="here" aria-current="page" title={st && st.sessionId === sid ? displayLabel(st) : undefined}>{st && st.sessionId === sid ? <LinkedLabel text={displayLabel(st)} max={36} /> : "Step"}</span>
       </>}
     </nav>
   );

@@ -7,6 +7,7 @@ import { useNav } from "../../lib/nav";
 import { highlightLines, langOf, renderPieces, useGrammar, usePalette } from "../../lib/highlight";
 import { basename, displayLabel } from "../format";
 import { JsonView } from "./JsonView";
+import { UrlLink } from "../../lib/links";
 import { HtmlPreview, isHtml, PAGE_MARKUP, ViewSwitch } from "./HtmlPreview";
 import { cleanResult, formatCommand, hostOf, humanKey, parseJson, parseNumbered, parseSearch, parseShell, splitBatch, splitTabContext, type Tab } from "./parse";
 import "./content.css";
@@ -206,7 +207,7 @@ function WebSearchView({ input, result }: { input: Input; result?: Step }) {
         <>
           <Block title="Results" aside={`${parsed.links.length} links`}>
             <ul className="cv-links">{parsed.links.map((l) => (
-              <li key={l.url}><a href={l.url} target="_blank" rel="noreferrer noopener">{l.title}</a><span>{hostOf(l.url)}</span></li>
+              <li key={l.url}><a href={l.url} target="_blank" rel="noreferrer noopener" title={l.url}>{l.title}</a><UrlLink url={l.url} max={56} className="cv-src" /></li>
             ))}</ul>
           </Block>
           {parsed.summary && <Output text={parsed.summary} title="What it found" />}
@@ -220,7 +221,7 @@ function WebFetchView({ input, result }: { input: Input; result?: Step }) {
   const url = str(input.url) ?? "";
   return (
     <>
-      <a className="cv-url" href={url} target="_blank" rel="noreferrer noopener">{hostOf(url)}<span>{url.replace(/^https?:\/\/[^/]+/, "")}</span></a>
+      {/^https?:\/\//.test(url) ? <UrlLink url={url} max={52} className="cv-fetch" /> : <p className="cv-why">{url}</p>}
       {str(input.prompt) && <Block title="Looking for"><p className="cv-why">{str(input.prompt)}</p></Block>}
       {result && <Output text={result.text ?? ""} title="What it found" />}
     </>

@@ -16,32 +16,10 @@
 .map-wrap .map-stats { padding: 3px 12px; margin-left: -12px; border-radius: 999px;
   background: color-mix(in srgb, var(--bg) 78%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
 
-/* The colour key (MapKey): top right, on the stats line's level and in its frosted capsule. A side panel covers that
-   corner: the key steps out (the panel says what's selected). */
-.map-key { position: absolute; right: 28px; top: calc(var(--sb-top, 84px) - 34px); z-index: 3; display: flex; align-items: center; gap: 16px;
-  padding: 3px 12px; border-radius: 999px; font-size: 13px; color: var(--ink-2); white-space: nowrap; pointer-events: auto;
-  background: color-mix(in srgb, var(--bg) 78%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
-.map-key span { display: inline-flex; align-items: center; gap: 7px; }
-.map-key i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-.map-key i.line { width: 16px; height: 2px; border-radius: 1px; }
-.map-wrap:has(.map-panel.open) .map-key { display: none; }
-@media (max-width: 1100px) { .map-key-read { display: none !important; } }
-/* Phone: under the stats line on the project; with a thread open the dots read on their own and the lens pill takes the corner. */
-@media (max-width: 600px) {
-  .map-key { top: 98px; left: 16px; right: auto; font-size: 12.5px; gap: 12px; }
-  .map-wrap:has(.lens-switch) .map-key { display: none; }
-}
-
 .map-empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 10px; color: var(--ink-3); }
 .map-empty h2 { font-size: 34px; font-weight: 700; color: var(--ink); }
 .map-empty p { margin: 0; font-size: 16px; }
 
-
-.map-legend { position: absolute; left: 40px; bottom: 32px; display: flex; gap: 22px; font-size: 13px; color: var(--ink-2);
-  background: rgba(251,251,253,.8); backdrop-filter: blur(12px); padding: 8px 14px; border-radius: 999px; }
-.map-legend span { display: inline-flex; align-items: center; gap: 8px; }
-.map-legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-.map-legend i.ring { background: transparent; border: 2px solid var(--accent); width: 12px; height: 12px; }
 
 .map-panel { position: absolute; top: 0; right: 0; bottom: 0; width: 440px; max-width: 100%; z-index: 4;
   background: rgba(255,255,255,.94); backdrop-filter: saturate(180%) blur(24px);
@@ -52,10 +30,6 @@
 .map-panel.open { transform: none; opacity: 1; visibility: visible; pointer-events: auto;
   transition: transform .38s cubic-bezier(.2,.8,.2,1), opacity .16s ease-out, visibility 0s; }
 @media (prefers-reduced-motion: reduce) { .map-panel, .map-panel.open { transition: opacity .15s, visibility 0s linear .15s; transform: none; } .map-panel.open { transition-delay: 0s; } }
-/* Imports legend sample */
-.map-legend i.line { width: 16px; height: 2px; border-radius: 1px; }
-.map-legend span { white-space: nowrap; }
-.map-legend { flex-wrap: wrap; row-gap: 8px; max-width: calc(100% - 80px); }
 
 /* The step panel on the right (StepPanel, and Places' place panel): its header with ‹ › and the step view. */
 .pl-panel { overflow: hidden; display: flex; flex-direction: column; z-index: 4; }
@@ -66,9 +40,8 @@
 .pl-panel-nav button { width: 26px; height: 26px; border-radius: 50%; border: 0; background: #f0f0f3; color: var(--ink-2); font-size: 16px; line-height: 1; }
 .pl-panel-nav button:hover:not(:disabled) { background: #e7e7ec; color: var(--ink); }
 .pl-panel-nav button:disabled { opacity: .35; }
-.map-wrap:has(.map-panel.open) .map-legend { max-width: calc(100% - 520px); }
 
-/* The dock's "Show reads" switch (ReplayBar's ReadsToggle). */
+/* The dock's switches: Show reads, Show file, Show git, Lock camera (ReplayBar). */
 .dock-reads { display: inline-flex; align-items: center; gap: 9px; border: 0; background: none; padding: 4px 6px 4px 2px; border-radius: 999px;
   font-size: 13px; color: var(--ink-2); white-space: nowrap; }
 .dock-reads i { position: relative; width: 28px; height: 17px; border-radius: 999px; background: var(--line); transition: background .18s; flex: none; }
@@ -91,9 +64,6 @@
 
 /* Narrow (tablet and phone). */
 @media (max-width: 1100px) {
-  /* The legend keeps clear of the folded sidebar tab and of the right edge; a side panel open covers its corner, so it steps aside. */
-  .map-wrap:has(.sidebar-collapsed) .map-legend { max-width: calc(100% - 110px); }
-  .map-wrap:has(.map-panel.open) .map-legend { display: none; }
   .map-panel { z-index: 7; } /* over the lens pill, which reaches into it on a narrow screen */
 }
 @media (max-width: 600px) {
@@ -102,17 +72,8 @@
   .map-wrap .dock { z-index: 8; } /* the footer stays over a panel, so a replay can still be driven */
   .pl-panel-nav { padding: 12px 14px 0 20px; }
   .pl-panel .sd-scroll { padding: 18px 18px 120px; }
-  /* Legend (Places): across the bottom, wrapping. */
-  .map-wrap .map-legend, .map-wrap:has(.sidebar-collapsed) .map-legend { left: 12px; right: 12px; bottom: 12px; max-width: none; gap: 6px 14px;
-    justify-content: center; border-radius: 16px; padding: 8px 12px; }
   /* Fit sits above the footer, and away while a panel fills the screen. */
   .map-fit { right: 12px; bottom: 84px; }
   .map-wrap:has(.map-panel.open) .map-fit { display: none; }
 }
 
-/* The Git view's filter on the map (MapView.tsx): what it shows, and the way back to everything. */
-.map-gitpill { position: absolute; top: 132px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 10px;
-  padding: 6px 6px 6px 14px; border-radius: 18px; border: 1px solid var(--line); background: var(--sheet, rgba(255,255,255,.92)); backdrop-filter: blur(12px);
-  box-shadow: 0 8px 24px rgba(0,0,0,.07); font: 500 13px/1 var(--font-body); color: var(--ink); white-space: nowrap; }
-.map-gitpill button { border: 0; border-radius: 13px; padding: 6px 10px; background: var(--hover, rgba(0,0,0,.06)); color: var(--ink); font: inherit; cursor: pointer; }
-@media (max-width: 1100px) { .map-gitpill { top: 120px; } }

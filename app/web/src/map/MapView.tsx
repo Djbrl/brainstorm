@@ -12,9 +12,8 @@ import { useLive } from "../lib/live";
 import { mapPrefs, useNav } from "../lib/nav";
 import { drawAgents } from "./agents";
 import { MapSidebar } from "./sidebar/MapSidebar";
-import { Dock, FileToggle, LockToggle, ReadsToggle } from "./replay/ReplayBar";
+import { Dock, FileToggle, GitToggle, LockToggle, ReadsToggle } from "./replay/ReplayBar";
 import { Peek } from "./replay/Peek";
-import { MapKey } from "./MapKey";
 import { useStepWindow } from "./prefs";
 import { TalkCard } from "./replay/TalkCard";
 import { StepPanel } from "./StepPanel";
@@ -31,7 +30,7 @@ import { createRedraw, Motion } from "./redraw";
 import { css, readTokens } from "./color";
 import { hitAt, nodeReach, shownLinks, stepTween, useGraph, type GLink, type GNode } from "./graph";
 import { foldFrame, openAround, useFoldOn } from "./fold";
-import { filterFiles, filterName, setGitFilter, useGitFilter } from "./gitFilter";
+import { GIT_COLOURS, gitFiles, useShowGit, worktreeOf } from "./gitFilter";
 import { drawFile, drawFocusLinks, drawFolderNames, drawLinks, FILE_LABELS_MAX, flushDots, labelFor, lookOf, moreMotion, newCaches, RIPPLE_MS, type Frame } from "./drawNode";
 import { useMapCamera } from "./useMapCamera";
 import { useLiveAgents } from "./useLiveAgents";
@@ -185,27 +184,23 @@ export function MapView() {
 
   // The folders that show open at any zoom: around the selected file, the one a link focuses, what the thread showed
   // and where a followed agent worked (agents at work are added per frame).
-  // ---- the Git view's filter (gitFilter.ts, sidebar/GitPanel.tsx): its files by id, their ring colours and folders ----
-  const gitState = state.git, gitFilter = useGitFilter();
+  // ---- the dock's Show git (gitFilter.ts): the files it rings, by id, with their colours and folders ----
+  const gitState = state.git, showGit = useShowGit();
+  const gitWt = worktreeOf(gitState, replay?.sessionId);
   const only = useMemo(() => {
-    const byRel = filterFiles(gitState, gitFilter);
-    if (!byRel || !map) return { files: null, dirs: null, nodes: [] as GNode[] };
-    const base = map.root.replace(/\/+$/, ""), files = new Map<string, string>(), dirs = new Set<string>(), nodes: GNode[] = [];
-    for (const [rel, colour] of byRel) {
+    if (!showGit || !gitState || !map) return { files: null, dirs: null, nodes: [] as GNode[] };
+    // A folder's ring, while it's closed: not committed inside it over committed (purple, blue).
+    const base = map.root.replace(/\/+$/, ""), files = new Map<string, string>(), dirs = new Map<string, string>(), nodes: GNode[] = [];
+    const quiet = new Set<string>([GIT_COLOURS.unpushed, GIT_COLOURS.branch]);
+    for (const [rel, colour] of gitFiles(gitState, gitWt)) {
       const n = nodeIndex.get(`${base}/${rel}`);
       if (!n) continue;
       files.set(n.id, colour); nodes.push(n);
-      for (let u = n.up; u; u = u.up) dirs.add(u.id);
+      for (let u = n.up; u; u = u.up) { const had = dirs.get(u.id); if (!had || (quiet.has(had) && !quiet.has(colour))) dirs.set(u.id, colour); }
     }
     return { files, dirs, nodes };
-  }, [gitState, gitFilter, map?.root, nodeIndex]);
+  }, [showGit, gitState, gitWt, map?.root, nodeIndex]);
   const onlyRef = useRef(only); onlyRef.current = only;
-  // Turning one on frames its files (their folders open: pinned below).
-  useEffect(() => {
-    if (!only.nodes.length) return;
-    const b = boxOf(only.nodes);
-    if (b) camRef.current.frame(b, { pad: 60, maxZoom: 2.4 }, 700);
-  }, [gitFilter]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const pinned = useMemo(() => {
     const set = new Set<GNode>();
@@ -476,17 +471,11 @@ export function MapView() {
       <LensSwitch />
       {graph.nodes.length > 0 && <FitButton onFit={fitNow} label={replay ? "Fit the thread's files" : "Fit the whole project"} />}
 
-      {gitFilter && (
-        <div className="map-gitpill" role="status">
-          <span>{filterName(gitState, gitFilter)}: {only.nodes.length.toLocaleString()} {only.nodes.length === 1 ? "file" : "files"} on the map</span>
-          <button onClick={() => setGitFilter(null)}>Show everything</button>
-        </div>
-      )}
-      <MapKey thread={!!replay} reads={showReads} imports={sel ? style.imports : null} />
       <Peek />
       <Dock>
         <ReadsToggle />
         <FileToggle />
+        <GitToggle />
         <LockToggle shown={!!replay || !!followId} />
       </Dock>
 

@@ -8,6 +8,7 @@ import { clock, useLiveSelector } from "../../lib/live";
 import { missingSummary } from "../../lib/ai";
 import { mapStyle } from "../themes";
 import { relPath } from "../useSelectedFile";
+import { gitWord } from "../gitFilter";
 
 const modName = (m: string) => (!m || m === "." ? "root" : m);
 const baseName = (p: string) => p.split("/").pop() || p;
@@ -45,6 +46,7 @@ export function FileView({ file, root, edges, onFocus }: {
   const now = useNow();
   const setup = useLiveSelector((s) => s.setup);
   const steps = useLiveSelector((s) => s.steps);
+  const git = useLiveSelector((s) => s.git);
   // Unique: a file can import from the same module in several statements.
   const imports = useMemo(() => [...new Set(edges.filter((e) => e.from === file.path).map((e) => e.to))], [file.path, edges]);
   const usedBy = useMemo(() => [...new Set(edges.filter((e) => e.to === file.path).map((e) => e.from))], [file.path, edges]);
@@ -54,6 +56,7 @@ export function FileView({ file, root, edges, onFocus }: {
     return out.sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 6);
   }, [file.path, steps]);
   const rel = relPath(file.path, root);
+  const inGit = git ? gitWord(git, relPath(file.path, git.root)) : null;
 
   return (
     <div className="file-view">
@@ -62,6 +65,7 @@ export function FileView({ file, root, edges, onFocus }: {
       <p className="file-view-meta">
         {modName(file.module)} · {file.lines.toLocaleString()} lines · {changedAgo(file.lastChangedAt, now)}
       </p>
+      {inGit && <p className="file-view-git"><i style={{ background: inGit.colour }} />{inGit.word}</p>}
       {file.activeSessionId && <p className="file-view-live"><i />An agent is editing this file right now</p>}
 
       <section>

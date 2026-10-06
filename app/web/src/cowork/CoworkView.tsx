@@ -1,5 +1,5 @@
 // Owner: cowork. Places: where the open thread went outside the code. The same screen as the Map (full-screen map,
-// threads sidebar, legend at the bottom); the open thread's panel in the sidebar lists its places (PlaceSteps).
+// threads sidebar, no legend: the places read without one); the open thread's panel in the sidebar lists its places (PlaceSteps).
 // Clicking a place opens its step in the side panel, the same step view as on the Map and the Track (and the same link: …/places/step/<id>).
 import { useEffect, useMemo, useRef } from "react";
 import type { CoworkArea } from "@contract";
@@ -8,10 +8,10 @@ import { useNav } from "../lib/nav";
 import { MapSidebar } from "../map/sidebar/MapSidebar";
 import { MapStats } from "../map/MapStats";
 import { LensSwitch } from "../map/LensSwitch";
-import { AREAS, AREA_NAME, eventsAt, placeOfStep, placeTitle, placesStore, selectPlace, useCowork, usePlaces } from "./data";
+import { AREAS, eventsAt, placeOfStep, placeTitle, placesStore, selectPlace, useCowork, usePlaces } from "./data";
 import { StepDetail } from "../follow/StepDetail";
 import { pairResults } from "../follow/format";
-import { AREA_COLOR, WorldMap } from "./WorldMap";
+import { WorldMap } from "./WorldMap";
 import "../map/map.css";
 import "../follow/follow.css";
 import "./cowork.css";
@@ -64,7 +64,6 @@ export function PlacesView() {
   const pos = stepId ? here.indexOf(stepId) : -1;
   const place = data && selected ? eventsAt(data, selected).find((e) => e.stepId === stepId) : undefined;
 
-  const used = data ? AREAS.filter((a) => data.areas[a] > 0) : [];
   return (
     <div className="map-wrap cw-wrap">
       {data && data.events.length > 0 && (
@@ -90,13 +89,6 @@ export function PlacesView() {
           </>
         )}
       </div>
-      {used.length > 0 && (
-        <div className="map-legend" aria-label="Legend">
-          {used.map((a) => <span key={a}><i style={{ background: AREA_COLOR[a] }} />{AREA_NAME[a]}</span>)}
-          <span><i className="ring" style={{ borderColor: "var(--hot)" }} />Changed something</span>
-          <span><i style={{ background: "var(--risk)" }} />Failed</span>
-        </div>
-      )}
     </div>
   );
 }

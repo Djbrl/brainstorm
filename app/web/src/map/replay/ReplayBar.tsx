@@ -1,15 +1,16 @@
 // Owner: replay agent. The map's floating footer: Replay, Share and the map switches in one pill, and the player above
-// it when you ask for it. (The colour legend moved to the map's top-right corner, map/MapKey.tsx: the pill ran out of room.) The player is only what playing needs: back, play, forward, a timeline cut by chapter (red where one
+// it when you ask for it. (The map has no colour legend: it reads without one; Show git's tooltip says its colours.) The player is only what playing needs: back, play, forward, a timeline cut by chapter (red where one
 // failed), speed and hide. The rest moved: the step panel follows the cursor (no "Open step"), the camera recenters
 // itself, "Every step" is under the step list. With a thread open the pill leads with what you can do with it:
 // Live (a running thread), Replay and Share.
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNav, useNavState, type ReplaySpeed } from "../../lib/nav";
-import { isReplay, useLive } from "../../lib/live";
+import { isReplay, useLive, useLiveSelector } from "../../lib/live";
 import { useThread, type Thread } from "../../lib/thread";
 import { chaptersOf } from "../../lib/chapters";
 import { togglePlay } from "./layer";
 import { setCameraLock, setShowFile, useCameraLock, useShowFile } from "../prefs";
+import { gitSummary, setShowGit, useShowGit, worktreeOf } from "../gitFilter";
 import "./replay.css";
 
 const SPEEDS: ReplaySpeed[] = [1, 2, 4];
@@ -187,6 +188,23 @@ export function FileToggle() {
     <button className="dock-reads" role="switch" aria-checked={on} onClick={() => setShowFile(!on)}
       title="A small window with the file the agent is reading or writing, while you follow it live or replay it">
       Show file<i aria-hidden="true" />
+    </button>
+  );
+}
+
+/**
+ * Show git: rings on the files not committed, and those committed but not pushed (or, with a thread open in its own
+ * worktree, that branch's), over the map as it is (gitFilter.ts). Shown whenever the project is in a git repository.
+ */
+export function GitToggle() {
+  const on = useShowGit();
+  const git = useLiveSelector((s) => s.git);
+  const { replay } = useNavState();
+  if (!git) return null;
+  return (
+    <button className="dock-reads" role="switch" aria-checked={on} onClick={() => setShowGit(!on)}
+      title={gitSummary(git, worktreeOf(git, replay?.sessionId))}>
+      Show git<i aria-hidden="true" />
     </button>
   );
 }

@@ -16,8 +16,8 @@ const GAP = 12;                                         // breathing room off ea
 const LEFT = ".map-sidebar:not(.sidebar-overlay), .sidebar-collapsed"; // the narrow sheet opens over the map: no reframing
 const RIGHT = ".map-panel.open";
 const FLOAT_RIGHT = ".map-peek";                         // floats in from the right edge: covers from its left side on
-const TOP = ".map-stats, .lens-switch, .map-key";
-const BOTTOM = ".dock, .map-legend, .rp-bar";
+const TOP = ".map-stats, .lens-switch";
+const BOTTOM = ".dock, .rp-bar";
 const WATCH = [LEFT, ".map-panel", FLOAT_RIGHT, TOP, BOTTOM].join(", ");
 
 /** Measure the safe area of the canvas living in `host` (the covering elements are looked up in its .map-wrap). */

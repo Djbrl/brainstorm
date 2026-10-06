@@ -2,8 +2,7 @@
 // dots and, during a replay, which files that thread touched.
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { ProjectMap } from "@contract";
-import { clock, useLiveSelector } from "../../lib/live";
-import { GitPanel } from "./GitPanel";
+import { clock } from "../../lib/live";
 import { useNav } from "../../lib/nav";
 import { useThread } from "../../lib/thread";
 import { repoBase } from "../../lib/paths";
@@ -50,11 +49,6 @@ export function FilesPanel({ map, onFocusFile, hidden = false }: {
   const [search, setSearch] = useState("");
   const [touchedOnly, setTouchedOnly] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  // All files (the tree), or Changes: where the project stands in git (GitPanel).
-  const [view, setView] = useState<"tree" | "git">("tree");
-  const git = useLiveSelector((s) => s.git);
-  const sessions = useLiveSelector((s) => s.sessions);
-  const changes = git ? Object.keys(git.uncommitted).length : 0;
 
   const built = useFileTree(map);
   const tree = built?.root ?? null;
@@ -84,24 +78,8 @@ export function FilesPanel({ map, onFocusFile, hidden = false }: {
 
   if (!map || !tree) return hidden ? null : <p className="sidebar-empty">No files mapped yet.</p>;
 
-  const switcher = (
-    <div className="files-switch" role="tablist" aria-label="Show">
-      <button role="tab" aria-selected={view === "tree"} className={view === "tree" ? "on" : ""} onClick={() => setView("tree")}>All files</button>
-      <button role="tab" aria-selected={view === "git"} className={view === "git" ? "on" : ""} onClick={() => setView("git")}>
-        Changes{changes ? <span className="files-switch-n">{changes}</span> : null}
-      </button>
-    </div>
-  );
-  if (view === "git") return (
-    <div className="sidebar-files" hidden={hidden}>
-      {switcher}
-      <div className="sidebar-tree-scroll"><GitPanel git={git} map={map} sessions={sessions} onFocusFile={focusFile} /></div>
-    </div>
-  );
-
   return (
     <div className="sidebar-files" hidden={hidden}>
-      {switcher}
       <div className="sidebar-search">
         <input type="search" placeholder="Search files" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search files" />
       </div>

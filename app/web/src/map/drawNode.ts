@@ -61,7 +61,7 @@ export type Frame = {
   /** The replay layer's look for a file; the hovered or selected file (its import lines show); a thread is being traced. */
   look: (id: string) => Look | null; linkFocus: string | null; tracing: boolean;
   /** The Git view's filter (gitFilter.ts): the files it shows, each with its ring colour, and the folders they're in; null: off. */
-  only: Map<string, string> | null; onlyDirs: Set<string> | null;
+  only: Map<string, string> | null; onlyDirs: Map<string, string> | null;
 };
 export type Dots = Map<string, { css: string; a: number; xyr: number[] }>;
 /** What lives as long as the map: ripples under way, the batches and buffers reused from frame to frame. */
@@ -245,9 +245,9 @@ export function drawFile(ctx: CanvasRenderingContext2D, n: GNode, scale: number,
   const look = lookOf(n, F);   // an open thread: its own footprint, the rest dimmed back
   if (look) { F.anyLook = true; F.lookSum += look.alpha * 3 + look.tone; }
   // Fading in as its folder opens, dimmed back by an open thread; the one you point at or picked shows in full.
-  // A git filter on: its files stay bright with a ring in its colour, the rest steps well back.
+  // Show git on: its files stay bright with a ring in its colour, the rest steps back a little (the map stays readable).
   const ring = F.only?.get(n.id);
-  const alpha = isHover || isSel ? 1 : ring ? shown : (look?.alpha ?? 1) * shown * (F.only ? 0.18 : 1);
+  const alpha = isHover || isSel ? 1 : ring ? shown : (look?.alpha ?? 1) * shown * (F.only ? 0.45 : 1);
   ctx.globalAlpha = alpha;
   const plain = st.node !== "dot"; // themed files stay plain: no ripple or outlines, one mark where an agent is
 
@@ -361,7 +361,7 @@ function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: F
   const look = lookOf(n, F);
   if (look) { F.anyLook = true; F.lookSum += look.alpha * 3 + look.tone; }
   // A thread's focus dims folders less than files: they're the lay of the land around what it did.
-  const dim = (look ? 0.5 + 0.5 * look.alpha : 1) * (F.only && !F.onlyDirs?.has(n.id) ? 0.25 : 1), alpha = dim * shown;
+  const dim = (look ? 0.5 + 0.5 * look.alpha : 1) * (F.only && !F.onlyDirs?.has(n.id) ? 0.55 : 1), alpha = dim * shown;
   // Open: the outline, and a breath of fill so folders inside folders read as levels.
   if (open > 0) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, TAU);
@@ -383,6 +383,8 @@ function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: F
   ctx.lineWidth = (isHover || isSel ? 1.8 : 1.2) / scale;
   ctx.strokeStyle = active ? tokens.accent : isHover || isSel ? tokens.ink : rgbCss;
   ctx.stroke();
+  const gitRing = F.onlyDirs?.get(n.id);   // Show git: something inside it
+  if (gitRing && !active) { ctx.beginPath(); ctx.arc(x, y, r + 3.5 / scale, 0, TAU); ctx.globalAlpha = closed; ctx.lineWidth = 2 / scale; ctx.strokeStyle = gitRing; ctx.stroke(); }
   if (active) { ctx.beginPath(); ctx.arc(x, y, r + 3.5 / scale, 0, TAU); ctx.globalAlpha = 0.9 * closed; ctx.lineWidth = 1.6 / scale; ctx.strokeStyle = tokens.accent; ctx.stroke(); }
   ctx.globalAlpha = 1;
   const px = r * scale, count = n.dir!.files.length;

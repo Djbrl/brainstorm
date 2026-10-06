@@ -129,7 +129,7 @@ type Label = { text: string; x: number; y: number; font: string; size: number; i
 export function WorldMap({ data, areas, selected, highlight, onSelect, rightInset = 0 }: {
   data: CoworkSummary; areas: ReadonlySet<CoworkArea>;
   selected: string | null; highlight: string | null; onSelect: (id: string | null) => void;
-  /** No longer used: the map measures what covers it (sidebar, side panel, stats line, lens pill, legend). */
+  /** No longer used: the map measures what covers it (sidebar, side panel, stats line, lens pill). */
   leftInset?: number;
   /** Set while the step panel is open on the right (its width is measured, not taken from here). */
   rightInset?: number;

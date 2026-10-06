@@ -3,9 +3,7 @@
 /* ---------- player controls ---------- */
 .rp-empty { margin: 0; color: var(--ink-2); font-size: 14.5px; }
 /* The legend fades in when it comes back. */
-.map-legend { animation: rp-fade .3s ease-out; }
 @keyframes rp-fade { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .map-legend { animation-duration: .01s; } }
 
 .rp-steps button { font: inherit; }
 .rp-icon { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; border: 0; padding: 0;

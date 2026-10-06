@@ -20,8 +20,8 @@
 :root[data-theme="ps2"], :root[data-theme="deadspace"] { color-scheme: dark; }
 :root[data-theme="ps2"] .topbar, :root[data-theme="deadspace"] .topbar { background: var(--chrome); }
 :root[data-theme="ps2"] .crumbs > button:hover, :root[data-theme="deadspace"] .crumbs > button:hover { background: var(--hover); }
-:root[data-theme="ps2"] :is(.map-sidebar, .sidebar-collapsed, .map-panel, .dock-pill, .map-legend, .welcome),
-:root[data-theme="deadspace"] :is(.map-sidebar, .sidebar-collapsed, .map-panel, .dock-pill, .map-legend, .welcome) {
+:root[data-theme="ps2"] :is(.map-sidebar, .sidebar-collapsed, .map-panel, .dock-pill, .welcome),
+:root[data-theme="deadspace"] :is(.map-sidebar, .sidebar-collapsed, .map-panel, .dock-pill, .welcome) {
   background: var(--sheet); box-shadow: 0 18px 50px rgba(0,0,0,.35);
 }
 :root[data-theme="ps2"] :is(.sidebar-tabs, .rp-speed, .pl-panel-nav button),

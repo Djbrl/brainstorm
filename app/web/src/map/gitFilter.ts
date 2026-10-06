@@ -1,45 +1,67 @@
-// Owner: git. What the map shows from git (the Files tab's Changes, sidebar/GitPanel.tsx): nothing (the whole map), the
-// files not committed, the files not pushed, or what one branch (a worktree, usually an agent's) has that yours doesn't.
-// While one is on, those files stay bright with a ring in its colour and their folders open; the rest steps back.
+// Owner: git. The dock's "Show git" switch: rings on the files git says something about, over the map as it is. Your
+// checkout's files not committed (orange, green when new) and those committed but not pushed (blue); with a thread
+// open that works in its own checkout (a worktree, usually an agent's branch), that branch's instead: what it
+// committed that yours doesn't have (purple) and what it hasn't committed. Remembered per browser.
 import { useSyncExternalStore } from "react";
-import type { GitFileState, GitState } from "@contract";
+import type { GitFileState, GitState, GitWorktree } from "@contract";
 
-export type GitFilter = { kind: "uncommitted" } | { kind: "unpushed" } | { kind: "branch"; path: string } | null;
-
-let filter: GitFilter = null;
+const KEY = "brainstorm-map-git";
+let on = (() => { try { return localStorage.getItem(KEY) === "1"; } catch { return false; } })();
 const listeners = new Set<() => void>();
 const subscribe = (f: () => void) => { listeners.add(f); return () => { listeners.delete(f); }; };
-const get = () => filter;
-export function setGitFilter(f: GitFilter) { filter = f; listeners.forEach((l) => l()); }
-export const useGitFilter = () => useSyncExternalStore(subscribe, get, get);
-export const sameFilter = (a: GitFilter, b: GitFilter) =>
-  a === b || (!!a && !!b && a.kind === b.kind && (a.kind !== "branch" || (b.kind === "branch" && a.path === b.path)));
+const get = () => on;
+export function setShowGit(v: boolean) {
+  if (v === on) return;
+  on = v;
+  try { localStorage.setItem(KEY, v ? "1" : "0"); } catch { /* not remembered, still applied */ }
+  listeners.forEach((l) => l());
+}
+export const useShowGit = () => useSyncExternalStore(subscribe, get, get);
 
-/** The colours of what git says about a file (rings on the map, letters in the list). */
+/** The colours of what git says about a file (its ring on the map). */
 export const GIT_COLOURS = { uncommitted: "#ff9f0a", added: "#30b46c", unpushed: "#0a84ff", branch: "#a35bd6", conflict: "#e5484d" };
-export const stateColour = (s: GitFileState) => (s === "added" || s === "untracked" ? GIT_COLOURS.added : s === "conflict" ? GIT_COLOURS.conflict : GIT_COLOURS.uncommitted);
-export const STATE_LETTER: Record<GitFileState, string> = { modified: "M", added: "A", deleted: "D", renamed: "R", untracked: "U", conflict: "C" };
-export const STATE_WORD: Record<GitFileState, string> = { modified: "Changed", added: "New", deleted: "Deleted", renamed: "Renamed", untracked: "New, not added to git", conflict: "Conflict" };
+const stateColour = (s: GitFileState) => (s === "added" || s === "untracked" ? GIT_COLOURS.added : s === "conflict" ? GIT_COLOURS.conflict : GIT_COLOURS.uncommitted);
+const STATE_WORD: Record<GitFileState, string> = { modified: "Changed, not committed", added: "New, not committed", deleted: "Deleted, not committed", renamed: "Renamed, not committed", untracked: "New, not added to git", conflict: "Conflict" };
 
-/** The files a filter shows, by their path relative to the map's root, each with its ring colour. */
-export function filterFiles(git: GitState | null, f: GitFilter): Map<string, string> | null {
-  if (!git || !f) return null;
+/** The checkout a thread works in, when it isn't yours. */
+export const worktreeOf = (git: GitState | null, sessionId: string | null | undefined): GitWorktree | null =>
+  (sessionId && git?.worktrees.find((w) => w.threads.includes(sessionId))) || null;
+
+/** The files the switch rings, by their path relative to the map's root, each with its colour. */
+export function gitFiles(git: GitState | null, wt: GitWorktree | null): Map<string, string> {
   const out = new Map<string, string>();
-  if (f.kind === "uncommitted") for (const [p, s] of Object.entries(git.uncommitted)) out.set(p, stateColour(s));
-  else if (f.kind === "unpushed") for (const p of git.unpushed ?? []) out.set(p, GIT_COLOURS.unpushed);
-  else {
-    const w = git.worktrees.find((x) => x.path === f.path);
-    if (!w) return out;
-    for (const p of w.committed) out.set(p, GIT_COLOURS.branch);
-    for (const [p, s] of Object.entries(w.uncommitted)) out.set(p, stateColour(s));
+  if (!git) return out;
+  if (wt) {
+    for (const p of wt.committed) out.set(p, GIT_COLOURS.branch);
+    for (const [p, s] of Object.entries(wt.uncommitted)) out.set(p, stateColour(s));
+    return out;
   }
+  for (const p of git.unpushed ?? []) out.set(p, GIT_COLOURS.unpushed);
+  for (const [p, s] of Object.entries(git.uncommitted)) out.set(p, stateColour(s));   // not committed wins over not pushed
   return out;
 }
 
-/** In words, for the pill on the map. */
-export function filterName(git: GitState | null, f: GitFilter): string {
-  if (!f) return "";
-  if (f.kind === "uncommitted") return "Not committed";
-  if (f.kind === "unpushed") return "Not pushed";
-  return `On ${git?.worktrees.find((w) => w.path === f.path)?.branch ?? "a branch"}`;
+/** What git says about one file, in words (the file's details in the sidebar). */
+export function gitWord(git: GitState | null, rel: string): { word: string; colour: string } | null {
+  if (!git) return null;
+  const s = git.uncommitted[rel];
+  if (s) return { word: STATE_WORD[s], colour: stateColour(s) };
+  if (git.unpushed?.includes(rel)) return { word: "Committed, not pushed", colour: GIT_COLOURS.unpushed };
+  return null;
+}
+
+/** The switch's tooltip: where things stand, and what the colours mean (the map has no legend). */
+export function gitSummary(git: GitState | null, wt: GitWorktree | null): string {
+  if (!git) return "This project isn't in a git repository";
+  const n = (k: number, one: string, many = one + "s") => `${k.toLocaleString()} ${k === 1 ? one : many}`;
+  if (wt) {
+    const u = Object.keys(wt.uncommitted).length;
+    return [`This thread works on ${wt.branch}`,
+      wt.merged ? "In your branch" : `Purple: ${n(wt.committed.length, "file")} it committed that your branch doesn't have`,
+      u ? `Orange: ${n(u, "file")} not committed (green when new)` : "Everything committed"].join("\n");
+  }
+  const u = Object.keys(git.uncommitted).length, p = git.unpushed?.length ?? 0;
+  return [git.branch ?? "No branch (detached)",
+    u ? `Orange: ${n(u, "file")} not committed (green when new)` : "Everything committed",
+    git.upstream ? (p ? `Blue: ${n(p, "file")} committed, not pushed (${n(git.ahead, "commit")})` : `Up to date with ${git.upstream}`) : "No upstream branch: nothing pushed yet"].join("\n");
 }

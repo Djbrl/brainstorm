@@ -100,7 +100,6 @@ nav .links a:hover { color: var(--text); }
   background: linear-gradient(to top, #fff 80%, rgba(255,255,255,0));
 }
 .hero-end h2 { font-size: clamp(30px, min(5vw, 8vh), 64px); line-height: 1; }
-.hero-end .said { font-size: clamp(17px, 1.7vw, 20px); color: var(--muted); font-weight: 500; margin-top: 14px; }
 .hcap {
   position: absolute; left: 0; right: 0; bottom: 13vh; padding: 0 24px; text-align: center; pointer-events: none; opacity: 0;
   font: 900 clamp(30px, 4.6vw, 60px)/1.05 var(--display); letter-spacing: -0.035em; text-wrap: balance;
@@ -222,6 +221,8 @@ nav .links a:hover { color: var(--text); }
 #install .wrap { position: relative; }
 #install .h2 .o { color: var(--claude); }
 #install .sub, #install .needs { color: #a3a09a; }
+#install .sub { max-width: 46ch; }
+#install .needs { max-width: 62ch; margin-left: auto; margin-right: auto; font-size: 15px; }
 .cc { max-width: 780px; margin: 80px auto 0; text-align: left; background: #262624; border: 1px solid #3a3935; border-radius: 18px; overflow: hidden;
   box-shadow: 0 40px 100px -40px rgba(0,0,0,.8), 0 0 0 1px rgba(217,119,87,.06); }
 .cc header { position: relative; display: flex; gap: 7px; align-items: center; padding: 13px 16px; border-bottom: 1px solid #33322f; }
@@ -297,14 +298,17 @@ nav { top: 40px; }
 
 /* roadmap */
 .road { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 72px; text-align: left; }
-.road::before { content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 2px; background: linear-gradient(90deg, var(--text) 0 22%, var(--blue) 42%, var(--orange) 62%, var(--line) 85%); }
+.road::before { content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 2px;   /* each stop's colour up to the next (columns 1/3 wide, 56px gaps) */
+  background: linear-gradient(90deg, var(--text) 0 calc((100% - 112px) / 3 + 56px), var(--orange) 0 calc((100% - 112px) * 2 / 3 + 112px), var(--blue) 0); }
 .road > div { position: relative; }
 .road .dot { display: block; position: relative; z-index: 1; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid var(--line); box-sizing: border-box; }
 .road .now .dot { background: var(--text); border-color: var(--text); }
 .road .next .dot { background: var(--orange); border-color: var(--orange); animation: road-pulse 2.2s ease-out infinite; }
 @keyframes road-pulse { 0% { box-shadow: 0 0 0 0 rgba(255,91,31,.45); } 100% { box-shadow: 0 0 0 16px rgba(255,91,31,0); } }
 .road h3 { font-size: clamp(28px, 3vw, 38px); margin-top: 26px; letter-spacing: -0.03em; }
-.road .next h3 { color: var(--red); }
+.road .next h3 { color: var(--orange); }
+.road .later .dot { background: var(--blue); border-color: var(--blue); }
+.road .later h3 { color: var(--blue); }
 .road .when { color: var(--muted); font-weight: 500; margin-top: 4px; }
 .road ul { list-style: none; margin: 22px 0 0; padding: 0; }
 .road li { padding: 12px 0; border-top: 1px solid var(--line); font-weight: 500; line-height: 1.4; }
@@ -320,14 +324,10 @@ nav { top: 40px; }
 .wl-big + .wl-note:empty { display: none; }
 
 /* privacy: three lines */
-#privacy .sub { max-width: 46ch; }
 
 /* closing */
-.closing { padding: 160px 0 150px; }
-.closing h2 { font-size: clamp(52px, 9vw, 140px); line-height: .92; letter-spacing: -0.05em; }
-.closing h2 span { display: block; }
-.closing h2 .grad { color: var(--red); }
-.closing .btns { margin-top: 56px; }
+.closing { padding: 110px 0 100px; }
+.closing .btns:first-child { margin-top: 0; }
 .btn.big { font-size: 20px; padding: 17px 36px; }
 .btn.pending { opacity: .5; pointer-events: none; }
 .award { display: inline-block; margin-top: 28px; color: var(--muted); font-size: 15px; font-weight: 500; }
@@ -354,7 +354,10 @@ footer a:hover { text-decoration: underline; }
   .wl-mini, .has-waitlist .band .dim { display: none; }
   .has-waitlist .band-link { display: inline; }
   .road { grid-template-columns: 1fr; gap: 40px; margin-top: 64px; padding-left: 36px; }
-  .road::before { left: 7px; right: auto; top: 8px; bottom: 0; width: 2px; height: auto; background: linear-gradient(180deg, var(--text) 0 22%, var(--blue) 40%, var(--orange) 60%, var(--line) 85%); }
+  .road::before { display: none; }
+  .road > div::before { content: ""; position: absolute; left: -29px; top: 16px; bottom: -40px; width: 2px; background: var(--text); }  /* each stop's colour down to the next */
+  .road > .next::before { background: var(--orange); }
+  .road > .later::before { background: var(--blue); bottom: 0; }
   .road .dot { position: absolute; left: -36px; top: 8px; }
   .road h3 { margin-top: 0; }
   .wl-big { flex-direction: column; margin-top: 64px; }
@@ -383,7 +386,7 @@ footer a:hover { text-decoration: underline; }
   .block { padding: 88px 0; }
   #stats { padding: 88px 0; height: auto; }
   #stats .stage { padding: 0; }
-  .closing { padding: 112px 0 104px; }
+  .closing { padding: 80px 0 72px; }
   .scene, #hero, #tasks { height: auto; }
   .scene .stage { position: relative; height: auto; overflow: visible; }
   #hero .stage { display: flex; flex-direction: column; }
@@ -451,7 +454,6 @@ footer a:hover { text-decoration: underline; }
     <p class="hcap" data-in=".47" data-out=".68">Each one is somewhere in your work.</p>
     <div class="hero-end" id="heroEnd">
       <h2>We give you the rundown.</h2>
-      <p class="said">Nobody reads a list of 47 changed files. You look at a map.</p>
       <div class="btns" style="margin-top:24px">
         <a class="btn" data-link="demo" href="#">Try the live demo</a>
         <a class="more" data-link="install" href="#">Install for Claude Code</a>
@@ -571,19 +573,11 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- Privacy, in three lines -->
-<section class="block" id="privacy">
-  <div class="wrap center">
-    <h2 class="h2 rv">Your code<br>stays yours.</h2>
-    <p class="sub rv d1">It runs on your machine and reads your agents' logs where they are. No account, no cloud. Secrets are masked before anything is stored, and nothing goes to Claude unless you ask. Once a day it sends anonymous usage counts, never your code; one click in Settings turns that off.</p>
-  </div>
-</section>
-
-<!-- Install: in Claude's colors, one Claude Code window -->
+<!-- Local, and installed in Claude Code: in Claude's colors, one Claude Code window -->
 <section class="block" id="install">
   <div class="wrap center">
-    <h2 class="h2 rv">Install it in<br><span class="o">Claude Code.</span></h2>
-    <p class="sub rv d1">Free. Everything runs on your machine.</p>
+    <h2 class="h2 rv">Runs on your machine.<br><span class="o">Installs in Claude Code.</span></h2>
+    <p class="sub rv d1">No account, no cloud: Rundown reads your agents' logs where they are. Secrets are masked before anything is stored, and nothing goes to Claude unless you ask. Free.</p>
     <div class="cc rv d2">
       <header><i></i><i></i><i></i><span>claude</span></header>
       <div class="cc-body">
@@ -594,7 +588,7 @@ footer a:hover { text-decoration: underline; }
       </div>
     </div>
     <p class="alt-cmd rv">On an older Claude Code: <code>/plugin marketplace add Djbrl/brainstorm</code>, then <code>/plugin install rundown@rundown</code>.</p>
-    <p class="needs rv">You need Claude Code and Node.js 22.13 or later.</p>
+    <p class="needs rv">You need Claude Code and Node.js 22.13 or later. Once a day Rundown sends anonymous usage counts, never your code; one click in Settings turns that off.</p>
     <div class="btns rv" style="margin-top:28px">
       <a class="btn" data-link="install" href="#">Install from GitHub</a>
       <a class="more" data-link="guide" href="#">Settings, updates and uninstall</a>
@@ -608,12 +602,12 @@ footer a:hover { text-decoration: underline; }
     <h2 class="h2 rv">What's next.</h2>
     <p class="sub rv d1">Rundown is a prototype today. The full release lands in late October.</p>
     <div class="road">
-      <div class="now rv"><span class="dot"></span><h3>Today</h3><p class="when">Prototype, version 0.5</p>
-        <ul><li>A live map of your agents, and a replay of every thread</li><li>The Track: every step beside the map, failures in red</li><li>Places: the websites and apps each thread used, on a map. Click one to see the step.</li><li>Waiting for you: a notification when a thread needs you</li><li>Share a thread as a web page or Markdown</li><li>A plugin for Claude Code</li></ul></div>
+      <div class="now rv"><span class="dot"></span><h3>Today</h3><p class="when">Version 0.5</p>
+        <ul><li>Live map and replays</li><li>The Track</li><li>Places</li><li>Notifications</li><li>Sharing</li><li>Claude Code plugin</li></ul></div>
       <div class="next rv d1"><span class="dot"></span><h3>Late October</h3><p class="when">Full release</p>
-        <ul><li>Codex threads on the same map as Claude Code</li><li>Files changed by commands (sed, scripts, redirects) count as edits</li><li>A first read on NVIDIA Nemotron: a short summary of every file and every step</li><li>A recap of what happened while you were away</li><li>Let your agents interact with Rundown through MCP and CLI</li></ul></div>
-      <div class="later rv d2"><span class="dot"></span><h3>After</h3><p class="when">What we're building toward</p>
-        <ul><li>Support for Cursor and Gemini CLI</li><li>Agents that warn each other before editing the same file</li><li>Replays on pull requests</li><li>Pause and steer an agent from the map</li></ul></div>
+        <ul><li>Codex</li><li>Commands as edits</li><li>Summaries on NVIDIA Nemotron</li><li>Recap of what you missed</li><li>MCP and CLI</li></ul></div>
+      <div class="later rv d2"><span class="dot"></span><h3>After</h3><p class="when">Later</p>
+        <ul><li>Cursor and Gemini CLI</li><li>Agents that coordinate</li><li>Replays on pull requests</li><li>Steering from the map</li></ul></div>
     </div>
     <form class="wl-big rv" id="waitlist" data-waitlist hidden><input type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" class="hp"><input type="email" name="email" required placeholder="you@example.com" aria-label="Your email" autocomplete="email"><button class="btn" type="submit">Join the waitlist</button></form>
     <p class="wl-note rv" id="wlNote"></p>
@@ -623,7 +617,6 @@ footer a:hover { text-decoration: underline; }
 <!-- Closing -->
 <section class="closing alt">
   <div class="wrap center">
-    <h2 class="rv"><span>Let the agents work.</span><span class="grad">Keep your brain in the loop.</span></h2>
     <div class="btns rv d1">
       <a class="btn big" data-link="install" href="#">Install for Claude Code</a>
     </div>

@@ -18,15 +18,15 @@ export const underPrefix = (projectDir: string, prefix: string) => projectDir ==
 
 /** Where a few of the folder's threads ran: every folder each one moved through, since a thread can start
  * elsewhere (a scratch space) and only later work in the repo. */
-function cwdsOf(dir: string): string[] {
+function cwdsOf(dir: string, maxFiles = 5, maxBytes = 4 * 1024 * 1024): string[] {
   let files: string[];
-  try { files = readdirSync(dir).filter((f) => f.endsWith(".jsonl")).slice(0, 5); } catch { return []; }
+  try { files = readdirSync(dir).filter((f) => f.endsWith(".jsonl")).slice(0, maxFiles); } catch { return []; }
   const out = new Set<string>();
   for (const f of files) {
     let fd: number | undefined;
     try {
       fd = openSync(join(dir, f), "r");
-      const buf = Buffer.alloc(4 * 1024 * 1024);
+      const buf = Buffer.alloc(maxBytes);
       const n = readSync(fd, buf, 0, buf.length, 0);
       for (const m of buf.toString("utf8", 0, n).matchAll(/"cwd":"((?:[^"\\]|\\.)*)"/g)) out.add(JSON.parse(`"${m[1]}"`) as string);
     } catch { /* unreadable, try the next */ } finally { if (fd !== undefined) closeSync(fd); }
@@ -38,7 +38,7 @@ const real = (p: string) => { try { return realpathSync(p); } catch { return p; 
 
 const cache = new Map<string, string[]>();
 
-/** The repo's other names: where it used to live, and its real path when opened through a symlink. Cached per root. */
+/** The repo's other names: where it used to live (moved or renamed), and its real path when opened through a symlink. Cached per root. */
 export function formerRoots(projectsDir: string, root: string): string[] {
   const base = repoBase(root);
   const hit = cache.get(base);
@@ -56,6 +56,16 @@ export function formerRoots(projectsDir: string, root: string): string[] {
       if (encodeRoot(old) !== d && !d.startsWith(encodeRoot(old) + "-")) continue; // ran elsewhere
       if (basename(old) !== name || old === base || found.includes(old)) continue;
       if (!existsSync(old) || real(old) === real(base)) found.push(old);
+    }
+  }
+  // Renamed, not just moved (~/brainstorm → ~/rundown): the old folder has another name, so only the link the rename left
+  // behind tells. A project folder whose own path now leads here is a former home (a quick look: its first lines only).
+  for (const d of dirs) {
+    if (d.endsWith(tail) || d.includes("--claude-worktrees-") || d === encodeRoot(base)) continue;
+    for (const cwd of cwdsOf(join(projectsDir, d), 2, 256 * 1024)) {
+      const old = repoBase(cwd);
+      if (encodeRoot(old) !== d || old === base || found.includes(old)) continue;
+      if (existsSync(old) && real(old) === real(base)) found.push(old);
     }
   }
   cache.set(base, found);

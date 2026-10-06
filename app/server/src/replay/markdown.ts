@@ -85,7 +85,7 @@ export function threadMarkdown(session: Session, steps: Step[], map: ProjectMap 
 
   const out: string[] = [];
   out.push(`# ${session.title || "Untitled thread"}`, "");
-  out.push(`Recorded with [Brainstorm](https://github.com/Djbrl/brainstorm) · ${dateOf(session.startedAt)}, ${timeOf(session.startedAt)} to ${timeOf(session.lastEventAt)} (${duration(session.startedAt, session.lastEventAt)})`, "");
+  out.push(`Recorded with [Rundown](https://github.com/Djbrl/brainstorm) · ${dateOf(session.startedAt)}, ${timeOf(session.startedAt)} to ${timeOf(session.lastEventAt)} (${duration(session.startedAt, session.lastEventAt)})`, "");
   out.push([
     `${asked.length} request${asked.length === 1 ? "" : "s"}`,
     `${edits} edit${edits === 1 ? "" : "s"} to ${changed.size} file${changed.size === 1 ? "" : "s"}`,

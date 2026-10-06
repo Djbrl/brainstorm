@@ -7,7 +7,7 @@ import { useSyncExternalStore } from "react";
 export type ThemeId = "default" | "ps2" | "deadspace" | "metro";
 
 export const THEMES: { id: ThemeId; name: string; note: string; dark: boolean }[] = [
-  { id: "default", name: "Brainstorm", note: "Light and quiet. Colour shows what changed.", dark: false },
+  { id: "default", name: "Rundown", note: "Light and quiet. Colour shows what changed.", dark: false },
   { id: "metro", name: "Metro", note: "Imports as transit lines, files as stations.", dark: false },
   { id: "ps2", name: "PS2", note: "Glass cubes in a violet haze.", dark: true },
   { id: "deadspace", name: "Dead Space", note: "A hologram: floor plates and a cyan locator line.", dark: true },

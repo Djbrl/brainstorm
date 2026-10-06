@@ -9,7 +9,7 @@ export const BENCH_DIR = dirname(fileURLToPath(import.meta.url));
 export const APP_DIR = resolve(BENCH_DIR, "../..");
 export const REPO_DIR = resolve(APP_DIR, "..");
 
-/** Ports other Brainstorm processes and agents use on this machine: never bind them. */
+/** Ports other Rundown processes and agents use on this machine: never bind them. */
 export const RESERVED_PORTS = new Set([3000, 4000, 4747, 5173, 5825, 7331, 9222, 9333, 9487, 9913]);
 
 /** mulberry32: small, fast, deterministic. */

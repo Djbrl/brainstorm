@@ -60,7 +60,7 @@ export class ShareController {
     // JSON inside <script> can't contain "</script>": escaping every "<" keeps it valid JSON and inert HTML.
     const data = `<script id="brainstorm-replay" type="application/json">${JSON.stringify(replay).replace(/</g, "\\u003c")}</script>`;
     const html = template
-      .replace(/<title>[^<]*<\/title>/, `<title>${escHtml(replay.shared!.title)} · Brainstorm replay</title>`)
+      .replace(/<title>[^<]*<\/title>/, `<title>${escHtml(replay.shared!.title)} · Rundown replay</title>`)
       .replace(PLACEHOLDER, () => data);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${name}.html"`);

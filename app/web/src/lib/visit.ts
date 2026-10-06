@@ -30,7 +30,7 @@ function baseline(): number {
 }
 const saved = baseline();
 
-/** When you last had Brainstorm open (ms), or null on a first visit. */
+/** When you last had Rundown open (ms), or null on a first visit. */
 export const lastSeen: number | null = saved > 0 ? saved : null;
 
 /** "Since you last looked" needs a line: a first visit uses the last 24 hours. */

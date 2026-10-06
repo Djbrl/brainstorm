@@ -1,6 +1,7 @@
 /* Setup screen: one calm column, big type. */
 .su-root { height: 100%; overflow-y: auto; background: var(--bg); position: relative; }
-.su-wordmark { position: absolute; top: 20px; left: 28px; font-family: var(--font-display); font-weight: 800; font-size: 20px; letter-spacing: -0.03em; }
+.su-wordmark { position: absolute; top: 22px; left: 28px; color: var(--ink); }
+.su-wordmark .logo { display: block; height: 20px; width: auto; }
 .su-col { max-width: 720px; margin: 0 auto; padding: 14vh 32px 96px; animation: su-in .5s cubic-bezier(.2,.7,.2,1) both; }
 .su-back { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; color: var(--accent); font-weight: 500; padding: 4px 0; margin-bottom: 20px; }
 .su-title { font-size: 60px; font-weight: 800; letter-spacing: -0.04em; line-height: 1.05; }

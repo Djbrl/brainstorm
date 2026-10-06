@@ -820,7 +820,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   listSessions(): Session[] {
     this.sessionsCache ??= this.shownSessionRows();
     // A thread you deleted (in Claude's desktop app) isn't one any more: its transcript is gone and the app left a
-    // marker. One that Claude Code cleaned up on its own (after ~30 days) stays: Brainstorm keeps that history.
+    // marker. One that Claude Code cleaned up on its own (after ~30 days) stays: Rundown keeps that history.
     const deleted = deletedThreads();
     let rows = this.sessionsCache;
     if (deleted.size) {

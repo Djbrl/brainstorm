@@ -1,5 +1,5 @@
 // Owner: viewers. Where a file opens when you click its name in a step (Settings, "Open files in"): an editor through
-// its own link (vscode://file/…; nothing goes through Brainstorm's server), or whatever app the computer uses for that
+// its own link (vscode://file/…; nothing goes through Rundown's server), or whatever app the computer uses for that
 // kind of file (the server opens it: server/src/open). Remembered per browser, like the map's prefs.
 import { useSyncExternalStore } from "react";
 

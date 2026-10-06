@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 
-/** Where Brainstorm keeps its database and private files. The plugin sets BRAINSTORM_DATA_DIR; dev uses app/server/data. */
+/** Where Rundown keeps its database and private files. The plugin sets BRAINSTORM_DATA_DIR; dev uses app/server/data. */
 export const dataDir = () => resolve(process.env.BRAINSTORM_DATA_DIR ?? resolve(__dirname, "../../data"));
 
 const LOCAL_NAMES = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);

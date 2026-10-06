@@ -1,4 +1,4 @@
-// Build, start and measure the Brainstorm server: startup, API timings and sizes, memory, CPU, websocket traffic.
+// Build, start and measure the Rundown server: startup, API timings and sizes, memory, CPU, websocket traffic.
 import { execSync, spawn, execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";

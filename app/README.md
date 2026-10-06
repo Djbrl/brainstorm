@@ -1,10 +1,10 @@
-# Brainstorm: app (agent briefing)
+# Rundown: app (agent briefing)
 
 > **Historical (27 Sep 2026).** This is the briefing the agents worked from on hackathon day: the deadline, ports, ownership and the planned views (Follow, Map, History) are as they were then. Some of it changed or was never built (the History view, for one). For how the app works today, read [docs/technical.md](../docs/technical.md); for what's planned, [docs/todo.md](../docs/todo.md) and [docs/roadmap.md](../docs/roadmap.md).
 
 **Every agent: read this whole file before writing code.** Deadline: submission 16:30. Code freeze 15:40.
 
-Brainstorm is a live map of your code and of the AI agents writing it. It runs locally, next to Claude Code, and has three views:
+Rundown is a live map of your code and of the AI agents writing it. It runs locally, next to Claude Code, and has three views:
 
 - **Follow**: a live timeline of one Claude Code session (messages, actions, code edits), each step with a short label. Click a step to ask "why?".
 - **Map**: the project's modules and files as a graph. Lines are imports. Nodes glow by how recently they changed and pulse where an agent is editing right now. Click a node to see its summary, its recent steps and to ask about it.

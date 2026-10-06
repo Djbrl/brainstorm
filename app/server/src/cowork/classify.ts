@@ -69,7 +69,7 @@ export class CoworkTracker {
   /** Element names from find/read_page results, by "<tab>|ref_N": 'button "Envoyer"'. */
   private refs = new Map<string, { role: string; name: string }>();
   private typedIn = new Set<string>();
-  /** Connector item titles learned from creates: id → "Brainstorm — Pitch…". */
+  /** Connector item titles learned from creates: id → "Rundown — Pitch…". */
   private itemTitles = new Map<string, string>();
 
   constructor(private sessionId: string) {}

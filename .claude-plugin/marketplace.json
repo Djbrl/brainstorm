@@ -1,7 +1,7 @@
 {
   "name": "brainstorm",
   "owner": { "name": "Djbrl", "url": "https://github.com/Djbrl" },
-  "description": "Brainstorm: a live map and replay of your coding agents.",
+  "description": "Rundown: a live map and replay of your coding agents.",
   "plugins": [
     {
       "name": "brainstorm",

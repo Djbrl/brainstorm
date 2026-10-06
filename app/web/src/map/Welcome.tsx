@@ -22,7 +22,7 @@ export function Welcome() {
   const demo = isReplay();
   return (
     <div className="welcome" role="dialog" aria-labelledby="welcome-title">
-      <h2 id="welcome-title">{demo ? "Agents building Brainstorm" : "This is your project"}</h2>
+      <h2 id="welcome-title">{demo ? "Agents building Rundown" : "This is your project"}</h2>
       <p>
         Each dot is a file, grouped by folder. When an agent works, it shows up here as a dot moving between the files
         it reads and changes.{demo ? " This is a recording of Claude Code agents building this app." : ""}

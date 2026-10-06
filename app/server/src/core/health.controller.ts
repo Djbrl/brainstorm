@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 
 const keyHash = (k?: string) => (k ? createHash("sha256").update(k).digest("hex").slice(0, 12) : null);
 
-/** The launcher and the page use this to tell which Brainstorm is running (and whether it has the current key). */
+/** The launcher and the page use this to tell which Rundown is running (and whether it has the current key). */
 @Controller()
 export class HealthController {
   @Get("health") health() {

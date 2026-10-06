@@ -10,8 +10,8 @@ allowed-tools: Bash(node:*)
 
 ## What to do
 
-The Brainstorm launcher ran above.
+The Rundown launcher ran above.
 
 - If it saved files, tell the user in two short sentences where the replay file and the summary are (as links to the paths), and that the replay opens in any browser with nothing to install. Add the line about what's included and masked.
-- If it says Node.js is missing or too old, tell the user Brainstorm needs Node.js 22.13 or later.
+- If it says Node.js is missing or too old, tell the user Rundown needs Node.js 22.13 or later.
 - If it failed another way, show the last lines of the output.

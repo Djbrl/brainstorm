@@ -71,7 +71,7 @@ export function useAttentionAlerts(onOpen: (sessionId: string) => void) {
       const key = `${a.state}|${a.since}`;
       if (seen.current.get(a.sessionId) === key) continue;
       seen.current.set(a.sessionId, key);
-      // Only fresh states (not old ones found on page load), not guesses, and not while you're looking at Brainstorm.
+      // Only fresh states (not old ones found on page load), not guesses, and not while you're looking at Rundown.
       if (Date.now() - Date.parse(a.since) > 60_000 || !(needsYou(a) || yourTurn(a)) || (!a.sure && a.state !== "stuck")) continue;
       if (!notifyPref() || typeof Notification === "undefined" || Notification.permission !== "granted" || document.visibilityState === "visible") continue;
       const t = attentionText(a);

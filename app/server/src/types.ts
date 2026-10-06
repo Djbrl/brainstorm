@@ -115,7 +115,7 @@ export type Replay = {
   agentMoves?: { id: string; name: string; isSubagent: boolean; sessionId: string; file: string; action: string; ts: string }[];
   /** Post-deadline preview: a recorded setup run, played back by the setup screen. */
   setupPreview?: { status: SetupStatus; suggestions: WorkspaceSuggestion[] };
-  /** A replay someone shared from their local Brainstorm (GET /api/share): one self-contained file, secrets masked. */
+  /** A replay someone shared from their local Rundown (GET /api/share): one self-contained file, secrets masked. */
   shared?: { title: string; createdAt: string; version: string };
 };
 

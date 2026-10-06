@@ -1,8 +1,9 @@
-// Owner: C. Pick a workspace, then a loading checklist while Brainstorm reads the code and connects to Claude Code.
+// Owner: C. Pick a workspace, then a loading checklist while Rundown reads the code and connects to Claude Code.
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { SetupStatus, SetupStep, WorkspaceSuggestion } from "@contract";
 import { clock, useLive } from "../lib/live";
 import { relTime } from "../follow/format";
+import { Logo } from "../Logo";
 import "./setup.css";
 
 const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`;
@@ -80,7 +81,7 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
     <div className="su-col su-pick">
       {onCancel && <button className="su-back" onClick={onCancel}><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 3.5L5.5 8l4.5 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>Back</button>}
       <h1 className="su-title">Pick a workspace</h1>
-      <p className="su-lede">Brainstorm maps the code in a folder and follows the Claude Code agents working in it, live.</p>
+      <p className="su-lede">Rundown maps the code in a folder and follows the Claude Code agents working in it, live.</p>
 
       <form className="su-find" onSubmit={(e) => { e.preventDefault(); submit(); }}>
         <svg className="su-find-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.8" stroke="currentColor" strokeWidth="1.6" /><path d="M10.6 10.6L14 14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
@@ -166,7 +167,7 @@ function Loading({ status, root, onDone, onBack }: { status: SetupStatus | null;
 
       <div className="su-actions">
         <button ref={btnRef} className="su-btn big" disabled={!ready} onClick={onDone}>
-          {ready ? "Open Brainstorm" : <><span className="su-spin light" />Getting ready</>}
+          {ready ? "Open Rundown" : <><span className="su-spin light" />Getting ready</>}
         </button>
         <button className="su-link" onClick={onBack}>{failed ? "Pick another folder" : "Choose a different folder"}</button>
       </div>
@@ -196,7 +197,7 @@ export function SetupView({ onDone, onCancel }: { onDone: () => void; onCancel?:
 
   return (
     <div className="su-root">
-      <div className="su-wordmark">Brainstorm</div>
+      <div className="su-wordmark"><Logo /></div>
       {phase === "pick" ? (
         <Pick onCancel={onCancel} onOpened={(s, r) => { setStatus(s); setRoot(r); setPhase("loading"); }} />
       ) : (

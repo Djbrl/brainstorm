@@ -37,7 +37,7 @@ export type LiveState = {
   agents: Record<string, AgentPresence>; // live agents by id (main session thread or subagent)
   setup: SetupStatus | null;             // null until loaded (and always null in replay)
   preview: boolean;                      // replay built for the post-deadline preview (agent + setup playback)
-  shared: Replay["shared"] | null;       // a replay file someone shared from their Brainstorm
+  shared: Replay["shared"] | null;       // a replay file someone shared from their Rundown
   attention: Record<string, Attention>;  // by sessionId: is a thread waiting on you (local app only)
   sessionsLoaded: boolean;               // the thread list has arrived (so a thread missing from it really is missing)
   git: GitState | null;                  // the project's branch, uncommitted and unpushed files, worktrees (null: not a repo, or not loaded)
@@ -292,7 +292,7 @@ export async function replayAnswer(req: AskRequest): Promise<AskResponse> {
   const hit = replayData?.answers.find((a) => a.request.question === req.question && a.request.stepId === req.stepId && a.request.filePath === req.filePath)
     ?? replayData?.answers.find((a) => (req.stepId && a.request.stepId === req.stepId) || (req.filePath && a.request.filePath === req.filePath));
   if (hit) return hit.response;
-  return { answer: "This is a recorded demo. Run Brainstorm locally to ask new questions.", model: "replay", tokensIn: 0, tokensOut: 0, costUsd: 0, fallback: false };
+  return { answer: "This is a recorded demo. Run Rundown locally to ask new questions.", model: "replay", tokensIn: 0, tokensOut: 0, costUsd: 0, fallback: false };
 }
 
 /** Load everything for the active workspace (on start, and again after the setup screen switches workspace). */

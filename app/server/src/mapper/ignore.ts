@@ -8,7 +8,7 @@ export const IGNORE_DIRS = new Set([
   "node_modules", "bower_components", "jspm_packages", "vendor", "Pods", "Carthage", "site-packages", "venv", "__pycache__",
   // build output, generated code, caches
   "dist", "build", "out", "target", "coverage", "DerivedData", "storybook-static", "tmp", "temp",
-  // Brainstorm's own data folder (app/server/data)
+  // Rundown's own data folder (app/server/data)
   "data",
 ]);
 export const LOCKFILES = new Set(["package-lock.json", "yarn.lock", "pnpm-lock.yaml", "Cargo.lock", "poetry.lock", "composer.lock"]);

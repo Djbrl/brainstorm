@@ -1,4 +1,4 @@
-# Brainstorm plugin for Claude Code
+# Rundown plugin for Claude Code
 
 A live map and replay of what your agents do: every session, every file and place they touch, what broke. Everything runs on your machine.
 
@@ -22,11 +22,11 @@ In Claude Code:
 
 Or in one command (Claude Code 2.1.275 or later): `/plugin install brainstorm --marketplace Djbrl/brainstorm`.
 
-Then start a new session. You need Node.js 22.13 or later (`node -v`). If Node is missing, Brainstorm tells you when the session starts.
+Then start a new session. You need Node.js 22.13 or later (`node -v`). If Node is missing, Rundown tells you when the session starts.
 
 ## Updates
 
-When a newer version is on GitHub, Brainstorm tells you at the start of a session (it checks at most once a day). To update, run `claude plugin update brainstorm@brainstorm` in a terminal, or choose **Update now** in `/plugin` → **Installed**, then start a new session. The running server restarts on the new version by itself.
+When a newer version is on GitHub, Rundown tells you at the start of a session (it checks at most once a day). To update, run `claude plugin update brainstorm@brainstorm` in a terminal, or choose **Update now** in `/plugin` → **Installed**, then start a new session. The running server restarts on the new version by itself.
 
 To update automatically instead, turn on auto-update for the `brainstorm` marketplace in `/plugin` → **Marketplaces**.
 
@@ -34,9 +34,9 @@ To update automatically instead, turn on auto-update for the `brainstorm` market
 
 - **`/brainstorm:open`** opens the map in your browser, for the project you're in.
 - **`/brainstorm:share`** saves this thread to your Downloads folder as a replay file and a Markdown summary. The Share button on the map's replay player does the same for any thread.
-- **`/brainstorm:stop`** stops Brainstorm. It starts again with your next Claude Code session.
+- **`/brainstorm:stop`** stops Rundown. It starts again with your next Claude Code session.
 
-Brainstorm starts in the background when a Claude Code session starts, and reads Claude Code's own session logs, so it also shows sessions that ran while it was closed. The first time, a message in Claude Code tells you where it's running.
+Rundown starts in the background when a Claude Code session starts, and reads Claude Code's own session logs, so it also shows sessions that ran while it was closed. The first time, a message in Claude Code tells you where it's running.
 
 ## Settings
 
@@ -47,7 +47,7 @@ Summaries of files and labels written by a model are off in this release. They'l
 ## What it stores, and where
 
 - Data: `~/.claude/plugins/data/brainstorm-brainstorm/` (a SQLite database, the server log, `server.json`, `notices.json`). Uninstalling the plugin deletes it.
-- Once a day, Brainstorm fetches its own version number from GitHub to tell you about updates. That request carries nothing about you or your code.
+- Once a day, Rundown fetches its own version number from GitHub to tell you about updates. That request carries nothing about you or your code.
 - The server listens on `127.0.0.1` only (port 4747, or the next free one). It refuses requests addressed to other host names, and WebSocket connections from other websites.
 - To show when a thread is waiting for you, the plugin's hooks tell the local server when Claude Code asks for a permission, shows a notification, finishes a turn or gets a new message (the tool's name and input, never the conversation). They only talk to `127.0.0.1`.
 - Nothing else is sent anywhere, except your questions to Claude if you set a key. Sharing only saves files on your computer; you decide where they go.
@@ -55,7 +55,7 @@ Summaries of files and labels written by a model are off in this release. They'l
 
 ## How it's built (for contributors)
 
-- `build/server.js` is the Brainstorm server (`app/server`) bundled into one file, and `build/web/` is the web app (`app/web`), which the server serves, and `build/share.html` is the same app in one file, which shared replays are poured into. Rebuild both from `app/` with `node scripts/build-plugin.mjs`, and commit `build/` with each release.
+- `build/server.js` is the Rundown server (`app/server`) bundled into one file, and `build/web/` is the web app (`app/web`), which the server serves, and `build/share.html` is the same app in one file, which shared replays are poured into. Rebuild both from `app/` with `node scripts/build-plugin.mjs`, and commit `build/` with each release.
 - `scripts/launch.mjs` starts the server or reuses the running one, restarts it when the plugin version changed, and opens the browser. The `SessionStart` hook runs it through `scripts/hook.sh` (which checks for Node) with `--background`, where it prints at most one JSON `systemMessage` for the user: welcome, updated, update available, or Node too old.
 - The `PermissionRequest`, `Notification`, `Stop` and `UserPromptSubmit` hooks run `scripts/signal.mjs` in the background (async, they never slow a session): it posts the event to the running server's `/api/hooks`, which works out whether a thread needs you (see `docs/attention.md`).
 - Releasing: bump `version` in `.claude-plugin/plugin.json`, rebuild, commit, push. Users on a pinned version don't get new commits until the version changes.
@@ -71,4 +71,4 @@ Summaries of files and labels written by a model are off in this release. They'l
 /plugin marketplace remove brainstorm
 ```
 
-Run `/brainstorm:stop` first to stop the server. Uninstalling deletes Brainstorm's data folder.
+Run `/brainstorm:stop` first to stop the server. Uninstalling deletes Rundown's data folder.

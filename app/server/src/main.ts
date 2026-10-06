@@ -18,7 +18,7 @@ async function bootstrap() {
   app.setGlobalPrefix("api");
 
   // Local only: refuse requests addressed to any other host name (DNS rebinding), and no CORS, so other sites can't read the API.
-  app.use((req: Request, res: Response, next: NextFunction) => (isLocalHost(req.headers.host) ? next() : res.status(403).send("Brainstorm only answers on localhost")));
+  app.use((req: Request, res: Response, next: NextFunction) => (isLocalHost(req.headers.host) ? next() : res.status(403).send("Rundown only answers on localhost")));
 
   // Plugin build: the server also serves the web app, so it's one process on one port.
   const web = process.env.BRAINSTORM_WEB_DIR;
@@ -37,6 +37,6 @@ async function bootstrap() {
     writeFileSync(join(dataDir(), "server.json"), JSON.stringify({ pid: process.pid, port, version, startedAt: new Date().toISOString() }));
     rmSync(join(dataDir(), "launch.lock"), { force: true }); // up: the launcher that started us is done
   }
-  console.log(`Brainstorm ${version} on http://localhost:${port}  (api /api, ws /ws)`);
+  console.log(`Rundown ${version} on http://localhost:${port}  (api /api, ws /ws)`);
 }
 bootstrap();

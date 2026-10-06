@@ -12,7 +12,7 @@ import { NemotronService } from "../llm/nemotron.service";
 import { maskSecrets } from "../privacy/mask";
 
 // Owner: D.
-const SYSTEM = `You are Brainstorm, a guide to a codebase that AI coding agents are editing live.
+const SYSTEM = `You are Rundown, a guide to a codebase that AI coding agents are editing live.
 Answer the question for someone learning this codebase. Use ONLY the context provided (file excerpt, summaries, the agent's recent steps and diff).
 Be concise: 2 to 6 short sentences or a few bullets, plain language, name concrete files and functions.
 If the context does not contain the answer, say so plainly and say what you would need to look at. Never invent code that is not shown.`;

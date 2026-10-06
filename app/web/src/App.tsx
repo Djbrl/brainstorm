@@ -10,6 +10,7 @@ import { SetupView } from "./setup/SetupView";
 import { Welcome } from "./map/Welcome";
 import { SettingsButton } from "./settings/Settings";
 import { useAttentionAlerts } from "./lib/attention";
+import { Logo } from "./Logo";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import "./boot.css";
 
@@ -90,8 +91,8 @@ function Shell() {
     <div className={`shell ${state.preview || state.shared ? "has-banner" : ""}`}>
       <header className="topbar">
         {isReplay()
-          ? <a className="wordmark" href="https://brainstorm-landing.vercel.app" aria-label="Brainstorm home">Brainstorm</a>
-          : <div className="wordmark">Brainstorm</div>}
+          ? <a className="wordmark" href="https://brainstorm-landing.vercel.app" aria-label="Rundown home"><Logo label="Rundown home" /></a>
+          : <div className="wordmark"><Logo /></div>}
         <Crumbs project={project} />
         <div className="status">
           {state.preview && (
@@ -110,15 +111,15 @@ function Shell() {
       </header>
       {state.preview && (
         <div className="preview-banner">
-          A recording of Claude Code agents building Brainstorm, played back. To see your own agents live,{" "}
+          A recording of Claude Code agents building Rundown, played back. To see your own agents live,{" "}
           <a href="https://github.com/Djbrl/brainstorm#install-claude-code-plugin-preview" target="_blank" rel="noopener">install the plugin</a>.
         </div>
       )}
       {state.shared && (
         <div className="preview-banner">
-          A Claude Code session, shared from Brainstorm on {new Date(state.shared.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}.
+          A Claude Code session, shared from Rundown on {new Date(state.shared.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}.
           {" "}Press Play to watch it on the map. To follow your own agents,{" "}
-          <a href="https://github.com/Djbrl/brainstorm#install-claude-code-plugin-preview" target="_blank" rel="noopener">install Brainstorm</a>.
+          <a href="https://github.com/Djbrl/brainstorm#install-claude-code-plugin-preview" target="_blank" rel="noopener">install Rundown</a>.
         </div>
       )}
       {state.shared && <OpenShared />}

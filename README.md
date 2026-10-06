@@ -1,12 +1,16 @@
-# Brainstorm
+<img src="brand/rundown-logo.svg" alt="Rundown" height="48">
 
-**A live map of your agents: where they go, what they touch, where they break.**
+# Rundown
 
-🥉 **3rd place** at [GOMYCODE × NVIDIA "Come Build with AI" 2026](https://hackathon.gomycode.com/onboarding/winners) (listed as "Brainstorm.ap").
+**Keep up with your agents: where they go, what they touch, where they break.**
 
-AI agents make it easy to stop understanding your own work. Brainstorm runs next to Claude Code and shows what the agents did, where, and why, so a human stays in the loop. Every session becomes a replay you can watch live or catch up on later, for code and for work that isn't code.
+Rundown was called Brainstorm until October 2026; the plugin, its commands (`/brainstorm:open`) and the repo still carry the old name for now.
 
-Brainstorm is a prototype (0.3). The full release is planned for late October 2026.
+🥉 **3rd place** at [GOMYCODE × NVIDIA "Come Build with AI" 2026](https://hackathon.gomycode.com/onboarding/winners) (as "Brainstorm", listed as "Brainstorm.ap").
+
+AI agents make it easy to stop understanding your own work. Rundown runs next to Claude Code and shows what the agents did, where, and why, so a human stays in the loop. Every session becomes a replay you can watch live or catch up on later, for code and for work that isn't code.
+
+Rundown is a prototype (0.3). The full release is planned for late October 2026.
 
 ## Install (Claude Code plugin, preview)
 
@@ -27,8 +31,8 @@ Then start a new session in your project and run `/brainstorm:open`: the map ope
 
 ## Try the live demo
 
-- **[brainstorm-next.vercel.app](https://brainstorm-next.vercel.app)**: a real recording of Claude Code agents (one lead and four subagents) building Brainstorm itself, played back. Open the thread to see what it touched, then its steps or its replay. Nothing to install.
-- **[brainstorm-landing.vercel.app](https://brainstorm-landing.vercel.app)**: what Brainstorm does, the roadmap, and the waitlist for the full release.
+- **[brainstorm-next.vercel.app](https://brainstorm-next.vercel.app)**: a real recording of Claude Code agents (one lead and four subagents) building Rundown itself, played back. Open the thread to see what it touched, then its steps or its replay. Nothing to install.
+- **[brainstorm-landing.vercel.app](https://brainstorm-landing.vercel.app)**: what Rundown does, the roadmap, and the waitlist for the full release.
 
 ![Map: a thread replaying, the agent's numbered path across the project's files, its steps in the sidebar](docs/screenshots/replay.jpg)
 
@@ -86,7 +90,7 @@ Local-first. Session logs are read from `~/.claude/projects` on your machine and
 
 ## The hackathon
 
-Brainstorm was built in about three hours on 27 September 2026 at GOMYCODE × NVIDIA "Come Build with AI", by one human and several AI agents working in parallel ([how we built it](docs/how-we-built-it.md)). The repo exactly as it stood at the 16:30 deadline is tagged [`hackathon-submission`](https://github.com/Djbrl/brainstorm/tree/hackathon-submission); everything after it is labeled `[post-deadline]` in the history.
+Rundown, then called Brainstorm, was built in about three hours on 27 September 2026 at GOMYCODE × NVIDIA "Come Build with AI", by one human and several AI agents working in parallel ([how we built it](docs/how-we-built-it.md)). The repo exactly as it stood at the 16:30 deadline is tagged [`hackathon-submission`](https://github.com/Djbrl/brainstorm/tree/hackathon-submission); everything after it is labeled `[post-deadline]` in the history.
 
 ## Known limits
 
@@ -94,4 +98,4 @@ Claude Code only today (Codex is next). No file summaries or model-written step 
 
 ## License
 
-[Functional Source License 1.1, Apache 2.0 future license](LICENSE.md) (`FSL-1.1-ALv2`). You can use, read, change and self-host Brainstorm, including at work. You can't offer it, or something built from it, as a competing product or service. Two years after each release, that release is also available under the Apache License 2.0.
+[Functional Source License 1.1, Apache 2.0 future license](LICENSE.md) (`FSL-1.1-ALv2`). You can use, read, change and self-host Rundown, including at work. You can't offer it, or something built from it, as a competing product or service. Two years after each release, that release is also available under the Apache License 2.0.

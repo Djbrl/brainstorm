@@ -132,8 +132,8 @@ type NavStore = {
 };
 const Ctx = createContext<NavStore | null>(null);
 
-const HIDDEN_KEY = "brainstorm-hidden-agents";
-const READS_KEY = "brainstorm-map-show-reads";
+const HIDDEN_KEY = "rundown-hidden-agents";
+const READS_KEY = "rundown-map-show-reads";
 function loadShowReads(): boolean {
   try { return localStorage.getItem(READS_KEY) !== "0"; } catch { return true; }
 }

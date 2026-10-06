@@ -4,8 +4,8 @@
 
 import { relTime } from "../follow/format";
 
-const KEY = "brainstorm-last-seen";
-const WELCOMED = "brainstorm-welcomed";
+const KEY = "rundown-last-seen";
+const WELCOMED = "rundown-welcomed";
 
 function read(key: string): string | null {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -18,7 +18,7 @@ function write(key: string, v: string) {
  * The line for this tab. A reload keeps it (the review found a refresh wiped every highlight): the first load in a tab
  * reads when you last left, and stores it for the tab's later reloads in sessionStorage. A new tab or window starts over.
  */
-const BASELINE = "brainstorm-baseline";
+const BASELINE = "rundown-baseline";
 function baseline(): number {
   try {
     const kept = Number(sessionStorage.getItem(BASELINE)) || 0;

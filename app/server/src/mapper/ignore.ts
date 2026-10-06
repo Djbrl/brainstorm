@@ -1,6 +1,7 @@
 // What belongs on the map. One rule, shared by the file listing (git or walk), the watcher and live updates,
 // so a folder the map never shows is also never read or watched.
 import { extname } from "node:path";
+import { env } from "../core/local";
 
 /** Folders never looked into, by name. Every dot folder (.git, .idea, .venv, .next, .gradle, .yarn, .tox…) is skipped too. */
 export const IGNORE_DIRS = new Set([
@@ -15,10 +16,10 @@ export const LOCKFILES = new Set(["package-lock.json", "yarn.lock", "pnpm-lock.y
 export const SOURCE_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py", ".go", ".rs", ".java", ".md", ".json", ".css", ".html"]);
 /**
  * At most this many files on the map: the first scan picks them (see select.ts), new files may add a few more (see
- * liveHeadroom), and files an agent edits always join. BRAINSTORM_MAX_FILES overrides it.
+ * liveHeadroom), and files an agent edits always join. RUNDOWN_MAX_FILES overrides it.
  */
 export function maxFiles(): number {
-  const n = Number(process.env.BRAINSTORM_MAX_FILES);
+  const n = Number(env("MAX_FILES"));
   return Number.isInteger(n) && n > 0 ? n : 3000; // 800 until 6 Oct; the canvas pass made 5,000 smooth at 4× CPU (docs/performance.md)
 }
 /** New files that appear while the map is open may take it this far past maxFiles(). */

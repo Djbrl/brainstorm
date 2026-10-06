@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const DATA = process.env.CLAUDE_PLUGIN_DATA || join(homedir(), ".brainstorm");
+const DATA = process.env.CLAUDE_PLUGIN_DATA || join(homedir(), ".rundown");
 
 async function main() {
   let input = "";
@@ -19,7 +19,7 @@ async function main() {
     tool_name: h.tool_name, tool_input: h.tool_input, tool_use_id: h.tool_use_id,
   };
   await fetch(`http://127.0.0.1:${port}/api/hooks`, {
-    method: "POST", headers: { "content-type": "application/json", "x-brainstorm-hook": "1" },
+    method: "POST", headers: { "content-type": "application/json", "x-rundown-hook": "1" },
     body: JSON.stringify(body), signal: AbortSignal.timeout(1500),
   });
 }

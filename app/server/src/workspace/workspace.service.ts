@@ -13,6 +13,7 @@ import { ListenerService } from "../listener/listener.service";
 import { MapperService } from "../mapper/mapper.service";
 import { ReaderService } from "../reader/reader.service";
 import { isIdleTranscript } from "./threads";
+import { env } from "../core/local";
 
 const execFileP = promisify(execFile);
 const encodeRoot = (root: string) => root.replace(/[^A-Za-z0-9-]/g, "-");
@@ -76,7 +77,7 @@ export class WorkspaceService implements OnModuleInit {
   onModuleInit() {
     this.dbs.db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
     // Started by the plugin for a project: that project wins over the saved one.
-    const given = process.env.BRAINSTORM_ROOT;
+    const given = env("ROOT");
     if (given && this.isValidDir(given)) {
       this.log.log(`boot: workspace from the launcher ${given}`);
       this.setSetting("workspace", resolve(given));

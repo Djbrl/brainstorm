@@ -12,15 +12,15 @@ const dist = (p) => join(__dirname, "..", "dist", p);
  */
 async function makeListener({ root = "/work/demo-repo", watch = false } = {}) {
   const tmp = mkdtempSync(join(tmpdir(), "bs-listener-"));
-  process.env.BRAINSTORM_DATA_DIR = join(tmp, "data");
-  process.env.BRAINSTORM_CLAUDE_DIR = join(tmp, "claude");
+  process.env.RUNDOWN_DATA_DIR = join(tmp, "data");
+  process.env.RUNDOWN_CLAUDE_DIR = join(tmp, "claude");
   process.env.MAP_ROOT = root;
   delete process.env.SESSION_FILTER;
   const { DbService } = require(dist("core/db.service.js"));
   const { BusService } = require(dist("core/bus.service.js"));
   const { ConfigService } = require(dist("core/config.service.js"));
   const { ListenerService } = require(dist("listener/listener.service.js"));
-  const projectDir = join(process.env.BRAINSTORM_CLAUDE_DIR, root.replace(/[^A-Za-z0-9-]/g, "-"));
+  const projectDir = join(process.env.RUNDOWN_CLAUDE_DIR, root.replace(/[^A-Za-z0-9-]/g, "-"));
   mkdirSync(projectDir, { recursive: true });
   const sent = [];
   const gateway = { broadcast: (m) => sent.push(JSON.parse(JSON.stringify(m))) };

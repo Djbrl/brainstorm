@@ -11,7 +11,7 @@ import type { Step, WsMessage } from "../types";
 import { ReaderService } from "./reader.service";
 
 function setup(nemotron = false) {
-  process.env.BRAINSTORM_DATA_DIR = mkdtempSync(join(tmpdir(), "bs-reader-"));
+  process.env.RUNDOWN_DATA_DIR = mkdtempSync(join(tmpdir(), "bs-reader-"));
   const dbs = new DbService();
   dbs.db.exec(`CREATE TABLE steps (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, seq INTEGER NOT NULL, ts TEXT NOT NULL, kind TEXT NOT NULL,
     text TEXT, tool TEXT, input TEXT, file_path TEXT, diff TEXT, label TEXT, risk TEXT, is_subagent INTEGER NOT NULL DEFAULT 0, tool_use_id TEXT, agent_id TEXT)`);

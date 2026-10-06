@@ -1,10 +1,13 @@
 {
-  "name": "brainstorm",
-  "owner": { "name": "Djbrl", "url": "https://github.com/Djbrl" },
+  "name": "rundown",
+  "owner": {
+    "name": "Djbrl",
+    "url": "https://github.com/Djbrl"
+  },
   "description": "Rundown: a live map and replay of your coding agents.",
   "plugins": [
     {
-      "name": "brainstorm",
+      "name": "rundown",
       "source": "./plugin",
       "description": "A live map and replay of what your agents do: every session, every file and place they touch, what broke."
     }

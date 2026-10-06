@@ -13,7 +13,7 @@ import { AttentionService } from "./attention.service";
 const iso = (msAgo: number) => new Date(Date.now() - msAgo).toISOString();
 
 function setup(visible = ["a", "b"]) {
-  process.env.BRAINSTORM_DATA_DIR = mkdtempSync(join(tmpdir(), "bs-attention-"));
+  process.env.RUNDOWN_DATA_DIR = mkdtempSync(join(tmpdir(), "bs-attention-"));
   const dbs = new DbService();
   dbs.db.exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY, cwd TEXT NOT NULL, title TEXT NOT NULL, started_at TEXT NOT NULL, last_event_at TEXT NOT NULL)`);
   dbs.db.exec(`CREATE TABLE steps (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, seq INTEGER NOT NULL, ts TEXT NOT NULL, kind TEXT NOT NULL,

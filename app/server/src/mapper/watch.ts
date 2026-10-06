@@ -8,6 +8,7 @@
 import { watch, type FSWatcher } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { isInIgnoredDir } from "./ignore";
+import { env } from "../core/local";
 
 /** Collects items and hands them over together, at most `delayMs` after the first one arrived. */
 export class Batcher<T> {
@@ -36,9 +37,9 @@ export class Batcher<T> {
 
 export type WatchMode = "recursive" | "folders";
 
-/** The platform's cheap mode. BRAINSTORM_MAP_WATCH=folders|recursive overrides it (for testing). */
+/** The platform's cheap mode. RUNDOWN_MAP_WATCH=folders|recursive overrides it (for testing). */
 export function defaultWatchMode(): WatchMode {
-  const forced = process.env.BRAINSTORM_MAP_WATCH;
+  const forced = env("MAP_WATCH");
   if (forced === "folders" || forced === "recursive") return forced;
   return process.platform === "darwin" || process.platform === "win32" ? "recursive" : "folders";
 }

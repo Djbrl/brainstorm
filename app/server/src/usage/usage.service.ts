@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/commo
 import { randomUUID } from "node:crypto";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
+import { env } from "../core/local";
 
 // Owned by the lead. Anonymous usage stats: once a day, counts of what was used, sent to the landing site so we know how
 // many people use Rundown, roughly where, and which parts matter. On by default, off in Settings (or with DO_NOT_TRACK=1
@@ -108,7 +109,7 @@ export class UsageService implements OnModuleInit, OnModuleDestroy {
 
   /** Only a released build reports (the plugin sets its version); a dev build never does, unless asked for testing. */
   private sends() {
-    const v = process.env.BRAINSTORM_VERSION;
+    const v = env("VERSION");
     return (!!v && v !== "dev") || process.env.RUNDOWN_USAGE_DEV === "1";
   }
 
@@ -128,7 +129,7 @@ export class UsageService implements OnModuleInit, OnModuleDestroy {
     const sent = this.pending();
     const body = {
       id, kind: last ? "day" : "new",
-      v: /^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(process.env.BRAINSTORM_VERSION ?? "") ? process.env.BRAINSTORM_VERSION : "0.0.0",
+      v: /^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(env("VERSION") ?? "") ? env("VERSION") : "0.0.0",
       os: ["darwin", "linux", "win32"].includes(process.platform) ? process.platform : "other",
       tm: this.theme || "none",
       c: sent,

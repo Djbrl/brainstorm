@@ -34,8 +34,8 @@ export type MapSidebarProps = {
 };
 
 type Tab = "threads" | "track" | "files";
-const TAB_KEY = "brainstorm-sidebar-tab";
-const COLLAPSED_KEY = "brainstorm-sidebar-collapsed";
+const TAB_KEY = "rundown-sidebar-tab";
+const COLLAPSED_KEY = "rundown-sidebar-collapsed";
 
 function loadTab(): Tab {
   try { const t = localStorage.getItem(TAB_KEY); return t === "track" || t === "files" ? t : "threads"; } catch { return "threads"; }

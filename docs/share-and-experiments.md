@@ -4,7 +4,7 @@ The two big directions chosen on 5 Oct 2026. Nothing here is built yet. The othe
 
 ## Facts checked before planning (5 Oct 2026)
 
-- **Sharing today:** `/brainstorm:share` (or Share on a thread) saves one `.html` file that holds the whole app and the recording, plus a Markdown report. Secrets, the home folder, account and computer names and emails are masked first. Screenshots are left out. Nothing is hosted.
+- **Sharing today:** `/rundown:share` (or Share on a thread) saves one `.html` file that holds the whole app and the recording, plus a Markdown report. Secrets, the home folder, account and computer names and emails are masked first. Screenshots are left out. Nothing is hosted.
 - **File snapshots:** Claude Code keeps snapshots at each of your messages in `~/.claude/file-history` (the log's `file-history-snapshot` lines point to them). They only cover files its edit tools changed, not what a shell command changed.
 - **Forking:** Claude Code can fork a whole conversation (`--resume <id> --fork-session`) and pick a model (`--model`), headless with `-p`. It can't fork from a given step. That would mean writing a truncated copy of the conversation's log ourselves, an undocumented format.
 

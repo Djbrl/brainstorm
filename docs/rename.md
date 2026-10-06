@@ -13,23 +13,19 @@ list is empty, delete this file. `git grep -i brainstorm` finds anything missed 
 - [x] The repo folder: `~/brainstorm` → `~/rundown` (links left at `~/brainstorm` and `~/Documents/brainstorm`;
       the app finds the old threads through them, `listener/moved.ts`)
 
-## Tier 2: the plugin's identity and internal names (with plugin 0.4.0, after analytics)
+## Tier 2: the plugin's identity and internal names (done in plugin 0.5.0, 6 Oct 2026)
 
-Breaks existing installs (only the author has one). Do it in one release, with a "reinstall as rundown" note.
+- [x] Plugin and marketplace id `rundown`; commands `/rundown:open`, `/rundown:share`, `/rundown:stop`; install lines in
+      the READMEs, the launcher and the landing page. "Moving from Brainstorm" in `plugin/README.md`
+- [x] Environment variables `RUNDOWN_*` (server `core/local.ts` `env()`, the launcher, tests)
+- [x] Data: `rundown.db` (an old `brainstorm.db` is renamed on start); the launcher takes over the old plugin's data folder
+      once and stops its server; `~/.rundown` fallback dir
+- [x] Hook header `x-rundown-hook`
+- [x] Shared files: `<!--rundown:replay-->`, `#rundown-replay`, `rundown-<title>-<date>.html`
+- [x] Browser storage keys `rundown-*` (copied from `brainstorm-*` once, `lib/storage-migrate.ts`)
 
-- [ ] Plugin and marketplace id `brainstorm` → `rundown` (`plugin/.claude-plugin/plugin.json`,
-      `.claude-plugin/marketplace.json`); commands become `/rundown:open`, `/rundown:share`, `/rundown:stop`;
-      every mention of `/brainstorm:…` and `brainstorm@brainstorm` (plugin README, launcher, landing install section)
-- [ ] Environment variables `BRAINSTORM_*` → `RUNDOWN_*` (server `main.ts`, `core/config.service.ts`, `core/local.ts`,
-      `core/health.controller.ts`, `mapper/ignore.ts`, `mapper/watch.ts`, `replay/share.controller.ts`,
-      `workspace/workspace.service.ts`, the launcher, tests, bench). Read the old name as a fallback for one release.
-- [ ] Data: `brainstorm.db` → `rundown.db`, `~/.brainstorm` fallback dir → `~/.rundown`; copy the old ones on first run
-- [ ] Hook header `x-brainstorm-hook` (server `attention.controller.ts`, plugin `signal.mjs`)
-- [ ] Shared files: `<!--brainstorm:replay-->`, `#brainstorm-replay`, `brainstorm-<title>-<date>.html`
-      (keep reading the old id so files shared before still open)
-- [ ] Browser storage keys `brainstorm-*` (theme, editor, notify, last seen, welcomed, baseline, hidden agents, reads,
-      map fold, git, window, camera lock, peek, sidebar tab and collapsed): read the old key once, write the new one
-- [ ] Multiprise and dev hostnames (`web.brainstorm.localhost` in a comment in `core/local.ts`)
+Kept for one release, remove in 0.6: the `BRAINSTORM_*` fallback in `env()`, the `x-brainstorm-hook` header, the old
+share marker and id, `brainstorm.db` renaming, `adoptOldData()` in the launcher, `lib/storage-migrate.ts`.
 
 ## Tier 3: names outside the repo (when the domain is secured)
 

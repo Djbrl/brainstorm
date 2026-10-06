@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 const WEB = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const TMP = join(WEB, "dist-share", "tmp");
 const OUT = join(WEB, "dist-share", "share.html");
-export const PLACEHOLDER = "<!--brainstorm:replay-->";
+export const PLACEHOLDER = "<!--rundown:replay-->";
 
 await build({
   root: WEB,

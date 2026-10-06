@@ -8,14 +8,16 @@ import { ReplayService } from "./replay.service";
 import { threadMarkdown } from "./markdown";
 import { forSharing, slug } from "./privacy";
 import { UsageService } from "../usage/usage.service";
+import { env } from "../core/local";
 
-const PLACEHOLDER = "<!--brainstorm:replay-->";
+const PLACEHOLDER = "<!--rundown:replay-->";
+const OLD_PLACEHOLDER = "<!--brainstorm:replay-->"; // a share.html built before the rename
 
 /** The one-file web app a shared replay is poured into (built by app/web/scripts/build-share.mjs). */
 function shareTemplate(): string | null {
-  const web = process.env.BRAINSTORM_WEB_DIR;
+  const web = env("WEB_DIR");
   const candidates = [
-    process.env.BRAINSTORM_SHARE_TEMPLATE,
+    env("SHARE_TEMPLATE"),
     web && join(web, "..", "share.html"),            // plugin: build/web + build/share.html
     resolve(__dirname, "../../../web/dist-share/share.html"), // dev: app/server/dist/replay → app/web/dist-share
   ];
@@ -44,7 +46,7 @@ export class ShareController {
     const stepIds = new Set(raw.steps.map((s) => s.id));
     const touched = new Set(raw.steps.map((s) => s.filePath).filter(Boolean) as string[]);
     const answers = raw.answers.filter((a) => (a.request.stepId ? stepIds.has(a.request.stepId) : !!a.request.filePath && touched.has(a.request.filePath)));
-    const shared = { title: session.title || "Untitled thread", createdAt: new Date().toISOString(), version: process.env.BRAINSTORM_VERSION ?? "dev" };
+    const shared = { title: session.title || "Untitled thread", createdAt: new Date().toISOString(), version: env("VERSION") ?? "dev" };
     return forSharing({ ...raw, answers, shared });
   }
 
@@ -52,7 +54,7 @@ export class ShareController {
     const session = this.pick(sessionId);
     const replay = this.sharedReplay(session);
     this.usage.bump("sh");
-    const name = `brainstorm-${slug(session.title)}-${session.startedAt.slice(0, 10)}`;
+    const name = `rundown-${slug(session.title)}-${session.startedAt.slice(0, 10)}`;
     if (format === "json") {
       res.setHeader("Content-Disposition", `attachment; filename="${name}.json"`);
       return res.json(replay);
@@ -60,10 +62,12 @@ export class ShareController {
     const template = shareTemplate();
     if (!template) throw new HttpException("The share page isn't built. Run `npm run build:share` in app/web.", 503);
     // JSON inside <script> can't contain "</script>": escaping every "<" keeps it valid JSON and inert HTML.
-    const data = `<script id="brainstorm-replay" type="application/json">${JSON.stringify(replay).replace(/</g, "\\u003c")}</script>`;
+    // A template built before the rename has the old marker, and its app reads the old id.
+    const old = !template.includes(PLACEHOLDER) && template.includes(OLD_PLACEHOLDER);
+    const data = `<script id="${old ? "brainstorm" : "rundown"}-replay" type="application/json">${JSON.stringify(replay).replace(/</g, "\\u003c")}</script>`;
     const html = template
       .replace(/<title>[^<]*<\/title>/, `<title>${escHtml(replay.shared!.title)} · Rundown replay</title>`)
-      .replace(PLACEHOLDER, () => data);
+      .replace(old ? OLD_PLACEHOLDER : PLACEHOLDER, () => data);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${name}.html"`);
     return res.send(html);
@@ -76,7 +80,7 @@ export class ShareController {
     const steps: Step[] = replay.steps;
     const md = threadMarkdown(replay.sessions[0] ?? session, steps, replay.map, replay.failures ?? []);
     res.setHeader("Content-Type", "text/markdown; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="brainstorm-${slug(session.title)}-${session.startedAt.slice(0, 10)}.md"`);
+    res.setHeader("Content-Disposition", `attachment; filename="rundown-${slug(session.title)}-${session.startedAt.slice(0, 10)}.md"`);
     return res.send(md);
   }
 }

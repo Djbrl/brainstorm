@@ -10,7 +10,7 @@ import type { GitFileState, GitState, GitWorktree } from "@contract";
 
 export const GIT_SHOWN = false;
 
-const KEY = "brainstorm-map-git";
+const KEY = "rundown-map-git";
 let on = (() => { try { return localStorage.getItem(KEY) === "1"; } catch { return false; } })();
 const listeners = new Set<() => void>();
 const subscribe = (f: () => void) => { listeners.add(f); return () => { listeners.delete(f); }; };

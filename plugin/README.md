@@ -17,36 +17,53 @@ In Claude Code:
 
 ```
 /plugin marketplace add Djbrl/brainstorm
-/plugin install brainstorm@brainstorm
+/plugin install rundown@rundown
 ```
 
-Or in one command (Claude Code 2.1.275 or later): `/plugin install brainstorm --marketplace Djbrl/brainstorm`.
+Or in one command (Claude Code 2.1.275 or later): `/plugin install rundown --marketplace Djbrl/brainstorm`.
 
 Then start a new session. You need Node.js 22.13 or later (`node -v`). If Node is missing, Rundown tells you when the session starts.
 
+## Moving from Brainstorm (0.4 and older)
+
+Until 0.4 the plugin was called `brainstorm`. Claude Code sees Rundown as a new plugin, so install it once and remove the old one:
+
+```
+/plugin marketplace update brainstorm
+/plugin install rundown@rundown
+```
+
+Start a new session: Rundown takes over the old plugin's data (your history and settings) and stops its server. Then remove the old plugin:
+
+```
+/plugin uninstall brainstorm@brainstorm
+```
+
+If `/plugin marketplace update brainstorm` complains, remove and re-add the marketplace: `/plugin marketplace remove brainstorm`, then `/plugin marketplace add Djbrl/brainstorm`.
+
 ## Updates
 
-When a newer version is on GitHub, Rundown tells you at the start of a session (it checks at most once a day). To update, run `claude plugin update brainstorm@brainstorm` in a terminal, or choose **Update now** in `/plugin` → **Installed**, then start a new session. The running server restarts on the new version by itself.
+When a newer version is on GitHub, Rundown tells you at the start of a session (it checks at most once a day). To update, run `claude plugin update rundown@rundown` in a terminal, or choose **Update now** in `/plugin` → **Installed**, then start a new session. The running server restarts on the new version by itself.
 
-To update automatically instead, turn on auto-update for the `brainstorm` marketplace in `/plugin` → **Marketplaces**.
+To update automatically instead, turn on auto-update for the `rundown` marketplace in `/plugin` → **Marketplaces**.
 
 ## Use
 
-- **`/brainstorm:open`** opens the map in your browser, for the project you're in.
-- **`/brainstorm:share`** saves this thread to your Downloads folder as a replay file and a Markdown summary. The Share button on the map's replay player does the same for any thread.
-- **`/brainstorm:stop`** stops Rundown. It starts again with your next Claude Code session.
+- **`/rundown:open`** opens the map in your browser, for the project you're in.
+- **`/rundown:share`** saves this thread to your Downloads folder as a replay file and a Markdown summary. The Share button on the map's replay player does the same for any thread.
+- **`/rundown:stop`** stops Rundown. It starts again with your next Claude Code session.
 
 Rundown starts in the background when a Claude Code session starts, and reads Claude Code's own session logs, so it also shows sessions that ran while it was closed. The first time, a message in Claude Code tells you where it's running.
 
 ## Settings
 
-- **Anthropic API key (optional):** lets you ask Claude questions about your code. Set it with `/plugin configure brainstorm@brainstorm`, then start a new session. Claude Code keeps it in your system's secure credential store. Leave it empty and everything else still works.
+- **Anthropic API key (optional):** lets you ask Claude questions about your code. Set it with `/plugin configure rundown@rundown`, then start a new session. Claude Code keeps it in your system's secure credential store. Leave it empty and everything else still works.
 
 Summaries of files and labels written by a model are off in this release. They'll use the Claude Code you already have in a later version.
 
 ## What it stores, and where
 
-- Data: `~/.claude/plugins/data/brainstorm-brainstorm/` (a SQLite database, the server log, `server.json`, `notices.json`). Uninstalling the plugin deletes it.
+- Data: `~/.claude/plugins/data/rundown-rundown/` (a SQLite database, the server log, `server.json`, `notices.json`). Uninstalling the plugin deletes it.
 - Once a day, Rundown fetches its own version number from GitHub to tell you about updates. That request carries nothing about you or your code.
 - Once a day, it sends anonymous usage stats (a random install id, version, OS, map theme and counts of what you used; never code, paths, prompts or names). See [Usage stats](../README.md#usage-stats) for exactly what. Turn it off in Settings, or with `DO_NOT_TRACK=1`.
 - The server listens on `127.0.0.1` only (port 4747, or the next free one). It refuses requests addressed to other host names, and WebSocket connections from other websites.
@@ -68,8 +85,8 @@ Summaries of files and labels written by a model are off in this release. They'l
 ## Uninstall
 
 ```
-/plugin uninstall brainstorm@brainstorm
-/plugin marketplace remove brainstorm
+/plugin uninstall rundown@rundown
+/plugin marketplace remove rundown
 ```
 
-Run `/brainstorm:stop` first to stop the server. Uninstalling deletes Rundown's data folder.
+Run `/rundown:stop` first to stop the server. Uninstalling deletes Rundown's data folder.

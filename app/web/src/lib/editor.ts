@@ -8,7 +8,7 @@ export const EDITORS: { id: Editor; name: string }[] = [
   { id: "vscode", name: "VS Code" }, { id: "cursor", name: "Cursor" }, { id: "windsurf", name: "Windsurf" }, { id: "zed", name: "Zed" },
   { id: "system", name: "The app your computer uses for it" },
 ];
-const KEY = "brainstorm-editor";
+const KEY = "rundown-editor";
 let editor: Editor = (() => { try { const v = localStorage.getItem(KEY); return EDITORS.some((e) => e.id === v) ? (v as Editor) : "vscode"; } catch { return "vscode"; } })();
 const listeners = new Set<() => void>();
 const subscribe = (f: () => void) => { listeners.add(f); return () => { listeners.delete(f); }; };

@@ -4,7 +4,7 @@
 
 **Keep up with your agents: where they go, what they touch, where they break.**
 
-Rundown was called Brainstorm until October 2026; the plugin, its commands (`/brainstorm:open`) and the repo still carry the old name for now.
+Rundown was called Brainstorm until October 2026 (the plugin was renamed in 0.5; the GitHub repo keeps the old name for now).
 
 🥉 **3rd place** at [GOMYCODE × NVIDIA "Come Build with AI" 2026](https://hackathon.gomycode.com/onboarding/winners) (as "Brainstorm", listed as "Brainstorm.ap").
 
@@ -17,17 +17,17 @@ Rundown is a prototype (0.3). The full release is planned for late October 2026.
 In Claude Code:
 
 ```
-/plugin install brainstorm --marketplace Djbrl/brainstorm
+/plugin install rundown --marketplace Djbrl/brainstorm
 ```
 
 On Claude Code older than 2.1.275, use two commands instead:
 
 ```
 /plugin marketplace add Djbrl/brainstorm
-/plugin install brainstorm@brainstorm
+/plugin install rundown@rundown
 ```
 
-Then start a new session in your project and run `/brainstorm:open`: the map opens in your browser. You need Node.js 22.13 or later. Everything runs on your machine. Settings, updates and uninstall: [plugin/README.md](plugin/README.md).
+Then start a new session in your project and run `/rundown:open`: the map opens in your browser. You need Node.js 22.13 or later. Everything runs on your machine. Settings, updates and uninstall: [plugin/README.md](plugin/README.md). Had the plugin when it was called Brainstorm? See [moving from Brainstorm](plugin/README.md#moving-from-brainstorm-04-and-older).
 
 ## Try the live demo
 
@@ -57,7 +57,7 @@ Full guide, Brev setup and troubleshooting: [docs/run-locally.md](docs/run-local
 - **Places**: where a thread went outside the code: websites, the apps you run on this computer, services (GitHub, Vercel, connectors, cloud CLIs), and what it changed there, from deploys and pushes to sent forms. Same screen as the Map; click a place to read the step in a side panel.
 - **Track**: the open thread's steps in the sidebar, next to the map, grouped by what you asked. Scrolling them moves the agent along the map; open a step for its diff, its output or the screenshots it took.
 - **Errors**: a failed tool call turns the agent's marker red with one red ring, and shows red in the steps (with the first line of the error), on the replay bar and in the Track. (At the hackathon, a separate Failures view grouped and ranked them.)
-- **Share**: Share on the replay player (or `/brainstorm:share`) saves a thread as one `.html` file anyone can open in a browser, with nothing to install, and as a Markdown report for a review or a pull request. Secrets and emails are masked, your home folder and computer name hidden, and screenshots never included.
+- **Share**: Share on the replay player (or `/rundown:share`) saves a thread as one `.html` file anyone can open in a browser, with nothing to install, and as a Markdown report for a review or a pull request. Secrets and emails are masked, your home folder and computer name hidden, and screenshots never included.
 - **Ask**: questions go to Claude with a small, grounded context (the step, its diff, the steps before it, the file and module summaries, at most 150 lines of the file). Every answer shows its model, tokens and cost.
 
 

@@ -1,14 +1,15 @@
 import { Injectable } from "@nestjs/common";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { env } from "./local";
 
 @Injectable()
 export class ConfigService {
-  /** Where Claude Code writes session logs. BRAINSTORM_CLAUDE_DIR points it at a copy (benchmarks, tests). */
-  readonly claudeProjectsDir = process.env.BRAINSTORM_CLAUDE_DIR ?? process.env.CLAUDE_PROJECTS_DIR ?? join(homedir(), ".claude", "projects");
-  /** Project the map shows by default: the repo root (…/brainstorm). */
+  /** Where Claude Code writes session logs. RUNDOWN_CLAUDE_DIR points it at a copy (benchmarks, tests). */
+  readonly claudeProjectsDir = env("CLAUDE_DIR") ?? process.env.CLAUDE_PROJECTS_DIR ?? join(homedir(), ".claude", "projects");
+  /** Project the map shows by default: the repo root. */
   /** Active workspace. Mutable: set by the setup screen (WorkspaceService). */
-  defaultRoot = resolve(process.env.MAP_ROOT ?? process.env.BRAINSTORM_ROOT ?? resolve(__dirname, "../../../.."));
+  defaultRoot = resolve(process.env.MAP_ROOT ?? env("ROOT") ?? resolve(__dirname, "../../../.."));
   readonly nemotron = {
     url: process.env.NEMOTRON_URL ?? "http://localhost:8000/v1",
     key: process.env.NEMOTRON_KEY ?? "",

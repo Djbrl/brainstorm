@@ -12,8 +12,8 @@ export class AttentionController {
    * a CORS preflight, which this server never answers, so only local programs can post.
    */
   @Post("hooks") @HttpCode(204)
-  hook(@Headers("x-brainstorm-hook") h: string | undefined, @Body() body: HookSignal) {
-    if (h !== "1") throw new ForbiddenException();
+  hook(@Headers("x-rundown-hook") h: string | undefined, @Headers("x-brainstorm-hook") old: string | undefined, @Body() body: HookSignal) {
+    if (h !== "1" && old !== "1") throw new ForbiddenException(); // x-brainstorm-hook: a 0.4 plugin's hooks, until 0.6
     this.attention.signal(body);
   }
 }

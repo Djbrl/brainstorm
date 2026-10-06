@@ -1,10 +1,13 @@
 import { resolve } from "node:path";
 
-/** Where Rundown keeps its database and private files. The plugin sets BRAINSTORM_DATA_DIR; dev uses app/server/data. */
-export const dataDir = () => resolve(process.env.BRAINSTORM_DATA_DIR ?? resolve(__dirname, "../../data"));
+/** A setting from the environment: RUNDOWN_<name>, or its name before the rename, BRAINSTORM_<name> (read until 0.6). */
+export const env = (name: string): string | undefined => process.env[`RUNDOWN_${name}`] ?? process.env[`BRAINSTORM_${name}`];
+
+/** Where Rundown keeps its database and private files. The plugin sets RUNDOWN_DATA_DIR; dev uses app/server/data. */
+export const dataDir = () => resolve(env("DATA_DIR") ?? resolve(__dirname, "../../data"));
 
 const LOCAL_NAMES = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
-// "*.localhost" names (a dev proxy's "web.brainstorm.localhost") always resolve to this machine (RFC 6761): no site can claim one.
+// "*.localhost" names (a dev proxy's "web.rundown.localhost") always resolve to this machine (RFC 6761): no site can claim one.
 const isLocalName = (name: string) => LOCAL_NAMES.has(name) || name.endsWith(".localhost");
 
 /** A Host header naming this machine (anything else is a DNS-rebinding attempt: some site pointing its own name at 127.0.0.1). */

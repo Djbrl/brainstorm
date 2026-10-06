@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Rundown launcher: starts the server (or reuses the running one) and opens it. No dependencies.
-// Used by the SessionStart hook (--background) and the /brainstorm:open and /brainstorm:stop skills.
+// Used by the SessionStart hook (--background) and the /rundown:open, /rundown:share and /rundown:stop skills.
 //
 //   --background   for the SessionStart hook: start if needed and return at once. Prints nothing, or one JSON line with a
 //                  `systemMessage` for the user (welcome, updated, update available); plain stdout would go into Claude's context
@@ -13,7 +13,7 @@
 // It always exits 0 and prints any problem on stdout, so a skill can run it as one plain command.
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
+import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { createServer } from "node:net";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -27,7 +27,7 @@ const BACKGROUND = flag("--background");
 const say = (msg) => { if (!BACKGROUND) console.log(msg); };
 
 const PLUGIN = process.env.CLAUDE_PLUGIN_ROOT || resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const DATA = process.env.CLAUDE_PLUGIN_DATA || join(homedir(), ".brainstorm");
+const DATA = process.env.CLAUDE_PLUGIN_DATA || join(homedir(), ".rundown");
 const PROJECT = resolve(opt("--project") || process.env.CLAUDE_PROJECT_DIR || process.cwd());
 const KEY = process.env.CLAUDE_PLUGIN_OPTION_ANTHROPIC_API_KEY || "";
 const VERSION = JSON.parse(readFileSync(join(PLUGIN, ".claude-plugin", "plugin.json"), "utf8")).version;
@@ -101,8 +101,8 @@ async function start() {
   writeSync(out, `\n--- ${new Date().toISOString()} starting Rundown ${VERSION} on ${port} for ${PROJECT}\n`);
   const env = {
     ...process.env,
-    BRAINSTORM_VERSION: VERSION, BRAINSTORM_PORT: String(port), BRAINSTORM_DATA_DIR: DATA,
-    BRAINSTORM_WEB_DIR: WEB, BRAINSTORM_ROOT: PROJECT, NODE_NO_WARNINGS: "1",
+    RUNDOWN_VERSION: VERSION, RUNDOWN_PORT: String(port), RUNDOWN_DATA_DIR: DATA,
+    RUNDOWN_WEB_DIR: WEB, RUNDOWN_ROOT: PROJECT, NODE_NO_WARNINGS: "1",
   };
   if (KEY) env.ANTHROPIC_API_KEY = KEY;
   const child = spawn(process.execPath, [SERVER], { cwd: DATA, env, detached: true, stdio: ["ignore", out, out] });
@@ -132,7 +132,7 @@ async function notices(port) {
   const n = readNotices();
   const out = [];
   if (!n.welcomed) {
-    out.push(port ? `Rundown is running for this project at http://localhost:${port}. Run /brainstorm:open to see the map.` : "Rundown is starting. Run /brainstorm:open to see the map.");
+    out.push(port ? `Rundown is running for this project at http://localhost:${port}. Run /rundown:open to see the map.` : "Rundown is starting. Run /rundown:open to see the map.");
     n.welcomed = true;
   } else if (n.lastVersion && n.lastVersion !== VERSION) {
     out.push(`Rundown was updated to ${VERSION}.`);
@@ -143,7 +143,7 @@ async function notices(port) {
     try {
       const latest = (await (await fetch(LATEST_URL, { signal: AbortSignal.timeout(1500) })).json()).version;
       if (latest && newer(latest, VERSION)) {
-        out.push(`Rundown ${latest} is available (you have ${VERSION}). To update, run \`claude plugin update brainstorm@brainstorm\` in a terminal, or choose Update now in /plugin → Installed.`);
+        out.push(`Rundown ${latest} is available (you have ${VERSION}). To update, run \`claude plugin update rundown@rundown\` in a terminal, or choose Update now in /plugin → Installed.`);
       }
     } catch { /* offline: try again tomorrow */ }
   }
@@ -160,8 +160,33 @@ function openBrowser(url) {
   try { spawn(cmd, args, { detached: true, stdio: "ignore" }).unref(); } catch { /* the URL is printed anyway */ }
 }
 
+/**
+ * Until 0.4 the plugin was called "brainstorm", so Claude Code gave it another data folder. The first time, take over its
+ * database and notices, and stop its server first (so the database is whole, and two servers don't run side by side).
+ */
+async function adoptOldData() {
+  if (existsSync(join(DATA, "rundown.db")) || existsSync(join(DATA, "brainstorm.db"))) return;
+  const olds = [process.env.CLAUDE_PLUGIN_DATA && join(dirname(DATA), "brainstorm-brainstorm"), join(homedir(), ".brainstorm")].filter(Boolean);
+  for (const old of olds) {
+    if (!existsSync(join(old, "brainstorm.db"))) continue;
+    try {
+      const st = JSON.parse(readFileSync(join(old, "server.json"), "utf8"));
+      const h = await health(st.port);
+      if (h?.pid) {
+        process.kill(h.pid, "SIGTERM");
+        for (let i = 0; i < 30 && (await health(st.port)); i++) await sleep(100);
+      }
+    } catch { /* not running */ }
+    for (const f of ["brainstorm.db", "brainstorm.db-wal", "brainstorm.db-shm", "notices.json"]) {
+      try { if (existsSync(join(old, f))) copyFileSync(join(old, f), join(DATA, f)); } catch { /* start fresh without it */ }
+    }
+    return;
+  }
+}
+
 async function main() {
   mkdirSync(DATA, { recursive: true });
+  await adoptOldData();
   if (!nodeOk()) {
     const msg = `Rundown needs Node.js 22.13 or later (you have ${process.versions.node}). Update Node, then start a new session.`;
     if (!BACKGROUND) return say(msg);
@@ -233,7 +258,7 @@ async function share(port) {
     let r = await get(path, sid && !sid.includes("$") ? sid : undefined);
     if (r.status === 404 && sid) r = await get(path);
     if (!r.ok) return say(`Couldn't save the replay: ${await r.text()}`);
-    const name = /filename="([^"]+)"/.exec(r.headers.get("content-disposition") ?? "")?.[1] ?? `brainstorm-replay${path.endsWith(".md") ? ".md" : ".html"}`;
+    const name = /filename="([^"]+)"/.exec(r.headers.get("content-disposition") ?? "")?.[1] ?? `rundown-replay${path.endsWith(".md") ? ".md" : ".html"}`;
     writeFileSync(join(dir, name), Buffer.from(await r.arrayBuffer()));
     saved.push(join(dir, name));
   }

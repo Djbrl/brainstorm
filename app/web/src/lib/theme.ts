@@ -13,7 +13,7 @@ export const THEMES: { id: ThemeId; name: string; note: string; dark: boolean }[
   { id: "deadspace", name: "Dead Space", note: "A hologram: floor plates and a cyan locator line.", dark: true },
 ];
 
-const KEY = "brainstorm-theme";
+const KEY = "rundown-theme";
 const isTheme = (v: unknown): v is ThemeId => THEMES.some((t) => t.id === v);
 
 function read(): ThemeId {

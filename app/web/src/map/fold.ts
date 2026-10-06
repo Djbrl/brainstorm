@@ -37,7 +37,7 @@ export function openAround(n: GNode | undefined, into: Set<GNode>) {
 }
 
 // ---------- the setting (like map/prefs.ts) ----------
-const KEY = "brainstorm-map-fold";
+const KEY = "rundown-map-fold";
 let foldOn = (() => { try { return localStorage.getItem(KEY) !== "0"; } catch { return true; } })();
 const listeners = new Set<() => void>();
 const subscribe = (f: () => void) => { listeners.add(f); return () => { listeners.delete(f); }; };

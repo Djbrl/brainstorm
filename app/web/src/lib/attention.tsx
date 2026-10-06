@@ -34,7 +34,7 @@ export function attentionText(a: Attention): { badge: string; line: string; titl
   }
 }
 
-const NOTIFY_KEY = "brainstorm-notify";
+const NOTIFY_KEY = "rundown-notify";
 const notifyPref = () => { try { return localStorage.getItem(NOTIFY_KEY) === "1"; } catch { return false; } };
 
 /** Desktop notifications, opt-in per browser. */
@@ -75,7 +75,7 @@ export function useAttentionAlerts(onOpen: (sessionId: string) => void) {
       if (Date.now() - Date.parse(a.since) > 60_000 || !(needsYou(a) || yourTurn(a)) || (!a.sure && a.state !== "stuck")) continue;
       if (!notifyPref() || typeof Notification === "undefined" || Notification.permission !== "granted" || document.visibilityState === "visible") continue;
       const t = attentionText(a);
-      const n = new Notification(`${titles.get(a.sessionId)}: ${t.title}`, { body: a.detail ? `${t.line}\n${a.detail}` : t.line, tag: `brainstorm-${a.sessionId}` });
+      const n = new Notification(`${titles.get(a.sessionId)}: ${t.title}`, { body: a.detail ? `${t.line}\n${a.detail}` : t.line, tag: `rundown-${a.sessionId}` });
       n.onclick = () => { window.focus(); openRef.current(a.sessionId); n.close(); };
     }
   }, [state.attention, state.sessions]);

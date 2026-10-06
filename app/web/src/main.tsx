@@ -1,3 +1,4 @@
+import "./lib/storage-migrate"; // first: renames the saved settings from Brainstorm before anything reads them
 import { createRoot } from "react-dom/client";
 import { LiveProvider } from "./lib/live";
 import { App } from "./App";

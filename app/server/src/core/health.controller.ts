@@ -1,5 +1,6 @@
 import { Controller, Get } from "@nestjs/common";
 import { createHash } from "node:crypto";
+import { env } from "./local";
 
 const keyHash = (k?: string) => (k ? createHash("sha256").update(k).digest("hex").slice(0, 12) : null);
 
@@ -7,6 +8,6 @@ const keyHash = (k?: string) => (k ? createHash("sha256").update(k).digest("hex"
 @Controller()
 export class HealthController {
   @Get("health") health() {
-    return { ok: true, version: process.env.BRAINSTORM_VERSION ?? "dev", pid: process.pid, anthropicKey: keyHash(process.env.ANTHROPIC_API_KEY) };
+    return { ok: true, version: env("VERSION") ?? "dev", pid: process.pid, anthropicKey: keyHash(process.env.ANTHROPIC_API_KEY) };
   }
 }

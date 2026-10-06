@@ -12,9 +12,9 @@ export const STEP_WINDOWS: { id: StepWindow; name: string }[] = [
   { id: "all", name: "The whole thread" },
 ];
 
-const WINDOW_KEY = "brainstorm-map-window";
-const LOCK_KEY = "brainstorm-camera-lock";
-const PEEK_KEY = "brainstorm-map-peek";
+const WINDOW_KEY = "rundown-map-window";
+const LOCK_KEY = "rundown-camera-lock";
+const PEEK_KEY = "rundown-map-peek";
 
 function load<T>(key: string, parse: (v: string | null) => T): T {
   try { return parse(localStorage.getItem(key)); } catch { return parse(null); } // storage blocked: the default

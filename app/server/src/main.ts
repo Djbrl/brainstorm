@@ -6,11 +6,11 @@ import { WsAdapter } from "@nestjs/platform-ws";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import type { NextFunction, Request, Response } from "express";
 import { AppModule } from "./app.module";
-import { dataDir, isLocalHost } from "./core/local";
+import { dataDir, isLocalHost, env } from "./core/local";
 
 const envFile = resolve(__dirname, "../../.env");
 // Dev only: the plugin passes its settings in the environment, and must not pick up some .env above its install folder.
-if (!process.env.BRAINSTORM_DATA_DIR && existsSync(envFile)) process.loadEnvFile(envFile);
+if (!env("DATA_DIR") && existsSync(envFile)) process.loadEnvFile(envFile);
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger: ["log", "warn", "error"] });
@@ -21,7 +21,7 @@ async function bootstrap() {
   app.use((req: Request, res: Response, next: NextFunction) => (isLocalHost(req.headers.host) ? next() : res.status(403).send("Rundown only answers on localhost")));
 
   // Plugin build: the server also serves the web app, so it's one process on one port.
-  const web = process.env.BRAINSTORM_WEB_DIR;
+  const web = env("WEB_DIR");
   if (web && existsSync(join(web, "index.html"))) {
     app.useStaticAssets(web);
     app.use((req: Request, res: Response, next: NextFunction) =>
@@ -30,10 +30,10 @@ async function bootstrap() {
       req.method === "GET" && !req.path.startsWith("/api") && !req.path.startsWith("/ws") ? res.sendFile("index.html", { root: web }) : next());
   }
 
-  const version = process.env.BRAINSTORM_VERSION ?? "dev";
-  const port = Number(process.env.BRAINSTORM_PORT ?? process.env.PORT ?? 4000);
+  const version = env("VERSION") ?? "dev";
+  const port = Number(env("PORT") ?? process.env.PORT ?? 4000);
   await app.listen(port, "127.0.0.1");
-  if (process.env.BRAINSTORM_DATA_DIR) {
+  if (env("DATA_DIR")) {
     writeFileSync(join(dataDir(), "server.json"), JSON.stringify({ pid: process.pid, port, version, startedAt: new Date().toISOString() }));
     rmSync(join(dataDir(), "launch.lock"), { force: true }); // up: the launcher that started us is done
   }

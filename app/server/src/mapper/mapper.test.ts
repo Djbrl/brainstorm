@@ -197,7 +197,7 @@ test("past the cap, the listing says when files last changed (recent commits; ne
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("past the cap (BRAINSTORM_MAX_FILES): a spread of files, totalFiles counts them all, an agent's edit joins anyway", { skip: !hasGit }, async () => {
+test("past the cap (RUNDOWN_MAX_FILES): a spread of files, totalFiles counts them all, an agent's edit joins anyway", { skip: !hasGit }, async () => {
   const files: Record<string, string> = { "README.md": "# r\n", "docs/guide.md": "# g\n" };
   for (let i = 0; i < 12; i++) files[`web/src/c${i}.ts`] = i ? "import { c } from './c0';\n" : "export const c = 0;\n";
   for (let i = 0; i < 6; i++) files[`api/src/r${i}.ts`] = "";
@@ -205,8 +205,8 @@ test("past the cap (BRAINSTORM_MAX_FILES): a spread of files, totalFiles counts 
   const projects = mkdtempSync(join(tmpdir(), "bs-projects-"));
   const handlers: Record<string, (p: unknown) => void> = {};
   const sent: WsMessage[] = [];
-  const before = process.env.BRAINSTORM_MAX_FILES;
-  process.env.BRAINSTORM_MAX_FILES = "8";
+  const before = process.env.RUNDOWN_MAX_FILES;
+  process.env.RUNDOWN_MAX_FILES = "8";
   const svc = new MapperService(
     { on: (ev: string, fn: (p: unknown) => void) => { handlers[ev] = fn; }, emit() {} } as never,
     { broadcast: (m: WsMessage) => sent.push(m) } as never,
@@ -233,7 +233,7 @@ test("past the cap (BRAINSTORM_MAX_FILES): a spread of files, totalFiles counts 
     await waitFor(() => node.activeSessionId === "s1" || undefined);
     assert.equal(svc.getCached(root)!.map.totalFiles, 20);
   } finally {
-    if (before === undefined) delete process.env.BRAINSTORM_MAX_FILES; else process.env.BRAINSTORM_MAX_FILES = before;
+    if (before === undefined) delete process.env.RUNDOWN_MAX_FILES; else process.env.RUNDOWN_MAX_FILES = before;
     svc.onModuleDestroy();
     rmSync(root, { recursive: true, force: true });
     rmSync(projects, { recursive: true, force: true });

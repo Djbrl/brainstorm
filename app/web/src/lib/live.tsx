@@ -272,7 +272,7 @@ const replayUrl = () => (replayUrlValue === undefined
 let embedded: Replay | null | undefined;
 function embeddedReplay(): Replay | null {
   if (embedded === undefined) {
-    const text = document.getElementById("brainstorm-replay")?.textContent;
+    const text = (document.getElementById("rundown-replay") ?? document.getElementById("brainstorm-replay"))?.textContent;
     try { embedded = text ? (JSON.parse(text) as Replay) : null; } catch { embedded = null; }
   }
   return embedded;

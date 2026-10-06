@@ -35,6 +35,7 @@ Size: ½ day.
 - [ ] **Rewind to a step.** Scrub the replay to where it still worked, restore the files to that step and continue from there. Needs a file snapshot per step, which is the expensive part. Overlaps "History slider" in `next-steps.md`.
 - [ ] **Runtime errors on the map.** Catch dev server and browser console errors, then light up the file and the agent step that last wrote the failing line.
 - [ ] **Learn tab.** A chat in the sidebar: ask how something works (a feature, a bug, a PR), and the map walks you through it, stopping on the key steps with the code at each. A headless, read-only Claude Code session Brainstorm follows, plus one tool for paced stops. Plan and risks in [learn-tab.md](learn-tab.md).
+- [ ] **Git on the map (built, hidden).** "Show git" in the bottom bar rings the files not committed and not pushed, or an open thread's worktree branch. Hidden on 6 Oct as a step too far for now: `GIT_SHOWN` in `app/web/src/map/gitFilter.ts` turns it back on; the server still serves `/api/git`. Next if it comes back: a menu on the switch listing the agents' worktrees.
 - [ ] **Brainstorm as context for agents (MCP).** "Is another thread editing this?", "what failed last time?". Already in `roadmap.md`, part 2. The import graph makes it sharper: blast radius before an edit, likely files for a prompt, parallel agents whose work overlaps. Ideas, uses and how to measure them first in [graph-for-agents.md](graph-for-agents.md).
 
 ## Open questions

@@ -2,14 +2,19 @@
 // checkout's files not committed (orange, green when new) and those committed but not pushed (blue); with a thread
 // open that works in its own checkout (a worktree, usually an agent's branch), that branch's instead: what it
 // committed that yours doesn't have (purple) and what it hasn't committed. Remembered per browser.
+//
+// Hidden for now (6 Oct): the person found git a step too far for the map today and may come back to it. GIT_SHOWN
+// turns it all back on (the switch, the rings, a file's git line); the server keeps reading git (/api/git, ws "git").
 import { useSyncExternalStore } from "react";
 import type { GitFileState, GitState, GitWorktree } from "@contract";
+
+export const GIT_SHOWN = false;
 
 const KEY = "brainstorm-map-git";
 let on = (() => { try { return localStorage.getItem(KEY) === "1"; } catch { return false; } })();
 const listeners = new Set<() => void>();
 const subscribe = (f: () => void) => { listeners.add(f); return () => { listeners.delete(f); }; };
-const get = () => on;
+const get = () => GIT_SHOWN && on;   // a switch left on before it was hidden draws nothing
 export function setShowGit(v: boolean) {
   if (v === on) return;
   on = v;
@@ -43,7 +48,7 @@ export function gitFiles(git: GitState | null, wt: GitWorktree | null): Map<stri
 
 /** What git says about one file, in words (the file's details in the sidebar). */
 export function gitWord(git: GitState | null, rel: string): { word: string; colour: string } | null {
-  if (!git) return null;
+  if (!GIT_SHOWN || !git) return null;
   const s = git.uncommitted[rel];
   if (s) return { word: STATE_WORD[s], colour: stateColour(s) };
   if (git.unpushed?.includes(rel)) return { word: "Committed, not pushed", colour: GIT_COLOURS.unpushed };

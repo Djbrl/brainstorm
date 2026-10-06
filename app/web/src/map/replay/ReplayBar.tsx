@@ -10,7 +10,7 @@ import { useThread, type Thread } from "../../lib/thread";
 import { chaptersOf } from "../../lib/chapters";
 import { togglePlay } from "./layer";
 import { setCameraLock, setShowFile, useCameraLock, useShowFile } from "../prefs";
-import { gitSummary, setShowGit, useShowGit, worktreeOf } from "../gitFilter";
+import { GIT_SHOWN, gitSummary, setShowGit, useShowGit, worktreeOf } from "../gitFilter";
 import "./replay.css";
 
 const SPEEDS: ReplaySpeed[] = [1, 2, 4];
@@ -200,7 +200,7 @@ export function GitToggle() {
   const on = useShowGit();
   const git = useLiveSelector((s) => s.git);
   const { replay } = useNavState();
-  if (!git) return null;
+  if (!GIT_SHOWN || !git) return null;
   return (
     <button className="dock-reads" role="switch" aria-checked={on} onClick={() => setShowGit(!on)}
       title={gitSummary(git, worktreeOf(git, replay?.sessionId))}>

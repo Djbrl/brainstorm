@@ -172,6 +172,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 03:00 (6 Oct) [git] Git is a switch now, not a view. "Show git" in the map's bottom bar, beside Show reads, always there in a git repository and remembered: rings on the files not committed (orange, green when new) and those committed but not pushed (blue); with a thread open that works in its own worktree, that branch's instead (purple: what it committed that yours doesn't have). The rest of the map steps back only a little, folders with changes inside get a ring while closed, the camera stays put. The switch's tooltip says the branch, the counts and the colours. A file's details say where it stands ("Changed, not committed"). Gone: the Files tab's All files | Changes, the Changes list and the "Show everything" pill. The map's colour key and the Places legend are gone too: the map reads without them.
 
+- 03:20 (6 Oct) [git] Show git hidden for now (a step too far for today): `GIT_SHOWN = false` in `map/gitFilter.ts` hides the switch, the rings and a file's git line, even for a browser that left it on. The code and the server's `git/` stay; on the to-do list to come back to.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

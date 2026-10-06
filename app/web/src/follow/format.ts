@@ -104,6 +104,7 @@ export function fallbackLabel(s: Step): string {
     case "thinking": return s.text ? `Thinking: ${firstLine(s.text, 120)}` : "Thinking";
     case "edit": {
       const f = basename(s.filePath ?? str(input.file_path));
+      if (input.deleted === true) return f ? `Delete ${f}` : "Delete a file";
       if (s.tool === "Write") return `Write ${f}`;
       return f ? `Edit ${f}` : "Edit a file";
     }

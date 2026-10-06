@@ -5,7 +5,7 @@ import type { Step } from "@contract";
 import { AskBox } from "../ask/AskBox";
 import { Markdown } from "../ask/Markdown";
 import { FileIcon, Glyph, RiskIcon } from "./Glyph";
-import { ToolView } from "./content/ToolView";
+import { Command, ToolView } from "./content/ToolView";
 import { editorLink, editorName, openInEditor, useEditor } from "../lib/editor";
 import { HtmlPreview, isHtml, PAGE_MARKUP, ViewSwitch } from "./content/HtmlPreview";
 import { basename, displayLabel, stepFile, stripInjected, timeIn, toolName } from "./format";
@@ -87,7 +87,25 @@ export function editPair(s: Step): { before: string; after: string } | null {
   return null;
 }
 
+/** A file an agent changed by running a command (a script, sed -i, a redirect) instead of its edit tool: the server
+ * saw it change (listener/command-edits.ts). The diff when it was watching; the command either way. */
+function CommandEditBody({ step }: { step: Step }) {
+  const i = inputOf(step);
+  const deleted = i.deleted === true;
+  return (
+    <>
+      <p className="cv-why">{deleted ? "The agent deleted this file by running a command." : "The agent changed this file by running a command, not its edit tool."}</p>
+      {step.diff ? <EditDiff step={step} /> : !deleted && <p className="sd-muted">What it changed wasn't recorded: Rundown wasn't watching the file when the command ran.</p>}
+      {typeof i.command === "string" && <Command command={i.command} />}
+    </>
+  );
+}
+
 function EditBody({ step }: { step: Step }) {
+  return inputOf(step).byCommand === true ? <CommandEditBody step={step} /> : <EditDiff step={step} />;
+}
+
+function EditDiff({ step }: { step: Step }) {
   const pair = useMemo(() => editPair(step), [step]);
   const lines = pair ? pair.before.split("\n").length + pair.after.split("\n").length : 0;
   const [open, setOpen] = useState(lines <= BIG_DIFF);

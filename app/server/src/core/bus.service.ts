@@ -8,7 +8,9 @@ export type BusEvents = {
   "file-touched": [{ path: string; sessionId: string; ts: string }]; // an agent edited a file (listener → mapper)
   "workspace": [{ root: string }];               // the active workspace changed (workspace → listener, mapper, reader)
   "files-changed": [{ root: string }];
-  "turn-ended": [{ sessionId: string }];         // an agent finished its turn, from its log (listener → attention)           // the mapper saw files change in the project (mapper → git)
+  "turn-ended": [{ sessionId: string }];
+  // a mapped file changed on disk: what it was (null: unknown, "": it didn't exist) and is (null: deleted) (mapper → listener)
+  "file-content": [{ path: string; before: string | null; after: string | null; at: number }];         // an agent finished its turn, from its log (listener → attention)           // the mapper saw files change in the project (mapper → git)
 };
 
 type Fn = (...args: any[]) => unknown;

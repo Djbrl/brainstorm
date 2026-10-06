@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from "@nestjs/common";
 import { existsSync, readFileSync, statSync } from "node:fs";
+import { deflateRawSync, inflateRawSync } from "node:zlib";
 import { readFile, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import type { Edge, FileNode, ProjectMap, Snapshot } from "../types";
@@ -57,6 +58,9 @@ type Cached = {
   uncounted: number;
   /** Files an agent edited while this map was live: they join the map whatever the cap. */
   agentTouched: Set<string>;
+  /** Each file's content as last read (deflated; files up to MAX_PARSE_BYTES), so a change can say what it was before:
+   * how a file a command rewrote gets its diff (listener/command-edits.ts). A few MB for a 3,000-file map. */
+  snapshots: Map<string, Buffer>;
 };
 type Live = { root: string; watcher: ProjectWatcher; batch: Batcher<string>; pending: Set<string>; running: boolean; folders: Set<string> };
 
@@ -299,10 +303,11 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
       map, gitTimes, byPath, fileSet, specs, out, mtimes,
       tracked: listing.tracked && new Set([...chosen].filter((rel) => listing.tracked!.has(rel))),
       listing: { source: listing.source, total: listing.total, ms: listMs },
-      unselected, uncounted: Math.max(0, listing.total - listing.rels.length), agentTouched: new Set(),
+      unselected, uncounted: Math.max(0, listing.total - listing.rels.length), agentTouched: new Set(), snapshots: new Map(),
     };
     this.flattenEdges(c);
     this.countFiles(c);
+    this.fillSnapshots(c, reads);
     return c;
   }
 
@@ -676,8 +681,11 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     });
     if (this.cache.get(root) !== c || this.live !== live) return; // switched away meanwhile
 
-    // Apply: removals, then updates and additions.
+    // Apply: removals, then updates and additions. Each change goes on the bus with what the file was before.
+    const at = Date.now();
     for (const abs of removed) {
+      this.bus.emit("file-content", { path: abs, before: this.snapshotOf(c, abs, true), after: null, at });
+      c.snapshots.delete(abs);
       c.byPath.delete(abs); c.fileSet.delete(abs); c.specs.delete(abs); c.out.delete(abs); c.mtimes.delete(abs);
     }
     if (removed.size) c.map.files = c.map.files.filter((f) => !removed.has(f.path));
@@ -685,6 +693,11 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     let added = 0;
     for (const r of reads) {
       if (!r || removed.has(r.abs)) continue;
+      if (r.content) {
+        const before = this.snapshotOf(c, r.abs, c.byPath.has(r.abs) || c.unselected.has(r.abs));
+        if (before !== r.content) this.bus.emit("file-content", { path: r.abs, before, after: r.content, at });
+        c.snapshots.set(r.abs, deflateRawSync(r.content, { level: 1 }));
+      }
       const lastChangedAt = this.lastChangedAt(c, root, r.abs, r.mtimeMs);
       let node = c.byPath.get(r.abs);
       if (!node) {
@@ -735,6 +748,26 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
       const touch = this.pendingTouches.get(abs);
       if (touch) { this.pendingTouches.delete(abs); this.onFileTouched(root, abs, touch.sessionId, touch.ts); }
     }
+  }
+
+  /** Keep each file's content, a slice at a time after the map is out (compressing 3,000 files takes ~100 ms). */
+  private fillSnapshots(c: Cached, reads: Read[]) {
+    let i = 0;
+    const step = () => {
+      for (const end = Math.min(reads.length, i + 300); i < end; i++) {
+        const r = reads[i];
+        if (r.content && c.byPath.has(r.abs) && !c.snapshots.has(r.abs)) c.snapshots.set(r.abs, deflateRawSync(r.content, { level: 1 }));
+      }
+      if (i < reads.length) setImmediate(step);
+    };
+    setImmediate(step);
+  }
+
+  /** What a file was when last read: "" for one that wasn't there, null when unknown (too big, or not kept yet). */
+  private snapshotOf(c: Cached, abs: string, known: boolean): string | null {
+    const z = c.snapshots.get(abs);
+    if (z) return inflateRawSync(z).toString("utf8");
+    return known ? null : "";
   }
 
   /** Send the active root's whole map now, or once MAP_BROADCAST_GAP_MS has passed since the last one (always the current map). */

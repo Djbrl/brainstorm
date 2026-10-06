@@ -86,7 +86,7 @@ export function Fields({ input, skip = [] }: { input: unknown; skip?: string[] }
 /** The grammar for a script inside a command (formatCommand's names). */
 const SCRIPT_LANG: Record<string, string> = { Python: "python", JavaScript: "javascript", Shell: "bash" };
 
-function Command({ command }: { command: string }) {
+export function Command({ command }: { command: string }) {
   const { lines, scripts } = formatCommand(command);
   return (
     <>

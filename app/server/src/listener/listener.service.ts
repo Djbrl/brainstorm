@@ -12,6 +12,7 @@ import { ClaudeSource } from "./claude.source";
 import { CodexSource } from "./codex.source";
 import type { LogFile, LogSource, NewStep, Scope, Sink } from "./source";
 import { promptTitle } from "./text";
+import { CommandEdits } from "./command-edits";
 import { backfillAgentIds } from "./agent-ids";
 
 // Owner: A. Tail the coding agents' session logs (log sources: claude.source.ts for ~/.claude/projects, codex.source.ts
@@ -41,6 +42,8 @@ type Batch = {
   seqBefore: Map<string, number | undefined>;
 };
 
+/** How long a live command's file edits wait for the mapper to see the files change (it batches changes for 100 ms). */
+const COMMAND_EDIT_WAIT_MS = 1_500;
 /** Read size per step of a file. */
 const CHUNK_BYTES = 4 * 1024 * 1024;
 /** Lines stored per transaction, about: the server answers requests between batches. */
@@ -66,6 +69,10 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   /** Where the agents' logs come from: Claude Code's, then Codex's. Built in onModuleInit (it needs the config). */
   private sources: LogSource[] = [];
   private codex?: CodexSource;
+  /** Files changed through shell commands, made edits of their thread (command-edits.ts). */
+  private commandEdits = new CommandEdits((p) => this.isWithinRoot(p));
+  /** Live command edits waiting for the mapper to see their files change. */
+  private commandTimers = new Set<NodeJS.Timeout>();
   /** Closes every source's watcher (tests read files themselves). */
   readonly watcher = {
     close: async () => { await Promise.all(this.sources.map((s) => s.close())); },
@@ -151,6 +158,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     // is explicitly chosen (WorkspaceService then emits "workspace" and we re-scope, see below).
     this.setRoot(this.cfg.defaultRoot);
     this.bus.on("workspace", ({ root }) => this.onWorkspaceChanged(root));
+    this.bus.on("file-content", (c) => this.commandEdits.fileChanged(c));
 
     const warn = (e: Error) => this.log.warn(`watcher error: ${e.message}`);
     this.codex = new CodexSource(this.cfg.codexDir, warn);
@@ -173,6 +181,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy() {
     this.backfillGen++; // stops a backfill between files
     this.destroyed = true;
+    for (const t of this.commandTimers) clearTimeout(t);
     await this.agentIdsDone;
     await this.watcher.close();
   }
@@ -455,11 +464,43 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
 
   /** What a source's parse stores into this chunk: steps numbered in order, threads created with its harness. */
   private sinkFor(b: Batch, harness: Harness): Sink {
-    return {
-      step: (s: NewStep, opts) => this.storeStep(b, inStoredOrder(s, this.allocSeq(b, s.sessionId)), harness, opts),
+    const sink: Sink = {
+      step: (s: NewStep, opts) => {
+        const step = inStoredOrder(s, this.allocSeq(b, s.sessionId));
+        this.storeStep(b, step, harness, opts);
+        // A shell command that finished: the files it changed become edits too (command-edits.ts). In history at once,
+        // without a diff; live a moment later, once the mapper has seen the files change.
+        const done = this.commandEdits.step(step, opts?.cwd || this.batchSession(b, step.sessionId)?.cwd || "");
+        if (!done) return;
+        if (b.quiet) { for (const e of this.commandEdits.editsFor(done, step.ts, false)) sink.step(e, { cwd: "" }); return; }
+        const timer = setTimeout(() => { this.commandTimers.delete(timer); this.storeCommandEdits(done, step.ts, harness); }, COMMAND_EDIT_WAIT_MS);
+        this.commandTimers.add(timer);
+      },
       customTitle: (sessionId, title) => this.setCustomTitle(b, sessionId, title, harness),
       turnEnded: (sessionId) => { if (!b.quiet) b.events.push({ turnEnded: sessionId }); },
     };
+    return sink;
+  }
+
+  /** A live command's file edits, in a transaction of their own, then announced like any live step. */
+  private storeCommandEdits(done: Parameters<CommandEdits["editsFor"]>[0], ts: string, harness: Harness) {
+    if (this.destroyed) return;
+    const edits = this.commandEdits.editsFor(done, ts, true);
+    if (!edits.length) return;
+    const db = this.dbs.db;
+    const b: Batch = { quietUntil: 0, quiet: false, sessions: new Map(), events: [], announced: new Set(), seqBefore: new Map() };
+    db.exec("BEGIN");
+    try {
+      for (const e of edits) this.storeStep(b, inStoredOrder(e, this.allocSeq(b, e.sessionId)), harness, { cwd: "" });
+      this.flushSessions(b);
+      db.exec("COMMIT");
+    } catch (e) {
+      try { db.exec("ROLLBACK"); } catch { /* already rolled back */ }
+      for (const [id, n] of b.seqBefore) if (n === undefined) this.nextSeq.delete(id); else this.nextSeq.set(id, n);
+      this.log.warn(`storing a command's file edits failed: ${(e as Error).message}`);
+      return;
+    }
+    this.announce(b);
   }
 
   private allocSeq(b: Batch, sessionId: string): number {

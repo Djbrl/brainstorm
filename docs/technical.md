@@ -59,6 +59,14 @@ Claude Code writes one JSON object per line to `~/.claude/projects/<project path
 - **Order:** `seq` increases per session.
 - **Status:** a session is `running` while its last event is under 2 minutes old.
 
+## Files changed through commands
+
+Agents often change files by running a command instead of their edit tool: `sed -i`, `cat > f <<EOF`, a Python or Node script that writes the file, `mv`, `rm`, `git checkout -- f`. Those become edits of the thread too (Claude Code and Codex alike), so the map, the Track and the counts see them (`listener/command-edits.ts`):
+
+- **Which files:** what the command says it writes, read from the command itself (`listener/command-writes.ts`: redirects, `tee`, in-place `sed`/`perl`/`ruby`, file commands, git restores, Codex's `apply_patch`, and the file calls inside Python, Node, Ruby and Perl scripts, with `cd` followed). Live, also any file that changed on disk while the command ran and that the command names (a formatter given the file). Only files inside the project count.
+- **What changed:** live, the mapper keeps each mapped file's content (compressed, a few MB for 3,000 files) and puts every change on the bus with what the file was before (`file-content`); the edit gets the changed hunks (`listener/line-diff.ts`). In history only the command is known: the edit says what ran, not what changed.
+- Each such edit has `input.byCommand`, the command, and a result (so attention never sees it waiting); the step panel says the agent used a command and shows it.
+
 ## Reading Codex logs
 
 Codex writes one file per thread: `~/.codex/sessions/YYYY/MM/DD/rollout-<time>-<uuid>.jsonl` (older ones in `archived_sessions/`). Lines are `{timestamp, type, payload}` and don't carry the thread id: it's in the first line (`session_meta`: id, cwd, cli version, git remote) and in the file name, so reading can resume mid-file. A thread belongs to the open project when its starting folder (or a `runtime_workspace_roots` entry) is inside it; the first line of each file is read once and cached. Codex Desktop's own worktrees (`~/.codex/worktrees/<id>/<repo>`) count as their repo: the main checkout comes from the worktree's `.git` file (or the git remote once it's gone), and every path is rewritten onto the main checkout so the map places it.

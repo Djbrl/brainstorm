@@ -109,3 +109,8 @@
 .su-pick .su-sub + .su-find { margin-top: 12px; }
 .su-home { border: 0; background: none; padding: 0; cursor: pointer; }
 .su-pick .su-choose { display: inline-flex; flex: none; align-self: flex-start; height: 48px; } /* the picker's column is a flex column */
+
+/* A big folder that isn't a git project: said calmly (not an error), with Open anyway. */
+.su-error.ask { color: var(--ink-2); display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.su-anyway { border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13.5px; font-weight: 600; padding: 5px 14px; cursor: pointer; }
+.su-anyway:hover { border-color: var(--accent); color: var(--accent); }

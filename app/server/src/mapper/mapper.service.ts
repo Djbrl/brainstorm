@@ -77,6 +77,14 @@ function toRead(abs: string, buf: Buffer, mtimeMs: number): Read {
   return { abs, lines: countLines(buf), content: buf.length <= MAX_PARSE_BYTES ? buf.toString("utf8") : "", mtimeMs };
 }
 
+/** How long one file may take to read before it's left out of the map. */
+const READ_MS = 2_000;
+/** The promise's value, or null once `ms` passed (the read carries on in the background and is ignored). */
+function within<T>(ms: number, p: Promise<T>): Promise<T | null> {
+  let t: NodeJS.Timeout;
+  return Promise.race([p, new Promise<null>((r) => { t = setTimeout(() => r(null), ms); })]).finally(() => clearTimeout(t));
+}
+
 async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const out = new Array<R>(items.length);
   let next = 0;
@@ -199,17 +207,22 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     const t0 = Date.now();
     const listing = await listProjectFiles(root, maxFiles());
     const listMs = Date.now() - t0;
+    // A read that takes too long (a file kept only in the cloud, downloading as it's opened) is left out and counted:
+    // one slow file doesn't hold the map up.
+    let unread = 0;
     const readAll = async (rels: string[]) => (await mapLimit(rels, IO_CONCURRENCY, async (rel): Promise<Read | null> => {
       const abs = join(root, rel);
       try {
-        const [buf, st] = await Promise.all([readFile(abs), stat(abs)]);
-        return toRead(abs, buf, st.mtimeMs);
+        const got = await within(READ_MS, Promise.all([readFile(abs), stat(abs)]));
+        if (!got) { unread++; return null; }
+        return toRead(abs, got[0], got[1].mtimeMs);
       } catch { return null; }
     })).filter((r): r is Read => !!r);
-    if (listing.rels.length <= maxFiles()) return this.assemble(root, listing, await readAll(listing.rels), listMs);
+    const done = (c: Cached) => { if (unread) c.map.unread = unread; return c; };
+    if (listing.rels.length <= maxFiles()) return done(this.assemble(root, listing, await readAll(listing.rels), listMs));
     const sig = this.firstSignals(root, listing);
     const pool = await readAll(selectFiles(listing.rels, Math.min(listing.rels.length, 2 * maxFiles()), scoreFrom(sig)));
-    return this.assemble(root, listing, this.chooseFromPool(root, sig, pool), listMs);
+    return done(this.assemble(root, listing, this.chooseFromPool(root, sig, pool), listMs));
   }
 
   private buildSync(root: string): Cached {
@@ -298,7 +311,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     const out = new Map<string, Set<string>>();
     for (const [abs, s] of specs) out.set(abs, this.resolveSpecs(abs, s, fileSet));
     const unselected = new Set(listing.rels.filter((rel) => !chosen.has(rel)).map((rel) => join(root, rel)));
-    const map: ProjectMap = { root, files: nodes, edges: [], modules: [...moduleIds.values()], formerRoots: formerRoots(this.cfg.claudeProjectsDir, root) };
+    const map: ProjectMap = { root, files: nodes, edges: [], modules: [...moduleIds.values()], formerRoots: formerRoots(this.cfg.claudeProjectsDir, root), ...(listing.stopped ? { scanStopped: true } : {}) };
     const c: Cached = {
       map, gitTimes, byPath, fileSet, specs, out, mtimes,
       tracked: listing.tracked && new Set([...chosen].filter((rel) => listing.tracked!.has(rel))),

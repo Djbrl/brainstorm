@@ -144,7 +144,14 @@ export async function jumpElsewhere(t: ElsewhereThread, nav: Pick<NavActions, "s
  * it touched that project's files.
  */
 export async function enterProject(root: string, nav: Pick<NavActions, "startReplay" | "stopReplay" | "selectFile">, reload: () => void, threadId?: string, landOn?: string) {
-  const r = await fetch("/api/workspace", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ root, ...(threadId ? { guest: threadId } : {}) }) });
+  const post = (anyway: boolean) => fetch("/api/workspace", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ root, ...(threadId ? { guest: threadId } : {}), ...(anyway ? { anyway } : {}) }) });
+  let r = await post(false);
+  // A big folder that isn't a git project: the server asks first (WorkspaceService.checkSize); so do we.
+  if (r.status === 409) {
+    const b = await r.json().catch(() => ({})) as { code?: string; message?: string };
+    if (b.code !== "large" || !confirm(b.message ?? "This folder is big. Open it anyway?")) return;
+    r = await post(true);
+  }
   if (!r.ok) throw new Error(`switch failed: ${r.status}`);
   nav.stopReplay(); nav.selectFile(null);
   reload();

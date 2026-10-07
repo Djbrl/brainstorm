@@ -15,5 +15,6 @@ export class WorkspaceController {
     try { return await this.picking; } catch (e) { throw new ServiceUnavailableException((e as Error).message); }
   }
   private picking: Promise<Chosen> | null = null;
-  @Post("workspace") select(@Body() body: { root: string; guest?: string }) { return this.ws.select(body.root, body.guest); }
+  /** `anyway`: open a big folder that isn't a git project after the person was asked (see WorkspaceService.checkSize). */
+  @Post("workspace") select(@Body() body: { root: string; guest?: string; anyway?: boolean }) { return this.ws.select(body.root, body.guest, body.anyway === true); }
 }

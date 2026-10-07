@@ -16,16 +16,25 @@ export type Listing = {
   /** How many mappable files exist (can exceed rels.length in a giant repo). */
   total: number;
   source: "git" | "walk";
+  /** A walk that hit its budget (WALK_DIRS folders or WALK_MS): the files found so far, not the whole folder. */
+  stopped?: boolean;
   /** Only past the cap: when files last changed (s). Git: the newest of the last 1000 commits that touched the file, or the modification time of a new file. Walk: modification times. */
   changedAt?: Map<string, number>;
   /** Only past the cap: exact last-commit times (s) learned from that recent history. */
   recent?: Map<string, number>;
 };
 
-type Candidates = { rels: string[]; tracked?: Set<string>; total: number };
+type Candidates = { rels: string[]; tracked?: Set<string>; total: number; stopped?: boolean };
 
 /** Stop collecting candidates past this many: enough to choose from, without holding a giant repo in memory. */
 const CANDIDATE_LIMIT = 50_000;
+/**
+ * A folder that isn't a git repo is walked, and a walk has a budget: at most this many folders, for at most this long.
+ * Past it, the map is made of what was found. A folder of folders (photos, archives, a synced drive whose folders
+ * download as they're opened) can't hold the server up for minutes.
+ */
+export const WALK_DIRS = 20_000;
+export const WALK_MS = 3_000;
 /** Past the cap, stat at most this many files for their modification time. */
 const STAT_LIMIT = 20_000;
 const STAT_CONCURRENCY = 64;
@@ -46,7 +55,7 @@ export function parseLsFiles(entries: Iterable<string>, out: { rels: string[]; t
 
 function listing(cand: Candidates, source: Listing["source"], changedAt?: Map<string, number>, recent?: Map<string, number>): Listing {
   const rels = [...new Set(cand.rels)].sort(); // an unmerged file is listed once per stage
-  return { rels, tracked: cand.tracked, total: Math.max(cand.total, rels.length), source, changedAt, recent };
+  return { rels, tracked: cand.tracked, total: Math.max(cand.total, rels.length), source, changedAt, recent, ...(cand.stopped ? { stopped: true } : {}) };
 }
 
 // ---- git ----
@@ -85,9 +94,12 @@ function gitCandidatesSync(root: string): Candidates | null {
 const byName = (a: Dirent, b: Dirent) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
 
 /** Depth first, folders in name order, skipping ignored folders and symlinked folders (loops; git doesn't follow them either). */
-async function walkCandidates(root: string): Promise<Candidates> {
+export async function walkCandidates(root: string, budget = { dirs: WALK_DIRS, ms: WALK_MS }): Promise<Candidates> {
   const acc: Candidates = { rels: [], total: 0 };
+  const until = Date.now() + budget.ms;
+  let dirs = 0;
   const visit = async (dir: string, relDir: string): Promise<void> => {
+    if (acc.stopped || ++dirs > budget.dirs || Date.now() > until) { acc.stopped = true; return; }
     let entries: Dirent[];
     try { entries = await readdir(dir, { withFileTypes: true }); } catch { return; }
     entries.sort(byName);
@@ -106,7 +118,10 @@ async function walkCandidates(root: string): Promise<Candidates> {
 
 function walkCandidatesSync(root: string): Candidates {
   const acc: Candidates = { rels: [], total: 0 };
+  const until = Date.now() + WALK_MS;
+  let dirs = 0;
   const visit = (dir: string, relDir: string): void => {
+    if (acc.stopped || ++dirs > WALK_DIRS || Date.now() > until) { acc.stopped = true; return; }
     let entries: Dirent[];
     try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
     entries.sort(byName);

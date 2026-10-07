@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { closeSync, existsSync, openSync, readdirSync, readSync, realpathSync, statSync } from "node:fs";
@@ -13,6 +13,7 @@ import { ListenerService } from "../listener/listener.service";
 import { MapperService } from "../mapper/mapper.service";
 import { ReaderService } from "../reader/reader.service";
 import { isIdleTranscript } from "./threads";
+import { walkCandidates } from "../mapper/list-files";
 import { env } from "../core/local";
 
 const execFileP = promisify(execFile);
@@ -193,8 +194,9 @@ export class WorkspaceService implements OnModuleInit {
 
   // ---- writes ----
 
-  async select(root: string, guest?: string): Promise<SetupStatus> {
+  async select(root: string, guest?: string, anyway = false): Promise<SetupStatus> {
     const abs = this.validateRoot(root);
+    if (!anyway) await this.checkSize(abs);
     if (typeof guest === "string" && /^[\w-]{8,64}$/.test(guest)) this.listener.bringGuest(guest);
     this.setSetting("workspace", abs);
     this.activate(abs);
@@ -203,6 +205,20 @@ export class WorkspaceService implements OnModuleInit {
 
   // ---- validation ----
   // (tooBroad, below the class: a folder that holds folders of projects, never one to map)
+
+  /**
+   * A folder that isn't a git project and holds more than a few seconds' walk (photos, archives, a synced drive): asked
+   * first (409, code "large"), then opened with `anyway`. A git project of any size is fine (git lists its files).
+   */
+  private async checkSize(abs: string) {
+    if (inGitRepo(abs)) return;
+    const quick = await walkCandidates(abs, { dirs: 5_000, ms: 1_500 });
+    if (!quick.stopped) return;
+    throw new ConflictException({
+      statusCode: 409, code: "large",
+      message: `${basename(abs)} isn't a git project and holds a lot of folders: Rundown would map only what it finds in a few seconds. Open it anyway, or pick the project's own folder inside it.`,
+    });
+  }
 
   private validateRoot(root: string): string {
     if (!root || typeof root !== "string") throw new BadRequestException("root is required");
@@ -437,12 +453,22 @@ export class WorkspaceService implements OnModuleInit {
   }
 }
 
-/** Folders that hold your other folders: mapping one reads everything in it (and would hang the server for minutes). */
+/** Folders that hold your other folders: mapping one reads everything in it (and would hang the server for minutes).
+ *  Home and above it are never a workspace; the folders below are, when they're a git project. */
 const CONTAINERS = new Set(["Documents", "Desktop", "Downloads", "Library", "Pictures", "Movies", "Music", "Public", "Applications", "Dropbox", "OneDrive", "iCloud Drive", "Google Drive"]);
-export function tooBroad(root: string): boolean {
+export function tooBroad(root: string, homeDir = homedir()): boolean {
   const abs = resolve(root).replace(/\/+$/, "") || "/";
-  const home = homedir().replace(/\/+$/, "");
+  const home = homeDir.replace(/\/+$/, "");
   if (abs === "/" || home === abs || home.startsWith(abs + "/")) return true;   // the disk, a folder above home, home itself
   const rest = abs.startsWith(home + "/") ? abs.slice(home.length + 1) : null;
-  return rest !== null && !rest.includes("/") && CONTAINERS.has(rest);           // ~/Documents, ~/Desktop, ~/Downloads…
+  // ~/Documents, ~/Desktop, ~/Downloads…, unless it's a git project itself (some keep their Documents in git)
+  return rest !== null && !rest.includes("/") && CONTAINERS.has(rest) && !existsSync(join(abs, ".git"));
+}
+
+/** Inside a git working tree: the folder or one above it has a .git (a folder, or a file in a worktree). */
+function inGitRepo(abs: string): boolean {
+  for (let d = abs; ; d = dirname(d)) {
+    if (existsSync(join(d, ".git"))) return true;
+    if (dirname(d) === d) return false;
+  }
 }

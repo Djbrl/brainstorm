@@ -89,6 +89,12 @@ export function FilesPanel({ map, onFocusFile, hidden = false }: {
           touched, changed lately or that many files use. A file an agent edits always joins.
         </p>
       )}
+      {(map.scanStopped || !!map.unread) && (
+        <p className="sidebar-files-note">
+          {map.scanStopped && "This folder isn't a git project and holds a lot: Rundown mapped what it found in a few seconds. "}
+          {!!map.unread && `${map.unread.toLocaleString()} file${map.unread === 1 ? "" : "s"} took too long to read (kept only in the cloud?) and ${map.unread === 1 ? "isn't" : "aren't"} on the map.`}
+        </p>
+      )}
       {replay && (
         <button className={`sidebar-chip ${touchedOnly ? "active" : ""}`} aria-pressed={touchedOnly} onClick={() => setTouchedOnly((v) => !v)}>
           Touched by this thread

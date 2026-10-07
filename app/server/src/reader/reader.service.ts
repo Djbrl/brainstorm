@@ -170,7 +170,7 @@ export class ReaderService implements OnModuleInit {
 
   private async retryMissingSummaries() {
     if (!this.nemotron.enabled) return;
-    const map = this.mapper.getMap(this.cfg.defaultRoot);
+    const map = await this.mapper.getMapAsync(this.cfg.defaultRoot); // never a blocking build
     const missing = map.files.filter((f) => !f.summary);
     if (!missing.length) return;
     this.log.log(`retrying ${missing.length} files with no summary yet`);
@@ -296,7 +296,7 @@ export class ReaderService implements OnModuleInit {
 
   private async summarizeAll() {
     if (!this.nemotron.enabled) { this.summaryTotal = 0; return; }
-    const map = this.mapper.getMap(this.cfg.defaultRoot);
+    const map = await this.mapper.getMapAsync(this.cfg.defaultRoot); // never a blocking build
     const files = [...map.files].sort((a, b) => (b.lastChangedAt ?? "").localeCompare(a.lastChangedAt ?? ""));
     this.summaryTotal = files.length;
     this.summaryPhaseStart = Date.now();

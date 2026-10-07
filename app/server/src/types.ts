@@ -19,7 +19,9 @@ export type FileNode = { path: string; module: string; lines: number; lastChange
 export type Edge = { from: string; to: string };
 /** `formerRoots`: where the repo lived before it moved, so paths in older threads still land on today's files. */
 /** `totalFiles`: how many mappable files the project has; more than `files.length` when the map shows a chosen subset ("800 of 20,312 files"). */
-export type ProjectMap = { root: string; files: FileNode[]; edges: Edge[]; modules: { id: string; summary?: string }[]; formerRoots?: string[]; totalFiles?: number };
+/** `scanStopped`: a folder that isn't a git repo whose walk hit its budget, so the map shows what was found in time.
+ *  `unread`: files left out because reading them took too long (a file kept only in the cloud, downloading on open). */
+export type ProjectMap = { root: string; files: FileNode[]; edges: Edge[]; modules: { id: string; summary?: string }[]; formerRoots?: string[]; totalFiles?: number; scanStopped?: boolean; unread?: number };
 export type Snapshot = { ts: string; map: ProjectMap };
 /** What a question is about: a step or a file. */
 export type AskRequest = { question: string; stepId?: string; filePath?: string; root?: string };

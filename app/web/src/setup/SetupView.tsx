@@ -16,11 +16,15 @@ async function getSuggestions(): Promise<WorkspaceSuggestion[]> {
   return Array.isArray(d) ? d : [];
 }
 
-async function openWorkspace(root: string): Promise<SetupStatus> {
-  const r = await fetch("/api/workspace", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ root }) });
+/** A folder the server wants a yes for first (a big one that isn't a git project): its message, and the folder. */
+class AskFirst extends Error { constructor(message: string, readonly root: string) { super(message); } }
+
+async function openWorkspace(root: string, anyway = false): Promise<SetupStatus> {
+  const r = await fetch("/api/workspace", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ root, ...(anyway ? { anyway } : {}) }) });
   if (!r.ok) {
-    let msg = `Couldn't open that folder (${r.status}).`;
-    try { const b = await r.json(); msg = (Array.isArray(b.message) ? b.message.join(" ") : b.message) || b.error || msg; } catch { /* keep default */ }
+    let msg = `Couldn't open that folder (${r.status}).`, code: string | undefined;
+    try { const b = await r.json(); code = b.code; msg = (Array.isArray(b.message) ? b.message.join(" ") : b.message) || b.error || msg; } catch { /* keep default */ }
+    if (r.status === 409 && code === "large") throw new AskFirst(msg, root);
     throw new Error(msg);
   }
   return r.json();
@@ -65,12 +69,17 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
     : isPath ? list.filter((s) => s.root.toLowerCase().startsWith(q.toLowerCase()))   // projects under the path typed so far
     : list.filter((s) => `${s.name} ${s.root}`.toLowerCase().includes(q.toLowerCase()));
 
-  const open = async (root: string) => {
+  const [ask, setAsk] = useState<string | null>(null); // a big folder waiting for "Open anyway"
+  const open = async (root: string, anyway = false) => {
     const r = root.trim();
     if (!r || busy) return;
-    setBusy(r); setError(null);
-    try { onOpened(await openWorkspace(r), r); }
-    catch (e) { setError(e instanceof Error ? e.message : "Couldn't open that folder."); setBusy(null); }
+    setBusy(r); setError(null); setAsk(null);
+    try { onOpened(await openWorkspace(r, anyway), r); }
+    catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't open that folder.");
+      if (e instanceof AskFirst) setAsk(e.root);
+      setBusy(null);
+    }
   };
   // The system's folder window (Finder, Explorer): the folder picked opens at once.
   const [choosing, setChoosing] = useState(false);
@@ -125,7 +134,11 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
           onKeyDown={(e) => { if (e.key === "ArrowDown") { e.preventDefault(); items()[0]?.focus(); } }} />
         {isPath && <button className="su-btn" type="submit" disabled={!!busy}>{busy === q ? <span className="su-spin light" /> : "Open"}</button>}
       </form>
-      {error && <p className="su-error" role="alert">{error}</p>}
+      {error && (
+        <p className={`su-error${ask ? " ask" : ""}`} role="alert">{error}
+          {ask && <button className="su-anyway" onClick={() => open(ask, true)}>Open anyway</button>}
+        </p>
+      )}
 
       {shown === null ? (
         <div className="su-list">{[0, 1, 2, 3].map((i) => <div key={i} className="su-skel" style={{ animationDelay: `${i * 90}ms` }}><span /><span /></div>)}</div>
@@ -144,7 +157,7 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
             </button>
           ))}
         </div>
-      ) : (
+      ) : ask ? null : (
         <p className="su-none">{isPath ? "Press Enter to open this folder." : list?.length ? `No project matches “${q}”. Choose its folder above.` : "Claude Code and Codex haven't worked in any folder on this computer yet. Choose one above."}</p>
       )}
       {shown && shown.length > 0 && <p className="su-count">{q ? `${shown.length} of ${list!.length} projects` : plural(list!.length, "project")} on this computer</p>}

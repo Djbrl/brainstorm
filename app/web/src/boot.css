@@ -25,3 +25,5 @@
 .trouble-dot { width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; flex: none; }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .trouble-banner { background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.3); color: #f5c06a; }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .trouble-banner button { background: transparent; border-color: rgba(245,158,11,.4); color: #f5c06a; }
+/* Dark themes: --ink is light there, so the dark button would be light on light. The theme's accent, with its dark ground for the words. */
+:root:is([data-theme="prism"], [data-theme="hologram"]) .boot .next-cta { background: var(--accent); color: var(--bg); }

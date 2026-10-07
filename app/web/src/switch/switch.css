@@ -5,8 +5,14 @@
 /* The project, first, a hairline after it. */
 .threadbar-project { flex: none; max-width: 22ch; border: 0; background: none; padding: 6px 10px; margin-left: -10px; border-radius: 10px;
   font-size: 14px; font-weight: 650; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; }
-.threadbar-project:not(.here):hover { background: var(--accent-soft); }
-.threadbar-project.here { cursor: default; }
+.threadbar-project { display: flex; align-items: center; gap: 6px; }
+.threadbar-project span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.threadbar-project svg { flex: none; width: 12px; height: 12px; stroke: var(--ink-3); stroke-width: 1.6; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.threadbar-project:hover, .threadbar-project[aria-expanded="true"] { background: var(--accent-soft); }
+/* Your projects (WorkspaceMenu), in the same sheet as the agents in other projects. */
+.ws-menu { width: 300px; }
+.ws-menu-note { margin: 0; padding: 10px 12px; font-size: 13px; color: var(--ink-3); }
+.ws-menu-all { margin-top: 4px; border-top: 1px solid var(--line) !important; border-radius: 0 0 10px 10px; font-size: 13.5px; font-weight: 600; color: var(--accent); }
 .threadbar-project::after { content: ""; position: absolute; right: -9px; top: 8px; bottom: 8px; width: 1px; background: var(--line); }
 /* The tabs scroll on their own, under a fade where more hide; the keys and Find a thread keep their place. */
 .threadbar-tabs { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 4px; overflow-x: auto; scrollbar-width: none; scroll-behavior: smooth; padding: 1px; }

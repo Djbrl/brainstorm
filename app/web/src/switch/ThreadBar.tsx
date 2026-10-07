@@ -7,9 +7,10 @@ import { setCameraLock, useCameraLock } from "../map/prefs";
 import { attentionText, needsYou, yourTurn } from "../lib/attention";
 import { forgetThread, openThread, rememberThread, useBarThreads, type BarThread } from "../lib/switcher";
 import { isTyping, MOD } from "./shortcuts";
+import { WorkspaceMenu } from "./WorkspaceMenu";
 import "./switch.css";
 
-export function ThreadBar({ project, onFind, onHelp }: { project: string; onFind: () => void; onHelp: () => void }) {
+export function ThreadBar({ project, onFind, onHelp, onAllProjects }: { project: string; onFind: () => void; onHelp: () => void; onAllProjects: () => void }) {
   const { replay } = useNavState();
   const nav = useNavActions();
   const openId = replay?.sessionId ?? null;
@@ -19,15 +20,17 @@ export function ThreadBar({ project, onFind, onHelp }: { project: string; onFind
   // The thread you open joins the bar for the next hours.
   useEffect(() => { if (openId && root) rememberThread(root, openId); }, [openId, root]);
 
-  // 1 to 9 open the bar's tabs; [ and ] the one before or after the open one.
+  // 1 to 9 open the bar's tabs; [ and ] (or Tab and Shift Tab, when nothing on the page has the focus) the one before
+  // or after the open one.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target) || !tabs.length) return;
+      const tab = e.key === "Tab" && (!document.activeElement || document.activeElement === document.body);
       let to: BarThread | undefined;
       if (/^[1-9]$/.test(e.key)) to = tabs[Number(e.key) - 1];
-      else if (e.key === "[" || e.key === "]") {
+      else if (e.key === "[" || e.key === "]" || tab) {
         const i = tabs.findIndex((t) => t.session.id === openId);
-        const d = e.key === "]" ? 1 : -1;
+        const d = e.key === "]" || (tab && !e.shiftKey) ? 1 : -1;
         to = tabs[i === -1 ? (d > 0 ? 0 : tabs.length - 1) : (i + d + tabs.length) % tabs.length];
       } else return;
       e.preventDefault();
@@ -53,9 +56,8 @@ export function ThreadBar({ project, onFind, onHelp }: { project: string; onFind
 
   return (
     <div className="threadbar">
-      {/* The project leads the row (the header no longer names it): back to it from a thread. */}
-      <button className={`threadbar-project${openId ? "" : " here"}`} onMouseDown={keepFocus} onClick={openId ? () => nav.stopReplay() : undefined}
-        aria-current={openId ? undefined : "page"} title={openId ? `Back to ${project}` : root}>{project}</button>
+      {/* The project leads the row (the header no longer names it): a click lists your other projects to hop to. */}
+      <WorkspaceMenu project={project} root={root} onAll={onAllProjects} />
       <div className={`threadbar-tabs${more.left ? " more-left" : ""}${more.right ? " more-right" : ""}`} role="tablist" aria-label="Your threads" ref={strip} onScroll={measure}
         onWheel={(e) => { const el = strip.current; if (el && Math.abs(e.deltaY) > Math.abs(e.deltaX)) el.scrollLeft += e.deltaY; }}>
         {tabs.map((t, i) => <Tab key={t.session.id} t={t} n={i + 1} open={t.session.id === openId}

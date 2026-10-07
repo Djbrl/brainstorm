@@ -14,6 +14,8 @@ import { harnessName, harnessOf } from "../../lib/harness";
 import { visitorHome } from "../../lib/islands";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
 
+const FOLDED_KEY = "rundown-folded-sections";
+
 function useTick(ms: number) {
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -46,6 +48,13 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
   const { state } = useLive();
   const { replay, hiddenAgents, toggleAgent, setHiddenAgents, startReplay, stopReplay } = useNav();
   const [all, setAll] = useState(false);
+  // Sections you folded, remembered in this browser.
+  const [closed, setClosed] = useState<ReadonlySet<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem(FOLDED_KEY) ?? "[]") as string[]); } catch { return new Set(); } });
+  const toggleGroup = (key: string) => setClosed((c) => {
+    const n = new Set(c); if (n.has(key)) n.delete(key); else n.add(key);
+    try { localStorage.setItem(FOLDED_KEY, JSON.stringify([...n])); } catch { /* folded for this visit only */ }
+    return n;
+  });
 
   const sessions = [...state.sessions].sort((a, b) => {
     const running = (a.status === "running" ? 0 : 1) - (b.status === "running" ? 0 : 1);
@@ -64,11 +73,11 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
     track("th");
   };
   // In sections: this project's threads by harness (Claude Code, then Codex), then the threads of other projects that
-  // touched this one, by project. Headings only when there's more than one section. Each section shows its most
-  // recent few; the rest behind "Show all" (the open thread always shows).
-  const sections = new Map<string, { title: string; list: Session[] }>();
-  const add = (key: string, title: string, s: Session) => (sections.get(key) ?? sections.set(key, { title, list: [] }).get(key)!).list.push(s);
-  for (const k of ["claude", "codex"]) sections.set(k, { title: harnessName(k as "claude" | "codex"), list: [] });
+  // touched this one, by project. A section's heading folds it. Each shows its most recent few; the rest behind
+  // "Show all" (the open thread always shows).
+  const sections = new Map<string, { key: string; title: string; list: Session[] }>();
+  const add = (key: string, title: string, s: Session) => (sections.get(key) ?? sections.set(key, { key, title, list: [] }).get(key)!).list.push(s);
+  for (const k of ["claude", "codex"]) sections.set(k, { key: k, title: harnessName(k as "claude" | "codex"), list: [] });
   for (const x of sessions) {
     const home = visitorHome(x.cwd, state.map);
     if (home) { const name = home.slice(home.lastIndexOf("/") + 1); add(`p:${home}`, `From ${name}`, x); }
@@ -77,7 +86,7 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
   const groups = [...sections.values()].filter((g) => g.list.length);
   const SHORT = 5;
   const cut = (list: Session[]) => (all || list.length <= SHORT + 1 ? list : list.filter((x, i) => i < SHORT || x.id === replay?.sessionId));
-  const hidden = groups.reduce((n, g) => n + g.list.length - cut(g.list).length, 0);
+  const hidden = groups.reduce((n, g) => n + (closed.has(g.key) ? 0 : g.list.length - cut(g.list).length), 0);
 
   const row = (session: Session) => (
     <ThreadRow
@@ -98,12 +107,21 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
   );
   return (
     <div className="sidebar-threads">
-      {groups.map((g) => (
-        <section key={g.title} className="sidebar-thread-group">
-          {groups.length > 1 && <h3>{g.title}<span>{g.list.length}</span></h3>}
-          <ul className="sidebar-thread-list">{cut(g.list).map(row)}</ul>
-        </section>
-      ))}
+      {groups.map((g) => {
+        const shut = closed.has(g.key);
+        // Folded: only the open thread stays, so you still see where you are.
+        const list = shut ? g.list.filter((x) => x.id === replay?.sessionId) : cut(g.list);
+        return (
+          <section key={g.key} className={`sidebar-thread-group${shut ? " shut" : ""}`}>
+            <h3>
+              <button onClick={() => toggleGroup(g.key)} aria-expanded={!shut}>
+                <i className="sidebar-tree-caret" aria-hidden="true">›</i>{g.title}
+              </button>
+            </h3>
+            {list.length > 0 && <ul className="sidebar-thread-list">{list.map(row)}</ul>}
+          </section>
+        );
+      })}
       {hidden > 0 && <button className="sidebar-more" onClick={() => setAll(true)}>Show all {sessions.length} threads</button>}
       {all && groups.some((g) => g.list.length > SHORT + 1) && <button className="sidebar-more" onClick={() => setAll(false)}>Show fewer</button>}
     </div>

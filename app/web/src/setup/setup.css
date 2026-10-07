@@ -96,8 +96,16 @@
 @keyframes su-ready { from { transform: scale(.97); } to { transform: none; } }
 
 /* Pick: the system's folder window first, then the folders Claude Code and Codex have worked in. */
-.su-choose { align-self: flex-start; margin-top: 28px; gap: 10px; }
-.su-choose:not(:disabled) { animation: none; }
+/* Choose a folder: the same sheet as the search field and the project rows (surface, hairline, the theme's ink), not
+   the big blue call to action. */
+.su-choose { display: inline-flex; align-items: center; gap: 10px; margin-top: 28px; height: 48px; padding: 0 20px 0 16px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--surface); color: var(--ink); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+  transition: border-color .15s, box-shadow .15s, background .15s; }
+.su-choose svg { color: var(--accent); }
+.su-choose:not(:disabled):hover { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.su-choose:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.su-choose:disabled { opacity: .6; cursor: default; }
 .su-sub { margin: 36px 0 0; font-size: 15px; font-weight: 600; color: var(--ink-2); }
 .su-pick .su-sub + .su-find { margin-top: 12px; }
 .su-home { border: 0; background: none; padding: 0; cursor: pointer; }
+.su-pick .su-choose { display: inline-flex; flex: none; align-self: flex-start; height: 48px; } /* the picker's column is a flex column */

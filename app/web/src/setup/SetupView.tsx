@@ -111,8 +111,8 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
       <h1 className="su-title">Pick a workspace</h1>
       <p className="su-lede">Rundown maps the code in a folder and follows the agents (Claude Code or Codex) working in it, live.</p>
 
-      <button className="su-btn big su-choose" onClick={choose} disabled={choosing || !!busy}>
-        {choosing ? <><span className="su-spin light" />Waiting for a folder…</> : <>
+      <button className="su-choose" onClick={choose} disabled={choosing || !!busy}>
+        {choosing ? <><span className="su-spin" />Waiting for a folder…</> : <>
           <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M2.75 6.25V15a1.25 1.25 0 0 0 1.25 1.25h12A1.25 1.25 0 0 0 17.25 15V8A1.25 1.25 0 0 0 16 6.75h-6.2L8.3 4.5a1 1 0 0 0-.83-.45H4A1.25 1.25 0 0 0 2.75 5.3Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /></svg>
           Choose a folder…</>}
       </button>

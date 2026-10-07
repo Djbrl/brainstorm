@@ -44,10 +44,18 @@
 .sidebar-thread-status.running { background: var(--ok); box-shadow: 0 0 0 3px rgba(31,157,85,.15); }
 .sidebar-thread-title { flex: 1; min-width: 0; font-weight: 600; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-thread-title { flex: 1 1 auto; }
-/* Sections of the thread list: Claude Code, Codex, other projects (headings only when there's more than one). */
-.sidebar-thread-group + .sidebar-thread-group { margin-top: 18px; }
-.sidebar-thread-group h3 { display: flex; align-items: baseline; gap: 6px; margin: 6px 2px 4px; font-size: 13px; font-weight: 650; color: var(--ink-2); }
-.sidebar-thread-group h3 span { font-weight: 500; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+/* Sections of the thread list: Claude Code, Codex, other projects. The heading reads as one (the threads under it a
+   size smaller) and folds the section. */
+.sidebar-thread-group + .sidebar-thread-group { margin-top: 10px; }
+.sidebar-thread-group h3 { margin: 4px -6px 2px; }
+.sidebar-thread-group h3 button { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; background: none; padding: 6px; border-radius: 10px;
+  font-size: 16.5px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); text-align: left; }
+.sidebar-thread-group h3 button:hover { background: #f4f4f7; }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .sidebar-thread-group h3 button:hover { background: var(--hover); }
+.sidebar-thread-group h3 .sidebar-tree-caret { width: 14px; font-size: 15px; color: var(--ink-3); transform: rotate(90deg); transition: transform .15s; }
+.sidebar-thread-group.shut h3 .sidebar-tree-caret { transform: none; }
+.sidebar-thread-group .sidebar-thread-title { font-size: 13.5px; font-weight: 500; }
+.sidebar-thread-group .sidebar-thread.selected .sidebar-thread-title { font-weight: 600; }
 .sidebar-thread-head time { color: var(--ink-3); font-size: 12px; white-space: nowrap; }
 .sidebar-thread-actions { display: flex; gap: 8px; margin: 8px 0 0 16px; }
 .sidebar-thread-actions button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 12px; font-size: 12.5px; font-weight: 500; color: var(--ink-2); }

@@ -1,7 +1,8 @@
 // Live agents on the Map: markers that glide between files, fading trails, lines of sight to the files they read.
 import type { AgentPresence } from "@contract";
 import { clock } from "../lib/live";
-import { along, casing, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs } from "./themes";
+import { along, casing, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs, type RGB } from "./themes";
+import { css, hex, mixRGB } from "./color";
 
 /** Main threads get the accent (Metro: their own ink line); subagents a colour from the theme's palette, by id. */
 export function agentColor(a: Pick<AgentPresence, "id" | "isSubagent">, accent: string): string {
@@ -54,6 +55,9 @@ export type AgentAnim = {
   lastTs: string; pulseT0: number;              // activity without a new file → pulse
   lastErr?: string; errT0: number;              // a failed tool call → the marker flashes red
   landedT0?: number;                            // the trip whose landing was announced (Prism: the cube flashes)
+  // Changing state eases (STATE_EASE): the marker's colour (its own, error red, greyed at rest), the thinking and
+  // waiting rings fading in and out; `easing` while any is still on its way (useLiveAgents keeps the frames coming).
+  col?: RGB; thinkA?: number; waitA?: number; easeT?: number; easing?: boolean;
 };
 type Pt = { x: number; y: number; r: number };
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -65,6 +69,11 @@ const ERR_MS = 2600;        // how long the marker stays red
 const ERR_PULSE_MS = 1100;  // one red ring
 const WAIT_MS = 1800;       // the amber ring's breath while an agent waits on you
 const THINK_MS = 2400;      // the slower ring while it thinks
+const STATE_EASE = 0.16;    // seconds for a marker to (nearly) take its new state's colour and rings
+const REST_GREY: RGB = [176, 180, 190];   // at rest, the marker's colour turns this much toward grey (REST_MIX)
+const REST_MIX = 0.55;
+const rgbOf = (c: string): RGB => (c.startsWith("#") ? hex(c) : ((c.match(/\d+/g) ?? ["0", "0", "0"]).slice(0, 3).map(Number) as RGB));
+const toward = (a: number, b: number, f: number) => (Math.abs(b - a) < 0.01 ? b : a + (b - a) * f);
 const WAIT_AMBER = "#f59e0b";
 const WAIT_TEXT = "#9a5800";      // on a light outline
 const WAIT_TEXT_DARK = "#ffc56b"; // on a dark one (Prism, Hologram)
@@ -146,6 +155,16 @@ export function drawAgents(opts: {
 
       const erring = t - st.errT0 < ERR_MS;
       const color = erring ? ERROR_RED : agentColor(a, accent);
+      // Its state's colour, eased: its own while it works or thinks, red on an error, greyed once it rests.
+      const resting = !a.active && !thinks && !waiting?.has(a.id) && !erring;
+      const want = resting ? mixRGB(rgbOf(color), REST_GREY, REST_MIX) : rgbOf(color);
+      const f = 1 - Math.exp(-Math.min(0.1, Math.max(0, (t - (st.easeT ?? t)) / 1000)) / STATE_EASE);
+      st.easeT = t;
+      st.col = st.col ? (mixRGB(st.col, want, f) as RGB) : want;
+      st.thinkA = toward(st.thinkA ?? (thinks ? 1 : 0), thinks ? 1 : 0, f);
+      st.waitA = toward(st.waitA ?? (waiting?.has(a.id) ? 1 : 0), waiting?.has(a.id) ? 1 : 0, f);
+      st.easing = st.col.some((v, i) => Math.abs(v - want[i]) > 1) || (st.thinkA > 0 && st.thinkA < 1) || (st.waitA > 0 && st.waitA < 1);
+      const markCss = css(st.col);
 
       // Trail through the last distinct files it wrote, newest strongest.
       const files: string[] = [];
@@ -219,9 +238,9 @@ export function drawAgents(opts: {
       if (trip) drawTrip(ctx, style.route, trip, p, e, color, 9 / scale, st.alpha, scale);
 
       // Thinking: a slow ring in its colour, swelling and fading, until its next step.
-      if (thinks) {
+      if (st.thinkA > 0.01) {
         const b = (t % THINK_MS) / THINK_MS;
-        ctx.globalAlpha = st.alpha * Math.sin(b * Math.PI) * 0.7;
+        ctx.globalAlpha = st.alpha * st.thinkA * Math.sin(b * Math.PI) * 0.7;
         ctx.beginPath(); ctx.arc(st.x, st.y, (11 + b * 9) / scale, 0, Math.PI * 2);
         ctx.strokeStyle = color; ctx.lineWidth = 2 / scale; ctx.stroke();
         ctx.globalAlpha = st.alpha;
@@ -229,12 +248,12 @@ export function drawAgents(opts: {
 
       // Waiting on you: an amber ring that breathes, as long as it waits.
       const waitLabel = waiting?.get(a.id);
-      if (waitLabel) {
+      if (st.waitA > 0.01) {
         const b = (t % WAIT_MS) / WAIT_MS;
-        ctx.globalAlpha = st.alpha * (1 - b) * 0.9;
+        ctx.globalAlpha = st.alpha * st.waitA * (1 - b) * 0.9;
         ctx.beginPath(); ctx.arc(st.x, st.y, (11 + b * 16) / scale, 0, Math.PI * 2);
         ctx.strokeStyle = WAIT_AMBER; ctx.lineWidth = 2.6 / scale; ctx.stroke();
-        ctx.globalAlpha = st.alpha;
+        ctx.globalAlpha = st.alpha * st.waitA;
         ctx.beginPath(); ctx.arc(st.x, st.y, 12 / scale, 0, Math.PI * 2);
         ctx.strokeStyle = WAIT_AMBER; ctx.lineWidth = 2.2 / scale; ctx.stroke();
       }
@@ -244,7 +263,7 @@ export function drawAgents(opts: {
       if (style.glow) { ctx.shadowColor = color; ctx.shadowBlur = 16; }
       else { ctx.shadowColor = "rgba(0,0,0,0.18)"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 1; }
       ctx.beginPath(); ctx.arc(st.x, st.y, 9 / scale, 0, Math.PI * 2);
-      ctx.fillStyle = color; ctx.fill();
+      ctx.fillStyle = markCss; ctx.fill();
       ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
       ctx.lineWidth = 2 / scale; ctx.strokeStyle = style.markerStroke; ctx.stroke();
       ctx.fillStyle = style.markerText;

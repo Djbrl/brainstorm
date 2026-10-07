@@ -83,13 +83,34 @@ export const lookOf = (n: GNode, F: Frame): Look | null => {
 };
 
 /** A file's own colour (when anyone last changed it), cached on the node. */
+const COLOUR_MS = 450;   // a file changing colour (an edit lands: grey to orange) eases over this
+const RING_EASE = 0.12;  // seconds for the "editing now" ring to (nearly) fade in or out
 const ownColour = (n: GNode, F: Frame) => {
   if (n.cAt !== n.file.lastChangedAt || n.cEp !== F.epoch || !n.c) {
+    const was = n.c, edited = n.cAt !== undefined && n.cAt !== n.file.lastChangedAt;
     n.c = recencyRGB(F.tokens, n.file.lastChangedAt, F.now, F.recorded, F.since); n.css = css(n.c);
+    // A new edit eases the colour in from what it was (the slow fade with time needs none: it moves in small steps).
+    if (edited && was && !same(was, n.c)) { n.cFrom = easedColour(n, F) ?? was; n.cT0 = F.t; }
     n.cAt = n.file.lastChangedAt; n.cEp = F.epoch;
   }
   return n;
 };
+/** The colour it shows this frame while easing from its old one, or undefined once there. */
+function easedColour(n: GNode, F: Frame): RGB | undefined {
+  if (!n.cFrom || n.cT0 === undefined) return undefined;
+  const k = (F.t - n.cT0) / COLOUR_MS;
+  if (k >= 1) { n.cFrom = undefined; return undefined; }
+  moreMotion(F, Motion.Smooth);
+  return mixRGB(n.cFrom, n.c!, 1 - (1 - k) ** 3);
+}
+/** How much the "editing now" ring shows (0…1), easing toward on or off; keeps frames coming while it moves. */
+function ringOf(n: GNode, on: boolean, F: Frame): number {
+  const target = on ? 1 : 0, a = n.ringA ?? target, dt = Math.min(0.1, Math.max(0, (F.t - (n.ringT ?? F.t)) / 1000));
+  n.ringT = F.t;
+  const next = Math.abs(target - a) < 0.01 ? target : a + (target - a) * (1 - Math.exp(-dt / RING_EASE));
+  if (next !== target) moreMotion(F, Motion.Smooth);
+  return (n.ringA = next);
+}
 /** The focus's colour for a time the thread changed a file (or the quiet colour: undefined). */
 const focusColour = (edited: string | undefined, F: Frame, m: Caches["focusColours"]) => {
   const k = edited ?? "";
@@ -211,11 +232,12 @@ export function drawFile(ctx: CanvasRenderingContext2D, n: GNode, scale: number,
       }
     }
   }
-  if (active && !plain) {
+  const ringA = plain ? 0 : ringOf(n, active, F);
+  if (ringA > 0.01) {
     ctx.beginPath();
     ctx.arc(x, y, r + 3.5 / scale, 0, TAU);
     ctx.strokeStyle = tokens.accent;
-    ctx.globalAlpha = 0.9 * alpha;
+    ctx.globalAlpha = 0.9 * alpha * ringA;
     ctx.lineWidth = 1.6 / scale;
     ctx.stroke();
     ctx.globalAlpha = alpha;
@@ -223,7 +245,8 @@ export function drawFile(ctx: CanvasRenderingContext2D, n: GNode, scale: number,
 
   // In a focus, a file takes the focus's colour (when the thread changed it, or the quiet one), not the project's.
   const own = ownColour(n, F);
-  let rgb = own.c!, rgbCss = own.css!;
+  const easing = easedColour(n, F);
+  let rgb = easing ?? own.c!, rgbCss = easing ? css(easing) : own.css!;
   if (look && look.tone > 0) {
     const fc = focusColour(look.edited, F, c.focusColours);
     if (look.tone >= 1) { rgb = fc.rgb; rgbCss = fc.css; }
@@ -315,8 +338,8 @@ function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: F
   }
   const closed = alpha * (1 - open);
   if (closed <= 0.01) { ctx.globalAlpha = 1; if (isle) ctx.setLineDash([]); return; }
-  const own = ownColour(n, F);
-  let rgbCss = own.css!;
+  const own = ownColour(n, F), eased = easedColour(n, F);
+  let rgbCss = eased ? css(eased) : own.css!;
   if (look && look.tone >= 1) rgbCss = focusColour(look.edited, F, c.focusColours).css;
   ctx.beginPath(); ctx.arc(x, y, r, 0, TAU);
   // Metro: a white disc like its stations, its lines passing under it; elsewhere a tint of the folder's colour.
@@ -330,7 +353,8 @@ function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: F
   if (isle) ctx.setLineDash([]);
   const gitRing = F.onlyDirs?.get(n.id);   // Show git: something inside it
   if (gitRing && !active) { ctx.beginPath(); ctx.arc(x, y, r + 3.5 / scale, 0, TAU); ctx.globalAlpha = closed; ctx.lineWidth = 2 / scale; ctx.strokeStyle = gitRing; ctx.stroke(); }
-  if (active) { ctx.beginPath(); ctx.arc(x, y, r + 3.5 / scale, 0, TAU); ctx.globalAlpha = 0.9 * closed; ctx.lineWidth = 1.6 / scale; ctx.strokeStyle = tokens.accent; ctx.stroke(); }
+  const ringA = ringOf(n, active, F);
+  if (ringA > 0.01) { ctx.beginPath(); ctx.arc(x, y, r + 3.5 / scale, 0, TAU); ctx.globalAlpha = 0.9 * closed * ringA; ctx.lineWidth = 1.6 / scale; ctx.strokeStyle = tokens.accent; ctx.stroke(); }
   ctx.globalAlpha = 1;
   const px = r * scale, count = n.dir!.files.length;
   if (px < FOLDER_TEXT_PX) {

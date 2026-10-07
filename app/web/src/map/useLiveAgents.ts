@@ -38,7 +38,7 @@ export function useLiveAgents({ agents: live, attention, hiddenAgents, threadId,
     for (const a of agentsRef.current) {
       const st = anim.current.get(a.id);
       if (!st) continue;   // not on the map (its file isn't a node)
-      if (t - st.t0 < tripMs(route, 650) + 50 || st.flashes.length || t - st.pulseT0 < 700 || t - st.errT0 < 2600 || waitingRef.current.has(a.id) || thinkingRef.current.has(a.id)) return true;
+      if (t - st.t0 < tripMs(route, 650) + 50 || st.flashes.length || t - st.pulseT0 < 700 || t - st.errT0 < 2600 || waitingRef.current.has(a.id) || thinkingRef.current.has(a.id) || st.easing) return true;
       const target = agentAlpha(a, now, waitingRef.current.has(a.id) || thinkingRef.current.has(a.id), keepRef.current);
       if (Math.abs(target - st.alpha) > 0.01) return true;
     }

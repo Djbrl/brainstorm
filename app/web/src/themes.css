@@ -32,7 +32,6 @@
 /* light hovers, pills and code blocks hard-coded elsewhere */
 :root:is([data-theme="prism"], [data-theme="hologram"]) .lens-switch { background: var(--sheet); }
 :root:is([data-theme="prism"], [data-theme="hologram"]) { --you: var(--hover-2); --you-hover: rgba(160,170,255,.28); }
-:root:is([data-theme="prism"], [data-theme="hologram"]) .dock-share { background: var(--hover); }
 :root:is([data-theme="prism"], [data-theme="hologram"]) :is(button.sidebar-thread-head:hover, .sidebar-thread-headrow:hover, .sidebar-fold:hover, .sidebar-more:hover,
   .rp-ch-head:hover, .rp-m:hover) { background: var(--hover-2); }
 :root:is([data-theme="prism"], [data-theme="hologram"]) :is(.md code, .md-pre, .sd-expand, .sd-glyph) { background: var(--hover); }

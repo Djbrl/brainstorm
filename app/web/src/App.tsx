@@ -116,7 +116,7 @@ function Shell() {
         {isReplay()
           ? <a className="wordmark" href="https://brainstorm-landing.vercel.app" aria-label="Rundown home"><Logo label="Rundown home" /></a>
           : <div className="wordmark"><Logo /></div>}
-        <Crumbs project={project} />
+        {state.replay || state.shared ? <Crumbs project={project} /> : <div className="topbar-space" />}
         <div className="status">
           {!state.replay && !state.shared && <Elsewhere />}
           {state.preview && (
@@ -151,7 +151,7 @@ function Shell() {
           <a href="https://github.com/Djbrl/brainstorm#install-claude-code-plugin-preview" target="_blank" rel="noopener">install Rundown</a>.
         </div>
       )}
-      {!state.replay && !state.shared && <ThreadBar onFind={() => setFinding(true)} onHelp={() => setHelp(true)} />}
+      {!state.replay && !state.shared && <ThreadBar project={project} onFind={() => setFinding(true)} onHelp={() => setHelp(true)} />}
       {!state.replay && !state.shared && <Keys finding={finding} setFinding={setFinding} help={help} setHelp={setHelp} />}
       {state.shared && <OpenShared />}
       <LiveFollow />
@@ -216,7 +216,9 @@ function LiveFollow() {
   const running = useLiveSelector((s) => !!sid && s.sessions.find((x) => x.id === sid)?.status === "running");
   if (!replay) return null;
   if (replay.live) return <FollowNewest sessionId={replay.sessionId} detail={replay.detail} />;
-  if (replay.mode === "play" && running) return <FollowAtEnd sessionId={replay.sessionId} detail={replay.detail} />;
+  // Live is a state, not a switch: a running thread you bring back to its newest step (scrolling, stepping, playing)
+  // follows it live again; moving off it is looking back.
+  if (running) return <FollowAtEnd sessionId={replay.sessionId} detail={replay.detail} />;
   return null;
 }
 
@@ -228,7 +230,7 @@ function FollowNewest({ sessionId, detail }: { sessionId: string; detail: Replay
   return null;
 }
 
-/** Replaying a running thread: once the player stops on its last beat, follow it live. */
+/** A running thread you look back through: once the cursor is back on its last beat (and not playing), follow it live. */
 function FollowAtEnd({ sessionId, detail }: { sessionId: string; detail: ReplayDetail }) {
   const { setReplayLive } = useNavActions();
   const all = useThread(sessionId, detail);

@@ -35,6 +35,7 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; margin: 
 a.wordmark { color: inherit; text-decoration: none; cursor: pointer; border-radius: 6px; }
 a.wordmark:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 /* Where you are: project › thread › step. Each part above the current one takes you back to it. */
+.topbar-space { flex: 1; }
 .crumbs { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; font-size: 14px; color: var(--ink-3); }
 .crumbs > span, .crumbs > button { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .crumbs > button { border: 0; background: none; padding: 4px 6px; border-radius: 8px; color: var(--ink-2); font-weight: 500; max-width: 38ch; }

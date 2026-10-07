@@ -149,27 +149,7 @@
 .track-agents button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); font-weight: 600; }
 .track-agents button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-/* ---------- under the open thread's title in the Track: Live, Replay, Share (ThreadActions) ---------- */
-.thread-actions { position: relative; flex: none; display: flex; align-items: center; gap: 8px; margin: -2px 8px 12px; }
-.dock-replay { display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 999px; background: var(--accent); color: #fff;
-  font-size: 13px; font-weight: 600; padding: 6px 14px; }
-.dock-replay.on { background: var(--accent-soft); color: #3f3fb0; }
-.dock-replay:disabled { opacity: .45; cursor: default; }
-/* Next to Live (a running thread), Replay steps back to an outline: one filled button per row. */
-.dock-replay.live ~ .dock-replay:not(.on) { background: var(--surface); color: var(--accent); box-shadow: inset 0 0 0 1px var(--line); }
-.dock-replay.live ~ .dock-replay:not(.on):hover { box-shadow: inset 0 0 0 1px var(--accent); }
-.dock-replay:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* A running thread: Follow live, then Live (a pulsing dot) while it follows the newest step. */
-.dock-live-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-.dock-replay.live.on { background: rgba(31,157,85,.12); color: #137a42; }
-.dock-replay.live.on .dock-live-dot { background: #1f9d55; animation: dock-pulse 1.6s ease-out infinite; }
 @keyframes dock-pulse { 0% { box-shadow: 0 0 0 0 rgba(31,157,85,.5); } 100% { box-shadow: 0 0 0 7px rgba(31,157,85,0); } }
-@media (prefers-reduced-motion: reduce) { .dock-replay.live.on .dock-live-dot { animation: none; } }
-.dock-share { border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink-2); font-size: 13px; font-weight: 600; padding: 5px 13px; }
-.dock-share:hover, .dock-share[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
-/* The share menu drops below the buttons, the sheet's width, over the steps. */
-.thread-actions .rp-share { position: static; }
-.thread-actions .rp-share-menu { left: 0; right: 0; top: calc(100% + 8px); bottom: auto; width: auto; }
 
 .rp-player { display: flex; align-items: center; gap: 8px; width: min(640px, calc(100vw - 480px)); min-width: 420px; padding: 10px 12px; border: 1px solid var(--line);
   border-radius: 18px; background: var(--surface); box-shadow: 0 10px 30px rgba(0,0,0,.08); animation: rp-rise .3s cubic-bezier(.2,.85,.25,1); }

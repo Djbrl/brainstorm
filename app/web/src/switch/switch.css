@@ -2,6 +2,12 @@
 
 /* ---- the tab bar ---- */
 .threadbar { display: flex; align-items: center; gap: 16px; padding: 6px 20px; border-bottom: 1px solid var(--line); background: var(--bg); flex: none; min-height: 47px; }
+/* The project, first, a hairline after it. */
+.threadbar-project { flex: none; max-width: 22ch; border: 0; background: none; padding: 6px 10px; margin-left: -10px; border-radius: 10px;
+  font-size: 14px; font-weight: 650; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; }
+.threadbar-project:not(.here):hover { background: var(--accent-soft); }
+.threadbar-project.here { cursor: default; }
+.threadbar-project::after { content: ""; position: absolute; right: -9px; top: 8px; bottom: 8px; width: 1px; background: var(--line); }
 /* The tabs scroll on their own, under a fade where more hide; the keys and Find a thread keep their place. */
 .threadbar-tabs { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 4px; overflow-x: auto; scrollbar-width: none; scroll-behavior: smooth; padding: 1px; }
 .threadbar-tabs::-webkit-scrollbar { display: none; }

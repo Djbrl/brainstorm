@@ -9,7 +9,7 @@ import { forgetThread, openThread, rememberThread, useBarThreads, type BarThread
 import { isTyping, MOD } from "./shortcuts";
 import "./switch.css";
 
-export function ThreadBar({ onFind, onHelp }: { onFind: () => void; onHelp: () => void }) {
+export function ThreadBar({ project, onFind, onHelp }: { project: string; onFind: () => void; onHelp: () => void }) {
   const { replay } = useNavState();
   const nav = useNavActions();
   const openId = replay?.sessionId ?? null;
@@ -53,6 +53,9 @@ export function ThreadBar({ onFind, onHelp }: { onFind: () => void; onHelp: () =
 
   return (
     <div className="threadbar">
+      {/* The project leads the row (the header no longer names it): back to it from a thread. */}
+      <button className={`threadbar-project${openId ? "" : " here"}`} onMouseDown={keepFocus} onClick={openId ? () => nav.stopReplay() : undefined}
+        aria-current={openId ? undefined : "page"} title={openId ? `Back to ${project}` : root}>{project}</button>
       <div className={`threadbar-tabs${more.left ? " more-left" : ""}${more.right ? " more-right" : ""}`} role="tablist" aria-label="Your threads" ref={strip} onScroll={measure}
         onWheel={(e) => { const el = strip.current; if (el && Math.abs(e.deltaY) > Math.abs(e.deltaX)) el.scrollLeft += e.deltaY; }}>
         {tabs.map((t, i) => <Tab key={t.session.id} t={t} n={i + 1} open={t.session.id === openId}

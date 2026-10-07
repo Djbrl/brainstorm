@@ -1,5 +1,5 @@
-// Owner: replay agent. The map's floating footer, the player, shown while you replay; and the open thread's buttons
-// (Live, Replay, Share) under its title in the sidebar. The player is only what playing needs: back, play, forward, a
+// Owner: replay agent. The map's floating footer, the player, shown while you replay (Space); and the share menu, beside
+// the open thread's title in the sidebar. The player is only what playing needs: back, play, forward, a
 // timeline cut by chapter (red where one failed), speed and hide. The step panel follows the cursor (no "Open step"),
 // the camera recenters itself, "Every step" is under the step list.
 import { memo, useEffect, useMemo, useRef, useState } from "react";
@@ -106,45 +106,11 @@ function Player() {
 }
 
 /**
- * The footer: only the player, while replaying. What you can do with the open thread (Live, Replay, Share) sits under its
- * title in the sidebar's Track (ThreadActions); the map's switches are in Settings and on keys (R, L).
+ * The footer: only the player, while replaying. Share sits by the thread's title in the sidebar's Track; the map's
+ * switches are in Settings and on keys (R, L).
  */
 export function Dock() {
   const { replay } = useNavState();
   if (replay?.mode !== "play") return null;
   return <div className="dock"><Player /></div>;
-}
-
-/**
- * Under the open thread's title: Follow live (a running thread), Replay and Share. Replay plays from the step you're on;
- * pressed again it hides the player.
- */
-export function ThreadActions() {
-  const { state } = useLive();
-  const { replay, setReplayPlaying, setThreadMode, setReplayLive } = useNav();
-  if (!replay) return null;
-  // A thread has moments as soon as it has steps (every step is in one), so the button needn't build the thread to know.
-  const hasSteps = !!state.steps[replay.sessionId]?.length;
-  const running = state.sessions.find((s) => s.id === replay.sessionId)?.status === "running";
-  const on = replay.mode === "play";
-  const toggle = () => {
-    if (on) { setThreadMode("steps"); return; }
-    track("rp");
-    setReplayPlaying(true); // from the step you're on, at the speed set in the player (at the last step: the player opens there, paused)
-  };
-  return (
-    <div className="thread-actions">
-      {running && !on && (
-        <button className={`dock-replay live${replay.live ? " on" : ""}`} onClick={() => { if (!replay.live) track("lv"); setReplayLive(!replay.live); }} aria-pressed={!!replay.live}
-          title={replay.live ? "Following its newest step. Click to stop" : "Jump to its newest step and follow it"}>
-          <i className="dock-live-dot" aria-hidden="true" />{replay.live ? "Live" : "Follow live"}
-        </button>
-      )}
-      <button className={`dock-replay${on ? " on" : ""}`} onClick={toggle} disabled={!hasSteps} aria-pressed={on}
-        title={on ? "Hide the player (Esc)" : "Play this thread from the step you're on (Space)"}>
-        {Icon.small}{on ? "Hide replay" : "Replay"}
-      </button>
-      {!isReplay() && <ShareMenu sessionId={replay.sessionId} className="dock-share" />}
-    </div>
-  );
 }

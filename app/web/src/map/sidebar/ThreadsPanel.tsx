@@ -1,7 +1,7 @@
 // Owner: sidebar agent. Threads tab: the list of threads, nothing more. Clicking one opens it on the map, and the sidebar
 // turns to its Track tab (its steps; a running one follows live, and Live, Replay and Share sit under its title there).
 // Clicking the open thread again closes it. A thread's harness is a colour mark, said once in a legend under the list.
-// Under the open thread: what it waits on you for, if it's blocked, and its agents folded into one row (follow, show/hide).
+// Under the open thread: what it waits on you for, if it's blocked, and its agents, each on its row (follow, show/hide).
 // The eye in the title row shows or hides all its agents.
 import { useEffect, useState } from "react";
 import type { AgentPresence, Session } from "@contract";
@@ -111,12 +111,9 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
 }) {
   const sorted = [...agents].sort((a, b) => (a.isSubagent ? 1 : 0) - (b.isSubagent ? 1 : 0) || a.id.localeCompare(b.id));
   const running = session.status === "running";
-  const [agentsOpen, setAgentsOpen] = useState(false);
-  useEffect(() => { if (!selected) setAgentsOpen(false); }, [selected]);
   const ids = sorted.map((a) => a.id);
   const allHidden = ids.length > 0 && ids.every((id) => hiddenAgents.has(id));
   const toggleAll = () => setHiddenAgents(allHidden ? [...hiddenAgents].filter((id) => !ids.includes(id)) : [...hiddenAgents, ...ids]);
-  const working = sorted.filter((a) => a.active).length;
   const attention = useLive().state.attention[session.id];
   const blocked = needsYou(attention), turn = yourTurn(attention);
   const say = attention && (blocked || turn) ? attentionText(attention) : null;
@@ -137,21 +134,12 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
         )}
       </div>
       {selected && blocked && say && <p className="sidebar-thread-note blocked" title={attention?.detail}>{say.line}</p>}
-      {selected && sorted.length > 0 && (
-        <button className="sidebar-fold" onClick={() => setAgentsOpen((o) => !o)} aria-expanded={agentsOpen}>
-          <span className="sidebar-fold-avatars" aria-hidden="true">
-            {sorted.slice(0, 5).map((a) => <i key={a.id} style={{ background: agentColor(a, accent) }}>{initial(a)}</i>)}
-          </span>
-          <span className="sidebar-fold-text">{sorted.length} agent{sorted.length > 1 ? "s" : ""}{working ? `, ${working} working` : ""}</span>
-          <i className={`sidebar-tree-caret ${agentsOpen ? "open" : ""}`} aria-hidden="true">›</i>
-        </button>
-      )}
-      {sorted.length > 0 && selected && agentsOpen && (
+      {sorted.length > 0 && selected && (
         <ul className="sidebar-thread-agents">
           {sorted.map((a) => {
             const following = followId === a.id;
             const hidden = hiddenAgents.has(a.id);
-            const name = shortName(a, 22);
+            const name = a.isSubagent ? shortName(a, 22) : "Main agent";
             return (
               <li key={a.id} className={`${following ? "following" : ""} ${hidden ? "hidden-agent" : ""}`}>
                 <button className="sidebar-agent-main" onClick={() => onFollow(following ? null : a.id)} title={following ? "Stop following" : a.file ? "Follow this agent on the map, and see only its steps" : "See only its steps (it hasn't touched a file on the map yet)"}>

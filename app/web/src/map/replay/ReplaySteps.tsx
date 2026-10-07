@@ -231,6 +231,9 @@ const TrackList = memo(function TrackList({ thread, sessionId, whoOf, index, pla
           : Number(row.dataset.from) + Math.floor((cy + dy - row.getBoundingClientRect().top) / rowHRef.current);
         break;
       }
+      // Scrolled to the bottom: the newest moment, which the center line can't reach (a running thread follows live
+      // again from there, App's LiveFollow).
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 4) i = threadRef.current.beats.length - 1;
       if (Number.isFinite(i) && i !== indexRef.current) {
         if (playingRef.current) setReplayPlaying(false);
         setReplayIndex(i);

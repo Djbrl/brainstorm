@@ -116,3 +116,19 @@ test("a question still waiting is kept past the forget window", () => {
   sweep();
   assert.equal((att as any).trackers.has("a"), true);
 });
+
+test("mid-turn and quiet is thinking, even past the 2 minutes that made it idle; a Stop or a closing message ends it", () => {
+  const { att, store, session } = setup();
+  session("a", iso(5 * 60_000));
+  store({ sessionId: "a", kind: "prompt", text: "plan it", ts: iso(5 * 60_000) });   // asked 5 minutes ago, nothing since
+  session("b", iso(3 * 60_000));
+  store({ sessionId: "b", kind: "prompt", text: "fix it", ts: iso(4 * 60_000) });
+  store({ sessionId: "b", kind: "tool_call", tool: "Bash", toolUseId: "b1", ts: iso(3 * 60_000) });
+  store({ sessionId: "b", kind: "tool_result", text: "ok", toolUseId: "b1", ts: iso(3 * 60_000) }); // a result, then the model thinks
+  session("c", iso(60 * 60_000));
+  store({ sessionId: "c", kind: "prompt", text: "old", ts: iso(60 * 60_000) });     // closed mid-turn an hour ago
+  const by = () => Object.fromEntries(att.list().map((a) => [a.sessionId, a.state]));
+  assert.deepEqual(by(), { a: "thinking", b: "thinking" });
+  att.signal({ event: "Stop", session_id: "a" });
+  assert.equal(by().a, "done");
+});

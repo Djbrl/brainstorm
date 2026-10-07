@@ -279,10 +279,26 @@ const TrackList = memo(function TrackList({ thread, sessionId, index, playing, f
   );
 });
 
+/** The live end of the list while the model works on its next step (nothing in the log yet): "Thinking", and for how long. */
+function ThinkingRow({ since }: { since: string }) {
+  const [, tick] = useState(0);
+  useEffect(() => { const t = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(t); }, []);
+  const s = Math.max(0, Math.round((Date.now() - Date.parse(since)) / 1000));
+  const took = s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`;
+  return (
+    <div className="rp-waiting thinking" role="status">
+      <b aria-hidden="true" />
+      <span className="rp-waiting-line">Thinking<i className="rp-dots" aria-hidden="true"><i /><i /><i /></i></span>
+      <span className="rp-waiting-detail">{took}</span>
+    </div>
+  );
+}
+
 /** The live end of the list: the agent is waiting on you (or done and it's your turn). */
 function WaitingRow({ sessionId, onOpen }: { sessionId: string; onOpen: (stepId: string) => void }) {
   const a = useLive().state.attention[sessionId];
   const harness = useHarness(sessionId);
+  if (a?.state === "thinking") return <ThinkingRow since={a.since} />;
   if (!a || !(needsYou(a) || yourTurn(a))) return null;
   const t = attentionText(a);
   const blocked = needsYou(a);

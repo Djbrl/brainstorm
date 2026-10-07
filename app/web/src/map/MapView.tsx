@@ -96,7 +96,7 @@ export function MapView() {
   useEffect(() => () => redraw.stop(), [redraw]);
 
   // ---- live agents ----
-  const { agents, drawnAgents, waiting, waitingRef, agentsRef, anim, moving: agentsMoving } = useLiveAgents({
+  const { agents, drawnAgents, waiting, waitingRef, thinkingRef, agentsRef, anim, moving: agentsMoving } = useLiveAgents({
     agents: state.agents, attention: state.attention, hiddenAgents, threadId: replay?.sessionId ?? null, liveThread: !!replay?.live,
   });
   const hoverRef = useRef(hover); hoverRef.current = hover;
@@ -129,7 +129,9 @@ export function MapView() {
     memo.set(file, id ?? null);
     return id;
   }, []);
-  const replayLayer = useReplayLayer({ fg: fg as never, wrapRef, nodeIndexRef, accent: tokens.accent, font: tokens.body, camera: camRef });
+  const liveShown = useRef(false);
+  liveShown.current = !!replay && drawnAgents.some((a) => a.sessionId === replay.sessionId);
+  const replayLayer = useReplayLayer({ fg: fg as never, wrapRef, nodeIndexRef, accent: tokens.accent, font: tokens.body, camera: camRef, liveShown });
   const replayRef = useRef<ReplayLayerApi>(replayLayer); replayRef.current = replayLayer;
   const openRef = useRef(!!replay); openRef.current = !!replay;
   const playingRef = useRef(false); playingRef.current = !!replay?.playing;
@@ -344,6 +346,7 @@ export function MapView() {
     drawAgents({
       ctx, scale, agents: agentsRef.current, anim: anim.current, accent: tokens.accent, font: tokens.body,
       hoverFile: hoverRef.current, followId: followRef.current, resolveId, showReads: mapPrefs.showReads, quiet: !openRef.current, waiting: waitingRef.current,
+      thinking: thinkingRef.current, keep: openRef.current,
       resolve: (id) => { const n = nodeIndexRef.current.get(id); return n && n.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y, r: n.r } : undefined; },
     });
   }, [resolveId]);
@@ -360,6 +363,7 @@ export function MapView() {
     if (Math.abs(F.lookSum - lastLookSum.current) > 1e-6) moreMotion(F, Motion.Smooth);   // files easing into or out of a focus
     lastLookSum.current = F.lookSum;
     if (agentsMoving(F.t) || (replayRef.current.tracing && replayRef.current.active && playingRef.current)) moreMotion(F, Motion.Smooth);
+    else if (replayRef.current.thinking && replayRef.current.tracing) moreMotion(F, Motion.Slow);   // the marker's thinking ring
     redraw.drew(F.motion);
   }, [drawModules, drawAgentLayer, redraw]);
 

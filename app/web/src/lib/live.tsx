@@ -63,7 +63,14 @@ type Indexes = {
   fileAt: Map<string, number>;                         // path → position in map.files
   edgesFrom: Map<string, Edge[]>;                      // path → its outgoing imports
   stepAt: Map<string, { sid: string; i: number }>;     // step id → its thread and position in that thread's list
+  serverStatus: Map<string, Session["status"]>;        // thread id → the status the server sent (before attention's say)
 };
+
+/**
+ * Attention knows better than the log's last write whether a thread is going: one the model is still thinking for (nothing
+ * logged for minutes) or with a long command running is running, not idle. Applied after every batch that changes either.
+ */
+const BUSY = new Set(["thinking", "working"]);
 
 function indexMap(ix: Indexes, map: ProjectMap | null) {
   ix.fileAt.clear(); ix.edgesFrom.clear();
@@ -94,18 +101,22 @@ function applyBatch(base: LiveState, actions: Action[], ix: Indexes): LiveState 
   const steps = () => (st().steps = own(s.steps, (o) => ({ ...o })));
   const map = () => (st().map = own(s.map!, (o) => ({ ...o })));
   const files = () => (map().files = own(s.map!.files, (o) => o.slice()));
-  let sortNeeded = false;
+  let sortNeeded = false, statusCheck = false;
   const removed = new Set<string>(), changedFrom = new Set<string>(); // files whose imports changed, files removed
 
   for (const a of actions) {
     switch (a.type) {
       case "connected": if (s.connected !== a.value) st().connected = a.value; break;
-      case "sessions": st().sessions = sortSessions(a.sessions); owned.add(s.sessions); s.sessionsLoaded = true; sortNeeded = false; break;
+      case "sessions":
+        st().sessions = sortSessions(a.sessions); owned.add(s.sessions); s.sessionsLoaded = true; sortNeeded = false;
+        ix.serverStatus.clear(); for (const x of a.sessions) ix.serverStatus.set(x.id, x.status); statusCheck = true;
+        break;
       case "session": {
         const list = st().sessions = own(s.sessions, (o) => o.slice());
         const i = list.findIndex((x) => x.id === a.session.id);
         if (i !== -1) list.splice(i, 1);
         list.unshift(withHarness(a.session));
+        ix.serverStatus.set(a.session.id, a.session.status); statusCheck = true;
         sortNeeded = true;
         break;
       }
@@ -162,8 +173,8 @@ function applyBatch(base: LiveState, actions: Action[], ix: Indexes): LiveState 
       }
       case "agents": st().agents = Object.fromEntries(a.agents.map((g) => [g.id, g])); owned.add(s.agents); break;
       case "agent": (st().agents = own(s.agents, (o) => ({ ...o })))[a.agent.id] = a.agent; break;
-      case "attention-all": st().attention = Object.fromEntries(a.list.map((x) => [x.sessionId, x])); owned.add(s.attention); break;
-      case "attention": (st().attention = own(s.attention, (o) => ({ ...o })))[a.attention.sessionId] = a.attention; break;
+      case "attention-all": st().attention = Object.fromEntries(a.list.map((x) => [x.sessionId, x])); owned.add(s.attention); statusCheck = true; break;
+      case "attention": (st().attention = own(s.attention, (o) => ({ ...o })))[a.attention.sessionId] = a.attention; statusCheck = true; break;
       case "setup-status": case "setup": st().setup = a.status; break;
       case "git": st().git = a.git; break;
       case "reset":
@@ -184,6 +195,16 @@ function applyBatch(base: LiveState, actions: Action[], ix: Indexes): LiveState 
     }
   }
 
+  if (statusCheck && !s.replay) {
+    for (let i = 0; i < s.sessions.length; i++) {
+      const x = s.sessions[i];
+      const a = s.attention[x.id];
+      // A call open for over 20 minutes with nothing else moving is more likely a closed session than a long command.
+      const busy = !!a && BUSY.has(a.state) && (a.state === "thinking" || Date.now() - Date.parse(a.since) < 20 * 60_000);
+      const want = busy ? "running" : ix.serverStatus.get(x.id) ?? x.status;
+      if (x.status !== want) (st().sessions = own(s.sessions, (o) => o.slice()))[i] = { ...x, status: want };
+    }
+  }
   if (sortNeeded) s.sessions.sort(byRecency); // owned: copied by the first "session" of the batch
   // Imports: one pass over the edges, whatever the number of changed files (a removed file's imports go both ways).
   if ((changedFrom.size || removed.size) && s.map) {
@@ -215,7 +236,7 @@ export type LiveStore = {
 
 export function createLiveStore(start: LiveState = initial): LiveStore {
   let state = start;
-  const ix: Indexes = { fileAt: new Map(), edgesFrom: new Map(), stepAt: new Map() };
+  const ix: Indexes = { fileAt: new Map(), edgesFrom: new Map(), stepAt: new Map(), serverStatus: new Map() };
   reindex(ix, state);
   const { subscribe, emit } = listeners();
   let queue: Action[] = [];

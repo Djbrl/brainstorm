@@ -92,7 +92,7 @@ function Tab({ t, n, open, onOpen, onClose }: { t: BarThread; n: number; open: b
   return (
     <div className={`threadbar-tab ${open ? "open" : ""}${blocked ? " needs-you" : ""}`} role="presentation">
       <button role="tab" aria-selected={open} onClick={open ? undefined : onOpen}
-        title={`${session.title || "Untitled thread"}${say ? `\n${say.line}` : running ? "\nWorking now" : ""}\nPress ${n}`}>
+        title={`${session.title || "Untitled thread"}${say ? `\n${say.line}` : attention?.state === "thinking" ? "\nThinking about its next step" : running ? "\nWorking now" : ""}\nPress ${n}`}>
         {state && <span className={`threadbar-dot ${state}`} aria-hidden="true" />}
         <span className="threadbar-title">{session.title || "Untitled thread"}</span>
         {isCodex(session) && <span className="threadbar-harness">Codex</span>}

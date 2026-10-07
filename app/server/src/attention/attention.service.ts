@@ -20,6 +20,10 @@ const STUCK_AFTER = 3;
 /** After this long without activity, a finished or stuck thread stops asking for you. */
 const FORGET_MS = 2 * 60 * 60_000;
 const WORKING_MS = 2 * 60_000;
+/** Mid-turn and quiet this long: the agent is thinking (no step in its log until the model answers). */
+const THINKING_AFTER_MS = 4_000;
+/** A turn that never ends (the session was closed mid-turn) stops counting as thinking after this long. */
+const THINKING_MAX_MS = 20 * 60_000;
 /** How much of a thread's stored log a new tracker reads to catch up. */
 const CATCH_UP = 600;
 /** Which threads belong to the open workspace is re-checked this often (the listener's list is costly to build). */
@@ -98,7 +102,7 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
   /** Threads that need you or just finished, newest first. */
   list(): Attention[] {
     this.sweep(false);
-    return [...this.last.values()].filter((a) => a.state !== "working" && a.state !== "idle").sort((a, b) => b.since.localeCompare(a.since));
+    return [...this.last.values()].filter((a) => a.state !== "working" && a.state !== "idle").sort((a, b) => b.since.localeCompare(a.since)); // thinking included: pages show it
   }
 
   /** From the plugin's hooks. */
@@ -216,6 +220,12 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
     const lm = t.lastMain;
     if (!pending.length && lm && (lm.kind === "text" || (lm.kind === "prompt" && /^\s*\[Request interrupted/.test(lm.text ?? ""))) && quiet > 4_000) {
       return make("done", false, t.lastTs);
+    }
+    // 6. Mid-turn with nothing open: the model is working on its next step (after the prompt, a thought, or a tool's
+    // result). Claude Code writes nothing meanwhile, so the log alone would call it idle after a couple of minutes.
+    if (!pending.length && lm && !t.hook && (lm.kind === "prompt" || lm.kind === "thinking" || lm.kind === "tool_call" || lm.kind === "edit")
+      && quiet > THINKING_AFTER_MS && quiet < THINKING_MAX_MS) {
+      return make("thinking", false, t.lastTs);
     }
     return make(quiet < WORKING_MS || pending.length ? "working" : "idle", true, t.lastTs, pending.length ? about(pending[pending.length - 1]) : {});
   }

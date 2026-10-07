@@ -172,7 +172,8 @@ export type CoworkSummary = {
  * `sure` is false when it's inferred from the log alone (a call with no result and no activity for a while); the plugin's
  * PermissionRequest and Notification hooks make it sure.
  */
-export type AttentionState = "working" | "permission" | "question" | "plan" | "stuck" | "done" | "idle";
+/** "thinking": mid-turn with nothing written for a while (the model is working on its next step; Claude Code logs nothing meanwhile). */
+export type AttentionState = "working" | "thinking" | "permission" | "question" | "plan" | "stuck" | "done" | "idle";
 export type Attention = {
   sessionId: string; state: AttentionState; since: string; sure: boolean;
   tool?: string;      // the tool waiting or failing

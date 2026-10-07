@@ -33,6 +33,16 @@ export function visibleAgents(agents: AgentPresence[], now = clock()): AgentPres
   return agents.filter((a) => a.active || now - Date.parse(a.ts) < 10 * 60_000);
 }
 
+/**
+ * How strongly a marker shows: lit while it works, waits on you or thinks; then dimmed. On the project overview it fades
+ * out over the next 8 minutes; with its thread open it stays, dimmed, where it last was (by its trail).
+ */
+export function agentAlpha(a: AgentPresence, now: number, busy: boolean, keep: boolean): number {
+  if (a.active || busy) return 1;
+  if (keep) return 0.55;
+  return Math.max(0, 0.35 * (1 - (now - Date.parse(a.ts) - 2 * 60_000) / (8 * 60_000)));
+}
+
 // ---------- canvas layer ----------
 // Writes are movement: the marker sits on the last file the agent changed and glides there on each edit/write,
 // and its trail links only write positions. Reads are a line of sight: the marker stays put and a thin line to
@@ -54,6 +64,7 @@ export const ERROR_RED = "#d93025";
 const ERR_MS = 2600;        // how long the marker stays red
 const ERR_PULSE_MS = 1100;  // one red ring
 const WAIT_MS = 1800;       // the amber ring's breath while an agent waits on you
+const THINK_MS = 2400;      // the slower ring while it thinks
 const WAIT_AMBER = "#f59e0b";
 const WAIT_TEXT = "#9a5800";      // on a light outline
 const WAIT_TEXT_DARK = "#ffc56b"; // on a dark one (Prism, Hologram)
@@ -75,8 +86,12 @@ export function drawAgents(opts: {
   quiet?: boolean;
   /** Agents waiting on you (attention), by agent id → the label to show. They stay lit and breathe amber. */
   waiting?: ReadonlyMap<string, string>;
+  /** Agents thinking (mid-turn, nothing logged yet): lit, a slow ring in their colour, "Thinking…". */
+  thinking?: ReadonlySet<string>;
+  /** A thread is open: its agents stay where they last were once they stop. */
+  keep?: boolean;
 }) {
-  const { ctx, scale, agents, anim, resolve, accent, font, hoverFile, followId, resolveId, showReads, quiet, waiting } = opts;
+  const { ctx, scale, agents, anim, resolve, accent, font, hoverFile, followId, resolveId, showReads, quiet, waiting, thinking, keep } = opts;
   const t = performance.now();
   const now = clock();
   const style = mapStyle();
@@ -111,8 +126,8 @@ export function drawAgents(opts: {
       if (trip) { const q = along(trip, e); st.x = q.x; st.y = q.y; }  // ride the route
       else { st.x = st.fromX + (tx - st.fromX) * e; st.y = st.fromY + (ty - st.fromY) * e; }
       if (style.route === "hop" && p >= 1 && st.t0 > 0 && st.landedT0 !== st.t0) { st.landedT0 = st.t0; landings.set(key, t); }
-      const idle = now - Date.parse(a.ts);
-      const target = a.active || waiting?.has(a.id) ? 1 : Math.max(0, 0.35 * (1 - (idle - 2 * 60_000) / (8 * 60_000)));
+      const thinks = !!thinking?.has(a.id) && !waiting?.has(a.id);
+      const target = agentAlpha(a, now, !!waiting?.has(a.id) || thinks, !!keep);
       st.alpha += (target - st.alpha) * 0.08;
 
       // New trail entries: reads become lines of sight. Activity with no new file becomes a pulse.
@@ -203,6 +218,15 @@ export function drawAgents(opts: {
       // The trip under way: Hologram's locator line ahead, Prism's afterimages behind.
       if (trip) drawTrip(ctx, style.route, trip, p, e, color, 9 / scale, st.alpha, scale);
 
+      // Thinking: a slow ring in its colour, swelling and fading, until its next step.
+      if (thinks) {
+        const b = (t % THINK_MS) / THINK_MS;
+        ctx.globalAlpha = st.alpha * Math.sin(b * Math.PI) * 0.7;
+        ctx.beginPath(); ctx.arc(st.x, st.y, (11 + b * 9) / scale, 0, Math.PI * 2);
+        ctx.strokeStyle = color; ctx.lineWidth = 2 / scale; ctx.stroke();
+        ctx.globalAlpha = st.alpha;
+      }
+
       // Waiting on you: an amber ring that breathes, as long as it waits.
       const waitLabel = waiting?.get(a.id);
       if (waitLabel) {
@@ -228,8 +252,9 @@ export function drawAgents(opts: {
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText(initial(a), st.x, st.y + 0.5 / scale);
 
-      if (scale > 1.6 || hoverFile === key || followId === a.id || erring || waitLabel) {
-        const label = waitLabel ? `${shortName(a, 20)} · ${waitLabel}` : erring && a.error ? `${shortName(a, 20)} · ${a.error.slice(0, 48)}` : `${shortName(a, 28)} · ${verbIng(a.action)}`;
+      if (scale > 1.6 || hoverFile === key || followId === a.id || erring || waitLabel || (thinks && keep)) {
+        const label = waitLabel ? `${shortName(a, 20)} · ${waitLabel}` : erring && a.error ? `${shortName(a, 20)} · ${a.error.slice(0, 48)}`
+          : thinks ? `${shortName(a, 28)} · Thinking…` : !a.active ? `${shortName(a, 28)} · Done` : `${shortName(a, 28)} · ${verbIng(a.action)}`;
         ctx.font = `600 ${12 / scale}px ${font}`;
         ctx.textAlign = "left";
         const lx = st.x + 13 / scale, ly = st.y;

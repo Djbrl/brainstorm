@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react";
 import type { ForceGraphMethods } from "react-force-graph-2d";
 import { mapPrefs, replayCursor, useNav } from "../../lib/nav";
 import { useThread, type Thread } from "../../lib/thread";
+import { useLiveSelector } from "../../lib/live";
 import { replayCamera } from "./store";
 import { centerFor, type Camera } from "../camera";
 import { getCameraLock, getStepWindow, type StepWindow } from "../prefs";
@@ -31,6 +32,8 @@ export type ReplayLayerApi = {
   look: (id: string) => Look | null;
   /** True while the tracer is drawn (a replay or steps, not the footprint): Metro quiets the import lines then. */
   tracing: boolean;
+  /** At the thread's last step while its agent thinks: the marker breathes (MapView keeps drawing). */
+  thinking: boolean;
   /** The player is open (a replay, playing or paused): the arrow keys step through it, not move the map. */
   playable: boolean;
   /** The thread's footprint mode (its files lit, no tracer): MapView frames it. */
@@ -50,6 +53,7 @@ export type ReplayLayerApi = {
 type Box = { x0: number; y0: number; x1: number; y1: number };
 
 const GLIDE_MS = 650;       // same glide as the live agent markers (map/agents.tsx)
+const THINK_MS = 2400;      // the thinking ring's breath (as in agents.tsx)
 const FLASH_MS = 600;       // read flash
 const PULSE_MS = 700;       // edit pulse on the marker
 const RED = "#d93025";      // a beat with a failed tool call
@@ -117,7 +121,7 @@ function isTyping(t: EventTarget | null) {
   return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable;
 }
 
-export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera }: {
+export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera, liveShown }: {
   fg: RefObject<ForceGraphMethods | undefined>;
   wrapRef: RefObject<HTMLDivElement | null>;
   nodeIndexRef: RefObject<Map<string, NodePos>>;
@@ -125,6 +129,9 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
   font: string;
   /** MapView's camera: the follow keeps the marker in the middle of the part of the map no panel covers. */
   camera: RefObject<Camera>;
+  /** Following live, whether the live layer draws the thread's agent: if it's gone (the server forgets an agent after
+   *  half an hour), the replay's marker stands in for it at its last step. */
+  liveShown?: RefObject<boolean>;
 }): ReplayLayerApi {
   const { replay, setReplayIndex, setReplayPlaying, landReplay } = useNav();
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
@@ -152,8 +159,10 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
   const speed = replay?.speed ?? 1;
   // Following live, the thread's own agents are drawn by the live layer (each in its colour): no single cursor marker.
   const live = !!replay?.live;
-  const st = useRef<{ active: boolean; thread: Thread | null; index: number; len: number; mode: string; speed: number; live: boolean }>({ active, thread, index, len, mode, speed, live });
-  st.current = { active, thread, index, len, mode, speed, live };
+  // The thread is mid-turn and the model hasn't answered yet: at its last step, the marker shows it's thinking.
+  const thinking = useLiveSelector((s) => !!replay && s.attention[replay.sessionId]?.state === "thinking") && active && index >= last;
+  const st = useRef<{ active: boolean; thread: Thread | null; index: number; len: number; mode: string; speed: number; live: boolean; thinking: boolean }>({ active, thread, index, len, mode, speed, live, thinking });
+  st.current = { active, thread, index, len, mode, speed, live, thinking };
   const anim = useRef<Anim>({ x: 0, y: 0, fromX: 0, fromY: 0, t0: -1e9, file: null, lastIndex: -1, beatAt: -1e9, cam: null });
 
   // Bounds: clamp the cursor whenever the thread (or its length) changes.
@@ -470,7 +479,8 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     // Current marker with a soft halo. Red, with one red ring, when this beat has a failed tool call.
     const failed = beat.failed > 0;
     const mark = failed ? RED : line;
-    if (target && curFile && !s.live) {
+    const ownMarker = !s.live || !liveShown?.current;
+    if (target && curFile && ownMarker) {
       if (trip) drawTrip(ctx, style.route, trip, tp, te, mark, 10 / scale, 1, scale);
       const halo = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, 26 / scale);
       halo.addColorStop(0, hexA(mark, 0.28));
@@ -479,6 +489,12 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
       ctx.fillStyle = halo;
       ctx.beginPath(); ctx.arc(a.x, a.y, 26 / scale, 0, Math.PI * 2); ctx.fill();
 
+      if (s.thinking) { // a slow ring in its colour, swelling and fading, like a live agent's (agents.tsx)
+        const b = (t % THINK_MS) / THINK_MS;
+        ctx.globalAlpha = Math.sin(b * Math.PI) * 0.7;
+        ctx.beginPath(); ctx.arc(a.x, a.y, (11 + b * 9) / scale, 0, Math.PI * 2);
+        ctx.strokeStyle = line; ctx.lineWidth = 2 / scale; ctx.stroke();
+      }
       if (failed) {
         const p = (t - a.beatAt) / ERR_PULSE_MS;
         if (p < 1) {
@@ -536,7 +552,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
       boxes.push({ x0: b.x - w / 2 - pad, x1: b.x + w / 2 + pad, y0: b.y - h / 2 - pad, y1: b.y + h / 2 + pad });
     }
     const a = anim.current;
-    if (curFile && a.file === curFile && !s.live) {   // the marker (where it is this frame) and its name to the right
+    if (curFile && a.file === curFile && (!s.live || !liveShown?.current)) {   // the marker (where it is this frame) and its name to the right
       ctx.save(); ctx.font = `600 ${NAME_FONT / scale}px ${font}`;
       const w = ctx.measureText(baseName(curFile)).width; ctx.restore();
       const m = (MARK_R + 3) / scale;
@@ -564,7 +580,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
   const subject = useCallback(() => (st.current.active && st.current.mode !== "footprint" ? anim.current.cam : null), []);
   const touches = useCallback((id: string) => !!st.current.thread?.touched.has(id), []);
 
-  return { active, tracing: active && mode !== "footprint", playable, footprintMode: active && mode === "footprint", footprint, touches, subject, nodeAlpha, look, draw, marks };
+  return { active, thinking, tracing: active && mode !== "footprint", playable, footprintMode: active && mode === "footprint", footprint, touches, subject, nodeAlpha, look, draw, marks };
 }
 
 /**

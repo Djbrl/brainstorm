@@ -38,6 +38,7 @@
 /* ---- agents in other projects (header) ---- */
 .elsewhere { position: relative; }
 .elsewhere-btn { display: flex; align-items: center; gap: 8px; font-weight: 500; color: var(--ink-2); }
+.ws-chip.elsewhere-btn span { color: inherit; margin-left: 0; font-weight: inherit; } /* not the header chip's accent span */
 .elsewhere-btn:hover, .elsewhere-btn[aria-expanded="true"] { border-color: var(--ink-3); color: var(--ink); }
 .elsewhere-btn.waiting { border-color: #f5c77a; background: #fffaf0; color: #9a5800; font-weight: 600; }
 .elsewhere-pop { position: fixed; z-index: 50; width: 360px; padding: 8px; background: var(--surface);
@@ -85,6 +86,7 @@
   .threadbar { padding: 6px 10px; }
   .threadbar-find { font-size: 0; gap: 0; }
   .threadbar-find kbd { display: none; }
+  .ws-chip.keys-btn { display: none; } /* no keyboard on a phone: the header keeps its room for the project's name */
   .elsewhere-long { display: none; }
   .elsewhere-short { display: inline; }
   .elsewhere-pop { right: 16px !important; left: 16px; width: auto; }

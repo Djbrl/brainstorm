@@ -7,10 +7,22 @@ import { getCameraLock, setCameraLock } from "../map/prefs";
 import { Picker } from "./Picker";
 import { isTyping, SHORTCUTS } from "./shortcuts";
 
-export function Keys({ finding, setFinding }: { finding: boolean; setFinding: (v: boolean) => void }) {
+/** The header's Shortcuts button (beside Settings): opens the list of keys, like ?. */
+export function KeysButton({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button className="ws-chip ws-change keys-btn" onClick={onOpen} title="Keyboard shortcuts (?)">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="5" width="15" height="10" rx="2" /><path d="M5.5 8h1M9.5 8h1M13.5 8h1M5.5 11.5h1M13.5 11.5h1M8.5 11.5h3" /></svg>
+      Shortcuts
+    </button>
+  );
+}
+
+export function Keys({ finding, setFinding, help, setHelp }: {
+  finding: boolean; setFinding: (v: boolean) => void;
+  help: boolean; setHelp: (v: boolean | ((h: boolean) => boolean)) => void;
+}) {
   const { replay, lens, showReads } = useNavState();
   const { setShowReads, setLens } = useNavActions();
-  const [help, setHelp] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const say = (s: string) => { setToast(s); clearTimeout(toastT.current); toastT.current = setTimeout(() => setToast(null), 1400); };
@@ -33,7 +45,7 @@ export function Keys({ finding, setFinding }: { finding: boolean; setFinding: (v
     };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
-  }, [finding, setFinding, setShowReads, setLens]);
+  }, [finding, setFinding, setHelp, setShowReads, setLens]);
 
   return <>
     {finding && <Picker onClose={() => setFinding(false)} />}

@@ -15,7 +15,7 @@ import { Logo } from "./Logo";
 import { track } from "./lib/usage";
 import { ThreadBar } from "./switch/ThreadBar";
 import { Elsewhere } from "./switch/Elsewhere";
-import { Keys } from "./switch/Keys";
+import { Keys, KeysButton } from "./switch/Keys";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import "./boot.css";
 
@@ -72,6 +72,7 @@ function Shell() {
   }), shallowEqual);
   const [setupOpen, setSetupOpen] = useState(false);
   const [finding, setFinding] = useState(false); // Find a thread (⌘K)
+  const [help, setHelp] = useState(false);       // the keyboard shortcuts (?)
 
   // Esc closes the innermost thing first: a popover (it handles Esc itself and marks it handled), then a panel (step,
   // file), then the player, then the thread (not while typing).
@@ -115,6 +116,7 @@ function Shell() {
               Change project
             </button>
           )}
+          {!state.replay && !state.shared && <KeysButton onOpen={() => setHelp(true)} />}
           <SettingsButton />
           {/* No "Live" pill: being live is the normal state. Only what isn't is said: a replay, or the server out of reach. */}
           {(state.shared || state.replay || !state.connected) && (
@@ -139,7 +141,7 @@ function Shell() {
         </div>
       )}
       {!state.replay && !state.shared && <ThreadBar onFind={() => setFinding(true)} />}
-      {!state.replay && !state.shared && <Keys finding={finding} setFinding={setFinding} />}
+      {!state.replay && !state.shared && <Keys finding={finding} setFinding={setFinding} help={help} setHelp={setHelp} />}
       {state.shared && <OpenShared />}
       <LiveFollow />
       {!replay && !state.shared && <Welcome />}

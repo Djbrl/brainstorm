@@ -1,17 +1,14 @@
-// Owner: replay agent. The map's floating footer: Replay, Share and the map switches in one pill, and the player above
-// it when you ask for it. (The map has no colour legend: it reads without one; Show git's tooltip says its colours.) The player is only what playing needs: back, play, forward, a timeline cut by chapter (red where one
-// failed), speed and hide. The rest moved: the step panel follows the cursor (no "Open step"), the camera recenters
-// itself, "Every step" is under the step list. With a thread open the pill leads with what you can do with it:
-// Live (a running thread), Replay and Share.
-import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+// Owner: replay agent. The map's floating footer, the player, shown while you replay; and the open thread's buttons
+// (Live, Replay, Share) under its title in the sidebar. The player is only what playing needs: back, play, forward, a
+// timeline cut by chapter (red where one failed), speed and hide. The step panel follows the cursor (no "Open step"),
+// the camera recenters itself, "Every step" is under the step list.
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useNav, useNavState, type ReplaySpeed } from "../../lib/nav";
-import { isReplay, useLive, useLiveSelector } from "../../lib/live";
+import { isReplay, useLive } from "../../lib/live";
 import { track } from "../../lib/usage";
 import { useThread, type Thread } from "../../lib/thread";
 import { chaptersOf } from "../../lib/chapters";
 import { togglePlay } from "./layer";
-import { setCameraLock, setShowFile, useCameraLock, useShowFile } from "../prefs";
-import { GIT_SHOWN, gitSummary, setShowGit, useShowGit, worktreeOf } from "../gitFilter";
 import "./replay.css";
 
 const SPEEDS: ReplaySpeed[] = [1, 2, 4];
@@ -109,104 +106,45 @@ function Player() {
 }
 
 /**
- * The footer pill: with a thread open, Replay (Live for a running thread) and Share, then the switches the view passes
- * in. The player rises above it while replaying. With nothing in it (the project, no agent followed) the pill hides.
+ * The footer: only the player, while replaying. What you can do with the open thread (Live, Replay, Share) sits under its
+ * title in the sidebar's Track (ThreadActions); the map's switches are in Settings and on keys (R, L).
  */
-export function Dock({ children }: { children: ReactNode }) {
+export function Dock() {
+  const { replay } = useNavState();
+  if (replay?.mode !== "play") return null;
+  return <div className="dock"><Player /></div>;
+}
+
+/**
+ * Under the open thread's title: Follow live (a running thread), Replay and Share. Replay plays from the step you're on;
+ * pressed again it hides the player.
+ */
+export function ThreadActions() {
   const { state } = useLive();
   const { replay, setReplayPlaying, setThreadMode, setReplayLive } = useNav();
-  // A thread has moments as soon as it has steps (every step is in one), so the pill needn't build the thread to know.
-  // The map's replay layer loads them.
-  const hasSteps = !!replay && !!state.steps[replay.sessionId]?.length;
-  const running = !!replay && state.sessions.find((s) => s.id === replay.sessionId)?.status === "running";
-  const on = replay?.mode === "play";
+  if (!replay) return null;
+  // A thread has moments as soon as it has steps (every step is in one), so the button needn't build the thread to know.
+  const hasSteps = !!state.steps[replay.sessionId]?.length;
+  const running = state.sessions.find((s) => s.id === replay.sessionId)?.status === "running";
+  const on = replay.mode === "play";
   const toggle = () => {
     if (on) { setThreadMode("steps"); return; }
     track("rp");
     setReplayPlaying(true); // from the step you're on, at the speed set in the player (at the last step: the player opens there, paused)
   };
   return (
-    <div className="dock">
-      {on && <Player />}
-      <div className="dock-pill">
-        {replay && running && !on && (
-          <button className={`dock-replay live${replay.live ? " on" : ""}`} onClick={() => { if (!replay.live) track("lv"); setReplayLive(!replay.live); }} aria-pressed={!!replay.live}
-            title={replay.live ? "Following its newest step. Click to stop" : "Jump to its newest step and follow it"}>
-            <i className="dock-live-dot" aria-hidden="true" />{replay.live ? "Live" : "Follow live"}
-          </button>
-        )}
-        {replay && (
-          <button className={`dock-replay${on ? " on" : ""}`} onClick={toggle} disabled={!hasSteps} aria-pressed={on}
-            title={on ? "Hide the player (Esc)" : "Play this thread from the step you're on (Space)"}>
-            {Icon.small}{on ? "Hide replay" : "Replay"}
-          </button>
-        )}
-        {replay && !isReplay() && <ShareMenu sessionId={replay.sessionId} className="dock-share" />}
-        {children}
-      </div>
+    <div className="thread-actions">
+      {running && !on && (
+        <button className={`dock-replay live${replay.live ? " on" : ""}`} onClick={() => { if (!replay.live) track("lv"); setReplayLive(!replay.live); }} aria-pressed={!!replay.live}
+          title={replay.live ? "Following its newest step. Click to stop" : "Jump to its newest step and follow it"}>
+          <i className="dock-live-dot" aria-hidden="true" />{replay.live ? "Live" : "Follow live"}
+        </button>
+      )}
+      <button className={`dock-replay${on ? " on" : ""}`} onClick={toggle} disabled={!hasSteps} aria-pressed={on}
+        title={on ? "Hide the player (Esc)" : "Play this thread from the step you're on (Space)"}>
+        {Icon.small}{on ? "Hide replay" : "Replay"}
+      </button>
+      {!isReplay() && <ShareMenu sessionId={replay.sessionId} className="dock-share" />}
     </div>
-  );
-}
-
-/**
- * Lock camera: the camera keeps the tracer (or the agent you follow) centred while you zoom; off, it frames it once and
- * stays where you put it. Shown while something moves on the map: a thread open, or an agent followed.
- */
-export function LockToggle({ shown }: { shown: boolean }) {
-  const lock = useCameraLock();
-  if (!shown) return null;
-  return (
-    <button className="dock-reads" role="switch" aria-checked={lock} onClick={() => setCameraLock(!lock)}
-      title={lock ? "The camera keeps the agent centred (you can still zoom). Click to move the map freely" : "Keep the agent centred as it moves"}>
-      Lock camera<i aria-hidden="true" />
-    </button>
-  );
-}
-
-/**
- * Whether the map draws reads: a line from the agent to each file it reads, and a ring on the file, as it reads it.
- * Only a thread (replayed or followed live) draws them, so the switch shows only with a thread open.
- */
-export function ReadsToggle() {
-  const { replay, showReads, setShowReads } = useNav();
-  if (!replay) return null;
-  return (
-    <button className="dock-reads" role="switch" aria-checked={showReads} onClick={() => setShowReads(!showReads)}
-      title="Lines to the files the agent reads, as it reads them (in a replay or while it works)">
-      Show reads<i aria-hidden="true" />
-    </button>
-  );
-}
-
-/**
- * Show file: a small window with what the agent is reading or writing (replay/Peek.tsx), while you follow the thread
- * live or replay it. Shown with a thread open, like Show reads. Remembered per browser.
- */
-export function FileToggle() {
-  const { replay } = useNavState();
-  const on = useShowFile();
-  if (!replay) return null;
-  return (
-    <button className="dock-reads" role="switch" aria-checked={on} onClick={() => setShowFile(!on)}
-      title="A small window with the file the agent is reading or writing, while you follow it live or replay it">
-      Show file<i aria-hidden="true" />
-    </button>
-  );
-}
-
-/**
- * Show git: rings on the files not committed, and those committed but not pushed (or, with a thread open in its own
- * worktree, that branch's), over the map as it is (gitFilter.ts). Shown whenever the project is in a git repository.
- */
-export function GitToggle() {
-  const on = useShowGit();
-  const git = useLiveSelector((s) => s.git);
-  const { replay } = useNavState();
-  if (!GIT_SHOWN || !git) return null;
-  return (
-    <button className="dock-reads" role="switch" aria-checked={on} onClick={() => setShowGit(!on)}
-      title={gitSummary(git, worktreeOf(git, replay?.sessionId))}>
-      Show git<i aria-hidden="true" />
-    </button>
   );
 }

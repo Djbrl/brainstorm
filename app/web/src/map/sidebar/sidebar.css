@@ -44,8 +44,13 @@
 .sidebar-thread-status.running { background: var(--ok); box-shadow: 0 0 0 3px rgba(31,157,85,.15); }
 .sidebar-thread-title { flex: 1; min-width: 0; font-weight: 600; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-thread-title { flex: 1 1 auto; }
-.sidebar-thread-tree { flex: 0 6 auto; min-width: 0; max-width: 84px; font-size: 11.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sidebar-thread-harness { flex: none; font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+/* Which harness ran the thread: a colour mark at the row's start, said once in the key under the list. */
+.sidebar-thread-harness, .sidebar-harness-key i { flex: none; width: 3px; height: 16px; border-radius: 2px; margin-right: -2px; }
+.h-claude { background: #d97757; }
+.h-codex { background: #3b82f6; }
+.sidebar-harness-key { display: flex; gap: 16px; margin: 14px 2px 0; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-3); }
+.sidebar-harness-key span { display: flex; align-items: center; gap: 7px; }
+.sidebar-harness-key i { height: 12px; margin: 0; }
 .sidebar-thread-head time { color: var(--ink-3); font-size: 12px; white-space: nowrap; }
 .sidebar-thread-actions { display: flex; gap: 8px; margin: 8px 0 0 16px; }
 .sidebar-thread-actions button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 12px; font-size: 12.5px; font-weight: 500; color: var(--ink-2); }
@@ -97,15 +102,10 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .sidebar-thread-status.running { background: var(--accent); box-shadow: 0 0 0 0 rgba(37,99,235,.55); animation: sidebar-pulse 1.6s infinite; }
 .sidebar-thread-head time { font-variant-numeric: tabular-nums; }
 
-/* The stats line sits just above the sidebar. */
-/* One line, no wider than the sidebar under it: it stops before the lens switch. */
-.map-stats { position: absolute; left: 40px; top: 84px; margin: 0; color: var(--ink-3); font-size: 14.5px; pointer-events: none; z-index: 3; white-space: nowrap; max-width: min(calc(50% - 160px), 330px); overflow: hidden; text-overflow: ellipsis; }
-
-/* The sidebar keeps one height and sits centered; the stats line rides just above it (Map, Places). */
-.map-wrap, .cw-wrap { --sb-h: min(900px, calc(100% - 140px)); --sb-top: calc(50% - var(--sb-h) / 2 + 18px); }
+/* The sidebar takes the map's height but a margin (Map, Places). */
+.map-wrap, .cw-wrap { --sb-h: calc(100% - 48px); --sb-top: 24px; }
 .map-sidebar { top: var(--sb-top); bottom: auto; height: var(--sb-h); }
 .sidebar-collapsed { top: var(--sb-top); }
-.map-stats { top: calc(var(--sb-top) - 34px); }
 
 /* Title row: the thread (a pill when open) and the eye that shows or hides all its agents. */
 .sidebar-thread-headrow { display: flex; align-items: center; gap: 2px; margin: -7px -8px; border-radius: 10px; }
@@ -167,15 +167,12 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
   .map-sidebar.sidebar-overlay { left: 10px; right: 10px; top: 10px; bottom: 10px; width: auto; max-width: none; height: auto; }
 }
 
-/* The stats line: on a phone it sits under the row of pills, full width. */
-@media (max-width: 600px) { .map-stats { top: 66px; left: 16px; max-width: calc(100% - 32px); font-size: 13.5px; } }
 
 /* The Track tab: the step list scrolls by itself (its scroll moves the tracer), so the body doesn't. */
 .sidebar-body:has(> .sidebar-track) { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
 .sidebar-track { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .sidebar-track-title { flex: none; display: flex; align-items: baseline; gap: 8px; margin: 2px 8px 10px; font-size: 16px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; color: var(--ink); }
 .sidebar-track-title span { min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.sidebar-track-title small { flex: none; font-size: 12px; font-weight: 500; color: var(--ink-3); }
 .sidebar-tabs button:disabled { color: var(--ink-3); opacity: .55; cursor: default; }
 
 /* Files tab, big repos: the map shows a chosen part of the project (see the server's mapper/select.ts). */

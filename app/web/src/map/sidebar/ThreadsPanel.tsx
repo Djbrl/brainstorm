@@ -1,6 +1,6 @@
 // Owner: sidebar agent. Threads tab: the list of threads, nothing more. Clicking one opens it on the map, and the sidebar
-// turns to its Track tab (its steps; a running one follows live). Clicking the open thread again closes it. The thread's
-// summary is the line above the sidebar (MapStats); Replay, Live and Share are in the Map's footer (ReplayBar's Dock).
+// turns to its Track tab (its steps; a running one follows live, and Live, Replay and Share sit under its title there).
+// Clicking the open thread again closes it. A thread's harness is a colour mark, said once in a legend under the list.
 // Under the open thread: what it waits on you for, if it's blocked, and its agents folded into one row (follow, show/hide).
 // The eye in the title row shows or hides all its agents.
 import { useEffect, useState } from "react";
@@ -10,8 +10,7 @@ import { END, useNav } from "../../lib/nav";
 import { track } from "../../lib/usage";
 import { relTime } from "../../follow/format";
 import { agentColor, baseName, initial, shortName, verbIng } from "../agents";
-import { isCodex } from "../../lib/harness";
-import { visitorFrom } from "../../lib/islands";
+import { harnessName, harnessOf } from "../../lib/harness";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
 
 function useTick(ms: number) {
@@ -88,6 +87,10 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }
       </ul>
       {sessions.length > shown.length && <button className="sidebar-more" onClick={() => setAll(true)}>Show all {sessions.length} threads</button>}
       {all && sessions.length > SHORT + 1 && <button className="sidebar-more" onClick={() => setAll(false)}>Show fewer</button>}
+      <p className="sidebar-harness-key">
+        <span><i className="h-claude" aria-hidden="true" />Claude Code</span>
+        <span><i className="h-codex" aria-hidden="true" />Codex</span>
+      </p>
     </div>
   );
 }
@@ -108,10 +111,6 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
 }) {
   const sorted = [...agents].sort((a, b) => (a.isSubagent ? 1 : 0) - (b.isSubagent ? 1 : 0) || a.id.localeCompare(b.id));
   const running = session.status === "running";
-  // Which git worktree the thread ran in ("hackathon-landing-page", without Claude Code's random suffix).
-  const tree = /\/\.claude\/worktrees\/([^/]+)/.exec(session.cwd ?? "")?.[1]?.replace(/-[0-9a-f]{6}$/, "");
-  // A visitor: a thread working in another project that touched this one (an orchestrator): where it comes from.
-  const from = visitorFrom(session.cwd, useLive().state.map);
   const [agentsOpen, setAgentsOpen] = useState(false);
   useEffect(() => { if (!selected) setAgentsOpen(false); }, [selected]);
   const ids = sorted.map((a) => a.id);
@@ -125,13 +124,10 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
     <li className={`sidebar-thread ${selected ? "selected" : ""}${blocked ? " needs-you" : ""}`}>
       <div className="sidebar-thread-headrow">
         <button className="sidebar-thread-head" onClick={onSelect} aria-pressed={selected} title={selected ? "Close this thread" : running ? "Open this thread and follow it live" : "Open this thread"}>
+          <i className={`sidebar-thread-harness h-${harnessOf(session)}`} title={`Ran in ${harnessName(harnessOf(session))}`} aria-hidden="true" />
           <span className={`sidebar-thread-status ${session.status}${blocked ? " waiting" : ""}`} aria-hidden="true" />
           <span className="sidebar-thread-title">{session.title || "Untitled thread"}</span>
-          {isCodex(session) && <span className="sidebar-thread-harness" title="This thread ran in Codex">Codex</span>}
-          {say
-            ? <span className={`sidebar-thread-attn ${blocked ? "blocked" : "turn"}`} title={`${say.line}${attention?.detail ? `\n${attention.detail}` : ""}`}>{say.badge}</span>
-            : from ? <span className="sidebar-thread-tree" title={`Works in ${session.cwd}, and touched this project`}>from {from}</span>
-            : tree && <span className="sidebar-thread-tree" title={session.cwd}>{tree}</span>}
+          {say && <span className={`sidebar-thread-attn ${blocked ? "blocked" : "turn"}`} title={`${say.line}${attention?.detail ? `\n${attention.detail}` : ""}`}>{say.badge}</span>}
           <time>{running ? "live" : relTime(session.lastEventAt, now)}</time>
         </button>
         {ids.length > 0 && (

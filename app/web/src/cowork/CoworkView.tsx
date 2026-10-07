@@ -6,7 +6,6 @@ import type { CoworkArea } from "@contract";
 import { useLive } from "../lib/live";
 import { useNav } from "../lib/nav";
 import { MapSidebar } from "../map/sidebar/MapSidebar";
-import { MapStats } from "../map/MapStats";
 import { LensSwitch } from "../map/LensSwitch";
 import { AREAS, eventsAt, placeOfStep, placeTitle, placesStore, selectPlace, useCowork, usePlaces } from "./data";
 import { StepDetail } from "../follow/StepDetail";
@@ -71,7 +70,6 @@ export function PlacesView() {
           onSelect={(id) => selectPlace(id)} />
       )}
       <MapSidebar agents={Object.values(state.agents)} accent="#2563eb" followId={null} onFollow={() => setLens("map")} onFocusFile={() => setLens("map")} map={state.map} />
-      <MapStats />
       <LensSwitch />
       {!replay && <p className="cw-note">Pick a thread to see where it went outside the code.</p>}
       <div className={`map-panel pl-panel ${step ? "open" : ""}`} aria-hidden={!step}>

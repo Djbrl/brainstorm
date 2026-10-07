@@ -5,7 +5,8 @@ import { createPortal } from "react-dom";
 import { useNotifyPref } from "../lib/attention";
 import { isReplay } from "../lib/live";
 import { setTheme, THEMES, useTheme } from "../lib/theme";
-import { setStepWindow, STEP_WINDOWS, useStepWindow } from "../map/prefs";
+import { setShowFile, setStepWindow, STEP_WINDOWS, useShowFile, useStepWindow } from "../map/prefs";
+import { useNavActions, useNavState } from "../lib/nav";
 import { setFoldOn, useFoldOn } from "../map/fold";
 import { EDITORS, setEditor, useEditor } from "../lib/editor";
 import { useUsageSetting } from "../lib/usage";
@@ -51,6 +52,7 @@ export function SettingsButton() {
               </div>
             </section>
             <WindowSetting />
+            <FollowSetting />
             <EditorSetting />
             <FoldSetting />
             <NotifySetting />
@@ -76,6 +78,26 @@ function WindowSetting() {
           </button>
         ))}
       </div>
+    </section>
+  );
+}
+
+/** While you follow or replay a thread: the file window (replay/Peek.tsx) and lines to the files it reads (R). */
+function FollowSetting() {
+  const file = useShowFile();
+  const { showReads } = useNavState();
+  const { setShowReads } = useNavActions();
+  return (
+    <section className="set-sec">
+      <h3>While you follow a thread</h3>
+      <label className="notify-opt">
+        <input type="checkbox" checked={file} onChange={() => setShowFile(!file)} />
+        <span><b>Show the file it works on</b><small>A small window with the file the agent is reading or writing</small></span>
+      </label>
+      <label className="notify-opt">
+        <input type="checkbox" checked={showReads} onChange={() => setShowReads(!showReads)} />
+        <span><b>Show reads</b><small>A line to each file the agent reads, as it reads it (R)</small></span>
+      </label>
     </section>
   );
 }

@@ -159,7 +159,7 @@ const Window = memo(function Window({ sessionId, step, result, now, roots }: Mom
         {stat ? <span className="peek-stat"><span className="add">+{stat.add}</span><span className="del">−{stat.del}</span></span>
           : range && <span className="peek-stat">{range}</span>}
         <button className="peek-close" onClick={() => setShowFile(false)} aria-label="Hide this window"
-          title="Hide. Show file in the bar below brings it back">{Icon.close}</button>
+          title="Hide. Settings brings it back">{Icon.close}</button>
       </header>
       <div className="peek-body" ref={scroll}>
         <Body step={step} result={result} />
@@ -185,7 +185,7 @@ function PeekBody({ sessionId, detail }: { sessionId: string; detail: Thread["de
   return <Window sessionId={sessionId} roots={roots} {...moment} />;
 }
 
-/** Mounted by MapView. Shown while a thread on the map is followed live or replayed, unless Show file is off. */
+/** Mounted by MapView. Shown while a thread on the map is followed live or replayed, unless turned off in Settings. */
 export function Peek() {
   const on = useShowFile();
   const { replay, step, lens } = useNavState();

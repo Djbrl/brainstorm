@@ -125,17 +125,17 @@
 .rp-m.current { background: var(--accent-soft); color: var(--ink); }
 .rp-detail-switch { align-self: flex-start; margin: 10px 10px 0; padding: 0; border: 0; background: none; color: var(--accent); font-size: 12.5px; }
 
-/* ---------- the floating footer: Replay, Share and the switches, the player above on demand (Dock) ---------- */
+/* ---------- the floating footer: the player, while replaying (Dock) ---------- */
 .dock { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: calc(100% - 48px); }
-.dock-pill { display: flex; align-items: center; gap: 16px; padding: 6px 8px 6px 6px; border: 1px solid var(--line); border-radius: 999px;
-  background: rgba(255,255,255,.92); backdrop-filter: blur(12px); box-shadow: 0 8px 24px rgba(0,0,0,.07); font-size: 13px; color: var(--ink-2); white-space: nowrap; }
-.dock-pill:not(:has(.dock-replay)) { padding-left: 16px; }
-.dock-pill:empty { display: none; } /* the project with no agent followed: nothing to switch */
-.dock-replay { display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 999px; background: var(--accent); color: #fff;
-  font-size: 13.5px; font-weight: 600; padding: 8px 16px; }
+.map-wrap:has(.map-panel.open) .dock { left: calc(50% - 220px); }
+
+/* ---------- under the open thread's title in the Track: Live, Replay, Share (ThreadActions) ---------- */
+.thread-actions { position: relative; flex: none; display: flex; align-items: center; gap: 8px; margin: -2px 8px 12px; }
+.dock-replay { display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 999px; background: var(--accent); color: #fff;
+  font-size: 13px; font-weight: 600; padding: 6px 14px; }
 .dock-replay.on { background: var(--accent-soft); color: #3f3fb0; }
 .dock-replay:disabled { opacity: .45; cursor: default; }
-/* Next to Live (a running thread), Replay steps back to an outline: one filled button per pill. */
+/* Next to Live (a running thread), Replay steps back to an outline: one filled button per row. */
 .dock-replay.live ~ .dock-replay:not(.on) { background: var(--surface); color: var(--accent); box-shadow: inset 0 0 0 1px var(--line); }
 .dock-replay.live ~ .dock-replay:not(.on):hover { box-shadow: inset 0 0 0 1px var(--accent); }
 .dock-replay:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -145,10 +145,11 @@
 .dock-replay.live.on .dock-live-dot { background: #1f9d55; animation: dock-pulse 1.6s ease-out infinite; }
 @keyframes dock-pulse { 0% { box-shadow: 0 0 0 0 rgba(31,157,85,.5); } 100% { box-shadow: 0 0 0 7px rgba(31,157,85,0); } }
 @media (prefers-reduced-motion: reduce) { .dock-replay.live.on .dock-live-dot { animation: none; } }
-.dock-share { border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink-2); font-size: 13.5px; font-weight: 600; padding: 7px 14px; margin-left: -8px; }
+.dock-share { border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink-2); font-size: 13px; font-weight: 600; padding: 5px 13px; }
 .dock-share:hover, .dock-share[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
-.dock .rp-share-menu { left: 0; right: auto; }
-.map-wrap:has(.map-panel.open) .dock { left: calc(50% - 220px); }
+/* The share menu drops below the buttons, the sheet's width, over the steps. */
+.thread-actions .rp-share { position: static; }
+.thread-actions .rp-share-menu { left: 0; right: 0; top: calc(100% + 8px); bottom: auto; width: auto; }
 
 .rp-player { display: flex; align-items: center; gap: 8px; width: min(640px, calc(100vw - 480px)); min-width: 420px; padding: 10px 12px; border: 1px solid var(--line);
   border-radius: 18px; background: var(--surface); box-shadow: 0 10px 30px rgba(0,0,0,.08); animation: rp-rise .3s cubic-bezier(.2,.85,.25,1); }
@@ -195,10 +196,7 @@
 /* Narrow (tablet and phone): the footer and the player fit the width they have. */
 @media (max-width: 1100px) {
   .rp-player { min-width: 0; width: min(640px, calc(100vw - 48px)); }
-  /* One row while it fits (the dock sizes to its content, not to the half width left of its anchor), then it wraps. */
   .dock { width: max-content; }
-  .dock-pill { flex-wrap: wrap; justify-content: center; row-gap: 6px; max-width: 100%; border-radius: 26px; }
-  .map-wrap:has(.map-panel.open) .dock:not(:has(.dock-replay)) { display: none; }
   /* A side panel open: the footer keeps to the space left of it. */
   .map-wrap:has(.map-panel.open) .dock { left: 16px; right: 456px; width: auto; transform: none; max-width: none; }
   .map-wrap:has(.map-panel.open) .rp-player { width: 100%; flex-wrap: wrap; }
@@ -208,10 +206,6 @@
 @media (max-width: 600px) {
   .dock { bottom: 12px; max-width: calc(100% - 24px); }
   .map-wrap:has(.map-panel.open) .dock { left: 50%; right: auto; transform: translateX(-50%); max-width: calc(100% - 24px); }
-  .dock-pill { gap: 10px; white-space: normal; }
-  .dock-share { margin-left: -4px; }
-  .rp-share { position: static; }
-  .dock .rp-share-menu { left: 50%; right: auto; transform: translateX(-50%); }
   .rp-player, .map-wrap:has(.map-panel.open) .rp-player { width: calc(100vw - 24px); flex-wrap: wrap; gap: 4px 6px; }
   .rp-player .rp-slider, .map-wrap:has(.map-panel.open) .rp-player .rp-slider { order: 5; flex-basis: 100%; margin: 0; }
   .rp-player .rp-speed { margin-left: auto; }

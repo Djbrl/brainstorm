@@ -31,35 +31,46 @@ const save = () => {
   subs.forEach((f) => f());
 };
 
+// Threads you closed in the bar stay out of it, even while they work, until you open them again or they need you.
+const CLOSED_KEY = "rundown-closed-threads";
+let closed: Recent = (() => { try { return JSON.parse(localStorage.getItem(CLOSED_KEY) ?? "{}") as Recent; } catch { return {}; } })();
+const saveClosed = () => { try { localStorage.setItem(CLOSED_KEY, JSON.stringify(closed)); } catch { /* kept for this visit only */ } };
+
 export function rememberThread(root: string, id: string) {
   const now = Date.now();
   const list = (recent[root] ?? []).filter((x) => x.id !== id && now - x.at < RECENT_MS);
   recent = { ...recent, [root]: [{ id, at: now }, ...list].slice(0, 20) };
+  if (closed[root]?.some((x) => x.id === id)) { closed = { ...closed, [root]: closed[root].filter((x) => x.id !== id) }; saveClosed(); }
   save();
 }
+/** Close a thread's tab: out of the bar, a running one too, until you open it again or it needs you. */
 export function forgetThread(root: string, id: string) {
-  if (!recent[root]?.some((x) => x.id === id)) return;
-  recent = { ...recent, [root]: recent[root].filter((x) => x.id !== id) };
+  const now = Date.now();
+  recent = { ...recent, [root]: (recent[root] ?? []).filter((x) => x.id !== id) };
+  closed = { ...closed, [root]: [{ id, at: now }, ...(closed[root] ?? []).filter((x) => x.id !== id && now - x.at < RECENT_MS)].slice(0, 40) };
+  saveClosed();
   save();
 }
 const useRecent = () => useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, () => recent);
+const useClosed = () => useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, () => closed);
 
 // ---- the tab bar ----
 
-export type BarThread = { session: Session; attention?: Attention; pinned: boolean };
+export type BarThread = { session: Session; attention?: Attention };
 /** The most tabs the bar shows (1 to 9 on the keyboard). */
 const MAX_TABS = 9;
 
 /**
- * The threads worth a tab: the open one, those at work or waiting on you, and those you opened in the last hours. In the
- * order they started, like a browser's tabs, so a thread keeps its place (and its number key) while others come and go.
+ * The threads worth a tab: the open one, those at work or waiting on you, and those you opened in the last hours, but
+ * not those you closed (unless they need you). In the order they started, like a browser's tabs, so a thread keeps its place (and its number key) while others come and go.
  */
 export function useBarThreads(openId: string | null): BarThread[] {
   const { sessions, attention, root } = useLiveSelector((s) => ({ sessions: s.sessions, attention: s.attention, root: s.setup?.root ?? "" }), shallowEqual);
-  const mine = useRecent()[root];
+  const mine = useRecent()[root], shut = useClosed()[root];
   return useMemo(() => {
     const now = Date.now();
     const lately = new Map((mine ?? []).filter((x) => now - x.at < RECENT_MS).map((x) => [x.id, x.at]));
+    const gone = new Set((shut ?? []).filter((x) => now - x.at < RECENT_MS).map((x) => x.id));
     const rank = (s: Session) => {
       const a = attention[s.id];
       if (s.id === openId) return 0;
@@ -69,13 +80,14 @@ export function useBarThreads(openId: string | null): BarThread[] {
       return 4;
     };
     const picked = sessions
-      .filter((s) => s.id === openId || s.status === "running" || needsYou(attention[s.id]) || yourTurn(attention[s.id]) || lately.has(s.id))
+      .filter((s) => s.id === openId || needsYou(attention[s.id])
+        || (!gone.has(s.id) && (s.status === "running" || yourTurn(attention[s.id]) || lately.has(s.id))))
       .sort((a, b) => rank(a) - rank(b) || (lately.get(b.id) ?? 0) - (lately.get(a.id) ?? 0) || b.lastEventAt.localeCompare(a.lastEventAt))
       .slice(0, MAX_TABS);
     return picked
       .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
-      .map((session) => ({ session, attention: attention[session.id], pinned: session.status === "running" || needsYou(attention[session.id]) }));
-  }, [sessions, attention, mine, openId]);
+      .map((session) => ({ session, attention: attention[session.id] }));
+  }, [sessions, attention, mine, shut, openId]);
 }
 
 // ---- threads at work in other projects ----

@@ -1,6 +1,6 @@
 // Owner: camera. The part of a map canvas that no panel covers (the "safe area"), and camera moves that land in it.
-// The sidebar on the left, a side panel (or the file window) on the right, the stats line, the colour key and the lens
-// pill at the top, the footer at the bottom: all float over the canvas. Every framing (fit, a file, a followed agent,
+// The sidebar on the left, a side panel (or the file window) on the right, the lens
+// pill at the top, the player at the bottom: all float over the canvas. Every framing (fit, a file, a followed agent,
 // the replay tracer) centres its content in what's left, measured from the DOM, not hard-coded.
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
@@ -16,7 +16,7 @@ const GAP = 12;                                         // breathing room off ea
 const LEFT = ".map-sidebar:not(.sidebar-overlay), .sidebar-collapsed"; // the narrow sheet opens over the map: no reframing
 const RIGHT = ".map-panel.open";
 const FLOAT_RIGHT = ".map-peek";                         // floats in from the right edge: covers from its left side on
-const TOP = ".map-stats, .lens-switch";
+const TOP = ".lens-switch";
 const BOTTOM = ".dock, .rp-bar";
 const WATCH = [LEFT, ".map-panel", FLOAT_RIGHT, TOP, BOTTOM].join(", ");
 
@@ -240,9 +240,6 @@ export function useCamera(fg: RefObject<Graph | undefined | null>, hostRef: RefO
     return { safe, version, measure, userAt: () => userAt.current, view, moveTo, lookAt, nudge, zoomBy, frame, reveal, easeToward, sees, stop };
   }, [fg, hostRef, version]);
 }
-
-/** A small, quiet "fit" button for the bottom-right corner of a map. */
-export const FIT_TITLE = "Fit to view (F)";
 
 /** F or 0 (not while typing, no modifiers) fits the map. */
 export function isFitKey(e: KeyboardEvent) {

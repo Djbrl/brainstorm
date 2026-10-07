@@ -5,7 +5,6 @@ import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-for
 import type { CoworkArea, CoworkPage, CoworkSite, CoworkSummary } from "@contract";
 import { AREA_NAME } from "./data";
 import { boxOf, isFitKey, useCamera, type Camera, type View } from "../map/camera";
-import { FitButton } from "../map/FitButton";
 import { LabelSpace } from "../map/labels";
 import { mapStyle } from "../map/themes";
 import { useTheme } from "../lib/theme";
@@ -312,7 +311,6 @@ export function WorldMap({ data, areas, selected, highlight, onSelect, rightInse
           ctx.restore();
         }}
       />
-      {graph.nodes.length > 0 && <FitButton onFit={fitNow} label="Fit all the places" />}
     </div>
   );
 }

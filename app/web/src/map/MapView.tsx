@@ -2,7 +2,6 @@
 // The pieces: graph.ts (nodes, layout, forces), drawNode.ts (drawing a frame), color.ts (recency colours), labels.ts
 // (names), useMapCamera.ts (what the camera frames), useLiveAgents.ts (agents on the map), redraw.ts (when to redraw).
 import { LensSwitch } from "./LensSwitch";
-import { MapStats } from "./MapStats";
 import { clock, isReplay } from "../lib/live";
 import { sinceMs } from "../lib/visit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -12,7 +11,7 @@ import { useLive } from "../lib/live";
 import { mapPrefs, useNav } from "../lib/nav";
 import { drawAgents } from "./agents";
 import { MapSidebar } from "./sidebar/MapSidebar";
-import { Dock, FileToggle, GitToggle, LockToggle, ReadsToggle } from "./replay/ReplayBar";
+import { Dock } from "./replay/ReplayBar";
 import { Peek } from "./replay/Peek";
 import { useStepWindow } from "./prefs";
 import { TalkCard } from "./replay/TalkCard";
@@ -26,7 +25,6 @@ import { useLiveActions } from "../lib/live";
 import { useNavActions } from "../lib/nav";
 import { clearTextWidths, drawQueuedLabels, LabelSpace, type QueuedLabel } from "./labels";
 import { boxOf, useCamera, type Camera } from "./camera";
-import { FitButton } from "./FitButton";
 import { useTheme } from "../lib/theme";
 import { mapStyle, settleLandings } from "./themes";
 import { clearSprites, spriteFrame } from "./sprites";
@@ -96,7 +94,7 @@ export function MapView() {
   const style = mapStyle();
   const stepWindow = useStepWindow();
   const [hover, setHover] = useState<string | null>(null);
-  // The camera works in the part of the canvas the sidebar, the side panels, the stats line and the footer leave free.
+  // The camera works in the part of the canvas the sidebar, the side panels, the lens pill and the player leave free.
   const cam = useCamera(fg as never, wrapRef);
   const camRef = useRef<Camera>(cam); camRef.current = cam;
 
@@ -487,22 +485,15 @@ export function MapView() {
       <MapSidebar agents={agents} accent={tokens.accent} followId={followId}
         onFollow={(id) => setFollowId(id)} onFocusFile={focusOnFile} map={map}
         file={sel} picked={picked} onCloseFile={closeFile} />
-      <MapStats />
       {/* A project with almost nothing to map (a folder opened from an island that holds little but the touched file). */}
       {map && map.files.length > 0 && map.files.length <= 3 && (
         <p className="map-sparse">This project has only {map.files.length === 1 ? "one file" : `${map.files.length} files`} on the map.</p>
       )}
       <TalkCard />
       <LensSwitch />
-      {graph.nodes.length > 0 && <FitButton onFit={fitNow} label={replay ? "Fit the thread's files" : "Fit the whole project"} />}
 
       <Peek />
-      <Dock>
-        <ReadsToggle />
-        <FileToggle />
-        <GitToggle />
-        <LockToggle shown={!!replay || !!followId} />
-      </Dock>
+      <Dock />
 
       <StepPanel />
     </div>

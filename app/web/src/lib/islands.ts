@@ -66,12 +66,6 @@ export function projectOf(abs: string, known: string[] | null): string {
 export const knownRoots = () => roots;
 /** A visitor's home (see homeOf), with the projects known so far. */
 export const visitorHome = (cwd: string | undefined, map: ProjectMap | null) => homeOf(cwd, map, roots);
-/** A visitor's project's name ("rundown", even when it works in rundown/app/server), or null for a thread of this one. */
-export function visitorFrom(cwd: string | undefined, map: ProjectMap | null): string | null {
-  const home = homeOf(cwd, map, roots);
-  return home ? home.slice(home.lastIndexOf("/") + 1) : null;
-}
-
 /** A visitor's home: the project its thread works in, when that isn't this one (null for this project's own threads). */
 function homeOf(cwd: string | undefined, map: ProjectMap | null, known: string[] | null): string | null {
   if (!cwd || !map || !cwd.startsWith("/") || inProject(cwd, map)) return null;

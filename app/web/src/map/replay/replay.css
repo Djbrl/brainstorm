@@ -170,7 +170,11 @@
 .rp-waiting.turn > b { background: var(--ink-3); }
 .rp-waiting-line { font-weight: 650; }
 .rp-waiting.thinking { background: var(--accent-soft); color: var(--ink-2); grid-template-columns: 14px auto minmax(0, 1fr); align-items: baseline; }
-.rp-waiting.thinking > * { grid-column: auto; }
+.rp-waiting.thinking > *, .rp-waiting.stopped > * { grid-column: auto; }
+.rp-waiting.stopped { background: #f4f4f7; color: var(--ink-3); grid-template-columns: 14px auto minmax(0, 1fr); align-items: baseline; }
+.rp-waiting.stopped > b { grid-column: 1; background: var(--cool); }
+.rp-waiting.stopped .rp-waiting-detail { justify-self: end; }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .rp-waiting.stopped { background: var(--hover); }
 .rp-waiting.thinking > b { grid-column: 1; background: var(--accent); animation: think-glow 2.4s ease-in-out infinite; }
 .rp-waiting.thinking .rp-waiting-detail { justify-self: end; font-variant-numeric: tabular-nums; }
 .rp-dots { display: inline-flex; gap: 2px; margin-left: 3px; }

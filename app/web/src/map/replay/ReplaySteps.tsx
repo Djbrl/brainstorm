@@ -7,7 +7,7 @@
 // around what you see and around the cursor (every row is one line, the same height), with empty space standing in
 // for the rest, so the scroll bar, the follow and the center line work as if they were all there.
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { isReplay, useHarness, useLive } from "../../lib/live";
+import { isReplay, useHarness, useLive, useLiveSelector } from "../../lib/live";
 import { harnessName } from "../../lib/harness";
 import { useNav } from "../../lib/nav";
 import { beatLabel, useThread, type Beat, type Thread } from "../../lib/thread";
@@ -279,6 +279,13 @@ const TrackList = memo(function TrackList({ thread, sessionId, index, playing, f
   );
 });
 
+/** When the agent last did something: "14:32", or "Mon 5 Oct, 14:32" before today. */
+function stoppedAt(iso: string): string {
+  const d = new Date(iso), today = new Date().toDateString() === d.toDateString();
+  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return today ? `at ${time}` : `${d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}, ${time}`;
+}
+
 /** The live end of the list while the model works on its next step (nothing in the log yet): "Thinking", and for how long. */
 function ThinkingRow({ since }: { since: string }) {
   const [, tick] = useState(0);
@@ -298,8 +305,19 @@ function ThinkingRow({ since }: { since: string }) {
 function WaitingRow({ sessionId, onOpen }: { sessionId: string; onOpen: (stepId: string) => void }) {
   const a = useLive().state.attention[sessionId];
   const harness = useHarness(sessionId);
+  const session = useLiveSelector((s) => s.sessions.find((x) => x.id === sessionId));
   if (a?.state === "thinking") return <ThinkingRow since={a.since} />;
-  if (!a || !(needsYou(a) || yourTurn(a))) return null;
+  if (!a || !(needsYou(a) || yourTurn(a))) {
+    // At rest: the agent stopped (its marker stays where it last was on the map). Not while it's running.
+    if (!session || session.status === "running" || isReplay()) return null;
+    return (
+      <div className="rp-waiting stopped" role="status">
+        <b aria-hidden="true" />
+        <span className="rp-waiting-line">Stopped</span>
+        <span className="rp-waiting-detail">{stoppedAt(session.lastEventAt)}</span>
+      </div>
+    );
+  }
   const t = attentionText(a);
   const blocked = needsYou(a);
   return (

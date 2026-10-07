@@ -22,8 +22,9 @@ const FORGET_MS = 2 * 60 * 60_000;
 const WORKING_MS = 2 * 60_000;
 /** Mid-turn and quiet this long: the agent is thinking (no step in its log until the model answers). */
 const THINKING_AFTER_MS = 4_000;
-/** A turn that never ends (the session was closed mid-turn) stops counting as thinking after this long. */
-const THINKING_MAX_MS = 20 * 60_000;
+/** A turn that never ends (the session was closed mid-turn) stops counting as thinking after this long: the model's
+ *  longest thinking between two steps is a few minutes. */
+const THINKING_MAX_MS = 5 * 60_000;
 /** How much of a thread's stored log a new tracker reads to catch up. */
 const CATCH_UP = 600;
 /** Which threads belong to the open workspace is re-checked this often (the listener's list is costly to build). */

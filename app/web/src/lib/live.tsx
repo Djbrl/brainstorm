@@ -199,8 +199,9 @@ function applyBatch(base: LiveState, actions: Action[], ix: Indexes): LiveState 
     for (let i = 0; i < s.sessions.length; i++) {
       const x = s.sessions[i];
       const a = s.attention[x.id];
-      // A call open for over 20 minutes with nothing else moving is more likely a closed session than a long command.
-      const busy = !!a && BUSY.has(a.state) && (a.state === "thinking" || Date.now() - Date.parse(a.since) < 20 * 60_000);
+      // A call open for over 10 minutes with nothing else moving is more likely a closed session than a long command
+      // (thinking is capped by the server, at 5 minutes).
+      const busy = !!a && BUSY.has(a.state) && (a.state === "thinking" || Date.now() - Date.parse(a.since) < 10 * 60_000);
       const want = busy ? "running" : ix.serverStatus.get(x.id) ?? x.status;
       if (x.status !== want) (st().sessions = own(s.sessions, (o) => o.slice()))[i] = { ...x, status: want };
     }

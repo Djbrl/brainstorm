@@ -2,14 +2,15 @@
 // one key: 1 to 9, [ and ]) from each other. Find a thread (⌘K) for the rest, this project's and your other projects'.
 import { useEffect } from "react";
 import { useLiveSelector } from "../lib/live";
-import { useNavActions, useNavState } from "../lib/nav";
+import { useNavActions, useNavState, useReplayCursor } from "../lib/nav";
+import { useCameraLock } from "../map/prefs";
 import { attentionText, needsYou, yourTurn } from "../lib/attention";
 import { isCodex } from "../lib/harness";
 import { forgetThread, openThread, rememberThread, useBarThreads, type BarThread } from "../lib/switcher";
 import { isTyping, MOD } from "./shortcuts";
 import "./switch.css";
 
-export function ThreadBar({ onFind }: { onFind: () => void }) {
+export function ThreadBar({ onFind, onHelp }: { onFind: () => void; onHelp: () => void }) {
   const { replay } = useNavState();
   const nav = useNavActions();
   const openId = replay?.sessionId ?? null;
@@ -43,10 +44,24 @@ export function ThreadBar({ onFind }: { onFind: () => void }) {
       {tabs.map((t, i) => <Tab key={t.session.id} t={t} n={i + 1} open={t.session.id === openId}
         onOpen={() => openThread(nav, t.session)}
         onClose={() => { forgetThread(root, t.session.id); if (t.session.id === openId) nav.stopReplay(); }} />)}
+      <KeyHints open={!!openId} onHelp={onHelp} />
       <button className="threadbar-find" onClick={onFind} title={`Find any thread, in this project or another (${MOD} K)`}>
         <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5 14 14" /></svg>
         Find a thread<kbd>{MOD === "⌘" ? "⌘K" : "Ctrl K"}</kbd>
       </button>
+    </div>
+  );
+}
+
+/** The keys people use most, said quietly beside Find a thread: play and the camera lock with a thread open, and ? for the rest. */
+function KeyHints({ open, onHelp }: { open: boolean; onHelp: () => void }) {
+  const playing = useReplayCursor((c) => c.playing);
+  const lock = useCameraLock();
+  return (
+    <div className="threadbar-keys" aria-label="Keyboard shortcuts">
+      {open && <span><kbd>Space</kbd>{playing ? "Pause" : "Play"}</span>}
+      {open && <span><kbd>L</kbd>{lock ? "Free camera" : "Lock camera"}</span>}
+      <button onClick={onHelp} title="Every keyboard shortcut"><kbd>?</kbd>Shortcuts</button>
     </div>
   );
 }

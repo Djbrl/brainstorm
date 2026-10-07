@@ -35,6 +35,15 @@
 .threadbar-find kbd, .picker-foot kbd, .keys-body kbd { font: 500 11.5px var(--font-body); color: var(--ink-2); background: var(--surface); border: 1px solid var(--line);
   border-bottom-width: 2px; border-radius: 6px; padding: 0 6px; min-width: 22px; text-align: center; display: inline-block; line-height: 18px; }
 
+/* The most used keys, quiet, before Find a thread. */
+.threadbar-keys { margin-left: auto; flex: none; display: flex; align-items: center; gap: 16px; padding: 0 8px; font-size: 12.5px; color: var(--ink-3); white-space: nowrap; }
+.threadbar-keys > span, .threadbar-keys > button { display: flex; align-items: center; gap: 6px; }
+.threadbar-keys > button { border: 0; background: none; padding: 4px 6px; margin: 0 -6px; border-radius: 8px; color: inherit; font-size: inherit; }
+.threadbar-keys > button:hover { background: var(--accent-soft); color: var(--ink); }
+.threadbar-keys kbd { font: 500 11.5px var(--font-body); color: var(--ink-2); background: var(--surface); border: 1px solid var(--line);
+  border-bottom-width: 2px; border-radius: 6px; padding: 0 6px; min-width: 22px; text-align: center; display: inline-block; line-height: 18px; }
+.threadbar-keys + .threadbar-find { margin-left: 8px; }
+
 /* ---- agents in other projects (header) ---- */
 .elsewhere { position: relative; }
 .elsewhere-btn { display: flex; align-items: center; gap: 8px; font-weight: 500; color: var(--ink-2); }
@@ -84,7 +93,8 @@
 
 @media (max-width: 760px) {
   .threadbar { padding: 6px 10px; }
-  .threadbar-find { font-size: 0; gap: 0; }
+  .threadbar-keys { display: none; }
+  .threadbar-find { font-size: 0; gap: 0; margin-left: auto !important; }
   .threadbar-find kbd { display: none; }
   .ws-chip.keys-btn { display: none; } /* no keyboard on a phone: the header keeps its room for the project's name */
   .elsewhere-long { display: none; }
@@ -95,7 +105,8 @@
 /* Dark map themes: the bar wears the header's chrome. */
 :root:is([data-theme="prism"], [data-theme="hologram"]) .threadbar { background: var(--chrome); }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .threadbar-tab:hover > button[role="tab"],
-:root:is([data-theme="prism"], [data-theme="hologram"]) .threadbar-find:hover { background: var(--hover); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .threadbar-find:hover,
+:root:is([data-theme="prism"], [data-theme="hologram"]) .threadbar-keys > button:hover { background: var(--hover); }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .picker-veil { background: rgba(0,0,0,.32); }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .elsewhere-btn.waiting { background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.45); color: #fbbf24; }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .threadbar-attn.blocked { background: rgba(245,158,11,.16); color: #fbbf24; }

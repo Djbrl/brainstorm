@@ -140,7 +140,7 @@ function Shell() {
           <a href="https://github.com/Djbrl/brainstorm#install-claude-code-plugin-preview" target="_blank" rel="noopener">install Rundown</a>.
         </div>
       )}
-      {!state.replay && !state.shared && <ThreadBar onFind={() => setFinding(true)} />}
+      {!state.replay && !state.shared && <ThreadBar onFind={() => setFinding(true)} onHelp={() => setHelp(true)} />}
       {!state.replay && !state.shared && <Keys finding={finding} setFinding={setFinding} help={help} setHelp={setHelp} />}
       {state.shared && <OpenShared />}
       <LiveFollow />

@@ -21,7 +21,9 @@ const MAX_ISLANDS = 8;
 
 /** Inside the project: any of its checkouts or the folders it lived in before a move. */
 function inProject(abs: string, map: ProjectMap): boolean {
-  return [repoBase(map.root), ...(map.formerRoots ?? [])].some((b) => repoRelative(abs, b) !== null);
+  // The project's folder itself too (a step can name it: a listing, a search in it), not only what's inside.
+  const at = abs.replace(/\/+$/, "");
+  return [repoBase(map.root), ...(map.formerRoots ?? [])].some((b) => at === b || repoRelative(abs, b) !== null);
 }
 
 /**
@@ -54,12 +56,18 @@ const useRoots = () => {
  *  repo's `<repo>/x` on an island. */
 export const islandPath = (abs: string) => abs.replace(/\/\.claude\/worktrees\/[^/]+(?=\/|$)/, "");
 
-/** The project a file belongs to: the deepest known project around it, else the folder right under the home folder. */
+/** Folders that hold projects rather than being one: a file in ~/Documents/x belongs to the project x, not to Documents
+ *  (which the server refuses to open: workspace.service.ts tooBroad). */
+const CONTAINERS = new Set(["Documents", "Desktop", "Downloads", "Library", "Pictures", "Movies", "Music", "Public", "Dropbox", "OneDrive"]);
+
+/** The project a file belongs to: the deepest known project around it, else the folder right under the home folder (or
+ *  under a folder of folders there, like ~/Documents). */
 export function projectOf(abs: string, known: string[] | null): string {
   const hit = known?.find((r) => abs === r || abs.startsWith(r + "/"));
   if (hit) return hit;
-  const m = /^(\/(?:Users|home)\/[^/]+\/[^/]+)(\/|$)/.exec(abs);
-  return m ? m[1] : abs.slice(0, abs.lastIndexOf("/"));
+  const m = /^(\/(?:Users|home)\/[^/]+)\/([^/]+)(?:\/([^/]+))?/.exec(abs);
+  if (!m) return abs.slice(0, abs.lastIndexOf("/"));
+  return CONTAINERS.has(m[2]) && m[3] ? `${m[1]}/${m[2]}/${m[3]}` : `${m[1]}/${m[2]}`;
 }
 
 /** The projects Rundown knows, deepest first (null until loaded). */
@@ -68,8 +76,7 @@ export const knownRoots = () => roots;
 export const visitorHome = (cwd: string | undefined, map: ProjectMap | null) => homeOf(cwd, map, roots);
 /** A visitor's home: the project its thread works in, when that isn't this one (null for this project's own threads). */
 function homeOf(cwd: string | undefined, map: ProjectMap | null, known: string[] | null): string | null {
-  // The project's own folder counts as in it (inProject asks about what's inside a folder).
-  if (!cwd || !map || !cwd.startsWith("/") || inProject(cwd.replace(/\/+$/, "") + "/", map)) return null;
+  if (!cwd || !map || !cwd.startsWith("/") || inProject(cwd, map)) return null;
   return projectOf(cwd.replace(/\/+$/, ""), known);
 }
 

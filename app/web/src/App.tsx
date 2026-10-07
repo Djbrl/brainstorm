@@ -10,6 +10,7 @@ import { LinkedLabel } from "./lib/links";
 import { SetupView } from "./setup/SetupView";
 import { Welcome } from "./map/Welcome";
 import { SettingsButton } from "./settings/Settings";
+import { Crashed, Offline, OfflineBanner, useOffline } from "./Trouble";
 import { useAttentionAlerts } from "./lib/attention";
 import { Logo } from "./Logo";
 import { track } from "./lib/usage";
@@ -69,6 +70,7 @@ function Shell() {
     replay: s.replay, preview: s.preview, shared: s.shared, connected: s.connected, setup: s.setup,
     sharedBy: s.shared ? s.sessions[0]?.harness ?? "claude" : null, // a shared replay holds one thread
     missing: !!replayId && s.sessionsLoaded && !s.sessions.some((x) => x.id === replayId), // a thread this project doesn't have
+    hasMap: !!s.map,
   }), shallowEqual);
   const [setupOpen, setSetupOpen] = useState(false);
   const [finding, setFinding] = useState(false); // Find a thread (⌘K)
@@ -97,6 +99,7 @@ function Shell() {
 
   // First load: a quiet "Loading" until we know whether to show setup or the map, rather than a blank page or a flash of either.
   const booting = useBooting();
+  const offline = useOffline();
   if (booting) return <Loading />;
 
   // Local app: pick a workspace first (and whenever "Change" is clicked). The hosted demo never shows setup,
@@ -108,7 +111,7 @@ function Shell() {
       setSetupOpen(false); stopReplay(); selectFile(null); reload();
     }} onCancel={state.setup?.root || state.preview ? closeSetup : undefined} />;
   }
-  const project = state.setup?.name || "brainstorm";
+  const project = state.setup?.name || "";   // none yet (the server out of reach): no name rather than a made-up one
 
   // The logo: home, the project as it opens (no thread, file or step), as if Esc were pressed until nothing is left to
   // close; already there, the page loads again.
@@ -158,16 +161,18 @@ function Shell() {
           <a href="https://github.com/Djbrl/brainstorm#install-claude-code-plugin-preview" target="_blank" rel="noopener">install Rundown</a>.
         </div>
       )}
+      {offline && state.hasMap && <OfflineBanner />}
       {!state.replay && !state.shared && <ThreadBar project={project} onFind={() => setFinding(true)} onHelp={() => setHelp(true)} onAllProjects={openSetup} />}
       {!state.replay && !state.shared && <Keys finding={finding} setFinding={setFinding} help={help} setHelp={setHelp} />}
       {state.shared && <OpenShared />}
       <LiveFollow />
       {!replay && !state.shared && <Welcome />}
-      <main className="view"><Suspense fallback={<Loading />}>{
-        replay && state.missing ? <MissingThread onBack={stopReplay} />
+      <main className="view"><Crashed where="the map" key={`${replay?.sessionId ?? ""}|${lens}`}><Suspense fallback={<Loading />}>{
+        offline && !state.hasMap ? <Offline />
+          : replay && state.missing ? <MissingThread onBack={stopReplay} />
           : replay && lens === "places" ? <PlacesView />
           : <MapView />
-      }</Suspense></main>
+      }</Suspense></Crashed></main>
     </div>
   );
 }
@@ -195,6 +200,9 @@ function MissingThread({ onBack }: { onBack: () => void }) {
 }
 
 function Loading() {
+  // Nothing loaded and the server out of reach: say so, rather than "Loading" forever.
+  const offline = useOffline();
+  if (offline) return <Offline />;
   return <div className="boot" role="status" aria-live="polite"><p>Loading your project…</p></div>;
 }
 
@@ -248,5 +256,5 @@ function FollowAtEnd({ sessionId, detail }: { sessionId: string; detail: ReplayD
 }
 
 export function App() {
-  return <NavProvider><AttentionAlerts /><Shell /></NavProvider>;
+  return <Crashed><NavProvider><AttentionAlerts /><Shell /></NavProvider></Crashed>;
 }

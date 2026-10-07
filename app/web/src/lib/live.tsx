@@ -348,12 +348,22 @@ export function LiveProvider({ children }: { children: ReactNode }) {
     loadAll(store.dispatch);
 
     let ws: WebSocket | null = null;
-    let stop = false;
+    let stop = false, opened = false;
     const connect = () => {
-      ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
-      ws.onopen = () => store.dispatch({ type: "connected", value: true });
-      ws.onclose = () => { store.dispatch({ type: "connected", value: false }); if (!stop) setTimeout(connect, 1500); };
-      ws.onmessage = (e) => { try { store.enqueue(JSON.parse(e.data) as WsMessage); } catch {} };
+      const sock = (ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`));
+      // A server that's up but stuck accepts the connection and never answers: the socket would wait forever without
+      // closing. Give up after a few seconds and try again (so the page can say it can't reach it).
+      const giveUp = setTimeout(() => { if (sock.readyState === WebSocket.CONNECTING) sock.close(); }, 5000);
+      sock.onopen = () => {
+        clearTimeout(giveUp);
+        store.dispatch({ type: "connected", value: true });
+        // Back after an outage: what changed meanwhile (the server may have restarted, even on another project). The
+        // first time too if the page loaded while the server was away (nothing came).
+        if (opened || !store.get().setup) loadAll(store.dispatch);
+        opened = true;
+      };
+      sock.onclose = () => { clearTimeout(giveUp); store.dispatch({ type: "connected", value: false }); if (!stop) setTimeout(connect, 1500); };
+      sock.onmessage = (e) => { try { store.enqueue(JSON.parse(e.data) as WsMessage); } catch {} };
     };
     connect();
     return () => { stop = true; ws?.close(); };

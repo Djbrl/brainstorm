@@ -78,14 +78,18 @@ export class WorkspaceService implements OnModuleInit {
     this.dbs.db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
     // Started by the plugin for a project: that project wins over the saved one.
     const given = env("ROOT");
-    if (given && this.isValidDir(given)) {
+    if (given && this.isValidDir(given) && !tooBroad(given)) {
       this.log.log(`boot: workspace from the launcher ${given}`);
       this.setSetting("workspace", resolve(given));
       this.activate(resolve(given));
       return;
     }
     const saved = this.getSetting("workspace");
-    if (saved && this.isValidDir(saved)) {
+    if (saved && tooBroad(saved)) {
+      // Saved before this guard (an island named after ~/Documents): mapping it would hang the server. Pick again.
+      this.log.warn(`boot: the saved workspace ${saved} is a folder of folders, not a project: showing the setup screen`);
+      this.dbs.db.prepare(`DELETE FROM settings WHERE key = 'workspace'`).run();
+    } else if (saved && this.isValidDir(saved)) {
       this.log.log(`boot: applying saved workspace ${saved}`);
       this.activate(saved); // fire and forget: don't block startup
     } else {
@@ -184,7 +188,7 @@ export class WorkspaceService implements OnModuleInit {
       add(home[0].root, ids.get(old.root) ?? [], old.lastActiveAt ?? "");
     }
 
-    return [...byRoot.values()].sort((a, b) => Number(b.exists) - Number(a.exists) || (b.lastActiveAt ?? "").localeCompare(a.lastActiveAt ?? ""));
+    return [...byRoot.values()].filter((s) => !tooBroad(s.root)).sort((a, b) => Number(b.exists) - Number(a.exists) || (b.lastActiveAt ?? "").localeCompare(a.lastActiveAt ?? ""));
   }
 
   // ---- writes ----
@@ -198,12 +202,14 @@ export class WorkspaceService implements OnModuleInit {
   }
 
   // ---- validation ----
+  // (tooBroad, below the class: a folder that holds folders of projects, never one to map)
 
   private validateRoot(root: string): string {
     if (!root || typeof root !== "string") throw new BadRequestException("root is required");
     if (!isAbsolute(root)) throw new BadRequestException(`"${root}" must be an absolute path`);
     if (!existsSync(root)) throw new BadRequestException(`"${root}" does not exist`);
     if (!statSync(root).isDirectory()) throw new BadRequestException(`"${root}" is not a directory`);
+    if (tooBroad(root)) throw new BadRequestException(`${resolve(root)} holds your folders, not one project. Pick the project's own folder inside it.`);
     return resolve(root);
   }
 
@@ -429,4 +435,14 @@ export class WorkspaceService implements OnModuleInit {
       closeSync(fd);
     }
   }
+}
+
+/** Folders that hold your other folders: mapping one reads everything in it (and would hang the server for minutes). */
+const CONTAINERS = new Set(["Documents", "Desktop", "Downloads", "Library", "Pictures", "Movies", "Music", "Public", "Applications", "Dropbox", "OneDrive", "iCloud Drive", "Google Drive"]);
+export function tooBroad(root: string): boolean {
+  const abs = resolve(root).replace(/\/+$/, "") || "/";
+  const home = homedir().replace(/\/+$/, "");
+  if (abs === "/" || home === abs || home.startsWith(abs + "/")) return true;   // the disk, a folder above home, home itself
+  const rest = abs.startsWith(home + "/") ? abs.slice(home.length + 1) : null;
+  return rest !== null && !rest.includes("/") && CONTAINERS.has(rest);           // ~/Documents, ~/Desktop, ~/Downloads…
 }

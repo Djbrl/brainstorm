@@ -46,6 +46,7 @@ export function WorkspaceMenu({ project, root, onAll }: { project: string; root:
   const here = root.replace(/\/+$/, "");
   const others = (list ?? []).filter((s) => s.exists && s.root.replace(/\/+$/, "") !== here).slice(0, SHOWN);
   const now = clock();
+  if (!project) return null;   // no project known yet (the server out of reach)
 
   return (
     <>

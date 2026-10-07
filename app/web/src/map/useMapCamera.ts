@@ -73,6 +73,19 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
   }, [fitNow]);
+  // Esc stops following an agent before it steps back out of anything else (capture: ahead of the shell's Esc). A window
+  // open over the map (Settings, Find a thread, a picture) takes that Esc for itself.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.key !== "Escape" || e.defaultPrevented || !followRef.current || (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable))) return;
+      if (document.querySelector('[aria-modal="true"], .lightbox')) return;
+      e.preventDefault();
+      setFollowId(null);
+    };
+    addEventListener("keydown", onKey, true);
+    return () => removeEventListener("keydown", onKey, true);
+  }, []);
 
   // Follow an agent (from the sidebar), like the tracer: the camera frames it once; locked, it keeps it centred (easing,
   // every frame, no stacked tweens) at whatever zoom you pick; unlocked, it stays where you put it, and frames the agent

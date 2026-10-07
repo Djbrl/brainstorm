@@ -13,6 +13,9 @@ import { SettingsButton } from "./settings/Settings";
 import { useAttentionAlerts } from "./lib/attention";
 import { Logo } from "./Logo";
 import { track } from "./lib/usage";
+import { ThreadBar } from "./switch/ThreadBar";
+import { Elsewhere } from "./switch/Elsewhere";
+import { Keys } from "./switch/Keys";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import "./boot.css";
 
@@ -68,6 +71,7 @@ function Shell() {
     missing: !!replayId && s.sessionsLoaded && !s.sessions.some((x) => x.id === replayId), // a thread this project doesn't have
   }), shallowEqual);
   const [setupOpen, setSetupOpen] = useState(false);
+  const [finding, setFinding] = useState(false); // Find a thread (⌘K)
 
   // Esc closes the innermost thing first: a popover (it handles Esc itself and marks it handled), then a panel (step,
   // file), then the player, then the thread (not while typing).
@@ -101,6 +105,7 @@ function Shell() {
           : <div className="wordmark"><Logo /></div>}
         <Crumbs project={project} />
         <div className="status">
+          {!state.replay && !state.shared && <Elsewhere />}
           {state.preview && (
             <button className="ws-chip" title="Play back a recorded setup run" onClick={() => setSetupOpen(true)}>Setup preview</button>
           )}
@@ -133,6 +138,8 @@ function Shell() {
           <a href="https://github.com/Djbrl/brainstorm#install-claude-code-plugin-preview" target="_blank" rel="noopener">install Rundown</a>.
         </div>
       )}
+      {!state.replay && !state.shared && <ThreadBar onFind={() => setFinding(true)} />}
+      {!state.replay && !state.shared && <Keys finding={finding} setFinding={setFinding} />}
       {state.shared && <OpenShared />}
       <LiveFollow />
       {!replay && !state.shared && <Welcome />}

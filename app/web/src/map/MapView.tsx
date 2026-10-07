@@ -20,6 +20,10 @@ import { StepPanel } from "./StepPanel";
 import { useSelectedFile } from "./useSelectedFile";
 import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
 import { makeFileResolver } from "../lib/paths";
+import { useIslands } from "../lib/islands";
+import { enterProject } from "../lib/switcher";
+import { useLiveActions } from "../lib/live";
+import { useNavActions } from "../lib/nav";
 import { clearTextWidths, drawQueuedLabels, LabelSpace, type QueuedLabel } from "./labels";
 import { boxOf, useCamera, type Camera } from "./camera";
 import { FitButton } from "./FitButton";
@@ -71,7 +75,11 @@ export function MapView() {
   // ---- the layout (graph.ts): files placed once by folder; laid out again only when files come or go ----
   // perf/web-store's structure counter when the store has it (files or imports added, removed or moved).
   const sv = (state as unknown as { structureVersion?: number }).structureVersion;
-  const { graph, tween } = useGraph(map, theme, sv);
+  // Files outside the project (another repo an orchestrator edits, a visitor's own project): islands beside the map.
+  const islandSteps = replay ? state.steps[replay.sessionId] : undefined;
+  const islandAgents = useMemo(() => Object.values(state.agents ?? {}).filter((a) => !replay || a.sessionId === replay.sessionId), [state.agents, replay?.sessionId]);
+  const islands = useIslands(map, islandSteps, islandAgents);
+  const { graph, tween } = useGraph(map, theme, sv, islands);
   const graphRef = useRef(graph); graphRef.current = graph;
   // ---- folders (fold.ts): open as you zoom; the files you look at, a thread's, an agent's open theirs at any zoom ----
   const foldOn = useFoldOn();
@@ -382,11 +390,17 @@ export function MapView() {
   // Files came or went: the frame keeps coming while the circles that moved glide (stepTween).
   useEffect(() => { if (tween.current) redraw.kick(700); }, [graph, redraw, tween]);
   // A closed folder: the camera goes into it (which opens it, fold.ts). A file: selected, or let go if it already was.
+  const nav = useNavActions();
+  const { reload } = useLiveActions();
   const onNodeClick = useCallback((g: GNode) => {
+    // An island (or a file on one): go to that project, the open thread still open (it shows there as a visitor).
+    let isle: GNode | undefined = g;
+    while (isle && !isle.dir?.island) isle = isle.up;
+    if (isle) { enterProject(isle.dir!.island!, nav, reload, replay?.sessionId).catch(() => {}); return; }
     if (!g.dir) { setSelected(selectedRef.current === g.id ? null : g.id); return; }   // the selected file again: let go of it
     const x = g.x ?? 0, y = g.y ?? 0, r = g.r;
     camRef.current.frame({ x0: x - r, x1: x + r, y0: y - r, y1: y + r }, { pad: 24, maxZoom: 12 }, 750);
-  }, [setSelected]);
+  }, [setSelected, nav, reload, replay?.sessionId]);
   // Pointing and clicking, worked out against where the circles are this frame (graph.ts hitAt), not force-graph's hit
   // map (repainted at most every 0.8 s). A click is a press and release less than 5 px apart: a trackpad's wobble
   // still clicks, a pan doesn't.

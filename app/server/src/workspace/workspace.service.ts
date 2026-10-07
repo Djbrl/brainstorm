@@ -189,8 +189,9 @@ export class WorkspaceService implements OnModuleInit {
 
   // ---- writes ----
 
-  async select(root: string): Promise<SetupStatus> {
+  async select(root: string, guest?: string): Promise<SetupStatus> {
     const abs = this.validateRoot(root);
+    if (typeof guest === "string" && /^[\w-]{8,64}$/.test(guest)) this.listener.bringGuest(guest);
     this.setSetting("workspace", abs);
     this.activate(abs);
     return this.status();

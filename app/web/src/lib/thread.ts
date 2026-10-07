@@ -7,6 +7,16 @@ import { useEffect, useMemo } from "react";
 import type { Step } from "@contract";
 import { useLive } from "./live";
 import { makeFileResolver, type FileResolver } from "./paths";
+import { isOutside } from "./islands";
+import type { ProjectMap } from "@contract";
+
+const outsideOf = new WeakMap<FileResolver, FileResolver>();
+/** The project's resolver, and an outside file as itself (one wrapper per resolver, so threads built with it are reused). */
+function withOutside(r: FileResolver, map: ProjectMap | null): FileResolver {
+  let w = outsideOf.get(r);
+  if (!w) { w = (abs) => r(abs) ?? (isOutside(abs, map) ? abs : null); outsideOf.set(r, w); }
+  return w;
+}
 import { displayLabel, isVisible, realLabel } from "../follow/format";
 
 export type BeatAction = "edit" | "read" | "other";
@@ -391,6 +401,7 @@ export function useThread(sessionId: string | null, detail: ReplayDetail = "ligh
   // No session: no resolver (it would index every file of the map for nothing).
   const map = sessionId ? state.map : null;
   const version = structureVersion(state);
-  const resolve = useMemo(() => makeFileResolver(map, version), [map, version]);
+  // A file outside the project resolves to itself: the map shows it on an island (lib/islands.ts, graph.ts).
+  const resolve = useMemo(() => withOutside(makeFileResolver(map, version), map), [map, version]);
   return useMemo(() => (sessionId && steps ? buildThread(sessionId, steps, resolve, detail) : null), [sessionId, steps, resolve, detail]);
 }

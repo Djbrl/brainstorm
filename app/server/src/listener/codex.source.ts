@@ -209,6 +209,7 @@ export class CodexSource implements LogSource {
     if (!meta || meta.reviewer) return false;
     const folders = [meta.cwd, ...meta.roots].filter(Boolean);
     if (scope.override) return folders.some((f) => f.includes(scope.override!));
+    if (scope.guests?.ids.has(meta.parent ?? meta.id)) return true; // a visitor from another project
     return folders.some((f) => this.inRoots(this.rewrite(meta, f)));
   }
 

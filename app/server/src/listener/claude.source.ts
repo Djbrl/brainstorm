@@ -51,15 +51,30 @@ export class ClaudeSource implements LogSource {
 
   constructor(private readonly dir: string, private readonly onError: (e: Error) => void = () => {}) {}
 
+  /** Visitors' transcripts (another project's threads that touched this one), and the project folders they're in. */
+  private guestFiles: readonly string[] = [];
+  private guestTops = new Set<string>();
+
   private setScope(scope: Scope) {
     this.override = scope.override;
     this.prefixes = scope.override ? [] : scope.roots.map(encodeRoot);
+    this.guestFiles = scope.guests?.files ?? [];
+    this.guestTops = new Set(this.guestFiles.map((f) => relative(this.dir, f).split(sep)[0]).filter(Boolean));
+  }
+
+  /** A visitor's transcript, or one of its subagents' (in <thread>/subagents/). */
+  private isGuest(file: string) {
+    return this.guestFiles.some((g) => file === g || file.startsWith(g.replace(/\.jsonl$/, "") + sep));
   }
 
   /** True if `projectDir` (a top-level folder name under the projects folder) belongs to the open project. */
   private matches(projectDir: string): boolean {
     if (this.override) return projectDir.includes(this.override);
     return this.prefixes.some((p) => underPrefix(projectDir, p));
+  }
+  /** A folder to watch: the open project's, or one a visitor's transcript is in (only that transcript is read there). */
+  private watches(projectDir: string): boolean {
+    return this.matches(projectDir) || this.guestTops.has(projectDir);
   }
 
   watch(scope: Scope, on: WatchEvents) {
@@ -72,7 +87,7 @@ export class ClaudeSource implements LogSource {
       // projects' gigabytes of logs aren't stat'ed or watched.
       ignored: (path: string, stats?: { isFile(): boolean }) => {
         const rel = relative(projects, path);
-        if (rel && !rel.startsWith("..") && !this.matches(rel.split(sep)[0])) return true;
+        if (rel && !rel.startsWith("..") && !this.watches(rel.split(sep)[0])) return true;
         return stats?.isFile() ? !path.endsWith(".jsonl") : false;
       },
     });
@@ -92,7 +107,7 @@ export class ClaudeSource implements LogSource {
     if (!this.watcher || !this.ready) return;
     const matching = this.matchingDirs();
     for (const d of matching) if (!this.watchedTop.has(d)) { this.watchedTop.add(d); this.watcher.add(join(this.dir, d)); }
-    for (const d of [...this.watchedTop]) if (!this.matches(d)) { this.watchedTop.delete(d); this.watcher.unwatch(join(this.dir, d)); }
+    for (const d of [...this.watchedTop]) if (!this.watches(d)) { this.watchedTop.delete(d); this.watcher.unwatch(join(this.dir, d)); }
   }
 
   async close() { await this.watcher?.close(); }
@@ -104,13 +119,18 @@ export class ClaudeSource implements LogSource {
       this.onError(new Error(`cannot read ${this.dir}: ${(e as Error).message}`));
       return [];
     }
-    return dirs.filter((d) => this.matches(d));
+    return dirs.filter((d) => this.watches(d));
   }
 
   list(scope: Scope): LogFile[] {
     this.setScope(scope);
     const files: LogFile[] = [];
-    for (const d of this.matchingDirs()) collectJsonl(join(this.dir, d), files);
+    for (const d of this.matchingDirs()) {
+      if (this.matches(d)) { collectJsonl(join(this.dir, d), files); continue; }
+      const theirs: LogFile[] = [];   // a visitor's folder: only its transcripts
+      collectJsonl(join(this.dir, d), theirs);
+      files.push(...theirs.filter((f) => this.isGuest(f.path)));
+    }
     return files;
   }
 
@@ -121,7 +141,7 @@ export class ClaudeSource implements LogSource {
 
   inScope(file: string, scope: Scope) {
     this.setScope(scope);
-    return this.matches(relative(this.dir, file).split(sep)[0] ?? "");
+    return this.matches(relative(this.dir, file).split(sep)[0] ?? "") || this.isGuest(file);
   }
 
   hidden(files: Iterable<string>) {

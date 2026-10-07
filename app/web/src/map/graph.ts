@@ -7,12 +7,15 @@ import { useMemo, useRef } from "react";
 import { hierarchy, pack, type HierarchyNode } from "d3-hierarchy";
 import type { NodeObject } from "react-force-graph-2d";
 import type { FileNode, ProjectMap } from "@contract";
+import type { Island } from "../lib/islands";
 import type { Look } from "./replay/layer";
 import type { StampMemo } from "./sprites";
 import { mapStyle, reachOf, type MapStyle, type RGB } from "./themes";
 
 /** A folder on the map: its path from the root ("app/web/src"), the name it shows, and what's inside it. */
-export type Dir = { rel: string; name: string; depth: number; files: FileNode[]; kids: GNode[] };
+export type Dir = { rel: string; name: string; depth: number; files: FileNode[]; kids: GNode[];
+  /** An island: files outside the project (lib/islands.ts), in the project at this path. */
+  island?: string };
 export type GNode = NodeObject & {
   id: string; file: FileNode; r: number;
   /** A folder's circle (its id is the folder's path ending in "/"); files have none. */
@@ -39,6 +42,7 @@ export const nodeReach = (n: GNode, st?: MapStyle) => (n.dir ? n.r : reachOf(n.r
 const GAP = 4;          // clear space around a file's mark (graph units)
 const PAD = 9;          // between a folder's edge and what it holds, and between its folders
 const TWEEN_MS = 650;   // circles gliding to new places when files come or go
+const SEA = 70;         // between the project and its islands, and between islands
 /** A file's room: its size when the map was laid out, rounded up a little, so a few more lines don't move anything. */
 const slotOf = (lines: number) => Math.ceil(radius(lines) * 1.15);
 
@@ -53,6 +57,7 @@ export type Graph = {
 let graphIds = 0;
 const NO_LINKS: never[] = [];
 const EMPTY: Graph = { nodes: [], links: [], folders: [], data: { nodes: [], links: NO_LINKS }, id: 0 };
+const NO_ISLANDS: Island[] = [];
 
 type T = { name: string; rel: string; file?: FileNode; children?: T[] };
 /** The folder tree. A folder that only leads to one other folder ("web" → "src") is one circle: "web/src". */
@@ -96,15 +101,16 @@ function folderFile(base: string, d: Dir): FileNode {
  * The map laid out. Laid out again only when files come or go, or the theme changes (its marks take more or less
  * room); a file's lines or times changing (every edit) only updates it and its folders' colours in place.
  */
-export function useGraph(map: ProjectMap | null, theme: string, structure?: number) {
+export function useGraph(map: ProjectMap | null, theme: string, structure?: number, islands: Island[] = NO_ISLANDS) {
   const last = useRef<{ key: string; graph: Graph; byId: Map<string, GNode> } | null>(null);
   const tween = useRef<Tween | null>(null);
   const graph = useMemo(() => {
     if (!map || !map.files.length) return EMPTY;
     const base = map.root.replace(/\/+$/, "");
-    const key = `${base}|${theme}|${structure ?? ""}|${structure === undefined ? map.files.map((f) => f.path).join("\n") : ""}`;
+    const isles = islands.map((i) => i.root + ":" + i.files.map((f) => f.path).join(",")).join("|");
+    const key = `${base}|${theme}|${structure ?? ""}|${structure === undefined ? map.files.map((f) => f.path).join("\n") : ""}|${isles}`;
     const prev = last.current;
-    if (prev && prev.key === key) { refresh(prev.graph, map, base); return prev.graph; }
+    if (prev && prev.key === key) { refresh(prev.graph, map, base, islands); return prev.graph; }
 
     const st = mapStyle();
     // Biggest first (by files held), so the big folders sit in the middle of their parent; ties by name, so the same
@@ -141,11 +147,39 @@ export function useGraph(map: ProjectMap | null, theme: string, structure?: numb
       for (const c of p.children ?? []) visit(c, n);
     };
     visit(packed, undefined);
+    // The islands: each packed on its own, then set in a column off the project's right side, never moving the project.
+    let y = 0;
+    const placed = islands.map((isle) => {
+      const t: T = { name: isle.name, rel: isle.root, children: isle.files.map((f) => ({ name: f.path.slice(f.path.lastIndexOf("/") + 1), rel: f.path, file: f })) };
+      const p = pack<T>().radius((d) => leafR(d as HierarchyNode<T>)).padding((d) => (d.children ? PAD : 0))(
+        hierarchy<T>({ name: "", rel: "", children: [t] }).sum((d) => (d.file ? 1 : 0)).sort((a, b) => (a.data.name < b.data.name ? -1 : 1)));
+      const top = p.children![0], at = y + top.r;
+      y += top.r * 2 + SEA;
+      return { isle, p, top, at };
+    });
+    for (const { isle, p, top, at } of placed) {
+      const dx = packed.x + packed.r + SEA + top.r - top.x, dy = packed.y - (y - SEA) / 2 + at - top.y;
+      const place = (q: HierarchyNode<T> & { x: number; y: number; r: number }, up: GNode | undefined) => {
+        const f = q.data.file, id = f ? f.path : isle.root + "/";
+        const was = old?.get(id);
+        const n = (was ?? { id }) as GNode;
+        n.up = up;
+        if (f) { n.file = f; n.slot = slotOf(f.lines); n.r = Math.min(radius(f.lines), n.slot); n.dir = undefined; }
+        else { n.dir = { rel: isle.root, name: `${isle.name} · outside`, depth: 1, files: [], kids: [], island: isle.root }; n.r = q.r; n.slot = q.r; folders.push(n); }
+        if (up) up.dir!.kids.push(n);
+        const x = q.x + dx, yy = q.y + dy;
+        if (was && was.x !== undefined && (was.x !== x || was.y !== yy)) from.push([n, was.x, was.y!, x, yy]);
+        else { n.x = n.fx = x; n.y = n.fy = yy; }
+        nodes.push(n); byId.set(id, n);
+        for (const c of q.children ?? []) place(c as typeof q, n);
+      };
+      place(top as typeof top & { x: number; y: number; r: number }, undefined);
+    }
     // Each folder's files, all levels down (deepest first, so a folder adds up its subfolders' lists).
     for (let i = folders.length - 1; i >= 0; i--) {
       const d = folders[i].dir!;
       for (const k of d.kids) if (k.dir) d.files.push(...k.dir.files); else d.files.push(k.file);
-      folders[i].file = folderFile(base, d);
+      folders[i].file = d.island ? { ...folderFile(base, d), path: d.island + "/", module: "outside" } : folderFile(base, d);
     }
     const links: GLink[] = [];
     for (const e of map.edges) { const s = byId.get(e.from), t = byId.get(e.to); if (s && t && s !== t) links.push({ source: s, target: t }); }
@@ -153,19 +187,20 @@ export function useGraph(map: ProjectMap | null, theme: string, structure?: numb
     const graph: Graph = { nodes, links, folders, data: { nodes, links: NO_LINKS }, id: ++graphIds };
     last.current = { key, graph, byId };
     return graph;
-  }, [map, theme, structure]);
+  }, [map, theme, structure, islands]);
   return { graph, tween };
 }
 
 /** The same files with new lines, times or activity: update the files and their folders' colours, nothing moves. */
-function refresh(g: Graph, map: ProjectMap, base: string) {
+function refresh(g: Graph, map: ProjectMap, base: string, islands: Island[]) {
   const byPath = new Map(map.files.map((f) => [f.path, f]));
+  for (const i of islands) for (const f of i.files) byPath.set(f.path, f);
   for (const n of g.nodes) if (!n.dir) { const f = byPath.get(n.id); if (f && f !== n.file) { n.file = f; n.r = Math.min(radius(f.lines), n.slot); } }
   for (let i = g.folders.length - 1; i >= 0; i--) {
     const d = g.folders[i].dir!;
     d.files.length = 0;
     for (const k of d.kids) if (k.dir) d.files.push(...k.dir.files); else d.files.push(k.file);
-    g.folders[i].file = folderFile(base, d);
+    g.folders[i].file = d.island ? { ...folderFile(base, d), path: d.island + "/", module: "outside" } : folderFile(base, d);
   }
 }
 
@@ -209,7 +244,8 @@ export function hitAt(g: Graph, x: number, y: number, scale: number): GNode | nu
   for (const n of g.nodes) {
     if (n.x === undefined || n.y === undefined || (n.shown ?? 1) < 0.5) continue;
     const d = Math.hypot(x - n.x, y - n.y);
-    if (n.dir) { if ((n.open ?? 0) < 0.5 && d <= n.r && (!folder || n.r < folder.r)) folder = n; continue; }
+    // A closed folder, or an island (open or not: anywhere on it takes you to its project).
+    if (n.dir) { if (((n.open ?? 0) < 0.5 || n.dir.island) && d <= n.r && (!folder || n.r < folder.r)) folder = n; continue; }
     if (d <= Math.max(n.r, least) + slack && d - n.r < gap) { file = n; gap = d - n.r; }
   }
   return file ?? folder;

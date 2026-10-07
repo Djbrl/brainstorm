@@ -11,6 +11,7 @@ import { track } from "../../lib/usage";
 import { relTime } from "../../follow/format";
 import { agentColor, baseName, initial, shortName, verbIng } from "../agents";
 import { isCodex } from "../../lib/harness";
+import { repoBase, repoRelative } from "../../lib/paths";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
 
 function useTick(ms: number) {
@@ -109,6 +110,10 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
   const running = session.status === "running";
   // Which git worktree the thread ran in ("hackathon-landing-page", without Claude Code's random suffix).
   const tree = /\/\.claude\/worktrees\/([^/]+)/.exec(session.cwd ?? "")?.[1]?.replace(/-[0-9a-f]{6}$/, "");
+  // A visitor: a thread working in another project that touched this one (an orchestrator): where it comes from.
+  const root = useLive().state.setup?.root;
+  const base = root ? repoBase(root) : null;
+  const from = base && session.cwd && repoRelative(session.cwd, base) === null ? session.cwd.replace(/\/+$/, "").split("/").pop() : null;
   const [agentsOpen, setAgentsOpen] = useState(false);
   useEffect(() => { if (!selected) setAgentsOpen(false); }, [selected]);
   const ids = sorted.map((a) => a.id);
@@ -127,6 +132,7 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
           {isCodex(session) && <span className="sidebar-thread-harness" title="This thread ran in Codex">Codex</span>}
           {say
             ? <span className={`sidebar-thread-attn ${blocked ? "blocked" : "turn"}`} title={`${say.line}${attention?.detail ? `\n${attention.detail}` : ""}`}>{say.badge}</span>
+            : from ? <span className="sidebar-thread-tree" title={`Works in ${session.cwd}, and touched this project`}>from {from}</span>
             : tree && <span className="sidebar-thread-tree" title={session.cwd}>{tree}</span>}
           <time>{running ? "live" : relTime(session.lastEventAt, now)}</time>
         </button>

@@ -302,6 +302,9 @@ function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: F
   if (look) { F.anyLook = true; F.lookSum += look.alpha * 3 + look.tone; }
   // A thread's focus dims folders less than files: they're the lay of the land around what it did.
   const dim = (look ? 0.5 + 0.5 * look.alpha : 1) * (F.only && !F.onlyDirs?.has(n.id) ? 0.55 : 1), alpha = dim * shown;
+  // An island (files outside the project, lib/islands.ts): its outline dashed, like a coast seen from afar.
+  const isle = !!n.dir!.island;
+  if (isle) ctx.setLineDash([5 / scale, 4 / scale]);
   // Open: the outline, and a breath of fill so folders inside folders read as levels.
   if (open > 0) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, TAU);
@@ -311,7 +314,7 @@ function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: F
     ctx.strokeStyle = tokens.ink; ctx.stroke();
   }
   const closed = alpha * (1 - open);
-  if (closed <= 0.01) { ctx.globalAlpha = 1; return; }
+  if (closed <= 0.01) { ctx.globalAlpha = 1; if (isle) ctx.setLineDash([]); return; }
   const own = ownColour(n, F);
   let rgbCss = own.css!;
   if (look && look.tone >= 1) rgbCss = focusColour(look.edited, F, c.focusColours).css;
@@ -324,6 +327,7 @@ function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: F
   ctx.lineWidth = (isHover || isSel ? 1.8 : 1.2) / scale;
   ctx.strokeStyle = active ? tokens.accent : isHover || isSel ? tokens.ink : rgbCss;
   ctx.stroke();
+  if (isle) ctx.setLineDash([]);
   const gitRing = F.onlyDirs?.get(n.id);   // Show git: something inside it
   if (gitRing && !active) { ctx.beginPath(); ctx.arc(x, y, r + 3.5 / scale, 0, TAU); ctx.globalAlpha = closed; ctx.lineWidth = 2 / scale; ctx.strokeStyle = gitRing; ctx.stroke(); }
   if (active) { ctx.beginPath(); ctx.arc(x, y, r + 3.5 / scale, 0, TAU); ctx.globalAlpha = 0.9 * closed; ctx.lineWidth = 1.6 / scale; ctx.strokeStyle = tokens.accent; ctx.stroke(); }

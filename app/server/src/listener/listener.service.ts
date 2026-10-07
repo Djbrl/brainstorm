@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from "@nestjs/common";
 import { HttpAdapterHost } from "@nestjs/core";
-import { closeSync, openSync, readSync, statSync } from "node:fs";
-import { resolve, sep } from "node:path";
+import { closeSync, existsSync, openSync, readdirSync, readSync, statSync } from "node:fs";
+import { join, resolve, sep } from "node:path";
 import type { Harness, Session, Step } from "../types";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
@@ -63,6 +63,11 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   private activeRoot: string | null = null;
   /** The active root and the folders the repo lived in before it moved (see moved.ts). */
   private roots: string[] = [];
+  /** Visitors: threads from other projects whose steps touched this one's files (an orchestrator editing it), shown and
+   *  read live like its own. From the stored steps when the project opens, and the thread you came with (an island). */
+  private visitors = new Set<string>();
+  private guestFiles: string[] = [];
+  private pendingGuest?: string;
   private offsets = new Map<string, number>();
   private nextSeq = new Map<string, number>();
   private ready = false;
@@ -259,6 +264,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       stepsJson: db.prepare(stepsJsonSql(`session_id = ?`)),
       stepsJsonAfter: db.prepare(stepsJsonSql(`session_id = ? AND seq > ?`)),
       stepTouches: db.prepare(`SELECT 1 FROM steps WHERE file_path = ? LIMIT 1`),
+      visitorsOf: db.prepare(`SELECT DISTINCT st.session_id, s.cwd FROM steps st JOIN sessions s ON s.id = st.session_id WHERE st.file_path >= ? AND st.file_path < ?`),
       stepPos: db.prepare(`SELECT session_id, seq FROM steps WHERE id = ?`),
       stepsBefore: db.prepare(`SELECT * FROM steps WHERE session_id = ? AND seq < ? ORDER BY seq DESC LIMIT ?`),
       stepLabel: db.prepare(`SELECT label, risk FROM steps WHERE id = ?`),
@@ -274,11 +280,37 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     // Opened from a worktree: the whole repo's threads (its main checkout and every worktree), not just this one's.
     const base = repoBase(this.activeRoot);
     this.roots = [...new Set([this.activeRoot, base, ...formerRoots(this.cfg.claudeProjectsDir, this.activeRoot)])];
+    this.findVisitors();
     this.sessionsCache = null;
   }
 
   private scope(): Scope {
-    return { roots: this.roots, override: this.sessionFilterOverride };
+    return { roots: this.roots, override: this.sessionFilterOverride, guests: { ids: this.visitors, files: this.guestFiles } };
+  }
+
+  /** The next project opened (from an island on the map) brings this thread along as a visitor. */
+  bringGuest(sessionId: string) { this.pendingGuest = sessionId; }
+
+  /** Which threads from elsewhere touched this project's files (stored steps, by the file index), and their transcripts. */
+  private findVisitors() {
+    this.visitors = new Set(this.pendingGuest ? [this.pendingGuest] : []);
+    this.pendingGuest = undefined;
+    if (!this.st) return;
+    for (const r of this.roots) {
+      const rows = this.st.visitorsOf.all(r + "/", r + "0") as { session_id: string; cwd: string }[]; // "0" sorts right after "/"
+      for (const row of rows) if (!this.isWithinRoot(row.cwd)) this.visitors.add(row.session_id);
+    }
+    // Their transcripts, to read live: Claude Code's are named by the thread (Codex's are found by id in its source).
+    this.guestFiles = [];
+    let dirs: string[] = [];
+    if (this.visitors.size) { try { dirs = readdirSync(this.cfg.claudeProjectsDir); } catch { /* no Claude Code */ } }
+    for (const id of this.visitors) {
+      for (const d of dirs) {
+        const f = join(this.cfg.claudeProjectsDir, d, `${id}.jsonl`);
+        if (existsSync(f)) { this.guestFiles.push(f); break; }
+      }
+    }
+    if (this.visitors.size) this.log.log(`visitors: ${this.visitors.size} thread(s) from other projects touched ${this.activeRoot}`);
   }
 
   private sourceOf(file: string): LogSource | undefined {
@@ -564,6 +596,11 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       agent_id: step.agentId ?? null,
     });
     this.upsertSession(b, step.sessionId, harness, opts?.cwd ?? "", step.ts, opts?.promptTitle, step.kind === "tool_call" || step.kind === "edit");
+    // A thread working elsewhere that touches this project's files: from now on it's a visitor here.
+    if (step.filePath && this.activeRoot && !this.visitors.has(step.sessionId) && this.isWithinRoot(step.filePath)) {
+      const cwd = opts?.cwd || this.batchSession(b, step.sessionId)?.cwd || "";
+      if (cwd && !this.isWithinRoot(cwd)) { this.visitors.add(step.sessionId); this.sessionsCache = null; }
+    }
     if (!b.quiet) b.events.push({ step });
   }
 
@@ -713,7 +750,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     const idle = (r: SessionRow) => !r.worked && (r.title.startsWith("/") || r.title === "(untitled session)");
     const shown = cleaned.filter((r) => !idle(r));
     if (!this.activeRoot) return shown;
-    return shown.filter((r) => this.isWithinRoot(r.cwd));
+    return shown.filter((r) => this.isWithinRoot(r.cwd) || this.visitors.has(r.id));
   }
 
   private isWithinRoot(cwd: string): boolean {

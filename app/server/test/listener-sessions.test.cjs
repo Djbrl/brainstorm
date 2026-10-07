@@ -25,7 +25,7 @@ async function fixture() {
   write("worked", [line("prompt", { sessionId: "worked", i: 1, text: "fix the bug" }), line("tool", { sessionId: "worked", i: 2 })]);
   write("slash", [line("prompt", { sessionId: "slash", i: 3, text: "<command-name>/compact</command-name>" }), line("text", { sessionId: "slash", i: 4 })]);
   write("untitled", [line("text", { sessionId: "untitled", i: 5 })]);
-  write("outside", [line("prompt", { sessionId: "outside", cwd: "/elsewhere", i: 6, text: "hi" }), line("edit", { sessionId: "outside", cwd: "/elsewhere", i: 7 })]);
+  write("outside", [line("prompt", { sessionId: "outside", cwd: "/elsewhere", i: 6, text: "hi" }), line("edit", { sessionId: "outside", cwd: "/elsewhere", i: 7, input: { file_path: "/elsewhere/a.ts", old_string: "a", new_string: "b" } })]);
   write("worktree", [line("prompt", { sessionId: "worktree", cwd: "/work/demo-repo/.claude/worktrees/x", i: 8, text: "in a worktree" }), line("text", { sessionId: "worktree", i: 9 })]);
   write("talk", [line("prompt", { sessionId: "talk", i: 10, text: "just a question" }), line("text", { sessionId: "talk", i: 11 })]);
   writeFileSync(f("custom"), jsonl([line("prompt", { sessionId: "custom", i: 12, text: "/review" })]) + JSON.stringify({ type: "custom-title", sessionId: "custom", customTitle: "My title" }) + "\n");
@@ -86,5 +86,24 @@ test("the worked flag is filled in for a database from before it existed", async
   assert.deepEqual(again.listSessions(), expected);
   const worked = t.dbs.db.prepare(`SELECT id FROM sessions WHERE worked = 1 ORDER BY id`).all().map((r) => r.id);
   assert.deepEqual(worked, ["outside", "worked"]);
+  await t.close();
+});
+
+test("a thread from another project that edits this one's files is a visitor here: listed, and read live", async () => {
+  const { t, f } = await fixture();
+  const L = t.listener;
+  const ids = () => L.listSessions().map((s) => s.id);
+  assert.ok(!ids().includes("orch"));
+  // An orchestrator in its own folder edits a file of the demo repo: from that step on, it's listed here too.
+  writeFileSync(f("orch"), jsonl([line("prompt", { sessionId: "orch", cwd: "/orchestrator", i: 30, text: "fix the demo" }),
+    line("edit", { sessionId: "orch", cwd: "/orchestrator", i: 31, input: { file_path: "/work/demo-repo/a.ts", old_string: "a", new_string: "c" } })]));
+  await t.readNow(f("orch"), true);
+  assert.ok(ids().includes("orch"));
+  // Opening the demo repo again finds it from the stored steps; its own project lists it as its own.
+  L.setRoot("/work/demo-repo");
+  assert.ok(ids().includes("orch"));
+  assert.ok(L.scope().guests.ids.has("orch"));
+  L.setRoot("/orchestrator");
+  assert.deepEqual(ids(), ["orch"]);
   await t.close();
 });

@@ -131,10 +131,11 @@ export async function jumpElsewhere(t: ElsewhereThread, nav: Pick<NavActions, "s
  * Open another project (an island on the map), keeping the thread you had open: it shows there too, as a visitor, since
  * it touched that project's files.
  */
-export async function enterProject(root: string, nav: Pick<NavActions, "startReplay" | "stopReplay" | "selectFile">, reload: () => void, threadId?: string) {
+export async function enterProject(root: string, nav: Pick<NavActions, "startReplay" | "stopReplay" | "selectFile">, reload: () => void, threadId?: string, landOn?: string) {
   const r = await fetch("/api/workspace", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ root, ...(threadId ? { guest: threadId } : {}) }) });
   if (!r.ok) throw new Error(`switch failed: ${r.status}`);
   nav.stopReplay(); nav.selectFile(null);
   reload();
-  if (threadId) nav.startReplay(threadId, END, {});
+  // On its last step in that project (the camera and the Track land there), else at its end.
+  if (threadId) nav.startReplay(threadId, landOn ?? END, {});
 }

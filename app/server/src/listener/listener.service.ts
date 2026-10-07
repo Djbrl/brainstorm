@@ -288,6 +288,9 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     return { roots: this.roots, override: this.sessionFilterOverride, guests: { ids: this.visitors, files: this.guestFiles } };
   }
 
+  /** Threads from other projects shown here as visitors (they touched this project's files). */
+  isVisitor(id: string) { return this.visitors.has(id); }
+
   /** The next project opened (from an island on the map) brings this thread along as a visitor. */
   bringGuest(sessionId: string) { this.pendingGuest = sessionId; }
 

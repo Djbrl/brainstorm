@@ -78,7 +78,7 @@ export const moreMotion = (F: Frame, m: Motion) => { if (m === Motion.Smooth || 
 export const lookOf = (n: GNode, F: Frame): Look | null => {
   if (n.lf === F.id) return n.lk ?? null;
   n.lf = F.id;
-  n.lk = F.looks ? F.look(n.id) : null;
+  n.lk = F.looks && !n.isle ? F.look(n.id) : null;   // islands stay readable: a thread's focus doesn't dim them
   return n.lk;
 };
 
@@ -326,7 +326,7 @@ function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: F
   // A thread's focus dims folders less than files: they're the lay of the land around what it did.
   const dim = (look ? 0.5 + 0.5 * look.alpha : 1) * (F.only && !F.onlyDirs?.has(n.id) ? 0.55 : 1), alpha = dim * shown;
   // An island (files outside the project, lib/islands.ts): its outline dashed, like a coast seen from afar.
-  const isle = !!n.dir!.island;
+  const isle = !!n.dir!.more || (!!n.dir!.island && n.dir!.rel === n.dir!.island);   // the island's own outline, not its folders'
   if (isle) ctx.setLineDash([5 / scale, 4 / scale]);
   // Open: the outline, and a breath of fill so folders inside folders read as levels.
   if (open > 0) {
@@ -359,7 +359,8 @@ function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: F
   const px = r * scale, count = n.dir!.files.length;
   if (px < FOLDER_TEXT_PX) {
     // Small on screen: named below, like a file (drawn in the label pass).
-    if (isSel || isHover || px > 6 || active) { F.labN.push(n); F.labP.push((isHover ? 4e6 : 0) + (active ? 1e6 : 0) + 7e5 + r); }
+    // An island is always named (high in the queue): it says which project, at any zoom.
+    if (isSel || isHover || px > 6 || active || isle) { F.labN.push(n); F.labP.push((isHover ? 4e6 : 0) + (active ? 1e6 : 0) + (isle ? 9e5 : 7e5) + r); }
     return;
   }
   // Its name goes first as it opens: by the time its files show, it's gone (its name is on the outline then).

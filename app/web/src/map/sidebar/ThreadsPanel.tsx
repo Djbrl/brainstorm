@@ -11,7 +11,7 @@ import { track } from "../../lib/usage";
 import { relTime } from "../../follow/format";
 import { agentColor, baseName, initial, shortName, verbIng } from "../agents";
 import { isCodex } from "../../lib/harness";
-import { repoBase, repoRelative } from "../../lib/paths";
+import { visitorFrom } from "../../lib/islands";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
 
 function useTick(ms: number) {
@@ -111,9 +111,7 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
   // Which git worktree the thread ran in ("hackathon-landing-page", without Claude Code's random suffix).
   const tree = /\/\.claude\/worktrees\/([^/]+)/.exec(session.cwd ?? "")?.[1]?.replace(/-[0-9a-f]{6}$/, "");
   // A visitor: a thread working in another project that touched this one (an orchestrator): where it comes from.
-  const root = useLive().state.setup?.root;
-  const base = root ? repoBase(root) : null;
-  const from = base && session.cwd && repoRelative(session.cwd, base) === null ? session.cwd.replace(/\/+$/, "").split("/").pop() : null;
+  const from = visitorFrom(session.cwd, useLive().state.map);
   const [agentsOpen, setAgentsOpen] = useState(false);
   useEffect(() => { if (!selected) setAgentsOpen(false); }, [selected]);
   const ids = sorted.map((a) => a.id);

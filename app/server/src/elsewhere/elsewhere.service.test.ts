@@ -22,7 +22,7 @@ function setup(hooks: Record<string, HookSignal & { at: number }> = {}) {
     utimesSync(file, t, t);
   };
   const here = join(base, "here"), there = join(base, "there");
-  const listener = { scopeRoots: () => [here], getSession: () => undefined, codexRecent: () => [] };
+  const listener = { scopeRoots: () => [here], getSession: () => undefined, codexRecent: () => [], isVisitor: (id: string) => id === "guest" };
   const attention = { hookOf: (sid: string) => hooks[sid] };
   const svc = new ElsewhereService({ claudeProjectsDir: projects } as any, listener as any, attention as any);
   return { svc, thread, here, there };
@@ -53,4 +53,11 @@ test("work after the hook spoke means the agent is going again", () => {
   const { svc, thread, there } = setup({ again: { event: "PermissionRequest", session_id: "again", at: Date.now() - 60_000 } });
   thread(there, "again", 2000);
   assert.equal(svc.list()[0]?.state, "working");
+});
+
+test("a visitor (shown in the open project already) isn't counted as an agent elsewhere", () => {
+  const { svc, thread, there } = setup();
+  thread(there, "guest", 1000);
+  thread(there, "other", 1000);
+  assert.deepEqual(svc.list().map((t) => t.sessionId), ["other"]);
 });

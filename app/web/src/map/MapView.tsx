@@ -20,7 +20,7 @@ import { StepPanel } from "./StepPanel";
 import { useSelectedFile } from "./useSelectedFile";
 import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
 import { makeFileResolver } from "../lib/paths";
-import { useIslands } from "../lib/islands";
+import { islandPath, useIslands } from "../lib/islands";
 import { enterProject } from "../lib/switcher";
 import { useLiveActions } from "../lib/live";
 import { useNavActions } from "../lib/nav";
@@ -78,7 +78,8 @@ export function MapView() {
   // Files outside the project (another repo an orchestrator edits, a visitor's own project): islands beside the map.
   const islandSteps = replay ? state.steps[replay.sessionId] : undefined;
   const islandAgents = useMemo(() => Object.values(state.agents ?? {}).filter((a) => !replay || a.sessionId === replay.sessionId), [state.agents, replay?.sessionId]);
-  const islands = useIslands(map, islandSteps, islandAgents);
+  const islandThread = replay ? state.sessions.find((x) => x.id === replay.sessionId) : undefined;
+  const islands = useIslands(map, islandThread, islandSteps, islandAgents, state.sessions);
   const { graph, tween } = useGraph(map, theme, sv, islands);
   const graphRef = useRef(graph); graphRef.current = graph;
   // ---- folders (fold.ts): open as you zoom; the files you look at, a thread's, an agent's open theirs at any zoom ----
@@ -126,6 +127,7 @@ export function MapView() {
     const idx = nodeIndexRef.current;
     let id: string | undefined;
     if (idx.has(file)) id = file;
+    else if (idx.has(islandPath(file))) id = islandPath(file);   // an island's file, from another checkout of its repo
     else {
       const other = same(file); // same file in another worktree of this repo
       if (other && idx.has(other)) id = other;
@@ -396,11 +398,18 @@ export function MapView() {
     // An island (or a file on one): go to that project, the open thread still open (it shows there as a visitor).
     let isle: GNode | undefined = g;
     while (isle && !isle.dir?.island) isle = isle.up;
-    if (isle) { enterProject(isle.dir!.island!, nav, reload, replay?.sessionId).catch(() => {}); return; }
+    if (isle) {
+      const root = isle.dir!.island!;
+      const list = replay ? state.steps[replay.sessionId] ?? [] : [];
+      let land: string | undefined;
+      for (let i = list.length - 1; i >= 0 && !land; i--) { const f = list[i].filePath; if (f && islandPath(f).startsWith(root + "/")) land = list[i].id; }
+      enterProject(root, nav, reload, replay?.sessionId, land).catch(() => {});
+      return;
+    }
     if (!g.dir) { setSelected(selectedRef.current === g.id ? null : g.id); return; }   // the selected file again: let go of it
     const x = g.x ?? 0, y = g.y ?? 0, r = g.r;
     camRef.current.frame({ x0: x - r, x1: x + r, y0: y - r, y1: y + r }, { pad: 24, maxZoom: 12 }, 750);
-  }, [setSelected, nav, reload, replay?.sessionId]);
+  }, [setSelected, nav, reload, replay?.sessionId, state.steps]);
   // Pointing and clicking, worked out against where the circles are this frame (graph.ts hitAt), not force-graph's hit
   // map (repainted at most every 0.8 s). A click is a press and release less than 5 px apart: a trackpad's wobble
   // still clicks, a pan doesn't.
@@ -479,6 +488,10 @@ export function MapView() {
         onFollow={(id) => setFollowId(id)} onFocusFile={focusOnFile} map={map}
         file={sel} picked={picked} onCloseFile={closeFile} />
       <MapStats />
+      {/* A project with almost nothing to map (a folder opened from an island that holds little but the touched file). */}
+      {map && map.files.length > 0 && map.files.length <= 3 && (
+        <p className="map-sparse">This project has only {map.files.length === 1 ? "one file" : `${map.files.length} files`} on the map.</p>
+      )}
       <TalkCard />
       <LensSwitch />
       {graph.nodes.length > 0 && <FitButton onFit={fitNow} label={replay ? "Fit the thread's files" : "Fit the whole project"} />}

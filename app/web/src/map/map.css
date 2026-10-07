@@ -77,3 +77,7 @@
   .map-wrap:has(.map-panel.open) .map-fit { display: none; }
 }
 
+
+/* A project with almost nothing on the map: said under the lens switch, quietly. */
+.map-sparse { position: absolute; top: 132px; left: 50%; transform: translateX(-50%); margin: 0; z-index: 2; pointer-events: none;
+  font-size: 14px; color: var(--ink-3); white-space: nowrap; }

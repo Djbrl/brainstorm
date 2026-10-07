@@ -73,6 +73,14 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     return p === root || p.startsWith(root + "/");
   }
 
+  /** A file the map can put an agent on: the open project's, or one outside it that the map shows as an island (in
+   *  someone's own folders, not a hidden one like ~/.claude where plans live, nor ~/Library). Same rule as lib/islands.ts. */
+  private onMap(p: string | undefined): p is string {
+    if (this.inWorkspace(p)) return true;
+    const home = p ? /^\/(?:Users|home)\/[^/]+\/(.+)$/.exec(p)?.[1] : undefined;
+    return !!home && !home.startsWith(".") && !home.startsWith("Library/");
+  }
+
   /** Subagent description from Claude Code's agent-<id>.meta.json (cached; cheap: one readdir per new agent). */
   private metaLabel(sessionId: string, agentId: string): string | undefined {
     try {
@@ -114,8 +122,9 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
 
     const now = step.ts || new Date().toISOString();
     const action = actionOf(step);
-    const file = this.inWorkspace(step.filePath) ? step.filePath : undefined;
-    // Do not create an agent until it touches something in this workspace.
+    // Inside the project or out on an island: an orchestrator (or its subagents) working elsewhere shows there too.
+    const file = this.onMap(step.filePath) ? step.filePath : undefined;
+    // Do not create an agent until it touches something the map shows.
     if (!a && !file) return;
     if (!a) {
       if (step.agentId && !this.subLabels.has(id)) {

@@ -21,6 +21,7 @@ export type ThreadNumbers = {
   steps: number;     // steps as the step list shows them
   changed: number;   // files edited or written
   created: number;   // of those, files the agent created
+  outside: number;   // of those, files outside the project (on islands): another repo an orchestrator edited
   read: number;      // files read and not changed
   workedMs: number;  // active time
 };
@@ -66,7 +67,8 @@ class Counter {
   private workedMs = 0;
   private prevMs = 0;
 
-  constructor(readonly key: (abs: string) => string) {}
+  /** `scoped`: keys are the project's ("repo:…") or, for a file outside it, its absolute path. */
+  constructor(readonly key: (abs: string) => string, readonly scoped = false) {}
 
   /** False when the new list doesn't follow on from the counted one (then count afresh). */
   update(next: Step[]): boolean {
@@ -110,7 +112,9 @@ class Counter {
   }
 
   numbers(): ThreadNumbers {
-    return (this.last ??= { steps: this.visible, changed: this.changed.size, created: this.created.size, read: this.readOnly, workedMs: this.steps.length > 1 ? this.workedMs : 0 });
+    let outside = 0;
+    if (this.scoped) for (const k of this.changed) if (k.startsWith("/")) outside++;
+    return (this.last ??= { steps: this.visible, changed: this.changed.size, created: this.created.size, outside, read: this.readOnly, workedMs: this.steps.length > 1 ? this.workedMs : 0 });
   }
 }
 
@@ -131,7 +135,7 @@ export function threadNumbers(steps: Step[], map: ProjectMap | null): ThreadNumb
   const key = `${id}\n\n${steps[0]?.sessionId ?? ""}`;
   let c = counters.get(key);
   counters.delete(key);
-  if (!c || !c.update(steps)) { c = new Counter(map ? fileKey(bases) : (abs) => abs); c.update(steps); }
+  if (!c || !c.update(steps)) { c = new Counter(map ? fileKey(bases) : (abs) => abs, !!map); c.update(steps); }
   counters.set(key, c);
   if (counters.size > MAX_COUNTERS) counters.delete(counters.keys().next().value!);
 
@@ -151,7 +155,7 @@ export function useThreadNumbers(sessionId: string | null): ThreadNumbers | null
 
 /** "Changed 16 files (15 new)", "Changed no files". */
 export const changedPhrase = (n: ThreadNumbers) =>
-  n.changed ? `Changed ${plural(n.changed, "file")}${n.created ? ` (${n.created.toLocaleString()} new)` : ""}` : "Changed no files";
+  n.changed ? `Changed ${plural(n.changed, "file")}${n.created || n.outside ? ` (${[n.created ? `${n.created.toLocaleString()} new` : "", n.outside ? `${n.outside.toLocaleString()} outside` : ""].filter(Boolean).join(", ")})` : ""}` : "Changed no files";
 
 /** The thread's summary line: "Changed 16 files (15 new) · read 40 more · 962 steps · worked 3 h 10 min". */
 export function threadLine(n: ThreadNumbers): string {

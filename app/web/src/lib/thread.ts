@@ -7,14 +7,23 @@ import { useEffect, useMemo } from "react";
 import type { Step } from "@contract";
 import { useLive } from "./live";
 import { makeFileResolver, type FileResolver } from "./paths";
-import { isOutside } from "./islands";
+import { islandPath, isOutside, knownRoots, projectOf, visitorHome } from "./islands";
 import type { ProjectMap } from "@contract";
 
-const outsideOf = new WeakMap<FileResolver, FileResolver>();
-/** The project's resolver, and an outside file as itself (one wrapper per resolver, so threads built with it are reused). */
-function withOutside(r: FileResolver, map: ProjectMap | null): FileResolver {
-  let w = outsideOf.get(r);
-  if (!w) { w = (abs) => r(abs) ?? (isOutside(abs, map) ? abs : null); outsideOf.set(r, w); }
+const outsideOf = new WeakMap<FileResolver, Map<string, FileResolver>>();
+/**
+ * The project's resolver, and an outside file as itself: the map shows it on an island. A visitor's (`home`: the project
+ * it comes from) only in that project, like its islands. One wrapper per resolver and home, so threads built with it
+ * are reused.
+ */
+function withOutside(r: FileResolver, map: ProjectMap | null, home: string | null): FileResolver {
+  let byHome = outsideOf.get(r);
+  if (!byHome) outsideOf.set(r, (byHome = new Map()));
+  let w = byHome.get(home ?? "");
+  if (!w) {
+    w = (abs) => r(abs) ?? (isOutside(abs, map) && (!home || projectOf(abs, knownRoots()) === home) ? islandPath(abs) : null);
+    byHome.set(home ?? "", w);
+  }
   return w;
 }
 import { displayLabel, isVisible, realLabel } from "../follow/format";
@@ -402,6 +411,8 @@ export function useThread(sessionId: string | null, detail: ReplayDetail = "ligh
   const map = sessionId ? state.map : null;
   const version = structureVersion(state);
   // A file outside the project resolves to itself: the map shows it on an island (lib/islands.ts, graph.ts).
-  const resolve = useMemo(() => withOutside(makeFileResolver(map, version), map), [map, version]);
+  const cwd = sessionId ? state.sessions.find((x) => x.id === sessionId)?.cwd : undefined;
+  const home = visitorHome(cwd, map);
+  const resolve = useMemo(() => withOutside(makeFileResolver(map, version), map, home), [map, version, home]);
   return useMemo(() => (sessionId && steps ? buildThread(sessionId, steps, resolve, detail) : null), [sessionId, steps, resolve, detail]);
 }

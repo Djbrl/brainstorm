@@ -92,6 +92,8 @@ export type Camera = {
   lookAt: (x: number, y: number, k?: number, ms?: number) => void;
   /** Shift the view by (dx, dy) screen pixels at once, as a hand move (each frame of a held arrow key). */
   nudge: (dx: number, dy: number) => void;
+  /** Zoom by a factor at once, about the middle of the view, as a hand move (each frame of a held + or − key). */
+  zoomBy: (f: number) => void;
   /** Fit a box in the safe area. */
   frame: (box: Box, opts?: { pad?: number; minZoom?: number; maxZoom?: number }, ms?: number) => void;
   /** Pan just enough to bring a circle into the safe area (no move if it's already in it). */
@@ -198,6 +200,19 @@ export function useCamera(fg: RefObject<Graph | undefined | null>, hostRef: RefO
       userAt.current = performance.now();
       c.centerAt(v.x + dx / v.k, v.y + dy / v.k);
     };
+    /** Zoom by a factor at once, about the middle of the part of the map no panel covers (so what you look at stays put),
+     *  as a hand move: one frame of a held + or − key. */
+    const zoomBy = (f: number) => {
+      const c = g(), v = view();
+      if (!c || !v) return;
+      stop();
+      userAt.current = performance.now();
+      const s = safe.current, ox = (s.left - s.right) / 2, oy = (s.top - s.bottom) / 2; // safe middle, from the canvas middle (px)
+      const k = Math.max(0.05, Math.min(24, v.k * f));
+      const px = v.x + ox / v.k, py = v.y + oy / v.k;                                     // the graph point there
+      c.zoom(k);
+      c.centerAt(px - ox / k, py - oy / k);
+    };
     const frame = (box: Box, opts?: { pad?: number; minZoom?: number; maxZoom?: number }, ms = 700) => moveTo(fitView(measure(), box, opts), ms);
     const reveal = (x: number, y: number, r: number, ms = 600) => {
       const v = view();
@@ -222,7 +237,7 @@ export function useCamera(fg: RefObject<Graph | undefined | null>, hostRef: RefO
       const sx = s.w / 2 + (x - v.x) * v.k, sy = s.h / 2 + (y - v.y) * v.k;
       return sx > s.left + m && sx < s.w - s.right - m && sy > s.top + m && sy < s.h - s.bottom - m;
     };
-    return { safe, version, measure, userAt: () => userAt.current, view, moveTo, lookAt, nudge, frame, reveal, easeToward, sees, stop };
+    return { safe, version, measure, userAt: () => userAt.current, view, moveTo, lookAt, nudge, zoomBy, frame, reveal, easeToward, sees, stop };
   }, [fg, hostRef, version]);
 }
 

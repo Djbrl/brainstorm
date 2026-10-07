@@ -135,14 +135,17 @@
 .map-wrap:has(.map-panel.open) .dock { left: calc(50% - 220px); }
 
 /* ---------- whose steps the Track shows: everyone, or one agent on its own (TrackPanel's AgentPicker) ---------- */
-.track-agents { flex: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0 8px 12px; max-height: 132px; overflow-y: auto; padding: 1px; }
-.track-agents button { flex: none; display: inline-flex; align-items: center; gap: 6px; max-width: 160px; border: 1px solid var(--line); border-radius: 999px;
+.track-agents { flex: none; display: flex; gap: 6px; margin: 0 8px 12px; padding: 1px; overflow-x: auto; scrollbar-width: none; scroll-behavior: smooth; }
+.track-agents::-webkit-scrollbar { display: none; }
+.track-agents.more-right { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
+.track-agents.more-left { -webkit-mask-image: linear-gradient(to right, transparent, #000 36px); mask-image: linear-gradient(to right, transparent, #000 36px); }
+.track-agents.more-left.more-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
+.track-agents button { flex: none; scroll-margin-inline: 36px; display: inline-flex; align-items: center; gap: 6px; max-width: 160px; border: 1px solid var(--line); border-radius: 999px;
   background: var(--surface); color: var(--ink-2); font-size: 12.5px; font-weight: 500; padding: 4px 10px; }
 .track-agents button:has(i) { padding-left: 4px; }
 .track-agents button span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .track-agents button i { flex: none; width: 18px; height: 18px; border-radius: 50%; display: grid; place-content: center; color: #fff; font: 700 9.5px/1 var(--font-body); font-style: normal; }
 .track-agents button:hover { color: var(--ink); border-color: var(--ink-3); }
-.track-agents button.more { border-style: dashed; color: var(--ink-3); }
 .track-agents button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); font-weight: 600; }
 .track-agents button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 

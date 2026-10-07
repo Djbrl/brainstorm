@@ -1,7 +1,7 @@
 // Owner: sidebar agent. The sidebar's Track tab: the open thread's steps, next to the map (scrolling them moves the
 // tracer), or its places on the Places lens, under the thread's name (so you see which one you're tracking), what you
 // can do with it (Live, Replay, Share) and, when subagents worked in it, who: everyone, or one agent on its own.
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNav } from "../../lib/nav";
 import { useLiveSelector } from "../../lib/live";
 import { focusAgent, useAgentFocus, useThreadAgents } from "../../lib/agentFocus";
@@ -39,16 +39,25 @@ function AgentPicker({ title }: { title?: string }) {
   const steps = useLiveSelector((s) => (sid ? s.steps[sid] : undefined));
   useTheme(); // the colours follow the map theme
   const accent = readTokens().accent;
-  const [all, setAll] = useState(false);
+  // One row that scrolls sideways (a wheel scrolls it too), an edge fading where more agents hide; the one picked is
+  // kept in view.
+  const row = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState({ left: false, right: false });
+  const measure = () => {
+    const el = row.current;
+    if (el) setMore({ left: el.scrollLeft > 2, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 });
+  };
+  useEffect(() => {
+    row.current?.querySelector(".on")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    measure();
+  }, [focus, agents.length]);
   if (agents.length < 2) return null;
   const pick = (id: string | null) => focusAgent(nav, replay, steps, id === focus ? null : id);
-  // Many subagents: the main agent and the two latest, the one shown on its own, and "+ N" for the rest.
-  const SHORT = 3;
-  const shown = all || agents.length <= SHORT + 1 ? agents : agents.filter((a, i) => i < SHORT || a.id === focus);
   return (
-    <div className="track-agents" role="radiogroup" aria-label="Whose steps">
+    <div className={`track-agents${more.left ? " more-left" : ""}${more.right ? " more-right" : ""}`} role="radiogroup" aria-label="Whose steps"
+      ref={row} onScroll={measure} onWheel={(e) => { const el = row.current; if (el && Math.abs(e.deltaY) > Math.abs(e.deltaX)) el.scrollLeft += e.deltaY; }}>
       <button role="radio" aria-checked={!focus} className={!focus ? "on" : ""} onClick={() => pick(null)}>Everyone</button>
-      {shown.map((a) => {
+      {agents.map((a) => {
         const name = a.name.replace(/^Subagent\s*·\s*/, "");
         return (
           <button key={a.id} role="radio" aria-checked={focus === a.id} className={focus === a.id ? "on" : ""} onClick={() => pick(a.id)}
@@ -58,8 +67,6 @@ function AgentPicker({ title }: { title?: string }) {
           </button>
         );
       })}
-      {agents.length > shown.length && <button className="more" onClick={() => setAll(true)} title="Every agent of this thread">+ {agents.length - shown.length}</button>}
-      {all && agents.length > SHORT + 1 && <button className="more" onClick={() => setAll(false)}>Fewer</button>}
     </div>
   );
 }

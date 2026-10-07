@@ -55,9 +55,9 @@ test("work after the hook spoke means the agent is going again", () => {
   assert.equal(svc.list()[0]?.state, "working");
 });
 
-test("a visitor (shown in the open project already) isn't counted as an agent elsewhere", () => {
+test("a visitor (listed here because it once touched this project) still counts at work in its own project", () => {
   const { svc, thread, there } = setup();
   thread(there, "guest", 1000);
   thread(there, "other", 1000);
-  assert.deepEqual(svc.list().map((t) => t.sessionId), ["other"]);
+  assert.deepEqual(svc.list().map((t) => t.sessionId).sort(), ["guest", "other"]);
 });

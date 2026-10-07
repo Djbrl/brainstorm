@@ -60,7 +60,6 @@ export class ElsewhereService {
         if (!name.endsWith(".jsonl")) continue;
         const file = join(dir, name);
         const sid = basename(name, ".jsonl");
-        if (this.listener.isVisitor(sid)) continue; // shown here already, as a visitor
         let st;
         try { st = statSync(file); } catch { continue; }
         const last = Math.max(st.mtimeMs, this.subagentsChanged(join(dir, sid)));
@@ -79,7 +78,6 @@ export class ElsewhereService {
     for (const t of this.listener.codexRecent(now - LIVE_MS).sort((a, b) => b.mtimeMs - a.mtimeMs)) {
       if (seen.has(t.id)) continue; // a subagent's file counts for its parent
       seen.add(t.id);
-      if (this.listener.isVisitor(t.id)) continue; // shown here already, as a visitor
       if (isHere(t.root)) continue;
       const state = this.stateOf(t.id, t.mtimeMs, now);
       if (!state) continue;

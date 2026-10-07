@@ -177,6 +177,7 @@ const TrackList = memo(function TrackList({ thread, sessionId, whoOf, index, pla
   const threadRef = useRef(thread); threadRef.current = thread;
   const listRef = useRef<HTMLDivElement>(null);
   const userAt = useRef(0);
+  const ownAt = useRef(0); // when the list last scrolled itself to the cursor
   const dragging = useRef(false);
   const [rowH, setRowH] = useState(ROW_H);
 
@@ -215,7 +216,10 @@ const TrackList = memo(function TrackList({ thread, sessionId, whoOf, index, pla
   const raf = useRef(0);
   const rowHRef = useRef(rowH); rowHRef.current = rowH;
   const onScroll = useCallback(() => {
-    if (!dragging.current && performance.now() - userAt.current > USER_MS) return; // our own scroll or layout shift
+    // Our own scroll (following the cursor) or a layout shift: only a scroll you started counts, and one you started
+    // before the list last moved by itself doesn't (a trackpad's glide would otherwise pick a moment mid-way and
+    // flip a live thread back and forth).
+    if (!dragging.current && (performance.now() - userAt.current > USER_MS || userAt.current < ownAt.current)) return;
     cancelAnimationFrame(raf.current);
     raf.current = requestAnimationFrame(() => {
       const el = listRef.current;
@@ -264,6 +268,7 @@ const TrackList = memo(function TrackList({ thread, sessionId, whoOf, index, pla
     const top = Math.max(0, rowTop - el.clientHeight / 2 + rowHeight / 2);
     const delta = Math.abs(el.scrollTop - top);
     if (delta < 2) return;
+    ownAt.current = performance.now();
     el.scrollTo({ top, behavior: first.current || delta > 1600 ? "auto" : "smooth" });
     first.current = false;
   }, [index, len, here, open, chapters, rowH]);
@@ -313,7 +318,6 @@ function ThinkingRow({ since }: { since: string }) {
   const took = s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`;
   return (
     <div className="rp-waiting thinking" role="status">
-      <b aria-hidden="true" />
       <span className="rp-waiting-line">Thinking<i className="rp-dots" aria-hidden="true"><i /><i /><i /></i></span>
       <span className="rp-waiting-detail">{took}</span>
     </div>

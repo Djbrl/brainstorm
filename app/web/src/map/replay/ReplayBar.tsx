@@ -84,7 +84,7 @@ function Player() {
   return (
     <div className="rp-player" role="region" aria-label="Replay">
       <button className="rp-icon" onClick={() => set(index - 1)} disabled={index === 0} aria-label="Previous step" title="Previous step (←)">{Icon.back}</button>
-      <button className="rp-icon rp-play" onClick={() => togglePlay(index, len, replay.playing, setReplayIndex, setReplayPlaying)}
+      <button className="rp-icon rp-play" onClick={() => togglePlay(replay.playing, setReplayPlaying)}
         aria-label={replay.playing ? "Pause" : "Play"} title={replay.playing ? "Pause (Space)" : "Play (Space)"}>
         {replay.playing ? Icon.pause : Icon.play}
       </button>

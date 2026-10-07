@@ -196,7 +196,6 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .track-back-live i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: sidebar-pulse 1.6s infinite; }
 .track-back-live button { flex: none; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font-size: 12.5px; font-weight: 600; padding: 6px 12px; }
 .track-back-live button:hover { filter: brightness(1.08); }
-.sidebar-track:has(.track-back-live) .rp-list { padding-bottom: 64px; } /* the last steps can still scroll clear of it */
 @keyframes back-live-in { from { opacity: 0; transform: translateY(8px); } }
 @media (prefers-reduced-motion: reduce) { .track-back-live, .track-back-live i { animation: none; } }
 .track-share { margin-top: 1px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink-2); font-size: 12.5px; font-weight: 600; padding: 4px 12px; }

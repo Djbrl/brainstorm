@@ -205,7 +205,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
         case "End": setReplayPlaying(false); setReplayIndex(st.current.len - 1); break;
         case " ": {
           if ((e.target as HTMLElement | null)?.tagName === "BUTTON") return; // let the focused button click
-          togglePlay(st.current.index, st.current.len, replayPlayingRef.current, setReplayIndex, setReplayPlaying, st.current.mode === "play");
+          togglePlay(replayPlayingRef.current, setReplayPlaying);
           break;
         }
         default: return;
@@ -584,15 +584,12 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
 }
 
 /**
- * Play/pause from the step you're on. In the player, play at the last beat starts over (like any player); from the
- * thread's steps, it opens the player there (paused, at the end: rewind with ← or the slider). Shared by the keyboard
- * and the ReplayBar.
+ * Play/pause from the step you're on, whatever it is (a thread opened with no step picked is on its last). At the last
+ * one the player opens there, paused, and you go back from it (scrolling the Track, ←, Home or the slider): it never
+ * jumps to the first step by itself. Shared by the keyboard and the ReplayBar.
  */
-export function togglePlay(index: number, len: number, playing: boolean,
-  setIndex: (i: number) => void, setPlaying: (p: boolean) => void, inPlayer = true) {
-  if (playing) { setPlaying(false); return; }
-  if (inPlayer && index >= len - 1) setIndex(0);
-  setPlaying(true);
+export function togglePlay(playing: boolean, setPlaying: (p: boolean) => void) {
+  setPlaying(!playing);
 }
 
 function hexA(c: string, alpha: number) {

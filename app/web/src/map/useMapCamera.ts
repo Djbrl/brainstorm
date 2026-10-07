@@ -137,6 +137,28 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
     addEventListener("blur", release);
     return () => { removeEventListener("keydown", onDown); removeEventListener("keyup", onUp); removeEventListener("blur", release); cancelAnimationFrame(raf); };
   }, [setIntent]);
+  // C centres the camera on the agent once, without locking: the replay's marker, the agent you follow, the open thread's
+  // agent, or else the agent that moved last. Zoomed far out, it comes in a little so the agent reads.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.key !== "c" && e.key !== "C") || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target instanceof HTMLElement ? e.target : null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      const agents = anim.current;
+      const newest = () => { let best: AgentAnim | undefined; for (const a of agents.values()) if (!best || a.lastTs > best.lastTs) best = a; return best; };
+      const at = replayRef.current.subject()
+        ?? (followRef.current ? agents.get(followRef.current) : undefined)
+        ?? (replay ? agents.get(replay.sessionId) : undefined)
+        ?? (replay ? undefined : newest());
+      if (!at) return;
+      e.preventDefault();
+      setIntent({ kind: "free" });
+      const k = camRef.current.view()?.k ?? 1;
+      camRef.current.lookAt(at.x, at.y, Math.max(k, 1.6), 600);
+    };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, [replay?.sessionId, setIntent]);
   // Esc stops following an agent before it steps back out of anything else (capture: ahead of the shell's Esc). A window
   // open over the map (Settings, Find a thread, a picture) takes that Esc for itself.
   useEffect(() => {

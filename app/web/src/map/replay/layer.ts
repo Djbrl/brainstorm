@@ -113,6 +113,7 @@ type Anim = { x: number; y: number; fromX: number; fromY: number; t0: number; fi
 function isTyping(t: EventTarget | null) {
   const el = t as HTMLElement | null;
   if (!el || !el.tagName) return false;
+  if (el.tagName === "INPUT" && /^(range|checkbox|radio|button)$/.test((el as HTMLInputElement).type)) return false; // not typing: the replay slider
   return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable;
 }
 

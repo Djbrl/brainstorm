@@ -95,7 +95,8 @@ function Player() {
       <div className="rp-slider" style={{ ["--rp-pct" as string]: `${pct}%` }}>
         <ChapterMarks thread={thread} />
         <input type="range" min={0} max={len - 1} step={1} value={index} aria-label="Replay position"
-          aria-valuetext={`${index + 1} of ${len}`} onChange={(e) => set(Number(e.target.value))} />
+          aria-valuetext={`${index + 1} of ${len}`} onChange={(e) => set(Number(e.target.value))}
+          onPointerUp={(e) => e.currentTarget.blur()} /> {/* dragged, it lets go of the keys: Space plays again, ← → step */}
       </div>
       <div className="rp-speed" role="group" aria-label="Speed">
         {SPEEDS.map((s) => (

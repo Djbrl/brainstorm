@@ -194,6 +194,7 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 - 05:40 (7 Oct) [switcher] Held arrow keys glide the map continuously (700 px/s, Shift 1600, two keys go diagonally), easing in and out; a tap still moves it a little. One animation loop, only while a key is held or the glide eases out (frames under 10 ms).
 - 05:55 (7 Oct) [switcher] + and − zoom the map from the keyboard (= and _ too, no Shift needed), held to keep going, easing in and out, about the middle of the part of the map no panel covers: the map works without a mouse or trackpad. Same loop as the arrow glide.
 - 06:05 (7 Oct) [switcher] Shift ↑ zooms in and Shift ↓ zooms out (held: keeps going; a tap is a step), also in the replay player; + and − still work. Shift no longer speeds up the arrow glide.
+- 06:30 (7 Oct) [map, switcher] Blue (an agent editing it this minute) rings files only: an open folder's outline no longer turns blue (a stack of concentric blue folders around one edit was too much); a folder closed at this zoom keeps the ring for the files inside it, and only the outermost closed one is drawn. The replay slider lets go of the keyboard once dragged, so Space plays and ← → step again. C centres the camera on the agent once, without locking it (the replay's marker, the agent you follow, the open thread's agent, else the one that moved last; zoomed far out it comes in a little); in the bar's key hints and the ? list.
 
 ## Requests
 

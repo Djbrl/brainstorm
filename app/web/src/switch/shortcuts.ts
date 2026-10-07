@@ -3,6 +3,7 @@
 /** Typing in a field: single-key shortcuts stay out of the way. */
 export function isTyping(t: EventTarget | null): boolean {
   const el = t as HTMLElement | null;
+  if (el?.tagName === "INPUT" && /^(range|checkbox|radio|button)$/.test((el as HTMLInputElement).type)) return false; // a slider isn't typing
   return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
 }
 
@@ -24,6 +25,7 @@ export const SHORTCUTS: { title: string; keys: { keys: string[]; what: string }[
     keys: [
       { keys: ["←", "↑", "→", "↓"], what: "Move around the map: hold to glide" },
       { keys: ["Shift", "↑", "↓"], what: "Zoom in or out: hold to keep going" },
+      { keys: ["C"], what: "Center the camera on the agent (without locking it)" },
       { keys: ["F"], what: "Fit the map to the window" },
       { keys: ["L"], what: "Lock or unlock the camera on the agent" },
       { keys: ["R"], what: "Show or hide reads" },

@@ -60,6 +60,7 @@ function KeyHints({ open, onHelp }: { open: boolean; onHelp: () => void }) {
   return (
     <div className="threadbar-keys" aria-label="Keyboard shortcuts">
       {open && <span><kbd>Space</kbd>{playing ? "Pause" : "Play"}</span>}
+      {open && <span><kbd>C</kbd>Center</span>}
       {open && <span><kbd>L</kbd>{lock ? "Free camera" : "Lock camera"}</span>}
       <button onClick={onHelp} title="Every keyboard shortcut"><kbd>?</kbd>Shortcuts</button>
     </div>

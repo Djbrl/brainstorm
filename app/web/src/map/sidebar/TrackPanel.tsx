@@ -1,4 +1,4 @@
-// Owner: sidebar agent. The sidebar's Track tab: the open thread's steps, next to the map (scrolling them moves the
+// Owner: sidebar agent. The open thread, in the sidebar's Threads tab (a back arrow to the list): its steps, next to the map (scrolling them moves the
 // tracer), or its places on the Places lens, under the thread's name (with Share) and, when
 // subagents worked in it, who: everyone, or one agent on its own. Live isn't a button: a running thread follows its
 // newest step until you move off it (then a footer offers the way back), and follows again once you're back on it
@@ -15,7 +15,7 @@ import { ShareMenu } from "../replay/ReplayBar";
 import { isReplay } from "../../lib/live";
 import { PlaceSteps } from "../../cowork/PlaceSteps";
 
-export function TrackPanel() {
+export function TrackPanel({ onBack }: { onBack?: () => void }) {
   const nav = useNav();
   const { replay, lens } = nav;
   const sid = replay?.sessionId;
@@ -24,6 +24,11 @@ export function TrackPanel() {
   return (
     <div className="sidebar-track">
       <div className="track-head">
+        {onBack && (
+          <button className="track-back" onClick={onBack} aria-label="All threads" title="All threads (the thread stays open on the map)">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3.5L5.5 8l4.5 4.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+        )}
         <h2 className="sidebar-track-title" title={session?.title}>{session?.title || "Untitled thread"}</h2>
         {!isReplay() && <ShareMenu sessionId={replay.sessionId} className="track-share" />}
       </div>

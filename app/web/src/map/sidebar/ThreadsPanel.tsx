@@ -1,6 +1,6 @@
 // Owner: sidebar agent. Threads tab: the list of threads, nothing more. Clicking one opens it on the map, and the sidebar
-// turns to its Track tab (its steps; a running one follows live, and Live, Replay and Share sit under its title there).
-// Clicking the open thread again closes it. A thread's harness is a colour mark, said once in a legend under the list.
+// shows it in the list's place (its steps; a running one follows live), with a back arrow to the list.
+// The list comes in sections: Claude Code, Codex, and the threads of other projects that touched this one.
 // Under the open thread: what it waits on you for, if it's blocked, and its agents, each on its row (follow, show/hide).
 // The eye in the title row shows or hides all its agents.
 import { useEffect, useState } from "react";
@@ -11,6 +11,7 @@ import { track } from "../../lib/usage";
 import { relTime } from "../../follow/format";
 import { agentColor, baseName, initial, shortName, verbIng } from "../agents";
 import { harnessName, harnessOf } from "../../lib/harness";
+import { visitorHome } from "../../lib/islands";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
 
 function useTick(ms: number) {
@@ -31,12 +32,14 @@ function EyeIcon({ off }: { off: boolean }) {
   );
 }
 
-export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }: {
+export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, onShowThread }: {
   agents: AgentPresence[];
   accent: string;
   followId: string | null;
   onFollow: (id: string | null) => void;
   onFocusFile: (path: string) => void;
+  /** The open thread clicked again: show it (the sidebar had gone back to the list). */
+  onShowThread?: () => void;
 }) {
   useTick(5000);
   const now = clock();
@@ -55,42 +58,54 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile }
 
   // Clicking a thread opens it at the end, on the lens you're on, and a running one keeps following its newest step.
   const select = (s: Session) => {
-    if (replay?.sessionId === s.id) { stopReplay(); return; } // clicking the open thread closes it
+    if (replay?.sessionId === s.id) { onShowThread?.(); return; } // the open thread: back to it
     const running = s.status === "running";
     startReplay(s.id, running ? 0 : END, { live: running });
     track("th");
   };
-  // The most recent few; the rest behind "Show all" (the open thread always shows).
+  // In sections: this project's threads by harness (Claude Code, then Codex), then the threads of other projects that
+  // touched this one, by project. Headings only when there's more than one section. Each section shows its most
+  // recent few; the rest behind "Show all" (the open thread always shows).
+  const sections = new Map<string, { title: string; list: Session[] }>();
+  const add = (key: string, title: string, s: Session) => (sections.get(key) ?? sections.set(key, { title, list: [] }).get(key)!).list.push(s);
+  for (const k of ["claude", "codex"]) sections.set(k, { title: harnessName(k as "claude" | "codex"), list: [] });
+  for (const x of sessions) {
+    const home = visitorHome(x.cwd, state.map);
+    if (home) { const name = home.slice(home.lastIndexOf("/") + 1); add(`p:${home}`, `From ${name}`, x); }
+    else add(harnessOf(x), "", x);
+  }
+  const groups = [...sections.values()].filter((g) => g.list.length);
   const SHORT = 5;
-  const shown = all || sessions.length <= SHORT + 1 ? sessions : sessions.filter((x, i) => i < SHORT || x.id === replay?.sessionId);
+  const cut = (list: Session[]) => (all || list.length <= SHORT + 1 ? list : list.filter((x, i) => i < SHORT || x.id === replay?.sessionId));
+  const hidden = groups.reduce((n, g) => n + g.list.length - cut(g.list).length, 0);
 
+  const row = (session: Session) => (
+    <ThreadRow
+      key={session.id}
+      session={session}
+      selected={replay?.sessionId === session.id}
+      agents={agents.filter((a) => a.sessionId === session.id)}
+      accent={accent}
+      followId={followId}
+      onFollow={onFollow}
+      onFocusFile={onFocusFile}
+      hiddenAgents={hiddenAgents}
+      toggleAgent={toggleAgent}
+      setHiddenAgents={setHiddenAgents}
+      now={now}
+      onSelect={() => select(session)}
+    />
+  );
   return (
     <div className="sidebar-threads">
-      <ul className="sidebar-thread-list">
-        {shown.map((session) => (
-          <ThreadRow
-            key={session.id}
-            session={session}
-            selected={replay?.sessionId === session.id}
-            agents={agents.filter((a) => a.sessionId === session.id)}
-            accent={accent}
-            followId={followId}
-            onFollow={onFollow}
-            onFocusFile={onFocusFile}
-            hiddenAgents={hiddenAgents}
-            toggleAgent={toggleAgent}
-            setHiddenAgents={setHiddenAgents}
-            now={now}
-            onSelect={() => select(session)}
-          />
-        ))}
-      </ul>
-      {sessions.length > shown.length && <button className="sidebar-more" onClick={() => setAll(true)}>Show all {sessions.length} threads</button>}
-      {all && sessions.length > SHORT + 1 && <button className="sidebar-more" onClick={() => setAll(false)}>Show fewer</button>}
-      <p className="sidebar-harness-key">
-        <span><i className="h-claude" aria-hidden="true" />Claude Code</span>
-        <span><i className="h-codex" aria-hidden="true" />Codex</span>
-      </p>
+      {groups.map((g) => (
+        <section key={g.title} className="sidebar-thread-group">
+          {groups.length > 1 && <h3>{g.title}<span>{g.list.length}</span></h3>}
+          <ul className="sidebar-thread-list">{cut(g.list).map(row)}</ul>
+        </section>
+      ))}
+      {hidden > 0 && <button className="sidebar-more" onClick={() => setAll(true)}>Show all {sessions.length} threads</button>}
+      {all && groups.some((g) => g.list.length > SHORT + 1) && <button className="sidebar-more" onClick={() => setAll(false)}>Show fewer</button>}
     </div>
   );
 }
@@ -121,7 +136,6 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
     <li className={`sidebar-thread ${selected ? "selected" : ""}${blocked ? " needs-you" : ""}`}>
       <div className="sidebar-thread-headrow">
         <button className="sidebar-thread-head" onClick={onSelect} aria-pressed={selected} title={selected ? "Close this thread" : running ? "Open this thread and follow it live" : "Open this thread"}>
-          <i className={`sidebar-thread-harness h-${harnessOf(session)}`} title={`Ran in ${harnessName(harnessOf(session))}`} aria-hidden="true" />
           <span className={`sidebar-thread-status ${session.status}${blocked ? " waiting" : ""}`} aria-hidden="true" />
           <span className="sidebar-thread-title">{session.title || "Untitled thread"}</span>
           {say && <span className={`sidebar-thread-attn ${blocked ? "blocked" : "turn"}`} title={`${say.line}${attention?.detail ? `\n${attention.detail}` : ""}`}>{say.badge}</span>}

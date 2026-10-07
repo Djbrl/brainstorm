@@ -26,6 +26,17 @@ async function openWorkspace(root: string): Promise<SetupStatus> {
   return r.json();
 }
 
+/** The system's folder picker, opened by the local server: the folder's path, or null if cancelled. */
+async function chooseFolder(): Promise<string | null> {
+  const r = await fetch("/api/workspace/choose", { method: "POST" });
+  if (!r.ok) {
+    let msg = "The folder picker didn't open.";
+    try { const b = await r.json(); msg = b.message || msg; } catch { /* keep default */ }
+    throw new Error(msg);
+  }
+  return ((await r.json()) as { root: string | null }).root;
+}
+
 async function getStatus(): Promise<SetupStatus | null> {
   try { const r = await fetch("/api/workspace"); return r.ok ? r.json() : null; } catch { return null; }
 }
@@ -61,6 +72,15 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
     try { onOpened(await openWorkspace(r), r); }
     catch (e) { setError(e instanceof Error ? e.message : "Couldn't open that folder."); setBusy(null); }
   };
+  // The system's folder window (Finder, Explorer): the folder picked opens at once.
+  const [choosing, setChoosing] = useState(false);
+  const choose = async () => {
+    if (choosing || busy) return;
+    setChoosing(true); setError(null);
+    try { const root = await chooseFolder(); if (root) await open(root); }
+    catch (e) { setError(e instanceof Error ? e.message : "The folder picker didn't open."); }
+    finally { setChoosing(false); }
+  };
   const submit = () => {
     if (isPath) return open(q);
     const first = shown?.find((s) => s.exists);
@@ -91,9 +111,16 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
       <h1 className="su-title">Pick a workspace</h1>
       <p className="su-lede">Rundown maps the code in a folder and follows the agents (Claude Code or Codex) working in it, live.</p>
 
+      <button className="su-btn big su-choose" onClick={choose} disabled={choosing || !!busy}>
+        {choosing ? <><span className="su-spin light" />Waiting for a folder…</> : <>
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M2.75 6.25V15a1.25 1.25 0 0 0 1.25 1.25h12A1.25 1.25 0 0 0 17.25 15V8A1.25 1.25 0 0 0 16 6.75h-6.2L8.3 4.5a1 1 0 0 0-.83-.45H4A1.25 1.25 0 0 0 2.75 5.3Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /></svg>
+          Choose a folder…</>}
+      </button>
+      <h2 className="su-sub">Or one Claude Code or Codex has worked in</h2>
+
       <form className="su-find" onSubmit={(e) => { e.preventDefault(); submit(); }}>
         <svg className="su-find-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.8" stroke="currentColor" strokeWidth="1.6" /><path d="M10.6 10.6L14 14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
-        <input ref={inputRef} className="su-input" value={query} placeholder="Find a project, or paste a folder path" spellCheck={false} autoComplete="off" aria-label="Find a project, or paste a folder path"
+        <input ref={inputRef} className="su-input" value={query} placeholder="Find a project" spellCheck={false} autoComplete="off" aria-label="Find a project (or paste a folder path)"
           onChange={(e) => { setQuery(e.target.value); setError(null); }}
           onKeyDown={(e) => { if (e.key === "ArrowDown") { e.preventDefault(); items()[0]?.focus(); } }} />
         {isPath && <button className="su-btn" type="submit" disabled={!!busy}>{busy === q ? <span className="su-spin light" /> : "Open"}</button>}
@@ -118,7 +145,7 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
           ))}
         </div>
       ) : (
-        <p className="su-none">{isPath ? "Press Enter to open this folder." : list?.length ? `No project matches “${q}”. Paste its folder path to open it.` : "No projects found on this computer yet. Paste a folder path above."}</p>
+        <p className="su-none">{isPath ? "Press Enter to open this folder." : list?.length ? `No project matches “${q}”. Choose its folder above.` : "Claude Code and Codex haven't worked in any folder on this computer yet. Choose one above."}</p>
       )}
       {shown && shown.length > 0 && <p className="su-count">{q ? `${shown.length} of ${list!.length} projects` : plural(list!.length, "project")} on this computer</p>}
     </div>
@@ -205,7 +232,8 @@ export function SetupView({ onDone, onCancel }: { onDone: () => void; onCancel?:
 
   return (
     <div className="su-root">
-      <div className="su-wordmark"><Logo /></div>
+      {/* The logo goes home: back to the project you had open, when there is one. */}
+      {onCancel ? <button className="su-wordmark su-home" onClick={onCancel} aria-label="Home" title="Home"><Logo /></button> : <div className="su-wordmark"><Logo /></div>}
       {phase === "pick" ? (
         <Pick onCancel={onCancel} onOpened={(s, r) => { setStatus(s); setRoot(r); setPhase("loading"); }} />
       ) : (

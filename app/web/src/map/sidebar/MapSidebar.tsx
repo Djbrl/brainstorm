@@ -1,6 +1,7 @@
-// Owner: sidebar agent. Floating left sidebar on the map: [Threads | Track | Files] tabs, collapsible to a slim tab.
-// Threads lists them; Track is the open thread's steps (its places, on the Places lens), next to the map: scrolling it
-// moves the tracer; Files is the project's folder tree, or the selected file (FileView) in its place.
+// Owner: sidebar agent. Floating left sidebar on the map: [Threads | Files] tabs, collapsible to a slim tab.
+// Threads lists them; an open thread shows in their place (TrackPanel: its steps, or its places on the Places lens,
+// next to the map: scrolling them moves the tracer), its back arrow returning to the list (the thread stays open);
+// Files is the project's folder tree, or the selected file (FileView) in its place.
 // Picking a file anywhere (the map, the tree, a link, a step's file) turns the sidebar to Files and opens it there,
 // unfolding the sidebar if it was folded; "All files" (or Esc) goes back to the tree. Another tab keeps it: back on
 // Files, the file is still there until you let go of it.
@@ -33,12 +34,12 @@ export type MapSidebarProps = {
   onCloseFile?: () => void;
 };
 
-type Tab = "threads" | "track" | "files";
+type Tab = "threads" | "files";
 const TAB_KEY = "rundown-sidebar-tab";
 const COLLAPSED_KEY = "rundown-sidebar-collapsed";
 
 function loadTab(): Tab {
-  try { const t = localStorage.getItem(TAB_KEY); return t === "track" || t === "files" ? t : "threads"; } catch { return "threads"; }
+  try { return localStorage.getItem(TAB_KEY) === "files" ? "files" : "threads"; } catch { return "threads"; }
 }
 function loadCollapsed(): boolean {
   try { return localStorage.getItem(COLLAPSED_KEY) === "1"; } catch { return false; }
@@ -56,8 +57,10 @@ const PHONE = "(max-width: 600px)";
 
 export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, map, file, picked, onCloseFile }: MapSidebarProps) {
   const { replay, file: fileLink } = useNav();
-  // A file link opens on Files, a thread link on its Track.
-  const [tab, setTab] = useState<Tab>(() => (fileLink ? "files" : replay ? "track" : loadTab()));
+  // A file link opens on Files, a thread link on the thread.
+  const [tab, setTab] = useState<Tab>(() => (fileLink ? "files" : replay ? "threads" : loadTab()));
+  // Threads with a thread open: the thread, or (after its back arrow) the list.
+  const [listing, setListing] = useState(false);
   const [folded, setFolded] = useState<boolean>(loadCollapsed); // the desktop choice, saved
   const narrow = useMedia(NARROW), phone = useMedia(PHONE);
   const [over, setOver] = useState(false); // narrow: open over the content, never saved
@@ -66,15 +69,17 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
 
   useEffect(() => { try { localStorage.setItem(TAB_KEY, tab); } catch { /* storage blocked: tab resets on reload */ } }, [tab]);
   useEffect(() => { try { localStorage.setItem(COLLAPSED_KEY, folded ? "1" : "0"); } catch { /* storage blocked */ } }, [folded]);
-  // Opening a thread shows its Track; closing it, the threads. On a phone the sheet folds away to show the map.
+  // Opening a thread shows it under Threads; closing it, the list. On a phone the sheet folds away to show the map.
   const thread = replay?.sessionId ?? null;
   const opened = useRef(false); // the first render already picked its tab
   useEffect(() => {
-    if (opened.current) setTab((t) => (thread ? "track" : t === "track" ? "threads" : t));
+    if (opened.current && thread) setTab("threads");
     opened.current = true;
+    setListing(false);
     if (phone) setOver(false);
   }, [thread]);
-  const shown: Tab = !thread && tab === "track" ? "threads" : tab;
+  const shown: Tab = tab;
+  const inThread = shown === "threads" && !!thread && !listing;
   useEffect(() => { if (!narrow) setOver(false); }, [narrow]);
   // A file picked: show it here, unfolded (over the content when narrow).
   useEffect(() => {
@@ -96,7 +101,7 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
   // their top.
   const body = useRef<HTMLDivElement>(null);
   const viewing = shown === "files" && file ? file.path : null;
-  const view = viewing ? `file:${viewing}` : shown; // "files" is the tree
+  const view = viewing ? `file:${viewing}` : inThread ? "thread" : shown; // "files" is the tree
   const viewRef = useRef(view); viewRef.current = view;
   const treeTop = useRef(0), lastView = useRef(view);
   useLayoutEffect(() => {
@@ -108,7 +113,7 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
 
   const tabButton = (
     <button className="sidebar-collapsed" onClick={() => setCollapsed(false)} aria-label="Open sidebar" aria-expanded={!collapsed}>
-      <span>{shown === "threads" ? "Threads" : shown === "track" ? "Track" : "Files"}</span>
+      <span>{shown === "threads" ? "Threads" : "Files"}</span>
       <i aria-hidden="true">›</i>
     </button>
   );
@@ -123,17 +128,16 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
       <div className="sidebar-head">
         <nav className="sidebar-tabs" role="tablist" aria-label="Sidebar view">
           <button role="tab" aria-selected={shown === "threads"} onClick={() => setTab("threads")}>Threads</button>
-          <button role="tab" aria-selected={shown === "track"} onClick={() => setTab("track")} disabled={!thread} title={thread ? undefined : "Open a thread to see its steps"}>Track</button>
           <button role="tab" aria-selected={shown === "files"} onClick={() => setTab("files")}>Files</button>
         </nav>
         <button className="sidebar-collapse" onClick={() => setCollapsed(true)} aria-label="Collapse sidebar" title="Collapse">‹</button>
       </div>
       {viewing && <FileViewBack onBack={() => onCloseFile?.()} />}
       <div className="sidebar-body" ref={body} onScroll={onScroll}>
-        {shown === "threads" ? (
-          <ThreadsPanel agents={agents} accent={accent} followId={followId} onFollow={fold(onFollow)} onFocusFile={onFocusFile} />
-        ) : shown === "track" ? (
-          <TrackPanel />
+        {inThread ? (
+          <TrackPanel onBack={() => setListing(true)} />
+        ) : shown === "threads" ? (
+          <ThreadsPanel agents={agents} accent={accent} followId={followId} onFollow={fold(onFollow)} onFocusFile={onFocusFile} onShowThread={() => setListing(false)} />
         ) : viewing && file ? (
           <FileView file={file} root={map?.root ?? ""} edges={map?.edges ?? []} onFocus={onFocusFile} />
         ) : null}

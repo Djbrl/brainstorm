@@ -62,8 +62,8 @@ function AttentionAlerts() {
 function Shell() {
   useEffect(() => { track("op"); }, []); // one "app opened" for the usage stats (counts nothing in a replay)
   const { reload } = useLiveActions();
-  const { lens, replay } = useNavState();
-  const { back, stopReplay, selectFile } = useNavActions();
+  const { lens, replay, file, step, focusFile } = useNavState();
+  const { back, stopReplay, selectFile, setFocusFile } = useNavActions();
   const replayId = replay?.sessionId ?? null;
   const state = useLiveSelector((s) => ({
     replay: s.replay, preview: s.preview, shared: s.shared, connected: s.connected, setup: s.setup,
@@ -110,12 +110,19 @@ function Shell() {
   }
   const project = state.setup?.name || "brainstorm";
 
+  // The logo: home, the project as it opens (no thread, file or step), as if Esc were pressed until nothing is left to
+  // close; already there, the page loads again.
+  const goHome = () => {
+    if (!replay && !file && !step && !focusFile && lens === "map") { location.reload(); return; }
+    stopReplay(); selectFile(null); setFocusFile(null);
+  };
+
   return (
     <div className={`shell ${state.preview || state.shared ? "has-banner" : ""}`}>
       <header className="topbar">
         {isReplay()
           ? <a className="wordmark" href="https://brainstorm-landing.vercel.app" aria-label="Rundown home"><Logo label="Rundown home" /></a>
-          : <div className="wordmark"><Logo /></div>}
+          : <button className="wordmark" onClick={goHome} aria-label="Home" title="Home"><Logo /></button>}
         {state.replay || state.shared ? <Crumbs project={project} /> : <div className="topbar-space" />}
         <div className="status">
           {!state.replay && !state.shared && <Elsewhere />}

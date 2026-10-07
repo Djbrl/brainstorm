@@ -68,7 +68,8 @@ export const knownRoots = () => roots;
 export const visitorHome = (cwd: string | undefined, map: ProjectMap | null) => homeOf(cwd, map, roots);
 /** A visitor's home: the project its thread works in, when that isn't this one (null for this project's own threads). */
 function homeOf(cwd: string | undefined, map: ProjectMap | null, known: string[] | null): string | null {
-  if (!cwd || !map || !cwd.startsWith("/") || inProject(cwd, map)) return null;
+  // The project's own folder counts as in it (inProject asks about what's inside a folder).
+  if (!cwd || !map || !cwd.startsWith("/") || inProject(cwd.replace(/\/+$/, "") + "/", map)) return null;
   return projectOf(cwd.replace(/\/+$/, ""), known);
 }
 

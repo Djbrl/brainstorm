@@ -94,3 +94,10 @@
 @keyframes su-pop { from { transform: scale(.6); } to { transform: scale(1); } }
 @keyframes su-draw { to { stroke-dashoffset: 0; } }
 @keyframes su-ready { from { transform: scale(.97); } to { transform: none; } }
+
+/* Pick: the system's folder window first, then the folders Claude Code and Codex have worked in. */
+.su-choose { align-self: flex-start; margin-top: 28px; gap: 10px; }
+.su-choose:not(:disabled) { animation: none; }
+.su-sub { margin: 36px 0 0; font-size: 15px; font-weight: 600; color: var(--ink-2); }
+.su-pick .su-sub + .su-find { margin-top: 12px; }
+.su-home { border: 0; background: none; padding: 0; cursor: pointer; }

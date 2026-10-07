@@ -33,7 +33,8 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; margin: 
 .wordmark { display: inline-flex; align-items: center; flex: none; color: var(--ink); }
 .wordmark .logo { display: block; height: 20px; width: auto; }
 a.wordmark { color: inherit; text-decoration: none; cursor: pointer; border-radius: 6px; }
-a.wordmark:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+button.wordmark { border: 0; background: none; padding: 0; cursor: pointer; border-radius: 6px; }
+:is(a, button).wordmark:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 /* Where you are: project › thread › step. Each part above the current one takes you back to it. */
 .topbar-space { flex: 1; }
 .crumbs { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; font-size: 14px; color: var(--ink-3); }

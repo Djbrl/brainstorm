@@ -77,6 +77,14 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
     else all[Math.min(all.length - 1, next)]?.focus();
   };
 
+  // Esc returns to the map (capture: before the app's own Esc, even from the search field).
+  useEffect(() => {
+    if (!onCancel) return;
+    const onKey = (e: globalThis.KeyboardEvent) => { if (e.key === "Escape" && !busy) { e.preventDefault(); e.stopPropagation(); onCancel(); } };
+    addEventListener("keydown", onKey, true);
+    return () => removeEventListener("keydown", onKey, true);
+  }, [onCancel, busy]);
+
   return (
     <div className="su-col su-pick">
       {onCancel && <button className="su-back" onClick={onCancel}><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 3.5L5.5 8l4.5 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>Back</button>}

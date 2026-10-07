@@ -102,7 +102,7 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .map-stats { position: absolute; left: 40px; top: 84px; margin: 0; color: var(--ink-3); font-size: 14.5px; pointer-events: none; z-index: 3; white-space: nowrap; max-width: min(calc(50% - 160px), 330px); overflow: hidden; text-overflow: ellipsis; }
 
 /* The sidebar keeps one height and sits centered; the stats line rides just above it (Map, Places). */
-.map-wrap, .cw-wrap { --sb-h: min(720px, calc(100% - 170px)); --sb-top: calc(50% - var(--sb-h) / 2 + 18px); }
+.map-wrap, .cw-wrap { --sb-h: min(900px, calc(100% - 140px)); --sb-top: calc(50% - var(--sb-h) / 2 + 18px); }
 .map-sidebar { top: var(--sb-top); bottom: auto; height: var(--sb-h); }
 .sidebar-collapsed { top: var(--sb-top); }
 .map-stats { top: calc(var(--sb-top) - 34px); }
@@ -173,6 +173,9 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 /* The Track tab: the step list scrolls by itself (its scroll moves the tracer), so the body doesn't. */
 .sidebar-body:has(> .sidebar-track) { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
 .sidebar-track { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.sidebar-track-title { flex: none; display: flex; align-items: baseline; gap: 8px; margin: 2px 8px 10px; font-size: 16px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; color: var(--ink); }
+.sidebar-track-title span { min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sidebar-track-title small { flex: none; font-size: 12px; font-weight: 500; color: var(--ink-3); }
 .sidebar-tabs button:disabled { color: var(--ink-3); opacity: .55; cursor: default; }
 
 /* Files tab, big repos: the map shows a chosen part of the project (see the server's mapper/select.ts). */

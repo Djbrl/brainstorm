@@ -15,7 +15,7 @@ import { Logo } from "./Logo";
 import { track } from "./lib/usage";
 import { ThreadBar } from "./switch/ThreadBar";
 import { Elsewhere } from "./switch/Elsewhere";
-import { Keys, KeysButton } from "./switch/Keys";
+import { Keys } from "./switch/Keys";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import "./boot.css";
 
@@ -73,6 +73,15 @@ function Shell() {
   const [setupOpen, setSetupOpen] = useState(false);
   const [finding, setFinding] = useState(false); // Find a thread (⌘K)
   const [help, setHelp] = useState(false);       // the keyboard shortcuts (?)
+  // Picking a project is a screen of its own: the browser's back (and Esc, and its Back link) return from it.
+  const openSetup = () => { try { history.pushState({ ...(history.state ?? {}), rundownSetup: true }, ""); } catch { /* still opens */ } setSetupOpen(true); };
+  const closeSetup = () => { if (history.state?.rundownSetup) history.back(); else setSetupOpen(false); };
+  useEffect(() => {
+    if (!setupOpen) return;
+    const onPop = () => setSetupOpen(false);
+    addEventListener("popstate", onPop);
+    return () => removeEventListener("popstate", onPop);
+  }, [setupOpen]);
 
   // Esc closes the innermost thing first: a popover (it handles Esc itself and marks it handled), then a panel (step,
   // file), then the player, then the thread (not while typing).
@@ -94,7 +103,10 @@ function Shell() {
   // except the post-deadline preview, which plays back a recorded setup run (see lib/preview.ts).
   if ((setupOpen && (!state.replay || state.preview)) || (!state.replay && state.setup && !state.setup.root)) {
     // Another project: whatever was open (a thread, a step, a file) belonged to the old one.
-    return <SetupView onDone={() => { setSetupOpen(false); stopReplay(); selectFile(null); reload(); }} onCancel={state.setup?.root || state.preview ? () => setSetupOpen(false) : undefined} />;
+    return <SetupView onDone={() => {
+      if (history.state?.rundownSetup) try { history.replaceState({ ...history.state, rundownSetup: false }, ""); } catch { /* fine */ }
+      setSetupOpen(false); stopReplay(); selectFile(null); reload();
+    }} onCancel={state.setup?.root || state.preview ? closeSetup : undefined} />;
   }
   const project = state.setup?.name || "brainstorm";
 
@@ -108,15 +120,14 @@ function Shell() {
         <div className="status">
           {!state.replay && !state.shared && <Elsewhere />}
           {state.preview && (
-            <button className="ws-chip" title="Play back a recorded setup run" onClick={() => setSetupOpen(true)}>Setup preview</button>
+            <button className="ws-chip" title="Play back a recorded setup run" onClick={openSetup}>Setup preview</button>
           )}
           {!state.replay && state.setup?.root && (
-            <button className="ws-chip ws-change" title={state.setup.root} onClick={() => setSetupOpen(true)}>
+            <button className="ws-chip ws-change" title={state.setup.root} onClick={openSetup}>
               <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.75 6.25V15a1.25 1.25 0 0 0 1.25 1.25h12A1.25 1.25 0 0 0 17.25 15V8A1.25 1.25 0 0 0 16 6.75h-6.2L8.3 4.5a1 1 0 0 0-.83-.45H4A1.25 1.25 0 0 0 2.75 5.3Z" /></svg>
               Change project
             </button>
           )}
-          {!state.replay && !state.shared && <KeysButton onOpen={() => setHelp(true)} />}
           <SettingsButton />
           {/* No "Live" pill: being live is the normal state. Only what isn't is said: a replay, or the server out of reach. */}
           {(state.shared || state.replay || !state.connected) && (

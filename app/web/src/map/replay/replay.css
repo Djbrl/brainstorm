@@ -169,7 +169,7 @@
 .rp-waiting.turn { background: #f4f4f7; color: var(--ink-2); }
 .rp-waiting.turn > b { background: var(--ink-3); }
 .rp-waiting-line { font-weight: 650; }
-.rp-waiting-detail { font-family: var(--font-mono); font-size: 11.5px; color: inherit; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rp-waiting-detail { color: inherit; opacity: .85; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .rp-waiting-hint { font-size: 12px; opacity: .8; }
 .rp-waiting-open { justify-self: start; border: 0; background: transparent; padding: 2px 0 0; color: var(--accent); font-size: 12px; font-weight: 600; }
 /* Dark themes: the light amber and grey sheets would glare (and the grey one left its pale text at 1.5:1). */

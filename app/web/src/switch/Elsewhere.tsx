@@ -49,7 +49,6 @@ export function Elsewhere() {
           {list.map((t) => (
             <button key={t.sessionId} role="menuitem" className="elsewhere-item" onClick={() => { setOpen(false); jumpElsewhere(t, nav, reload).catch(() => {}); }}
               title={`Switch to ${t.project} and open this thread`}>
-              <span className={`threadbar-dot ${t.state === "needs-you" ? "waiting" : t.state === "working" ? "running" : ""}`} aria-hidden="true" />
               <span className="elsewhere-text">
                 <b>{t.project}</b>
                 <span>{t.title || "Untitled thread"}{t.harness === "codex" ? " · Codex" : ""}</span>
@@ -57,7 +56,6 @@ export function Elsewhere() {
               <span className={`elsewhere-state ${t.state}`}>{elsewhereWord(t.state)}</span>
             </button>
           ))}
-          <p className="elsewhere-note">Opening one switches Rundown to its project.</p>
         </div>,
         document.body,
       )}

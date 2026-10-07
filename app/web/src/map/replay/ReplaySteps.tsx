@@ -289,9 +289,8 @@ function WaitingRow({ sessionId, onOpen }: { sessionId: string; onOpen: (stepId:
   return (
     <div className={`rp-waiting ${blocked ? "blocked" : "turn"}`} role="status">
       <b aria-hidden="true" />
-      <span className="rp-waiting-line">{t.line}</span>
-      {a.detail && <code className="rp-waiting-detail" title={a.detail}>{a.detail}</code>}
-      {blocked && <span className="rp-waiting-hint">{a.state === "stuck" ? "It may need a hint from you." : `Answer it in ${harnessName(harness)}.`}</span>}
+      <span className="rp-waiting-line" title={blocked && a.state !== "stuck" ? `Answer it in ${harnessName(harness)}` : undefined}>{t.title}</span>
+      {a.detail && <span className="rp-waiting-detail" title={a.detail}>{a.detail}</span>}
       {a.stepId && <button className="rp-waiting-open" onClick={() => onOpen(a.stepId!)}>Show the step</button>}
     </div>
   );

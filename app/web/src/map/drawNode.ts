@@ -296,6 +296,7 @@ const FOLDER_TEXT_PX = 15;
  */
 function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: Frame, c: Caches, shown: number) {
   const x = n.x!, y = n.y!, r = n.r, tokens = F.tokens, st = F.st, open = n.open ?? 1;
+  // A closed folder stands in for files too small to see: it keeps their blue ring (only the outermost closed one is drawn).
   const active = !!n.file.activeSessionId, isSel = n.id === F.sel, isHover = n.id === F.hover;
   const look = lookOf(n, F);
   if (look) { F.anyLook = true; F.lookSum += look.alpha * 3 + look.tone; }
@@ -305,8 +306,9 @@ function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: F
   if (open > 0) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, TAU);
     if (n.dir!.depth <= 3) { ctx.globalAlpha = alpha * open * 0.02; ctx.fillStyle = tokens.ink; ctx.fill(); }   // deeper, the levels would add up to grey
-    ctx.globalAlpha = alpha * open * (active ? 0.6 : 0.16); ctx.lineWidth = (active ? 1.4 : 1) / scale;
-    ctx.strokeStyle = active ? tokens.accent : tokens.ink; ctx.stroke();
+    // No blue on an open folder: its files show their own rings, and every folder around an edit turning blue was too much.
+    ctx.globalAlpha = alpha * open * 0.16; ctx.lineWidth = 1 / scale;
+    ctx.strokeStyle = tokens.ink; ctx.stroke();
   }
   const closed = alpha * (1 - open);
   if (closed <= 0.01) { ctx.globalAlpha = 1; return; }

@@ -65,6 +65,17 @@ export type SetupStatus = {
 };
 export type WorkspaceSuggestion = { root: string; name: string; lastActiveAt?: string; sessions: number; exists: boolean };
 
+/**
+ * A thread running in another project on this machine (GET /api/elsewhere): working now, waiting on you (permission or
+ * a question, from the plugin's hooks), or just finished its turn. The open project's threads are never in it.
+ */
+export type ElsewhereThread = {
+  sessionId: string; harness: Harness; title?: string;
+  root: string; project: string;        // the repo (a worktree counts as its repo) and its folder name
+  lastEventAt: string;
+  state: "working" | "needs-you" | "your-turn";
+};
+
 /** Live agents on the map. GET /api/agents + ws "agent". One per main session thread and per subagent. */
 export type AgentMove = { file: string; action: string; ts: string }; // action: "edit" | "read" | "search" | "run" | ...
 export type AgentPresence = {

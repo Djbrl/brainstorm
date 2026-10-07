@@ -107,7 +107,13 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
     const t = this.tracker(sig.session_id);
     if (sig.event === "UserPromptSubmit") { t.hook = undefined; t.streak = null; }
     else t.hook = { ...sig, at: Date.now() };
-    this.publish(sig.session_id);
+    // Hooks come from every project's sessions: pages hear about the open workspace's (another's is in GET /api/elsewhere).
+    if (this.inScope(new Set([sig.session_id]), Date.now()).has(sig.session_id)) this.publish(sig.session_id);
+  }
+
+  /** The last thing a hook said about a thread, any project's (for threads in other projects: GET /api/elsewhere). */
+  hookOf(sid: string): (HookSignal & { at: number }) | undefined {
+    return this.trackers.get(sid)?.hook;
   }
 
   // ---- tracking ----

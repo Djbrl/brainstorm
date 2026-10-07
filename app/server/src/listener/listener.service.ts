@@ -675,6 +675,14 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     return (this.codex ?? new CodexSource(this.cfg.codexDir)).projects();
   }
 
+  /** Codex threads whose log changed since `sinceMs`, any project (for "agents in other projects"). */
+  codexRecent(sinceMs: number) {
+    return (this.codex ?? new CodexSource(this.cfg.codexDir)).recent(sinceMs);
+  }
+
+  /** The folders whose threads this workspace shows: the open root, its repo, the folders it lived in before a move. */
+  scopeRoots(): string[] { return this.roots; }
+
   private rowToSession(row: SessionRow): Session {
     const idle = Date.now() - Date.parse(row.last_event_at) > IDLE_AFTER_MS;
     return { id: row.id, cwd: row.cwd, title: row.title, startedAt: row.started_at, lastEventAt: row.last_event_at, status: idle ? "idle" : "running", harness: row.harness === "codex" ? "codex" : "claude" };

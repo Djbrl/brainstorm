@@ -20,7 +20,7 @@ const encodeRoot = (root: string) => root.replace(/[^A-Za-z0-9-]/g, "-");
 const real = (p: string) => { try { return realpathSync(p); } catch { return p; } };
 
 /** Turn a Claude Code project folder name back into a real path by walking the filesystem ("-Users-me-my-app" → /Users/me/my-app). */
-function decodeProjectDir(name: string): string | null {
+export function decodeProjectDir(name: string): string | null {
   const walk = (dir: string, rest: string, depth: number): string | null => {
     if (!rest) return dir;
     if (depth > 12) return null;

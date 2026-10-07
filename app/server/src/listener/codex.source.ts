@@ -135,6 +135,25 @@ export class CodexSource implements LogSource {
     const files: LogFile[] = [];
     for (const d of [this.sessionsDir, this.archivedDir]) collectJsonl(d, files, 0);
     const out = new Map<string, { id: string; mtimeMs: number }[]>();
+    for (const t of this.threadsOf(files)) {
+      const list = out.get(t.root) ?? out.set(t.root, []).get(t.root)!;
+      list.push({ id: t.id, mtimeMs: t.mtimeMs });
+    }
+    return out;
+  }
+
+  /** Threads whose file changed since `sinceMs` (live ones are never archived), with their repo and a title. */
+  recent(sinceMs: number): { id: string; root: string; mtimeMs: number; title?: string }[] {
+    const files: LogFile[] = [];
+    collectJsonl(this.sessionsDir, files, 0);
+    const threads = this.threadsOf(files.filter((f) => f.mtimeMs >= sinceMs));
+    return threads.map((t) => ({ ...t, title: this.titleOf(t.path, t.id) }));
+  }
+
+  /** Each file's thread (a subagent's is its parent's) and its project, a Codex worktree counted as its repo. Codex
+   * Desktop's dated scratch folders (~/Documents/Codex/2026-09-23, where a chat with no project runs) aren't projects. */
+  private threadsOf(files: LogFile[]): { id: string; root: string; mtimeMs: number; path: string }[] {
+    const out: { id: string; root: string; mtimeMs: number; path: string }[] = [];
     for (const f of files) {
       const meta = this.metaOf(f.path);
       if (!meta || meta.reviewer || !meta.cwd) continue;
@@ -147,10 +166,36 @@ export class CodexSource implements LogSource {
         if (!main) continue; // a Codex worktree that's gone: its repo is unknown here
         root = main;
       }
-      const list = out.get(root) ?? out.set(root, []).get(root)!;
-      list.push({ id: meta.parent ?? meta.id, mtimeMs: f.mtimeMs }); // a subagent is part of its parent's thread
+      out.push({ id: meta.parent ?? meta.id, root, mtimeMs: f.mtimeMs, path: f.path });
     }
     return out;
+  }
+
+  private titles = new Map<string, string | null>();
+  /** The thread's first request, as its title would be (read once, from the first 512 KB). */
+  private titleOf(file: string, id: string): string | undefined {
+    const hit = this.titles.get(id);
+    if (hit !== undefined) return hit ?? undefined;
+    let title: string | null = null;
+    let fd: number | undefined;
+    try {
+      fd = openSync(file, "r");
+      const buf = Buffer.allocUnsafe(512 * 1024);
+      const n = readSync(fd, buf, 0, buf.length, 0);
+      for (const line of buf.toString("utf8", 0, n).split("\n")) {
+        if (!line.includes('"role":"user"')) continue;
+        try {
+          const p = (JSON.parse(line) as { payload?: any }).payload;
+          if (p?.type !== "message" || p.role !== "user" || !Array.isArray(p.content)) continue;
+          const raw = p.content.filter((b: any) => typeof b?.text === "string").map((b: any) => b.text).join("\n\n");
+          if (!raw || isInjected(raw) || questionReply(raw)) continue;
+          title = codexPrompt(raw).title.trim().slice(0, 80) || null;
+          if (title) break;
+        } catch { /* a line cut off at the end of the buffer */ }
+      }
+    } catch { /* unreadable: no title */ } finally { if (fd !== undefined) closeSync(fd); }
+    if (title) this.titles.set(id, title); // no title yet may just mean the first request isn't written: look again next time
+    return title ?? undefined;
   }
 
   owns(file: string) {

@@ -90,6 +90,8 @@ export type Camera = {
   moveTo: (v: View, ms?: number) => void;
   /** Put a graph point in the middle of the safe area, at zoom k (default: the current zoom). */
   lookAt: (x: number, y: number, k?: number, ms?: number) => void;
+  /** Move the view by (dx, dy) screen pixels, as a hand move (the arrow keys). */
+  pan: (dx: number, dy: number, ms?: number) => void;
   /** Fit a box in the safe area. */
   frame: (box: Box, opts?: { pad?: number; minZoom?: number; maxZoom?: number }, ms?: number) => void;
   /** Pan just enough to bring a circle into the safe area (no move if it's already in it). */
@@ -111,6 +113,7 @@ export function useCamera(fg: RefObject<Graph | undefined | null>, hostRef: RefO
   const [version, setVersion] = useState(0);
   const userAt = useRef(0);
   const glide = useRef(0);
+  const panTo = useRef<{ to: View; until: number } | null>(null);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -188,6 +191,16 @@ export function useCamera(fg: RefObject<Graph | undefined | null>, hostRef: RefO
       const kk = k ?? g()?.zoom() ?? 1;
       moveTo({ ...centerFor(measure(), x, y, kk), k: kk }, ms);
     };
+    // Presses add up: one made while the last pan still glides goes on from where that one was headed.
+    const pan = (dx: number, dy: number, ms = 220) => {
+      const now = performance.now(), last = panTo.current;
+      const v = last && now < last.until ? last.to : view();
+      if (!v) return;
+      userAt.current = now;
+      const to = { x: v.x + dx / v.k, y: v.y + dy / v.k, k: v.k };
+      panTo.current = { to, until: now + ms };
+      moveTo(to, ms);
+    };
     const frame = (box: Box, opts?: { pad?: number; minZoom?: number; maxZoom?: number }, ms = 700) => moveTo(fitView(measure(), box, opts), ms);
     const reveal = (x: number, y: number, r: number, ms = 600) => {
       const v = view();
@@ -212,7 +225,7 @@ export function useCamera(fg: RefObject<Graph | undefined | null>, hostRef: RefO
       const sx = s.w / 2 + (x - v.x) * v.k, sy = s.h / 2 + (y - v.y) * v.k;
       return sx > s.left + m && sx < s.w - s.right - m && sy > s.top + m && sy < s.h - s.bottom - m;
     };
-    return { safe, version, measure, userAt: () => userAt.current, view, moveTo, lookAt, frame, reveal, easeToward, sees, stop };
+    return { safe, version, measure, userAt: () => userAt.current, view, moveTo, lookAt, pan, frame, reveal, easeToward, sees, stop };
   }, [fg, hostRef, version]);
 }
 

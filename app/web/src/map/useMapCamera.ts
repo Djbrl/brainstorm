@@ -2,7 +2,7 @@
 // files, the open file, a followed agent; again when a panel opens or the window resizes, unless you moved it yourself.
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { ThreadReplay } from "../lib/nav";
-import { getCameraLock } from "./prefs";
+import { getCameraLock, setCameraLock } from "./prefs";
 import { replayCamera } from "./replay/store";
 import type { ReplayLayerApi } from "./replay/layer";
 import { boxOf, isFitKey, type Camera, type View } from "./camera";
@@ -73,6 +73,25 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
   }, [fitNow]);
+  // The arrow keys move the map (Shift: further), outside the replay player (there they step through it) and the Track's
+  // list (there they scroll it). A hand move: the camera stops following and comes unlocked, like a drag would want.
+  useEffect(() => {
+    const PAN: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    const onKey = (e: KeyboardEvent) => {
+      const d = PAN[e.key];
+      if (!d || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || replayRef.current.playable) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable || t.closest(".rp-list, [role=listbox], [aria-modal=true]"))) return;
+      e.preventDefault();
+      if (followRef.current) setFollowId(null);
+      if (getCameraLock() && replayRef.current.tracing) setCameraLock(false);
+      setIntent({ kind: "free" });
+      const step = e.shiftKey ? 320 : 110;
+      camRef.current.pan(d[0] * step, d[1] * step, e.repeat ? 120 : 220);
+    };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, [setIntent]);
   // Esc stops following an agent before it steps back out of anything else (capture: ahead of the shell's Esc). A window
   // open over the map (Settings, Find a thread, a picture) takes that Esc for itself.
   useEffect(() => {

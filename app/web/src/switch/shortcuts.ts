@@ -22,6 +22,7 @@ export const SHORTCUTS: { title: string; keys: { keys: string[]; what: string }[
   {
     title: "Map",
     keys: [
+      { keys: ["←", "↑", "→", "↓"], what: "Move around the map (with Shift, further)" },
       { keys: ["F"], what: "Fit the map to the window" },
       { keys: ["L"], what: "Lock or unlock the camera on the agent" },
       { keys: ["R"], what: "Show or hide reads" },
@@ -31,9 +32,9 @@ export const SHORTCUTS: { title: string; keys: { keys: string[]; what: string }[
   {
     title: "Replay",
     keys: [
-      { keys: ["Space"], what: "Play or pause" },
-      { keys: ["←", "→"], what: "One step back or forward (with Shift, ten)" },
-      { keys: ["Home", "End"], what: "The first or the last step" },
+      { keys: ["Space"], what: "Play or pause, from the step you're on" },
+      { keys: ["←", "→"], what: "In the player: one step back or forward (with Shift, ten)" },
+      { keys: ["Home", "End"], what: "In the player: the first or the last step" },
     ],
   },
   {

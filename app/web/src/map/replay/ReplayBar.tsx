@@ -113,7 +113,7 @@ function Player() {
  */
 export function Dock({ children }: { children: ReactNode }) {
   const { state } = useLive();
-  const { replay, setReplayIndex, setReplayPlaying, setThreadMode, setReplayLive } = useNav();
+  const { replay, setReplayPlaying, setThreadMode, setReplayLive } = useNav();
   // A thread has moments as soon as it has steps (every step is in one), so the pill needn't build the thread to know.
   // The map's replay layer loads them.
   const hasSteps = !!replay && !!state.steps[replay.sessionId]?.length;
@@ -122,8 +122,7 @@ export function Dock({ children }: { children: ReactNode }) {
   const toggle = () => {
     if (on) { setThreadMode("steps"); return; }
     track("rp");
-    setReplayIndex(0); // a replay starts from the first moment and plays, at the speed set in the player
-    setReplayPlaying(true);
+    setReplayPlaying(true); // from the step you're on, at the speed set in the player (at the last step: the player opens there, paused)
   };
   return (
     <div className="dock">
@@ -137,7 +136,7 @@ export function Dock({ children }: { children: ReactNode }) {
         )}
         {replay && (
           <button className={`dock-replay${on ? " on" : ""}`} onClick={toggle} disabled={!hasSteps} aria-pressed={on}
-            title={on ? "Hide the player (Esc)" : "Play this thread from the start"}>
+            title={on ? "Hide the player (Esc)" : "Play this thread from the step you're on (Space)"}>
             {Icon.small}{on ? "Hide replay" : "Replay"}
           </button>
         )}

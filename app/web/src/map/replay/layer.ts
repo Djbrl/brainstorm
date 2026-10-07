@@ -31,6 +31,8 @@ export type ReplayLayerApi = {
   look: (id: string) => Look | null;
   /** True while the tracer is drawn (a replay or steps, not the footprint): Metro quiets the import lines then. */
   tracing: boolean;
+  /** The player is open (a replay, playing or paused): the arrow keys step through it, not move the map. */
+  playable: boolean;
   /** The thread's footprint mode (its files lit, no tracer): MapView frames it. */
   footprintMode: boolean;
   /** The files in focus (what a fit frames: the recent window, or the whole thread), or null with no thread open. */
@@ -176,7 +178,8 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     return () => clearTimeout(t);
   }, [active, replay?.playing, replay?.speed, index, last, thread, setReplayIndex, setReplayPlaying]);
 
-  // ---- keyboard: ← → step, Home / End, Space plays (with a thread open on the map) ----
+  // ---- keyboard: Space plays from where you are (with a thread open on the map); in the player, ← → step, Home / End.
+  // Outside the player the arrows move the map (useMapCamera). ----
   const replayPlayingRef = useRef(false);
   replayPlayingRef.current = !!replay?.playing;
   useEffect(() => {
@@ -184,6 +187,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     const step = (d: number) => { setReplayPlaying(false); setReplayIndex((i) => Math.max(0, Math.min(st.current.len - 1, i + d))); };
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return;
+      if (e.key !== " " && st.current.mode !== "play") return;
       switch (e.key) {
         case "ArrowRight": step(e.shiftKey ? 10 : 1); break;
         case "ArrowLeft": step(e.shiftKey ? -10 : -1); break;
@@ -191,7 +195,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
         case "End": setReplayPlaying(false); setReplayIndex(st.current.len - 1); break;
         case " ": {
           if ((e.target as HTMLElement | null)?.tagName === "BUTTON") return; // let the focused button click
-          togglePlay(st.current.index, st.current.len, replayPlayingRef.current, setReplayIndex, setReplayPlaying);
+          togglePlay(st.current.index, st.current.len, replayPlayingRef.current, setReplayIndex, setReplayPlaying, st.current.mode === "play");
           break;
         }
         default: return;
@@ -559,14 +563,18 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
   const subject = useCallback(() => (st.current.active && st.current.mode !== "footprint" ? anim.current.cam : null), []);
   const touches = useCallback((id: string) => !!st.current.thread?.touched.has(id), []);
 
-  return { active, tracing: active && mode !== "footprint", footprintMode: active && mode === "footprint", footprint, touches, subject, nodeAlpha, look, draw, marks };
+  return { active, tracing: active && mode !== "footprint", playable, footprintMode: active && mode === "footprint", footprint, touches, subject, nodeAlpha, look, draw, marks };
 }
 
-/** Play/pause; pressing play at the last beat starts over. Shared by the keyboard and the ReplayBar. */
+/**
+ * Play/pause from the step you're on. In the player, play at the last beat starts over (like any player); from the
+ * thread's steps, it opens the player there (paused, at the end: rewind with ← or the slider). Shared by the keyboard
+ * and the ReplayBar.
+ */
 export function togglePlay(index: number, len: number, playing: boolean,
-  setIndex: (i: number) => void, setPlaying: (p: boolean) => void) {
+  setIndex: (i: number) => void, setPlaying: (p: boolean) => void, inPlayer = true) {
   if (playing) { setPlaying(false); return; }
-  if (index >= len - 1) setIndex(0);
+  if (inPlayer && index >= len - 1) setIndex(0);
   setPlaying(true);
 }
 

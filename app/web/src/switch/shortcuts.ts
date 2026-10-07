@@ -22,8 +22,8 @@ export const SHORTCUTS: { title: string; keys: { keys: string[]; what: string }[
   {
     title: "Map",
     keys: [
-      { keys: ["←", "↑", "→", "↓"], what: "Move around the map: hold to glide (with Shift, faster)" },
-      { keys: ["+", "−"], what: "Zoom in or out: hold to keep going" },
+      { keys: ["←", "↑", "→", "↓"], what: "Move around the map: hold to glide" },
+      { keys: ["Shift", "↑", "↓"], what: "Zoom in or out: hold to keep going" },
       { keys: ["F"], what: "Fit the map to the window" },
       { keys: ["L"], what: "Lock or unlock the camera on the agent" },
       { keys: ["R"], what: "Show or hide reads" },

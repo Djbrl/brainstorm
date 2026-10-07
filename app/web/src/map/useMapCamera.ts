@@ -73,26 +73,31 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
   }, [fitNow]);
-  // The arrow keys glide the map while they're held (Shift: faster; two at once go diagonally), and + / − zoom in and out
-  // (= and _ too, no Shift needed), easing in and out: the map without a mouse or trackpad. Arrows not in the replay player
-  // (there they step through it), none in the Track's list (there they scroll it). One loop, only while a key is held or
-  // a glide eases out. Moving the map stops following an agent and unlocks the camera, like a drag would want.
+  // The arrow keys glide the map while they're held (two at once go diagonally); with Shift, ↑ and ↓ zoom in and out
+  // instead (+ and − too, = and _ without Shift); all easing in and out: the map without a mouse or trackpad. In the
+  // replay player ← → step through it, so only Shift ↑ ↓ zoom there; none in the Track's list (there they scroll it).
+  // One loop, only while a key is held or a glide eases out. Moving the map stops following an agent and unlocks the
+  // camera, like a drag would want.
   useEffect(() => {
     const DIR: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
     const ZOOM: Record<string, number> = { "+": 1, "=": 1, "-": -1, "_": -1 };
-    const SPEED = 700, FAST = 1600, EASE = 0.09; // screen px per second; seconds to (nearly) reach the speed or stop
-    const ZOOM_RATE = 1.5;                        // held + / −: the zoom grows or shrinks by e^1.5 (4.5×) a second
+    const SPEED = 700, EASE = 0.09; // screen px per second; seconds to (nearly) reach the speed or stop
+    const ZOOM_RATE = 1.5;          // held: the zoom grows or shrinks by e^1.5 (4.5×) a second
     const held = new Set<string>();
     const vel = { x: 0, y: 0, z: 0 };
-    let fast = false, raf = 0, last = 0;
+    let shift = false, raf = 0, last = 0;
     const tick = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000); last = now;
       let dx = 0, dy = 0, dz = 0;
-      for (const k of held) { if (DIR[k]) { dx += DIR[k][0]; dy += DIR[k][1]; } else dz += ZOOM[k] ?? 0; }
-      const n = Math.hypot(dx, dy) || 1, sp = fast ? FAST : SPEED;
+      for (const k of held) {
+        if (shift && (k === "ArrowUp" || k === "ArrowDown")) dz += k === "ArrowUp" ? 1 : -1;
+        else if (DIR[k]) { dx += DIR[k][0]; dy += DIR[k][1]; }
+        else dz += ZOOM[k] ?? 0;
+      }
+      const n = Math.hypot(dx, dy) || 1;
       const f = 1 - Math.exp(-dt / EASE);
-      vel.x += ((dx / n) * sp - vel.x) * f;
-      vel.y += ((dy / n) * sp - vel.y) * f;
+      vel.x += ((dx / n) * SPEED - vel.x) * f;
+      vel.y += ((dy / n) * SPEED - vel.y) * f;
       vel.z += (Math.sign(dz) * ZOOM_RATE - vel.z) * f;
       if (!held.size && Math.hypot(vel.x, vel.y) < 8 && Math.abs(vel.z) < 0.02) { raf = 0; vel.x = vel.y = vel.z = 0; return; }
       if (vel.x || vel.y) camRef.current.nudge(vel.x * dt, vel.y * dt);
@@ -100,32 +105,33 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
       raf = requestAnimationFrame(tick);
     };
     const onDown = (e: KeyboardEvent) => {
-      if (e.key === "Shift") { fast = true; return; }
-      const d = DIR[e.key], z = ZOOM[e.key];
-      if ((!d && !z) || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || (d && replayRef.current.playable)) return;
+      if (e.key === "Shift") { shift = true; return; }
+      const d = DIR[e.key];
+      const z = e.shiftKey && (e.key === "ArrowUp" || e.key === "ArrowDown") ? (e.key === "ArrowUp" ? 1 : -1) : ZOOM[e.key];
+      if ((!d && !z) || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || (!z && replayRef.current.playable)) return;
       const t = e.target instanceof HTMLElement ? e.target : null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable || t.closest(".rp-list, [role=listbox], [aria-modal=true]"))) return;
       e.preventDefault();
-      fast = e.shiftKey;
+      shift = e.shiftKey;
       if (held.has(e.key)) return; // the key's own repeats: the loop is already gliding
       held.add(e.key);
       setIntent({ kind: "free" });
-      // A tap still moves a little: start at half speed rather than from rest.
-      if (d) {
+      // A tap still moves a little: start at half speed rather than from rest (a zoom at full speed: a tap is a step).
+      if (z) { if (Math.abs(vel.z) < ZOOM_RATE) vel.z = z * ZOOM_RATE; }
+      else {
         if (followRef.current) setFollowId(null);
         if (getCameraLock() && replayRef.current.tracing) setCameraLock(false);
-        const sp = (fast ? FAST : SPEED) / 2;
-        if (Math.abs(vel.x) < sp && d[0]) vel.x = d[0] * sp;
-        if (Math.abs(vel.y) < sp && d[1]) vel.y = d[1] * sp;
-      } else if (Math.abs(vel.z) < ZOOM_RATE / 2) vel.z = z * ZOOM_RATE / 2;
+        if (Math.abs(vel.x) < SPEED / 2 && d[0]) vel.x = d[0] * SPEED / 2;
+        if (Math.abs(vel.y) < SPEED / 2 && d[1]) vel.y = d[1] * SPEED / 2;
+      }
       if (!raf) { last = performance.now(); raf = requestAnimationFrame(tick); }
     };
     const onUp = (e: KeyboardEvent) => {
-      if (e.key === "Shift") { fast = false; held.delete("+"); held.delete("_"); } // + and _ need Shift: no key-up of their own may come
+      if (e.key === "Shift") { shift = false; held.delete("+"); held.delete("_"); } // + and _ need Shift: no key-up of their own may come
       held.delete(e.key);
       if (e.key === "=") held.delete("+"); if (e.key === "-") held.delete("_");
     };
-    const release = () => held.clear(); // the window lost focus: no key-up will come
+    const release = () => { held.clear(); shift = false; }; // the window lost focus: no key-up will come
     addEventListener("keydown", onDown);
     addEventListener("keyup", onUp);
     addEventListener("blur", release);

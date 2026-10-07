@@ -32,7 +32,7 @@
   border-radius: 10px; font-size: 13px; color: var(--ink-3); white-space: nowrap; }
 .threadbar-find:hover { background: var(--accent-soft); color: var(--ink); }
 .threadbar-find svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; fill: none; }
-.threadbar-find kbd, .picker-foot kbd, .keys-body kbd { font: 500 11.5px var(--font-body); color: var(--ink-2); background: var(--surface); border: 1px solid var(--line);
+.threadbar-find kbd, .picker-foot kbd, .keys-body kbd { white-space: nowrap; font: 500 11.5px var(--font-body); color: var(--ink-2); background: var(--surface); border: 1px solid var(--line);
   border-bottom-width: 2px; border-radius: 6px; padding: 0 6px; min-width: 22px; text-align: center; display: inline-block; line-height: 18px; }
 
 /* The most used keys, quiet, before Find a thread. */

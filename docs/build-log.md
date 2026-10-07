@@ -193,6 +193,7 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 - 05:20 (7 Oct) [switcher] Replay plays from the step you're on (the one you opened, or where the cursor is), not from the first; at the last step the player opens there, paused, to rewind with ← or the slider; in the player, play at the end starts over. Space works the same from the thread's steps. The arrow keys step through a replay only in the player; everywhere else they move the map (Shift: further; presses add up; a hand move stops following and unlocks the camera); the wheel and trackpad still zoom.
 - 05:40 (7 Oct) [switcher] Held arrow keys glide the map continuously (700 px/s, Shift 1600, two keys go diagonally), easing in and out; a tap still moves it a little. One animation loop, only while a key is held or the glide eases out (frames under 10 ms).
 - 05:55 (7 Oct) [switcher] + and − zoom the map from the keyboard (= and _ too, no Shift needed), held to keep going, easing in and out, about the middle of the part of the map no panel covers: the map works without a mouse or trackpad. Same loop as the arrow glide.
+- 06:05 (7 Oct) [switcher] Shift ↑ zooms in and Shift ↓ zooms out (held: keeps going; a tap is a step), also in the replay player; + and − still work. Shift no longer speeds up the arrow glide.
 
 ## Requests
 

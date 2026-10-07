@@ -1,7 +1,8 @@
 // Owner: sidebar agent. The sidebar's Track tab: the open thread's steps, next to the map (scrolling them moves the
-// tracer), or its places on the Places lens, under the thread's name (with Share, and whether it's live) and, when
+// tracer), or its places on the Places lens, under the thread's name (with Share) and, when
 // subagents worked in it, who: everyone, or one agent on its own. Live isn't a button: a running thread follows its
-// newest step until you move off it, and follows again once you're back on it (App's LiveFollow). Space replays.
+// newest step until you move off it (then a footer offers the way back), and follows again once you're back on it
+// (App's LiveFollow). Space replays.
 import { useEffect, useRef, useState } from "react";
 import { useNav } from "../../lib/nav";
 import { useLiveSelector } from "../../lib/live";
@@ -24,23 +25,26 @@ export function TrackPanel() {
     <div className="sidebar-track">
       <div className="track-head">
         <h2 className="sidebar-track-title" title={session?.title}>{session?.title || "Untitled thread"}</h2>
-        {session?.status === "running" && <LiveState live={!!replay.live} onBack={() => nav.setReplayLive(true)} />}
         {!isReplay() && <ShareMenu sessionId={replay.sessionId} className="track-share" />}
       </div>
       {lens !== "places" && <AgentPicker title={session?.title} />}
       {lens === "places" ? <PlaceSteps /> : <ReplaySteps />}
+      {session?.status === "running" && !replay.live && replay.mode !== "play" && <BackToLive onBack={() => nav.setReplayLive(true)} />}
     </div>
   );
 }
 
 /**
- * A running thread: "Live" while you follow its newest step; looking back, the same word faded, which takes you back to
- * it (scrolling back to the end does too).
+ * A running thread you're looking back through: a footer floating over the bottom of the steps takes you back to its
+ * newest step. At the end, nothing: the thread just follows live (its dot pulses in the list and the tab bar).
  */
-function LiveState({ live, onBack }: { live: boolean; onBack: () => void }) {
-  return live
-    ? <span className="track-live on" title="Following its newest step. Scroll up to look back">Live</span>
-    : <button className="track-live" onClick={onBack} title="You're looking back. Back to its newest step">Live</button>;
+function BackToLive({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="track-back-live" role="status">
+      <span><i aria-hidden="true" />This thread is live</span>
+      <button onClick={onBack}>Back to live <span aria-hidden="true">↓</span></button>
+    </div>
+  );
 }
 
 /** Everyone, or one agent's steps on their own (the map then shows only that agent's files). Only with subagents. */

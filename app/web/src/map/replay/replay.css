@@ -103,7 +103,7 @@
 .rp-ch-head.at { border-color: var(--accent); background: var(--accent-soft); }
 .rp-ch-title { font-size: 13.5px; font-weight: 500; line-height: 1.45; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .rp-ch-head.open .rp-ch-title { -webkit-line-clamp: 5; }
-/* Work before your first message (a resumed or delegated thread) isn't a message: no bubble. */
+/* The beginning of the thread before your first message (a resumed or delegated thread, one subagent on its own) isn't a message: no bubble. */
 .rp-ch-head.pre { width: 100%; margin-left: 0; padding: 6px 10px; background: transparent; border-radius: 10px; }
 .rp-ch-head.pre:hover { background: var(--hover, #f5f5f8); }
 .rp-ch-head.pre .rp-ch-title { color: var(--ink-3); font-size: 12.5px; }

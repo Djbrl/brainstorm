@@ -11,7 +11,7 @@ import { isReplay, useHarness, useLive, useLiveSelector } from "../../lib/live";
 import { harnessName } from "../../lib/harness";
 import { useNav } from "../../lib/nav";
 import { beatLabel, useThread, type Beat, type Thread } from "../../lib/thread";
-import { chapterAt, chaptersOf, duration, injectedLabel, type Chapter } from "../../lib/chapters";
+import { chapterAt, chaptersOf, injectedLabel, type Chapter } from "../../lib/chapters";
 import { timeIn } from "../../follow/format";
 import { LinkedLabel } from "../../lib/links";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
@@ -66,7 +66,7 @@ const ChapterHead = memo(function ChapterHead({ c, open, at, multiDay, onToggle 
       data-beat={c.hasPrompt ? c.first : undefined} aria-current={at ? "step" : undefined}>
       <span className="rp-ch-title" title={c.title}><LinkedLabel text={c.title} /></span>
       <span className="rp-ch-meta">
-        <span>{timeIn(c.at, multiDay)} · {duration(c.ms)} · {files}</span>
+        <span>{timeIn(c.at, multiDay)} · {files}</span>
         {c.failed > 0 && <span className="rp-ch-fail">{c.failed} failed</span>}
       </span>
     </button>

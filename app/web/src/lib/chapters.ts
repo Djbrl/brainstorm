@@ -55,7 +55,7 @@ export function chaptersOf(thread: Thread): Chapter[] {
 function cutChapters(thread: Thread): Chapter[] {
   const out: Chapter[] = [];
   const add = (b: Beat, hasPrompt: boolean) => out.push({
-    index: out.length, title: hasPrompt ? oneLine(stripInjected(b.step.text)) : "Before your first message",
+    index: out.length, title: hasPrompt ? oneLine(stripInjected(b.step.text)) : "Beginning of the thread",
     first: b.index, last: b.index, hasPrompt, at: b.step.ts, end: b.step.ts, ms: 0, files: 0, failed: 0,
   });
   // Working time: activeMs over the chapter's steps in beat order, added up as they come.

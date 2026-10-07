@@ -24,6 +24,7 @@ Size: ½ day.
 
 - [ ] **Follow me.** When the user sends a prompt, every open Brainstorm tab switches to that thread and follows it live (a "focus" message over the WebSocket). A pin keeps the current thread. Size: ½ day.
 - [ ] **End-of-turn recap in Claude Code.** The Stop hook prints one line in the session ("6 files changed, 1 command failed, see it") with a link to `/thread/<id>`. Size: 2 hours.
+- [x] **Switch threads in one move.** Done 7 Oct: a tab bar of your threads (at work, waiting on you, opened lately), keys 1 to 9 and [ ], Find a thread (⌘K), and the header says when agents work in your other projects, one click to go there. See `lib/switcher.ts` and `switch/`.
 - [ ] **Needs-you board.** With 2 or more threads running, one lane per thread with its state: working, waiting on you, failing, done. Clicking a lane opens the thread. Size: 1 day.
 - [ ] **Notifications on events only.** A macOS notification when a thread finishes, repeats the same error 3 times, or two threads write the same file. Clicking it opens that step. A setting to turn each kind off. Size: ½ day.
 - [ ] **Inside Claude Code (spike first).** A status line ("3 threads, 1 needs you") and, in the desktop app, Brainstorm in a pane beside the conversation. Not checked yet: how far a plugin can go on either. Spike: 2 hours.

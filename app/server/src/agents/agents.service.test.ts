@@ -25,10 +25,12 @@ test("only changes and a once-a-second pulse are broadcast; the session name is 
   bus.emit("step", step({ tool: "Read", filePath: "/r/a.ts" }));
   bus.emit("step", step({ kind: "edit", tool: "Edit", filePath: "/r/a.ts" }));
   for (let i = 0; i < 20; i++) bus.emit("step", step({ tool: "Bash", input: { command: "ls" } }));
-  assert.deepEqual(sent.map((a) => a.action), ["read", "edit"]); // the Bash steps only moved the time, within a second
+  // The first Bash step says what it does now (off the map); the rest only moved the time, within a second.
+  assert.deepEqual(sent.map((a) => a.away ?? a.action), ["read", "edit", "Running a command"]);
   assert.equal(lookups(), 1);
   bus.emit("step", step({ tool: "Read", filePath: "/r/b.ts" }));
   assert.equal(sent.at(-1)?.file, "/r/b.ts");
+  assert.equal(sent.at(-1)?.away, undefined); // back on the map
 });
 
 test("a ts-only update goes out once a second has passed", () => {
@@ -49,13 +51,19 @@ test("a renamed session is looked up again", () => {
   assert.equal(sent.at(-1)?.name, "Fix the camera");
 });
 
-test("a subagent is named after its first prompt once it touches the workspace, not before", () => {
-  const { bus, sent, agents, step } = setup();
+test("a subagent shows as soon as it acts, named after its first prompt; off the map, it says what it does", () => {
+  const { bus, sent, step } = setup();
   bus.emit("step", step({ agentId: "sub1", isSubagent: true, kind: "prompt", text: "Find where the camera is set up" }));
+  assert.equal(sent.length, 0); // a prompt alone isn't doing anything yet
   bus.emit("step", step({ agentId: "sub1", isSubagent: true, tool: "Bash" }));
-  assert.equal((agents as any).subLabels.size, 0);
-  bus.emit("step", step({ agentId: "sub1", isSubagent: true, tool: "Read", filePath: "/r/camera.ts" }));
   assert.equal(sent.at(-1)?.name, "Subagent · Find where the camera is set up");
+  assert.equal(sent.at(-1)?.away, "Running a command");
+  assert.equal(sent.at(-1)?.file, undefined);
+  bus.emit("step", step({ agentId: "sub1", isSubagent: true, tool: "Read", filePath: "/tmp/shot.png" }));
+  assert.equal(sent.at(-1)?.away, "Reading a file outside the project");
+  bus.emit("step", step({ agentId: "sub1", isSubagent: true, tool: "Read", filePath: "/r/camera.ts" }));
+  assert.equal(sent.at(-1)?.file, "/r/camera.ts");
+  assert.equal(sent.at(-1)?.away, undefined);
 });
 
 test("errors are sent at once", () => {

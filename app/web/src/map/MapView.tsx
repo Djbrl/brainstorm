@@ -21,6 +21,7 @@ import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
 import { makeFileResolver } from "../lib/paths";
 import { islandPath, useIslands } from "../lib/islands";
 import { enterProject } from "../lib/switcher";
+import { focusAgent, setAgentFocus, useAgentFocus } from "../lib/agentFocus";
 import { useLiveActions } from "../lib/live";
 import { useNavActions } from "../lib/nav";
 import { clearTextWidths, drawQueuedLabels, LabelSpace, type QueuedLabel } from "./labels";
@@ -103,8 +104,8 @@ export function MapView() {
   useEffect(() => () => redraw.stop(), [redraw]);
 
   // ---- live agents ----
-  const { agents, drawnAgents, waiting, waitingRef, thinkingRef, agentsRef, anim, moving: agentsMoving } = useLiveAgents({
-    agents: state.agents, attention: state.attention, hiddenAgents, threadId: replay?.sessionId ?? null, liveThread: !!replay?.live,
+  const { agents, drawnAgents, waiting, waitingRef, thinkingRef, agentsRef, anim, moving: agentsMoving, dimmedRef } = useLiveAgents({
+    agents: state.agents, attention: state.attention, hiddenAgents, threadId: replay?.sessionId ?? null,
   });
   const hoverRef = useRef(hover); hoverRef.current = hover;
   const selectedRef = useRef(selected); selectedRef.current = selected;
@@ -138,7 +139,7 @@ export function MapView() {
     return id;
   }, []);
   const liveShown = useRef(false);
-  liveShown.current = !!replay && drawnAgents.some((a) => a.sessionId === replay.sessionId);
+  liveShown.current = !!replay?.live && drawnAgents.some((a) => a.sessionId === replay.sessionId);
   const replayLayer = useReplayLayer({ fg: fg as never, wrapRef, nodeIndexRef, accent: tokens.accent, font: tokens.body, camera: camRef, liveShown });
   const replayRef = useRef<ReplayLayerApi>(replayLayer); replayRef.current = replayLayer;
   const openRef = useRef(!!replay); openRef.current = !!replay;
@@ -150,6 +151,27 @@ export function MapView() {
     cam, camRef, nodeIndex, nodeIndexRef, replayRef, replayActive: replayLayer.active, replay, step, selected, selectedRef, setSelected,
     resolveId, anim, hasNodes, focusFile, setFocusFile,
   });
+
+  // Faint: with a thread open, its agents you aren't watching. Looking back through it (not live), all but the one you
+  // follow (the replay's marker is the thread then); one agent on its own (agentFocus), the others.
+  const focus = useAgentFocus(replay?.sessionId ?? null);
+  dimmedRef.current = useMemo(() => {
+    if (!replay) return new Set<string>();
+    const lead = followId ?? focus;
+    return new Set(drawnAgents.filter((a) => a.id !== lead && (!replay.live || !!lead)).map((a) => a.id));
+  }, [replay?.sessionId, replay?.live, drawnAgents, followId, focus]);
+  // Another thread: everyone's steps again.
+  useEffect(() => () => { if (replay?.sessionId) setAgentFocus(replay.sessionId, null); }, [replay?.sessionId]);
+  // Following one of the thread's agents shows it: the thread follows live again, and its steps show on their own.
+  const nav0 = useNavActions();
+  const follow = useCallback((id: string | null) => {
+    setFollowId(id);
+    if (!replay) return;
+    const a = id ? agents.find((x) => x.id === id) : undefined;
+    if (id && a?.sessionId !== replay.sessionId) return;
+    focusAgent(nav0, { ...replay, live: true }, state.steps[replay.sessionId], id && a?.isSubagent ? id : null);
+    if (id && !replay.live) nav0.setReplayLive(true);
+  }, [replay, agents, state.steps, setFollowId, nav0]);
 
   // The thread's files in view (its recent window, or all of it) and a followed agent's file open their folders, and
   // keep them open until the thread closes or you stop following: folders don't fold and open again as the window moves.
@@ -286,7 +308,7 @@ export function MapView() {
     // What's open at this zoom; an agent at work shows its folders open too.
     let forced: ReadonlySet<GNode> = pinnedRef.current;
     for (const ag of agentsRef.current) {
-      if (!ag.active || !ag.file) continue;
+      if ((!ag.active && !openRef.current) || !ag.file) continue;   // with a thread open, where each of its agents is (or stopped)
       const id = resolveId(ag.file), n = id ? nodeIndexRef.current.get(id) : undefined;
       if (!n) continue;
       if (forced === pinnedRef.current) forced = new Set(forced);
@@ -354,7 +376,7 @@ export function MapView() {
     drawAgents({
       ctx, scale, agents: agentsRef.current, anim: anim.current, accent: tokens.accent, font: tokens.body,
       hoverFile: hoverRef.current, followId: followRef.current, resolveId, showReads: mapPrefs.showReads, quiet: !openRef.current, waiting: waitingRef.current,
-      thinking: thinkingRef.current, keep: openRef.current,
+      thinking: thinkingRef.current, keep: openRef.current, dimmed: dimmedRef.current,
       resolve: (id) => { const n = nodeIndexRef.current.get(id); return n && n.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y, r: n.r } : undefined; },
     });
   }, [resolveId]);
@@ -483,7 +505,7 @@ export function MapView() {
 
 
       <MapSidebar agents={agents} accent={tokens.accent} followId={followId}
-        onFollow={(id) => setFollowId(id)} onFocusFile={focusOnFile} map={map}
+        onFollow={follow} onFocusFile={focusOnFile} map={map}
         file={sel} picked={picked} onCloseFile={closeFile} />
       {/* A project with almost nothing to map (a folder opened from an island that holds little but the touched file). */}
       {map && map.files.length > 0 && map.files.length <= 3 && (

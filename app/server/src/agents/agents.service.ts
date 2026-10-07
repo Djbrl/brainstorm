@@ -22,6 +22,18 @@ function isFailed(step: Step): boolean {
   return !!(step.input as { isError?: boolean } | undefined)?.isError || FAILED.test((step.text ?? "").slice(0, 300));
 }
 
+/** What a step the map can't show is doing, in plain words. */
+function awayOf(step: Step): string | undefined {
+  const t = step.tool ?? "";
+  if (step.filePath) return step.kind === "edit" || t === "Write" || t === "Edit" || t === "MultiEdit" ? "Editing a file outside the project" : "Reading a file outside the project";
+  if (t === "Bash" || t === "BashOutput" || t === "exec_command" || t === "shell") return "Running a command";
+  if (t === "Grep" || t === "Glob" || t === "LS") return "Searching the code";
+  if (t === "WebSearch" || t === "WebFetch") return "Looking something up on the web";
+  if (t === "Task" || t === "Agent") return "Starting a subagent";
+  if (t.startsWith("mcp__") && /browser|chrome|computer|navigate/i.test(t)) return "Using the browser";
+  return t ? "Using a tool" : undefined;
+}
+
 function actionOf(step: Step): string | undefined {
   const t = step.tool ?? "";
   if (step.kind === "edit") return t === "Write" ? "write" : "edit";
@@ -124,8 +136,11 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     const action = actionOf(step);
     // Inside the project or out on an island: an orchestrator (or its subagents) working elsewhere shows there too.
     const file = this.onMap(step.filePath) ? step.filePath : undefined;
-    // Do not create an agent until it touches something the map shows.
-    if (!a && !file) return;
+    // A tool call the map can't show (a command, a search, a file outside every project): said in words, the marker
+    // staying on the last file it was on. A call on a file the map shows ends it.
+    const away = step.kind === "tool_call" || step.kind === "edit" ? (file ? undefined : awayOf(step)) : a?.away;
+    // An agent shows as soon as it does something: on the map once it touches a file there, in words until then.
+    if (!a && !file && !away) return;
     if (!a) {
       if (step.agentId && !this.subLabels.has(id)) {
         this.subLabels.set(id, this.metaLabel(step.sessionId, step.agentId) ?? this.firstPrompts.get(id) ?? ""); // "" = looked up, nothing found
@@ -135,6 +150,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     }
     const prev = this.agents.get(id);
     const next: AgentPresence = { ...a, name: this.nameFor(step, id), ts: now, active: true };
+    if (away) next.away = away; else delete next.away;
     if (step.kind === "tool_result" && isFailed(step)) {
       next.errorAt = now;
       next.error = (step.text ?? "").replace(/<\/?tool_use_error>/g, "").trim().split("\n")[0].slice(0, 160);
@@ -149,7 +165,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     this.agents.set(id, next);
     // Something the map shows changed: send now. Only the time moved (the pulse): at most once a second.
     const changed = !prev || prev.file !== next.file || prev.action !== next.action || prev.error !== next.error || prev.errorAt !== next.errorAt
-      || prev.active !== next.active || prev.name !== next.name;
+      || prev.active !== next.active || prev.name !== next.name || prev.away !== next.away;
     const t = Date.now();
     if (!changed && t - (this.sentAt.get(id) ?? 0) < PULSE_MS) return;
     this.sentAt.set(id, t);

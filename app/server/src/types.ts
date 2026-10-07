@@ -90,6 +90,7 @@ export type AgentPresence = {
   trail: AgentMove[];         // newest last, at most 12
   errorAt?: string;           // last failed tool call (the map flashes the marker red)
   error?: string;             // its first line
+  away?: string;              // what it does now that the map can't show (a command, a file outside every project), in words
 };
 
 /** Recurring failures in agent tool calls, grouped (GET /api/failures). Added 15:35 for the "Find the Hidden Failures" award. */

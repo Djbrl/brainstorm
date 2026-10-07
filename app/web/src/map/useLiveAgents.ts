@@ -4,13 +4,13 @@ import { useCallback, useMemo, useRef } from "react";
 import type { AgentPresence, Attention } from "@contract";
 import { clock } from "../lib/live";
 import { attentionText, needsYou } from "../lib/attention";
-import { agentAlpha, visibleAgents, type AgentAnim } from "./agents";
+import { agentAlpha, DIM, visibleAgents, type AgentAnim } from "./agents";
 import { mapStyle, tripMs } from "./themes";
 
 
-export function useLiveAgents({ agents: live, attention, hiddenAgents, threadId, liveThread }: {
+export function useLiveAgents({ agents: live, attention, hiddenAgents, threadId }: {
   agents: Record<string, AgentPresence> | undefined; attention: Record<string, Attention>;
-  hiddenAgents: ReadonlySet<string>; threadId: string | null; liveThread: boolean;
+  hiddenAgents: ReadonlySet<string>; threadId: string | null;
 }) {
   // An agent waiting on you stays on the map however long it waits; one thinking (mid-turn, nothing logged yet) too.
   const waitingIds = useMemo(() => new Set(Object.values(attention).filter(needsYou).map((a) => a.agentId ?? a.sessionId)), [attention]);
@@ -21,10 +21,13 @@ export function useLiveAgents({ agents: live, attention, hiddenAgents, threadId,
     const shown = new Set(visibleAgents(all));
     return all.filter((a) => shown.has(a) || waitingIds.has(a.id) || thinking.has(a.id) || (!!threadId && a.sessionId === threadId));
   }, [live, waitingIds, thinking, threadId]); // the open thread's agents stay, where they last were
-  // Hidden agents (sidebar toggles) are not drawn. With a thread open: its own agents (main and subagents, each in its
-  // colour) while it's followed live; none while you move through its past (the replay's cursor is the marker then).
-  const drawnAgents = useMemo(() => agents.filter((a) => !hiddenAgents.has(a.id) && (!threadId || (liveThread && a.sessionId === threadId))),
-    [agents, hiddenAgents, threadId, liveThread]);
+  // Hidden agents (sidebar toggles) are not drawn. With a thread open: only its own agents (main and subagents, each in
+  // its colour), live or not: while you move through its past they stay where they are now, faint (MapView's dimmed),
+  // behind the replay's marker.
+  const drawnAgents = useMemo(() => agents.filter((a) => !hiddenAgents.has(a.id) && (!threadId || a.sessionId === threadId)),
+    [agents, hiddenAgents, threadId]);
+  /** Agents drawn faint, filled by the view (it knows who is followed and whose steps show). */
+  const dimmedRef = useRef<ReadonlySet<string>>(new Set());
   // Agents waiting on you (attention): agent id → label. A subagent waits under its own id, a main thread under the session's.
   const waiting = useMemo(() => new Map(Object.values(attention).filter(needsYou).map((a) => [a.agentId ?? a.sessionId, attentionText(a).badge === "Stuck" ? "Stuck" : `Needs you · ${attentionText(a).title.toLowerCase()}`])), [attention]);
   const waitingRef = useRef(waiting); waitingRef.current = waiting;
@@ -39,11 +42,11 @@ export function useLiveAgents({ agents: live, attention, hiddenAgents, threadId,
       const st = anim.current.get(a.id);
       if (!st) continue;   // not on the map (its file isn't a node)
       if (t - st.t0 < tripMs(route, 650) + 50 || st.flashes.length || t - st.pulseT0 < 700 || t - st.errT0 < 2600 || waitingRef.current.has(a.id) || thinkingRef.current.has(a.id) || st.easing) return true;
-      const target = agentAlpha(a, now, waitingRef.current.has(a.id) || thinkingRef.current.has(a.id), keepRef.current);
+      const target = agentAlpha(a, now, waitingRef.current.has(a.id) || thinkingRef.current.has(a.id), keepRef.current) * (dimmedRef.current.has(a.id) ? DIM : 1);
       if (Math.abs(target - st.alpha) > 0.01) return true;
     }
     return false;
   }, []);
 
-  return { agents, drawnAgents, waiting, waitingRef, thinkingRef, agentsRef, anim, moving };
+  return { agents, drawnAgents, waiting, waitingRef, thinkingRef, agentsRef, anim, moving, dimmedRef };
 }

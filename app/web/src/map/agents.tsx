@@ -17,9 +17,10 @@ export const shortName = (a: AgentPresence, max = 34) => {
   const n = a.name || a.id.slice(0, 7);
   return n.length > max ? n.slice(0, max - 1).trimEnd() + "…" : n;
 };
-export const initial = (a: AgentPresence) => {
+/** The letter on an agent's mark: its task's first letter for a subagent ("Loader on result pages": L), the thread's for the main one. */
+export const initial = (a: Pick<AgentPresence, "name" | "isSubagent">) => {
   const n = (a.name || "").replace(/^Subagent\s*·\s*/i, "").trim();
-  return (a.isSubagent ? "S" : (n[0] || "A")).toUpperCase();
+  return (n.match(/[\p{L}\p{N}]/u)?.[0] ?? (a.isSubagent ? "S" : "A")).toUpperCase();
 };
 
 const VERB_ING: Record<string, string> = {
@@ -38,6 +39,9 @@ export function visibleAgents(agents: AgentPresence[], now = clock()): AgentPres
  * How strongly a marker shows: lit while it works, waits on you or thinks; then dimmed. On the project overview it fades
  * out over the next 8 minutes; with its thread open it stays, dimmed, where it last was (by its trail).
  */
+/** How faint a background agent is (see drawAgents' `dimmed`). */
+export const DIM = 0.4;
+
 export function agentAlpha(a: AgentPresence, now: number, busy: boolean, keep: boolean): number {
   if (a.active || busy) return 1;
   if (keep) return 0.55;
@@ -99,8 +103,10 @@ export function drawAgents(opts: {
   thinking?: ReadonlySet<string>;
   /** A thread is open: its agents stay where they last were once they stop. */
   keep?: boolean;
+  /** Agents in the background (you look back through the thread, or at another agent of it): drawn faint. */
+  dimmed?: ReadonlySet<string>;
 }) {
-  const { ctx, scale, agents, anim, resolve, accent, font, hoverFile, followId, resolveId, showReads, quiet, waiting, thinking, keep } = opts;
+  const { ctx, scale, agents, anim, resolve, accent, font, hoverFile, followId, resolveId, showReads, quiet, waiting, thinking, keep, dimmed } = opts;
   const t = performance.now();
   const now = clock();
   const style = mapStyle();
@@ -136,7 +142,7 @@ export function drawAgents(opts: {
       else { st.x = st.fromX + (tx - st.fromX) * e; st.y = st.fromY + (ty - st.fromY) * e; }
       if (style.route === "hop" && p >= 1 && st.t0 > 0 && st.landedT0 !== st.t0) { st.landedT0 = st.t0; landings.set(key, t); }
       const thinks = !!thinking?.has(a.id) && !waiting?.has(a.id);
-      const target = agentAlpha(a, now, !!waiting?.has(a.id) || thinks, !!keep);
+      const target = agentAlpha(a, now, !!waiting?.has(a.id) || thinks, !!keep) * (dimmed?.has(a.id) ? DIM : 1);
       st.alpha += (target - st.alpha) * 0.08;
 
       // New trail entries: reads become lines of sight. Activity with no new file becomes a pulse.
@@ -273,7 +279,7 @@ export function drawAgents(opts: {
 
       if (scale > 1.6 || hoverFile === key || followId === a.id || erring || waitLabel || (thinks && keep)) {
         const label = waitLabel ? `${shortName(a, 20)} · ${waitLabel}` : erring && a.error ? `${shortName(a, 20)} · ${a.error.slice(0, 48)}`
-          : thinks ? `${shortName(a, 28)} · Thinking…` : !a.active ? `${shortName(a, 28)} · Done` : `${shortName(a, 28)} · ${verbIng(a.action)}`;
+          : thinks ? `${shortName(a, 28)} · Thinking…` : !a.active ? `${shortName(a, 28)} · Done` : `${shortName(a, 28)} · ${a.away ?? verbIng(a.action)}`;
         ctx.font = `600 ${12 / scale}px ${font}`;
         ctx.textAlign = "left";
         const lx = st.x + 13 / scale, ly = st.y;

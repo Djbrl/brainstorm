@@ -121,6 +121,11 @@
 .rp-m.say b { background: var(--accent); }
 .rp-m.fl b { background: var(--risk); }
 .rp-m em { flex: none; font-style: normal; font-size: 12px; font-weight: 600; color: #b3261e; }
+/* A subagent's moment (the Track shows everyone): indented, its initial in its colour in place of the dot. */
+.rp-m.by-sub { padding-left: 22px; }
+.rp-who { flex: none; width: 14px; height: 14px; margin: 0 -4px; border-radius: 50%; display: grid; place-content: center; color: #fff;
+  font: 700 8.5px/1 var(--font-body); font-style: normal; }
+.rp-m.todo .rp-who { opacity: .55; }
 .rp-m.todo { color: var(--ink-3); }
 .rp-m.current { background: var(--accent-soft); color: var(--ink); }
 .rp-detail-switch { align-self: flex-start; margin: 10px 10px 0; padding: 0; border: 0; background: none; color: var(--accent); font-size: 12.5px; }
@@ -128,6 +133,18 @@
 /* ---------- the floating footer: the player, while replaying (Dock) ---------- */
 .dock { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: calc(100% - 48px); }
 .map-wrap:has(.map-panel.open) .dock { left: calc(50% - 220px); }
+
+/* ---------- whose steps the Track shows: everyone, or one agent on its own (TrackPanel's AgentPicker) ---------- */
+.track-agents { flex: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0 8px 12px; max-height: 132px; overflow-y: auto; padding: 1px; }
+.track-agents button { flex: none; display: inline-flex; align-items: center; gap: 6px; max-width: 160px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface); color: var(--ink-2); font-size: 12.5px; font-weight: 500; padding: 4px 10px; }
+.track-agents button:has(i) { padding-left: 4px; }
+.track-agents button span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-agents button i { flex: none; width: 18px; height: 18px; border-radius: 50%; display: grid; place-content: center; color: #fff; font: 700 9.5px/1 var(--font-body); font-style: normal; }
+.track-agents button:hover { color: var(--ink); border-color: var(--ink-3); }
+.track-agents button.more { border-style: dashed; color: var(--ink-3); }
+.track-agents button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); font-weight: 600; }
+.track-agents button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* ---------- under the open thread's title in the Track: Live, Replay, Share (ThreadActions) ---------- */
 .thread-actions { position: relative; flex: none; display: flex; align-items: center; gap: 8px; margin: -2px 8px 12px; }

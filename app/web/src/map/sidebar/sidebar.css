@@ -65,8 +65,9 @@
 .sidebar-agent-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .sidebar-agent-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-agent-doing { color: var(--ink-3); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sidebar-agent-doing button { border: 0; background: none; padding: 0; font: inherit; color: inherit; font-weight: 600; }
-.sidebar-agent-doing button:hover { color: var(--accent); text-decoration: underline; }
+.sidebar-agent-file { font-weight: 600; cursor: pointer; border-radius: 3px; }
+.sidebar-agent-file:hover { color: var(--accent); text-decoration: underline; }
+.sidebar-agent-file:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .sidebar-thread-agents li.hidden-agent .sidebar-agent-main { opacity: .4; }
 .sidebar-agent-eye { flex: none; border: 0; background: none; width: 26px; height: 26px; border-radius: 50%; color: var(--ink-3); display: grid; place-content: center; }
 .sidebar-agent-eye:hover { background: #f0f0f3; color: var(--ink); }

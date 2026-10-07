@@ -15,6 +15,10 @@ import { chapterAt, chaptersOf, duration, injectedLabel, type Chapter } from "..
 import { timeIn } from "../../follow/format";
 import { LinkedLabel } from "../../lib/links";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
+import { agentFocusOf, streamOf, useAgentFocus, useThreadAgents } from "../../lib/agentFocus";
+import { useTheme } from "../../lib/theme";
+import { agentColor, initial } from "../agents";
+import { readTokens } from "../color";
 import "./replay.css";
 
 const USER_MS = 400;       // the list stops following the cursor this long after the user scrolls it
@@ -38,13 +42,16 @@ function textOf(b: Beat) {
   return t;
 }
 
+/** Who did a moment, when it's a subagent and the Track shows everyone: its initial in its colour, its name on hover. */
+export type Who = { name: string; color: string; letter: string };
+
 /** One moment. Its props are plain values, so a new step (which rebuilds every beat) redraws only the rows that changed. */
-const Moment = memo(function Moment({ index, label, tone, failed, state, onPick }:
-  { index: number; label: string; tone: string; failed: boolean; state: RowState; onPick: (i: number) => void }) {
+const Moment = memo(function Moment({ index, label, tone, failed, state, onPick, who, whoColor, whoLetter }:
+  { index: number; label: string; tone: string; failed: boolean; state: RowState; onPick: (i: number) => void; who?: string; whoColor?: string; whoLetter?: string }) {
   return (
-    <button className={`rp-m ${tone} ${state}`} data-beat={index} onClick={() => onPick(index)}
-      aria-current={state === "current" ? "step" : undefined} title={label}>
-      <b aria-hidden="true" />
+    <button className={`rp-m ${tone} ${state}${who ? " by-sub" : ""}`} data-beat={index} onClick={() => onPick(index)}
+      aria-current={state === "current" ? "step" : undefined} title={who ? `${who}: ${label}` : label}>
+      {who ? <i className="rp-who" style={{ background: whoColor }} aria-hidden="true">{whoLetter}</i> : <b aria-hidden="true" />}
       <span><LinkedLabel text={label} max={40} /></span>
       {failed && <em>failed</em>}
     </button>
@@ -72,8 +79,8 @@ type Range = [number, number]; // rows [start, end) of a chapter, as beat indexe
  * An open chapter's moments, beats `from`..`last`: the rows in view and around the cursor, with spacers for the rest.
  * Each spacer says which rows it stands for (data-from), so the center line can find a moment there too.
  */
-const Moments = memo(function Moments({ beats, from, last, index, rowH, onPick, onRowH }:
-  { beats: Beat[]; from: number; last: number; index: number; rowH: number; onPick: (i: number) => void; onRowH: (h: number) => void }) {
+const Moments = memo(function Moments({ beats, from, last, index, rowH, onPick, onRowH, whoOf }:
+  { beats: Beat[]; from: number; last: number; index: number; rowH: number; onPick: (i: number) => void; onRowH: (h: number) => void; whoOf: (b: Beat) => Who | undefined }) {
   const box = useRef<HTMLDivElement>(null);
   const end = last + 1;
   const clamp = (r: Range): Range => [Math.max(from, r[0]), Math.min(end, r[1])];
@@ -122,8 +129,8 @@ const Moments = memo(function Moments({ beats, from, last, index, rowH, onPick, 
   for (const [a, b] of merged) {
     if (a > at) spacer(at, a);
     for (let i = a; i < b; i++) {
-      const beat = beats[i], t = textOf(beat);
-      out.push(<Moment key={beat.step.id} index={i} label={t.label} tone={t.tone} failed={beat.failed > 0} onPick={onPick}
+      const beat = beats[i], t = textOf(beat), who = whoOf(beat);
+      out.push(<Moment key={beat.step.id} index={i} label={t.label} tone={t.tone} failed={beat.failed > 0} onPick={onPick} who={who?.name} whoColor={who?.color} whoLetter={who?.letter}
         state={i < index ? "done" : i === index ? "current" : "todo"} />);
     }
     at = b;
@@ -135,12 +142,20 @@ const Moments = memo(function Moments({ beats, from, last, index, rowH, onPick, 
 export function ReplaySteps() {
   const { replay, setReplayIndex, setReplayPlaying, setReplayDetail, openStep } = useNav();
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
+  const sid = replay?.sessionId ?? null;
+  // Showing everyone: a subagent's moments carry its mark (one agent on its own needs none).
+  const agents = useThreadAgents(sid), focus = useAgentFocus(sid), theme = useTheme();
+  const whoOf = useMemo(() => {
+    const accent = readTokens().accent;
+    const by = new Map(agents.filter((a) => a.isSubagent).map((a) => [a.id, { name: a.name, color: agentColor(a, accent), letter: initial(a) }]));
+    return (b: Beat): Who | undefined => (focus || !sid || !b.step.isSubagent ? undefined : by.get(streamOf(b.step, sid)));
+  }, [agents, focus, sid, theme]);
   if (!replay) return null;
   if (!thread) return <div className="rp-steps"><p className="rp-quiet rp-pad"><Loading /></p></div>;
   if (!thread.beats.length) return <div className="rp-steps"><p className="rp-quiet rp-pad">This thread has no steps yet.</p></div>;
   const len = thread.beats.length;
   return (
-    <TrackList thread={thread} sessionId={replay.sessionId} index={Math.min(replay.index, Math.max(0, len - 1))} playing={!!replay.playing}
+    <TrackList thread={thread} sessionId={replay.sessionId} whoOf={whoOf} index={Math.min(replay.index, Math.max(0, len - 1))} playing={!!replay.playing}
       full={replay.detail === "full"} setReplayIndex={setReplayIndex} setReplayPlaying={setReplayPlaying} setReplayDetail={setReplayDetail} openStep={openStep} />
   );
 }
@@ -152,13 +167,13 @@ function Loading() {
 }
 
 type TrackProps = {
-  thread: Thread; sessionId: string; index: number; playing: boolean; full: boolean;
+  thread: Thread; sessionId: string; whoOf: (b: Beat) => Who | undefined; index: number; playing: boolean; full: boolean;
   setReplayIndex: (i: number | ((prev: number) => number)) => void; setReplayPlaying: (p: boolean) => void;
   setReplayDetail: (d: "light" | "full") => void; openStep: (sessionId: string, stepId: string) => void;
 };
 
 /** The list itself. Memoised: a live message that doesn't change this thread or its cursor leaves it alone. */
-const TrackList = memo(function TrackList({ thread, sessionId, index, playing, full, setReplayIndex, setReplayPlaying, setReplayDetail, openStep }: TrackProps) {
+const TrackList = memo(function TrackList({ thread, sessionId, whoOf, index, playing, full, setReplayIndex, setReplayPlaying, setReplayDetail, openStep }: TrackProps) {
   const threadRef = useRef(thread); threadRef.current = thread;
   const listRef = useRef<HTMLDivElement>(null);
   const userAt = useRef(0);
@@ -265,12 +280,13 @@ const TrackList = memo(function TrackList({ thread, sessionId, index, playing, f
             <section key={c.first} className="rp-ch" data-chapter={c.index}>
               <ChapterHead c={c} open={isOpen} multiDay={multiDay} at={c.hasPrompt && index === c.first} onToggle={toggle} />
               {isOpen && from <= c.last && (
-                <Moments beats={thread.beats} from={from} last={c.last} index={index} rowH={rowH} onPick={onPick} onRowH={onRowH} />
+                <Moments beats={thread.beats} from={from} last={c.last} index={index} rowH={rowH} onPick={onPick} onRowH={onRowH} whoOf={whoOf} />
               )}
             </section>
           );
         })}
-        <WaitingRow sessionId={sessionId} onOpen={(stepId) => openStep(sessionId, stepId)} />
+        {/* How the thread ends is the main agent's: not said under one subagent's steps. */}
+        <WaitingRow sessionId={sessionId} onOpen={(stepId) => openStep(sessionId, stepId)} hidden={!!agentFocusOf(sessionId)} />
         <button className="rp-detail-switch" onClick={() => setReplayDetail(full ? "light" : "full")}>
           {full ? "Group the steps into moments" : "Show every step"}
         </button>
@@ -302,10 +318,11 @@ function ThinkingRow({ since }: { since: string }) {
 }
 
 /** The live end of the list: the agent is waiting on you (or done and it's your turn). */
-function WaitingRow({ sessionId, onOpen }: { sessionId: string; onOpen: (stepId: string) => void }) {
+function WaitingRow({ sessionId, onOpen, hidden }: { sessionId: string; onOpen: (stepId: string) => void; hidden?: boolean }) {
   const a = useLive().state.attention[sessionId];
   const harness = useHarness(sessionId);
   const session = useLiveSelector((s) => s.sessions.find((x) => x.id === sessionId));
+  if (hidden) return null;
   if (a?.state === "thinking") return <ThinkingRow since={a.since} />;
   if (!a || !(needsYou(a) || yourTurn(a))) {
     // At rest: the agent stopped (its marker stays where it last was on the map). Not while it's running.

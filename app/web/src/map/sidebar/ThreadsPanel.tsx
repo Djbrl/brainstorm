@@ -154,18 +154,21 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
             const name = shortName(a, 22);
             return (
               <li key={a.id} className={`${following ? "following" : ""} ${hidden ? "hidden-agent" : ""}`}>
-                <button className="sidebar-agent-main" onClick={() => onFollow(following ? null : a.id)} title={following ? "Stop following" : "Follow this agent on the map"}>
+                <button className="sidebar-agent-main" onClick={() => onFollow(following ? null : a.id)} title={following ? "Stop following" : a.file ? "Follow this agent on the map, and see only its steps" : "See only its steps (it hasn't touched a file on the map yet)"}>
                   <i className="sidebar-agent-avatar" style={{ background: agentColor(a, accent) }}>{initial(a)}</i>
                   <span className="sidebar-agent-text">
                     <span className="sidebar-agent-name">{name}</span>
                     <span className="sidebar-agent-doing">
-                      {verbIng(a.action)}
-                      {a.file && (
-                        <>
-                          {" "}
-                          <button onClick={(e) => { e.stopPropagation(); onFocusFile(a.file!); }}>{baseName(a.file)}</button>
-                        </>
-                      )}
+                      {a.away && a.active ? a.away : <>
+                        {a.active ? verbIng(a.action) : a.file ? "Stopped at" : "Stopped"}
+                        {a.file && (
+                          <>
+                            {" "}
+                            <span role="button" tabIndex={0} className="sidebar-agent-file" onClick={(e) => { e.stopPropagation(); onFocusFile(a.file!); }}
+                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onFocusFile(a.file!); } }}>{baseName(a.file)}</span>
+                          </>
+                        )}
+                      </>}
                     </span>
                   </span>
                 </button>

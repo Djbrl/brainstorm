@@ -143,7 +143,9 @@ export function drawFocusLinks(ctx: CanvasRenderingContext2D, scale: number, lin
 function roleLines(ctx: CanvasRenderingContext2D, scale: number, links: GLink[], focus: string, alpha: number, reach: (stub: number) => number, F: Frame) {
   const st = F.st, metro = st.link === "metro";
   ctx.globalAlpha = alpha;
-  ctx.lineWidth = metro ? Math.max(3 / scale, 3.2) : 1.6 / scale;
+  // Metro lines are thick like a transit map's, in screen pixels: 3 at a distance, at most 4.5 zoomed in (as map units
+  // they grew with the zoom, to a dozen pixels and more up close).
+  ctx.lineWidth = metro ? Math.min(Math.max(3 / scale, 3.2), 4.5 / scale) : 1.6 / scale;
   for (const role of ["imports", "usedBy"] as const) {
     ctx.strokeStyle = ctx.fillStyle = st[role];
     for (const l of links) {
@@ -161,7 +163,7 @@ function roleLines(ctx: CanvasRenderingContext2D, scale: number, links: GLink[],
       ctx.stroke();
       if (!metro && k >= 1) arrowHead(ctx, s, tg);
       // A dot at its end: where a stub stops, or the file it reaches.
-      ctx.beginPath(); ctx.arc(end[0], end[1], (metro ? Math.max(3.2 / scale, 3.6) : 2.6 / scale), 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(end[0], end[1], (metro ? Math.min(Math.max(3.2 / scale, 3.6), 5 / scale) : 2.6 / scale), 0, TAU); ctx.fill();
     }
   }
 }

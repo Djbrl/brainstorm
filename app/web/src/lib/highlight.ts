@@ -113,6 +113,9 @@ const DARK: Palette = {
 };
 /** The palette for the current map theme (and whether it's a dark one). */
 export function usePalette(): { palette: Palette; dark: boolean } {
-  const dark = THEMES.find((t) => t.id === useTheme())?.dark ?? false;
+  // The hook outside find(): called inside it, it ran once per theme until the match, a different number of times per
+  // theme, and switching theme broke React's hook order (a blank page).
+  const theme = useTheme();
+  const dark = THEMES.find((t) => t.id === theme)?.dark ?? false;
   return { palette: dark ? DARK : LIGHT, dark };
 }

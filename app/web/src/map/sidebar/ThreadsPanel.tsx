@@ -1,6 +1,7 @@
 // Owner: sidebar agent. Threads tab: the list of threads, nothing more. Clicking one opens it on the map, and the sidebar
 // shows it in the list's place (its steps; a running one follows live), with a back arrow to the list.
-// The list comes in sections: Claude Code, Codex, and the threads of other projects that touched this one.
+// The list comes in sections under quiet labels: Claude Code, Codex, and Other projects (the threads of other projects
+// that touched this one, each row naming its project).
 // Under the open thread: what it waits on you for, if it's blocked, and its agents, each on its row (follow, show/hide).
 // The eye in the title row shows or hides all its agents.
 import { useEffect, useState } from "react";
@@ -78,9 +79,11 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
   const sections = new Map<string, { key: string; title: string; list: Session[] }>();
   const add = (key: string, title: string, s: Session) => (sections.get(key) ?? sections.set(key, { key, title, list: [] }).get(key)!).list.push(s);
   for (const k of ["claude", "codex"]) sections.set(k, { key: k, title: harnessName(k as "claude" | "codex"), list: [] });
+  // Threads of other projects share one group; each row names its project where the time would be.
+  const projectOf = new Map<string, string>();
   for (const x of sessions) {
     const home = visitorHome(x.home ?? x.cwd, state.map);
-    if (home) { const name = home.slice(home.lastIndexOf("/") + 1); add(`p:${home}`, `From ${name}`, x); }
+    if (home) { projectOf.set(x.id, home.slice(home.lastIndexOf("/") + 1)); add("other", "Other projects", x); }
     else add(harnessOf(x), "", x);
   }
   const groups = [...sections.values()].filter((g) => g.list.length);
@@ -102,6 +105,7 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
       toggleAgent={toggleAgent}
       setHiddenAgents={setHiddenAgents}
       now={now}
+      project={projectOf.get(session.id)}
       onSelect={() => select(session)}
     />
   );
@@ -115,7 +119,7 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
           <section key={g.key} className={`sidebar-thread-group${shut ? " shut" : ""}`}>
             <h3>
               <button onClick={() => toggleGroup(g.key)} aria-expanded={!shut}>
-                <i className="sidebar-tree-caret" aria-hidden="true">›</i>{g.title}
+                {g.title}<i className="sidebar-tree-caret" aria-hidden="true">›</i>
               </button>
             </h3>
             {list.length > 0 && <ul className="sidebar-thread-list">{list.map(row)}</ul>}
@@ -128,7 +132,7 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
   );
 }
 
-function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFocusFile, hiddenAgents, toggleAgent, setHiddenAgents, now, onSelect }: {
+function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFocusFile, hiddenAgents, toggleAgent, setHiddenAgents, now, project, onSelect }: {
   session: Session;
   selected: boolean;
   agents: AgentPresence[];
@@ -140,6 +144,8 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
   toggleAgent: (id: string) => void;
   setHiddenAgents: (ids: Iterable<string>) => void;
   now: number;
+  /** A thread of another project: its name, shown where the time is. */
+  project?: string;
   onSelect: () => void;
 }) {
   const sorted = [...agents].sort((a, b) => (a.isSubagent ? 1 : 0) - (b.isSubagent ? 1 : 0) || a.id.localeCompare(b.id));
@@ -157,7 +163,8 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
           <span className={`sidebar-thread-status ${session.status}${blocked ? " waiting" : ""}`} aria-hidden="true" />
           <span className="sidebar-thread-title">{session.title || "Untitled thread"}</span>
           {say && <span className={`sidebar-thread-attn ${blocked ? "blocked" : "turn"}`} title={`${say.line}${attention?.detail ? `\n${attention.detail}` : ""}`}>{say.badge}</span>}
-          <time>{running ? "live" : relTime(session.lastEventAt, now)}</time>
+          {project && !running ? <span className="sidebar-thread-project" title={`From ${project}, ${relTime(session.lastEventAt, now)}`}>{project}</span>
+            : <time>{running ? "live" : relTime(session.lastEventAt, now)}</time>}
         </button>
         {ids.length > 0 && (
           <button className="sidebar-agent-eye" onClick={toggleAll} aria-label={allHidden ? "Show this thread's agents on the map" : "Hide this thread's agents from the map"} title={allHidden ? "Show its agents" : "Hide its agents"}>

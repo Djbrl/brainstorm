@@ -7,7 +7,7 @@ import { FailuresService } from "../failures/failures.service";
 import { WorkspaceService } from "../workspace/workspace.service";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Replay, Step } from "../types";
+import type { Replay, Session, Step } from "../types";
 import { summarizePlaces } from "../cowork/cowork.service";
 
 type Move = NonNullable<Replay["agentMoves"]>[number];
@@ -70,7 +70,8 @@ export class ReplayService {
   build(sessionId?: string, root?: string, movesFrom?: string, movesTo?: string, preview?: string, until?: string): Replay {
     const all = this.listener.listSessions();
     const wanted = sessionId ? sessionId.split(",") : [];
-    const sessions = wanted.length ? all.filter((s) => wanted.includes(s.id)) : all.slice(0, 1);
+    // A thread asked for by id is found even when it's from another project (the list holds the open project's).
+    const sessions = wanted.length ? wanted.map((id) => all.find((s) => s.id === id) ?? this.listener.getSession(id)).filter((s): s is Session => !!s) : all.slice(0, 1);
     const steps = sessions.flatMap((s) => this.listener.listSteps(s.id)).filter((st) => !until || st.ts <= until);
     const map = this.mapper.getMap(root || this.cfg.defaultRoot);
     const answers = this.askService.listAnswers();

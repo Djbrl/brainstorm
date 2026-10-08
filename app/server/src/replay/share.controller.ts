@@ -10,6 +10,8 @@ import { forSharing, slug } from "./privacy";
 import { slimMap } from "./slim";
 import { UsageService } from "../usage/usage.service";
 import { env } from "../core/local";
+import { ConfigService } from "../core/config.service";
+import { shareMapRoot, within } from "./share-root";
 
 const PLACEHOLDER = "<!--rundown:replay-->";
 const OLD_PLACEHOLDER = "<!--brainstorm:replay-->"; // a share.html built before the rename
@@ -31,20 +33,22 @@ const escHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<":
 // Owned by the lead. Sharing a thread: GET /api/share (one .html file anyone can open) and GET /api/export.md (a report).
 @Controller()
 export class ShareController {
-  constructor(private listener: ListenerService, private replays: ReplayService, private usage: UsageService) {}
+  constructor(private listener: ListenerService, private replays: ReplayService, private usage: UsageService, private cfg: ConfigService) {}
 
-  /** The thread to share: the one asked for, or the newest one in the workspace. */
+  /** The thread to share: the one asked for, or the newest one working in the open project (not one from another
+   *  project that only visited it). */
   private pick(sessionId?: string): Session {
     const id = sessionId?.split(",")[0];
-    const s = id ? this.listener.getSession(id) : this.listener.listSessions()[0];
-    if (!s) throw new HttpException(id ? `No thread ${id}` : "No thread to share yet", 404);
+    const s = id ? this.listener.getSession(id) : this.listener.listSessions().find((t) => [t.cwd, t.home].some((f) => f && within(f, this.cfg.defaultRoot)));
+    if (!s) throw new HttpException(id ? `No thread ${id}` : "No thread in this project to share yet", 404);
     return s;
   }
 
   /** A replay of one thread for someone else: only this thread, its answers, the part of the map it touched (slim.ts),
    *  secrets masked, no screenshots. */
   sharedReplay(session: Session): Replay {
-    const raw = this.replays.build(session.id);
+    const steps = this.listener.listSteps(session.id);
+    const raw = this.replays.build(session.id, shareMapRoot(session, steps, this.cfg.defaultRoot));
     const stepIds = new Set(raw.steps.map((s) => s.id));
     const touched = new Set(raw.steps.map((s) => s.filePath).filter(Boolean) as string[]);
     const answers = raw.answers.filter((a) => (a.request.stepId ? stepIds.has(a.request.stepId) : !!a.request.filePath && touched.has(a.request.filePath)));

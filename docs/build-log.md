@@ -230,6 +230,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - 04:05 (8 Oct) [share] Shared replays carry only their part of the map (server `replay/slim.ts`): the files the thread touched, up to 60 around them (their imports first, then files from the same folders) and the imports between those, instead of the whole project (up to 3,000 files and 23,000 imports). A one-minute thread on a 3,000-file project: the map goes from 5.2 MB to 58 kB. The Files tab says "This shared replay shows N of the project's M files".
 
+- **8 Oct 2026** · [share] A shared thread carries its own project's map (replay/share-root.ts: the repo it ran in, a worktree's repo, unless most of what it touched is in the open project; never a folder too broad to map), and is found by id even from another project; Share with no thread picked takes the newest thread of the open project, not a visitor's.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

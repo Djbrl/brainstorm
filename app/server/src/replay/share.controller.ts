@@ -48,7 +48,7 @@ export class ShareController {
    *  secrets masked, no screenshots. */
   sharedReplay(session: Session): Replay {
     const steps = this.listener.listSteps(session.id);
-    const raw = this.replays.build(session.id, shareMapRoot(session, steps, this.cfg.defaultRoot));
+    const raw = this.replays.build(session.id, undefined, undefined, undefined, undefined, undefined, { mapRoot: shareMapRoot(session, steps, this.cfg.defaultRoot) });
     const stepIds = new Set(raw.steps.map((s) => s.id));
     const touched = new Set(raw.steps.map((s) => s.filePath).filter(Boolean) as string[]);
     const answers = raw.answers.filter((a) => (a.request.stepId ? stepIds.has(a.request.stepId) : !!a.request.filePath && touched.has(a.request.filePath)));

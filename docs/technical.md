@@ -21,7 +21,7 @@ Web "Ask" ──▶ /api/ask ──▶ Claude (fallback: Nemotron) ────�
 tool_result errors ──▶ Failures ──▶ Nemotron names each group ──▶ /api/failures
 ```
 
-Everything runs on the user's machine. The only network calls are to the two models, and they only receive small, masked context.
+Everything runs on the user's machine. The only network calls are to the two models, and they only receive small, masked context (file summaries included).
 
 ## Server modules (`app/server/src/`)
 
@@ -187,11 +187,14 @@ Everything is masked first. Cost is tokens × price ($5 in, $25 out per million 
 
 - **Local storage:** logs and summaries stay in a local SQLite file.
 - **Masking:** `maskSecrets()` runs on every step before it is stored and on every context before it is sent. It redacts:
-  - API keys: Anthropic, NVIDIA, GitHub, AWS, Slack, Google
-  - JWTs, bearer tokens and PEM private keys
-  - passwords inside URLs, `--password=` flags
-  - `KEY=value` or `"password": "…"` style assignments
+  - API keys: Anthropic, OpenAI, NVIDIA, GitHub, GitLab, AWS, Slack, Google, Stripe, SendGrid, npm, PyPI, Hugging Face, DigitalOcean, Shopify
+  - JWTs, bearer tokens, cookies and API-key headers, and PEM private keys
+  - passwords inside URLs, tokens in query strings (`?access_token=`, `X-Amz-Signature=`), `--password=` flags, `curl -u`, `mysql -p`
+  - `KEY=value` or `"password": "…"` style assignments, and lowercase unquoted ones (`password: …` in YAML, `aws_secret_access_key = …`) when the value looks like a secret rather than code
+- **Local only:** requests must name this machine (`Host`, against DNS rebinding); writes need a JSON body from a local page (no form parser, so no CSRF); the live feed (`/ws`) needs a per-start token from `GET /api/live-token`, which other origins can't read; the page is served with a Content Security Policy and can't be framed. Ask, the map and replays stay inside the open project (symlinks resolved). Git runs with `core.fsmonitor=false` and no hooks, so a copied repo's config can't run a program.
+- **Launcher trust:** `server.json` (0600) holds a per-start secret; the launcher and the hooks send `GET /api/health?challenge=` and trust the port only if the answer's HMAC proves it.
 - **Published export:** before the hosted demo was published, the replay file was scanned for the real key values in `.env` and for personal email addresses.
+- **Shared files:** home folder (also JSON-escaped and URL-encoded), account and computer names (whole words, a host name that's an IP too) and emails are replaced; the file carries a hash-pinned Content Security Policy and makes no network requests.
 
 ## Hosted demo
 

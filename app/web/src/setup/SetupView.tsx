@@ -32,7 +32,7 @@ async function openWorkspace(root: string, anyway = false): Promise<SetupStatus>
 
 /** The system's folder picker, opened by the local server: the folder's path, or null if cancelled. */
 async function chooseFolder(): Promise<string | null> {
-  const r = await fetch("/api/workspace/choose", { method: "POST" });
+  const r = await fetch("/api/workspace/choose", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
   if (!r.ok) {
     let msg = "The folder picker didn't open.";
     try { const b = await r.json(); msg = b.message || msg; } catch { /* keep default */ }

@@ -17,6 +17,19 @@ export function isLocalHost(host: string | undefined): boolean {
   return isLocalName(name.toLowerCase());
 }
 
+/** A request that may change something: reads always pass; a write needs a JSON body and, from a browser, a page on
+ * this machine. Forms and no-cors fetches from other sites can't send `application/json` without a preflight. */
+export function isLocalWrite(method: string, contentType: string | undefined, origin: string | undefined): boolean {
+  if (method === "GET" || method === "HEAD") return true;
+  return /^application\/json\s*(;|$)/i.test(contentType ?? "") && isLocalOrigin(origin);
+}
+
+/** The Content-Security-Policy for Rundown's own page, served from `host` (already checked to be local). */
+export const pageCsp = (host: string) => [
+  "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline'", "img-src 'self' data: blob:", "font-src 'self' data:",
+  `connect-src 'self' ws://${host}`, "worker-src 'self' blob:", "frame-src 'self'", "object-src 'none'", "base-uri 'none'", "form-action 'self'", "frame-ancestors 'none'",
+].join("; ");
+
 /** A browser Origin from this machine, or none (curl, scripts). Blocks other websites from reading the live feed. */
 export function isLocalOrigin(origin: string | undefined): boolean {
   if (!origin) return true;

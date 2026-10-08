@@ -6,7 +6,7 @@ import { ConfigService } from "../core/config.service";
 import { FailuresService } from "../failures/failures.service";
 import { WorkspaceService } from "../workspace/workspace.service";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import type { Replay, Session, Step } from "../types";
 import { summarizePlaces } from "../cowork/cowork.service";
 
@@ -66,14 +66,20 @@ export class ReplayService {
     return moves.sort((a, b) => a.ts.localeCompare(b.ts));
   }
 
-  /** `until` (ISO time): the recording stops there (steps, agent moves, failures, answers). */
-  build(sessionId?: string, root?: string, movesFrom?: string, movesTo?: string, preview?: string, until?: string): Replay {
+  /**
+   * `until` (ISO time): the recording stops there (steps, agent moves, failures, answers).
+   * `share`: a thread being shared (share.controller.ts), found by id even from another project, with the map of the
+   * project the server worked out for it (share-root.ts), never one a link names.
+   */
+  build(sessionId?: string, root?: string, movesFrom?: string, movesTo?: string, preview?: string, until?: string, share?: { mapRoot: string }): Replay {
     const all = this.listener.listSessions();
     const wanted = sessionId ? sessionId.split(",") : [];
-    // A thread asked for by id is found even when it's from another project (the list holds the open project's).
-    const sessions = wanted.length ? wanted.map((id) => all.find((s) => s.id === id) ?? this.listener.getSession(id)).filter((s): s is Session => !!s) : all.slice(0, 1);
+    const sessions = !wanted.length ? all.slice(0, 1)
+      : share ? wanted.map((id) => all.find((s) => s.id === id) ?? this.listener.getSession(id)).filter((s): s is Session => !!s)
+      : all.filter((s) => wanted.includes(s.id));
     const steps = sessions.flatMap((s) => this.listener.listSteps(s.id)).filter((st) => !until || st.ts <= until);
-    const map = this.mapper.getMap(root || this.cfg.defaultRoot);
+    // The open project only (or the same folder written another way): never a walk of any folder a link names.
+    const map = this.mapper.getMap(share ? share.mapRoot : root && resolve(root) === resolve(this.cfg.defaultRoot) ? root : this.cfg.defaultRoot);
     const answers = this.askService.listAnswers();
     const failures = this.failures.list(sessions.map((s) => s.id).join(","), until);
     const cowork = Object.fromEntries(sessions.map((s) => [s.id, summarizePlaces([s.id], (id) => steps.filter((st) => st.sessionId === id))])); // Places, for the hosted demo

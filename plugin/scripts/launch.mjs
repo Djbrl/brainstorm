@@ -12,11 +12,11 @@
 //                  --session ID, else the project's newest one
 // It always exits 0 and prints any problem on stdout, so a skill can run it as one plain command.
 import { spawn } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { createServer } from "node:net";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const argv = process.argv.slice(2);
@@ -45,17 +45,26 @@ const LATEST_URL = "https://raw.githubusercontent.com/Djbrl/brainstorm/main/plug
 const DAY = 24 * 60 * 60 * 1000;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const keyHash = (k) => (k ? createHash("sha256").update(k).digest("hex").slice(0, 12) : null);
+// Which key the server runs with: an HMAC with the server's secret (from server.json), or a plain hash for a server
+// from before 0.6 that has no secret.
+const keyHash = (k, secret) => (!k ? null : secret ? createHmac("sha256", secret).update(`key:${k}`).digest("hex").slice(0, 12)
+  : createHash("sha256").update(k).digest("hex").slice(0, 12));
 
 function nodeOk() {
   const [maj, min] = process.versions.node.split(".").map(Number);
   return maj > 23 || (maj === 23 && min >= 4) || (maj === 22 && min >= 13); // node:sqlite without a flag
 }
 
-async function health(port) {
+/** What answers on `port`. With the server's secret, `verified` says it proved it knows it: it's the Rundown we
+ * started, not some other program that took the port after it stopped. */
+async function health(port, secret) {
   try {
-    const r = await fetch(`http://127.0.0.1:${port}/api/health`, { signal: AbortSignal.timeout(800) });
-    return r.ok ? await r.json() : null;
+    const challenge = randomBytes(16).toString("hex");
+    const r = await fetch(`http://127.0.0.1:${port}/api/health?challenge=${challenge}`, { signal: AbortSignal.timeout(800) });
+    if (!r.ok) return null;
+    const h = await r.json();
+    if (secret) h.verified = h.proof === createHmac("sha256", secret).update(`health:${challenge}`).digest("hex");
+    return h;
   } catch { return null; }
 }
 
@@ -63,12 +72,15 @@ function readState() {
   try { return JSON.parse(readFileSync(STATE, "utf8")); } catch { return null; }
 }
 
-/** The running Rundown, if any: {port, health}. */
+/** The running Rundown, if any: {port, health, secret}. Only one that proves it's ours: anything else on that port
+ * is never killed, never sent the workspace, never opened. A server from before 0.6 (no secret) must at least have
+ * the pid it wrote. */
 async function running() {
   const st = readState();
   if (!st?.port) return null;
-  const h = await health(st.port);
-  return h ? { port: st.port, health: h } : null;
+  const h = await health(st.port, st.secret);
+  if (!h || (st.secret ? !h.verified : h.pid !== st.pid)) return null;
+  return { port: st.port, health: h, secret: st.secret };
 }
 
 async function stop(run) {
@@ -145,7 +157,7 @@ async function notices(port) {
     n.checkedAt = Date.now();
     try {
       const latest = (await (await fetch(LATEST_URL, { signal: AbortSignal.timeout(1500) })).json()).version;
-      if (latest && newer(latest, VERSION)) {
+      if (typeof latest === "string" && /^\d+\.\d+\.\d+$/.test(latest) && newer(latest, VERSION)) {
         out.push(`Rundown ${latest} is available (you have ${VERSION}). To update, run \`claude plugin update rundown@${MARKET}\` in a terminal, or choose Update now in /plugin → Installed.`);
       }
     } catch { /* offline: try again tomorrow */ }
@@ -175,7 +187,7 @@ async function adoptOldData() {
     try {
       const st = JSON.parse(readFileSync(join(old, "server.json"), "utf8"));
       const h = await health(st.port);
-      if (h?.pid) {
+      if (h?.pid && h.pid === st.pid) { // the old server itself, not whatever took its port
         process.kill(h.pid, "SIGTERM");
         for (let i = 0; i < 30 && (await health(st.port)); i++) await sleep(100);
       }
@@ -208,7 +220,7 @@ async function main() {
 
   // A different plugin version (after an update) or a new API key: restart so the running server matches.
   // Only a launcher that has a key compares keys (the skills don't receive plugin settings, the hook does).
-  if (run && (run.health.version !== VERSION || (KEY && run.health.anthropicKey !== keyHash(KEY)))) {
+  if (run && (run.health.version !== VERSION || (KEY && run.health.anthropicKey !== keyHash(KEY, run.secret)))) {
     await stop(run);
     run = null;
   }
@@ -261,7 +273,10 @@ async function share(port) {
     let r = await get(path, sid && !sid.includes("$") ? sid : undefined);
     if (r.status === 404 && sid) r = await get(path);
     if (!r.ok) return say(`Couldn't save the replay: ${await r.text()}`);
-    const name = /filename="([^"]+)"/.exec(r.headers.get("content-disposition") ?? "")?.[1] ?? `rundown-replay${path.endsWith(".md") ? ".md" : ".html"}`;
+    // Only a plain file name, in that folder: never a path the answer names ("../.zshrc").
+    const ext = path.endsWith(".md") ? ".md" : ".html";
+    const given = basename(/filename="([^"]+)"/.exec(r.headers.get("content-disposition") ?? "")?.[1] ?? "").replace(/[^\w.\-]/g, "_");
+    const name = given && !given.startsWith(".") && given.endsWith(ext) ? given : `rundown-replay${ext}`;
     writeFileSync(join(dir, name), Buffer.from(await r.arrayBuffer()));
     saved.push(join(dir, name));
   }

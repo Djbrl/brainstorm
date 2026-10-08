@@ -4,7 +4,8 @@ import { statSync } from "node:fs";
 import { extname, isAbsolute, normalize, sep } from "node:path";
 import { isLocalHost } from "../core/local";
 import { ListenerService } from "../listener/listener.service";
-import { WorkspaceService } from "../workspace/workspace.service";
+import { tooBroad, WorkspaceService } from "../workspace/workspace.service";
+import { insideAny } from "../core/roots";
 
 // Owner: viewers. "Open in your default app" for a file shown in the step panel: the computer opens it with whatever
 // app it uses for that kind of file. Only a text or code file (by extension: never a program, a script a double-click would run, or an app),
@@ -31,8 +32,9 @@ export class OpenController {
     if (!OPENABLE.has(ext) || (process.platform === "win32" && RUN_ON_WINDOWS.has(ext))) throw new ForbiddenException("Only text and code files open from here");
     let st; try { st = statSync(path); } catch { throw new BadRequestException("No such file"); }
     if (!st.isFile()) throw new BadRequestException("Not a file");
-    const roots = [this.ws.status().root, ...this.listener.listSessions().map((s) => s.cwd)].filter((r): r is string => !!r).map((r) => normalize(r).replace(/\/+$/, "") + sep);
-    if (!roots.some((r) => path.startsWith(r))) throw new ForbiddenException("Outside the project and the threads' folders");
+    // A thread started in the home folder (or /) doesn't make every file on the disk "a thread's folder".
+    const roots = [this.ws.status().root, ...this.listener.listSessions().map((s) => s.cwd)].filter((r): r is string => !!r && !tooBroad(r));
+    if (!insideAny(path, roots)) throw new ForbiddenException("Outside the project and the threads' folders");
     const [cmd, args] = process.platform === "darwin" ? ["open", [path]] : process.platform === "win32" ? ["explorer.exe", [path]] : ["xdg-open", [path]];
     execFile(cmd, args, () => { /* the app opens on its own; nothing to report */ });
   }

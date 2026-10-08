@@ -6,6 +6,7 @@ import { ConfigService } from "../core/config.service";
 @Controller()
 export class MapController {
   constructor(private mapper: MapperService, private cfg: ConfigService) {}
-  @Get("map") map(@Query("root") root?: string) { return this.mapper.getMapAsync(root || this.cfg.defaultRoot); }
-  @Get("history") history(@Query("root") root?: string) { return this.mapper.getHistory(root || this.cfg.defaultRoot); }
+  // Only the open project: a link (or another site's no-cors request) can't make the server walk any other folder.
+  @Get("map") map(@Query("root") _root?: string) { return this.mapper.getMapAsync(this.cfg.defaultRoot); }
+  @Get("history") history(@Query("root") _root?: string) { return this.mapper.getHistory(this.cfg.defaultRoot); }
 }

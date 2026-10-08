@@ -66,10 +66,11 @@ Summaries of files and labels written by a model are off in this release. They'l
 - Data: `~/.claude/plugins/data/rundown-rundown/` (a SQLite database, the server log, `server.json`, `notices.json`). Uninstalling the plugin deletes it.
 - Once a day, Rundown fetches its own version number from GitHub to tell you about updates. That request carries nothing about you or your code.
 - Once a day, it sends anonymous usage stats (a random install id, version, OS, map theme and counts of what you used; never code, paths, prompts or names). See [Usage stats](../README.md#usage-stats) for exactly what. Turn it off in Settings, or with `DO_NOT_TRACK=1`.
-- The server listens on `127.0.0.1` only (port 4747, or the next free one). It refuses requests addressed to other host names, and WebSocket connections from other websites.
+- The server listens on `127.0.0.1` only (port 4747, or the next free one). It refuses requests addressed to other host names, changes that don't come from its own page, and live-feed connections without a token only its own page can read (other websites and other apps on your computer can't listen in). Its page can't load anything from elsewhere (a Content Security Policy), and other sites can't frame it.
+- `server.json` (readable only by you) holds a random secret. The launcher and the hooks only talk to a server that proves it knows it, so nothing else that takes the port gets your data.
 - To show when a thread is waiting for you, the plugin's hooks tell the local server when Claude Code asks for a permission, shows a notification, finishes a turn or gets a new message (the tool's name and input, never the conversation). They only talk to `127.0.0.1`.
 - Nothing else is sent anywhere, except your questions to Claude if you set a key. Sharing only saves files on your computer; you decide where they go.
-- A shared file contains the thread's prompts, messages, commands and code changes, and the project's file list. Before it's saved, secrets are masked again, email addresses are masked, and your home folder, account name and computer name are replaced. Screenshots are never included. Read it before you send it anywhere.
+- A shared file contains the thread's prompts, messages, commands and code changes, and the project's file list. Before it's saved, secrets are masked again, email addresses are masked, and your home folder, account name and computer name are replaced. Screenshots are never included. The file runs only its own code and loads nothing from the network. Read it before you send it anywhere.
 
 ## How it's built (for contributors)
 

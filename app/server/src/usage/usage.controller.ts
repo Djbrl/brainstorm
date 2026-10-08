@@ -21,6 +21,13 @@ export class UsageController {
     return this.usage.setEnabled(body.enabled);
   }
 
+  /** Delete the reports already sent (the site removes every report with this install's id); a new id after. */
+  @Post("usage/forget") @HttpCode(200)
+  forget(@Headers("origin") origin?: string, @Headers("content-type") type?: string) {
+    local(origin, type);
+    return this.usage.forget();
+  }
+
   /** {name: "op" | "th" | "rp" | "lv", theme?}: one use, from the web app. */
   @Post("usage/event") @HttpCode(204)
   event(@Body() body: { name?: unknown; theme?: unknown }, @Headers("origin") origin?: string, @Headers("content-type") type?: string) {

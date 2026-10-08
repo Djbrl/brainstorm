@@ -15,19 +15,29 @@ export function track(name: WebEvent) {
   }).catch(() => { /* offline or an older server: nothing to do */ });
 }
 
-export type UsageStatus = { enabled: boolean; locked: string | null; sends: boolean; lastSent: string | null; pending: Record<string, number> };
+export type UsageStatus = { enabled: boolean; asked: boolean; id: string | null; locked: string | null; sends: boolean; lastSent: string | null; pending: Record<string, number> };
 
-/** The setting in Settings: on by default, off for good with one click. */
+/** Where the site says exactly what's sent, how long it's kept and how to have it deleted. */
+export const PRIVACY_URL = "https://brainstorm-landing.vercel.app/privacy#usage-stats";
+
+const put = (enabled: boolean) => fetch("/api/usage", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled }) })
+  .then((r) => (r.ok ? (r.json() as Promise<UsageStatus>) : null));
+
+/** The setting: off until the person says yes (the app asks once), and off again with one click. */
 export function useUsageSetting() {
   const [status, setStatus] = useState<UsageStatus | null>(null);
   useEffect(() => {
     if (isReplay()) return;
     fetch("/api/usage").then((r) => (r.ok ? r.json() : null)).then(setStatus).catch(() => setStatus(null));
   }, []);
-  const toggle = useCallback(() => {
-    if (!status) return;
-    fetch("/api/usage", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled: !status.enabled }) })
-      .then((r) => (r.ok ? r.json() : null)).then((s) => s && setStatus(s)).catch(() => { /* keep what's shown */ });
-  }, [status]);
-  return { status, toggle };
+  const set = useCallback((enabled: boolean) => {
+    put(enabled).then((s) => s && setStatus(s)).catch(() => { /* keep what's shown */ });
+  }, []);
+  const toggle = useCallback(() => { if (status) set(!status.enabled); }, [status, set]);
+  /** Ask the site to delete every report sent from this install. Resolves to whether it worked. */
+  const forget = useCallback(() => fetch("/api/usage/forget", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((r: { status: UsageStatus; deleted: boolean } | null) => { if (r) setStatus(r.status); return !!r?.deleted; })
+    .catch(() => false), []);
+  return { status, set, toggle, forget };
 }

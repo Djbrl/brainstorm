@@ -5,8 +5,11 @@ import { BusService } from "../core/bus.service";
 import { env } from "../core/local";
 
 // Owned by the lead. Anonymous usage stats: once a day, counts of what was used, sent to the landing site so we know how
-// many people use Rundown, roughly where, and which parts matter. On by default, off in Settings (or with DO_NOT_TRACK=1
-// or RUNDOWN_USAGE=off), and never sent from a development build. What is sent, exactly (also in the README):
+// many people use Rundown, roughly where, and which parts matter. Off until the person says yes (the app asks once;
+// since 0.7, also for installs that never chose), off again in Settings, always off with DO_NOT_TRACK=1 or
+// RUNDOWN_USAGE=off, and never sent from a development build. "Delete the stats already sent" asks the site to remove
+// every report with this install's id, then makes a new id. What is sent, exactly (also in the README and on the
+// site's privacy page):
 //   id    a random install id made on this machine (not derived from anything about it)
 //   kind  "new" the first time, then "day"
 //   v, os Rundown's version and the platform (darwin, linux, win32)
@@ -22,12 +25,17 @@ export const WEB_KEYS = new Set<string>(["op", "th", "rp", "lv"]);
 export const THEMES = new Set(["default", "metro", "prism", "hologram"]);
 
 const ENDPOINT = process.env.RUNDOWN_USAGE_URL ?? "https://brainstorm-landing.vercel.app/api/usage";
+const FORGET = ENDPOINT.replace(/\/api\/usage$/, "/api/usage-forget");
 const FIRST_TRY_MS = 60_000;          // after start, so a crash loop doesn't report
 const EVERY_MS = 60 * 60_000;         // then hourly: one report per UTC day at most
 const SAVE_MS = 30_000;               // counts are saved this often (a restart loses at most that much)
 
 export type UsageStatus = {
   enabled: boolean;
+  /** The person has answered (yes or no). Until then nothing is counted or sent, and the app asks. */
+  asked: boolean;
+  /** This install's random id, once a report was sent (shown in Settings, for a deletion request). */
+  id: string | null;
   /** Why it's off whatever the setting says: DO_NOT_TRACK or RUNDOWN_USAGE in the environment. */
   locked: string | null;
   /** False in a development build: nothing is sent even when enabled. */
@@ -43,7 +51,7 @@ export class UsageService implements OnModuleInit, OnModuleDestroy {
   private sessions = new Set<string>();
   private theme = "";
   private dirty = false;
-  private on = true;                  // the setting, read once (a step bumps a count: no database read each time)
+  private on = false;                 // the setting, read once (a step bumps a count: no database read each time)
   private timers: NodeJS.Timeout[] = [];
 
   constructor(private dbs: DbService, private bus: BusService) {}
@@ -53,7 +61,7 @@ export class UsageService implements OnModuleInit, OnModuleDestroy {
     try { this.counts = JSON.parse(this.get("usage.counts") ?? "{}"); } catch { this.counts = {}; }
     try { for (const s of JSON.parse(this.get("usage.sessions") ?? "[]")) this.sessions.add(s); } catch { /* none */ }
     this.theme = this.get("usage.theme") ?? "";
-    this.on = this.get("usage.enabled") !== "0";
+    this.on = this.get("usage.enabled") === "1"; // only after a yes
     // Live agent work only: the listener emits "step" for live steps, not for history it reads in.
     this.bus.on("step", (s) => {
       if (!this.enabled()) return;
@@ -73,7 +81,8 @@ export class UsageService implements OnModuleInit, OnModuleDestroy {
   // ---- reads and settings ----
 
   status(): UsageStatus {
-    return { enabled: this.enabled(), locked: this.locked(), sends: this.sends(), lastSent: this.get("usage.lastDay"), pending: this.pending() };
+    return { enabled: this.enabled(), asked: this.get("usage.enabled") !== null, id: this.get("usage.lastDay") ? this.get("usage.id") : null,
+      locked: this.locked(), sends: this.sends(), lastSent: this.get("usage.lastDay"), pending: this.pending() };
   }
 
   setEnabled(on: boolean): UsageStatus {
@@ -81,6 +90,22 @@ export class UsageService implements OnModuleInit, OnModuleDestroy {
     this.set("usage.enabled", on ? "1" : "0");
     if (!on) { this.counts = {}; this.sessions.clear(); this.dirty = true; this.save(); } // off means nothing kept to send later
     return this.status();
+  }
+
+  /** Remove every report already sent with this install's id (the site deletes them), then start over with a new id. */
+  async forget(): Promise<{ status: UsageStatus; deleted: boolean }> {
+    const id = this.get("usage.id");
+    let deleted = !id; // nothing was ever sent
+    if (id) {
+      try {
+        const r = await fetch(FORGET, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id }), signal: AbortSignal.timeout(15_000) });
+        deleted = r.ok;
+      } catch { deleted = false; }
+      if (!deleted) return { status: this.status(), deleted }; // keep the id, so asking again can still find the reports
+      this.del("usage.id"); this.del("usage.lastDay");
+    }
+    this.counts = {}; this.sessions.clear(); this.dirty = true; this.save();
+    return { status: this.status(), deleted };
   }
 
   /** Count one use. Nothing is counted while it's off. */
@@ -170,4 +195,6 @@ export class UsageService implements OnModuleInit, OnModuleDestroy {
   private set(key: string, value: string) {
     this.dbs.db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(key, value);
   }
+
+  private del(key: string) { this.dbs.db.prepare(`DELETE FROM settings WHERE key = ?`).run(key); }
 }

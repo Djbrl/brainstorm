@@ -44,7 +44,8 @@ if (typeof window !== "undefined") {
 
 /** Whether the first-visit card was seen (or dismissed). */
 export const welcomed = () => read(WELCOMED) === "1";
-export const markWelcomed = () => write(WELCOMED, "1");
+/** Also tells the page (the usage question waits for the welcome card to close). */
+export const markWelcomed = () => { write(WELCOMED, "1"); window.dispatchEvent(new Event("rundown-welcomed")); };
 
 /** When `ms` was, for a sentence: relTime's words ("3 h ago", "yesterday 14:05"), with "on" before a date ("on Mon 2 Oct"). */
 export function sinceLabel(ms: number, now = Date.now()): string {

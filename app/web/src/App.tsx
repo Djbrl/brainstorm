@@ -9,6 +9,7 @@ import { displayLabel } from "./follow/format";
 import { LinkedLabel } from "./lib/links";
 import { SetupView } from "./setup/SetupView";
 import { Welcome } from "./map/Welcome";
+import { UsageAsk } from "./map/UsageAsk";
 import { SettingsButton } from "./settings/Settings";
 import { Crashed, Offline, OfflineBanner, useOffline } from "./Trouble";
 import { useAttentionAlerts } from "./lib/attention";
@@ -167,6 +168,7 @@ function Shell() {
       {state.shared && <OpenShared />}
       <LiveFollow />
       {!replay && !state.shared && <Welcome />}
+      {!replay && !state.shared && <UsageAsk />}
       <main className="view"><Crashed where="the map" key={`${replay?.sessionId ?? ""}|${lens}`}><Suspense fallback={<Loading />}>{
         offline && !state.hasMap ? <Offline />
           : replay && state.missing ? <MissingThread onBack={stopReplay} />

@@ -9,7 +9,7 @@ import { setShowFile, setStepWindow, STEP_WINDOWS, useShowFile, useStepWindow } 
 import { useNavActions, useNavState } from "../lib/nav";
 import { setFoldOn, useFoldOn } from "../map/fold";
 import { EDITORS, setEditor, useEditor } from "../lib/editor";
-import { useUsageSetting } from "../lib/usage";
+import { PRIVACY_URL, useUsageSetting } from "../lib/usage";
 import { useDialogFocus } from "../lib/useDialogFocus";
 import "./settings.css";
 
@@ -150,13 +150,16 @@ function NotifySetting() {
   );
 }
 
-/** Anonymous usage stats (lib/usage.ts, server usage/usage.service.ts): on by default, one click turns them off. */
+/** Anonymous usage stats (lib/usage.ts, server usage/usage.service.ts): off until the person says yes, one click turns
+ * them off again, and the reports already sent can be deleted. */
 function UsageSetting() {
-  const { status, toggle } = useUsageSetting();
+  const { status, toggle, forget } = useUsageSetting();
+  const [forgot, setForgot] = useState<"" | "busy" | "done" | "failed">("");
   if (!status || isReplay()) return null;
   const note = status.locked ? `Off: ${status.locked}`
     : !status.sends ? "Nothing is sent from a development build"
-    : "Once a day: how much you used Rundown (counts only), its version, your OS and country. Never code, paths, prompts or names.";
+    : "Once a day: how much you used Rundown (counts only), its version, your OS and country. Never code, paths, prompts or names. Kept 13 months.";
+  const del = () => { setForgot("busy"); void forget().then((ok) => setForgot(ok ? "done" : "failed")); };
   return (
     <section className="set-sec">
       <h3>Usage stats</h3>
@@ -164,7 +167,11 @@ function UsageSetting() {
         <input type="checkbox" checked={status.enabled} disabled={!!status.locked} onChange={toggle} />
         <span><b>Share anonymous usage stats</b><small>{note}</small></span>
       </label>
-      <a className="usage-more" href="https://github.com/Djbrl/brainstorm#usage-stats" target="_blank" rel="noopener">Exactly what's sent</a>
+      <a className="usage-more" href={PRIVACY_URL} target="_blank" rel="noopener">Exactly what's sent</a>
+      {status.id && <button className="usage-forget" onClick={del} disabled={forgot === "busy"}>Delete the stats already sent</button>}
+      {forgot === "done" && <p className="usage-note" role="status">Deleted. This install has a new id from now on.</p>}
+      {forgot === "failed" && <p className="usage-note" role="status">Couldn't reach the site. Try again later.</p>}
+      {status.id && <p className="usage-note">Install id: <code>{status.id}</code></p>}
     </section>
   );
 }

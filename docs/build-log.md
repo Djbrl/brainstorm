@@ -220,6 +220,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - **8 Oct 2026** · [themes] Metro: no lines between files of a folder (they claimed links that aren't there): only agents' tracks and the imports of the file you point at or pick; stations and closed folders keep their folder's RER colour; the bars are a lighter cream. Prism and Hologram back to how they were.
 
+- **8 Oct 2026** · [themes] Hologram: files are wireframe globes turning slowly (faster where an agent is, stamped at 24 angles), the agents' locator and its accent a blue going violet instead of green, quiet globes slate blue. The floor tiles are gone.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

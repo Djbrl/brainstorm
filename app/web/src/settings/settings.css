@@ -47,8 +47,9 @@
 .sw-hologram { background:
   linear-gradient(rgba(143,233,240,.08) 1px, transparent 1px) 0 0 / 8px 8px,
   linear-gradient(90deg, rgba(143,233,240,.08) 1px, transparent 1px) 0 0 / 8px 8px, #0c1012; }
-.sw-hologram::before { content: ""; position: absolute; left: 14%; top: 30%; width: 44%; height: 32%; border-left: 2px solid #5fe3e0; border-bottom: 2px solid #5fe3e0; box-shadow: -2px 2px 8px rgba(95,227,224,.5); }
-.sw-hologram::after { content: ""; position: absolute; left: 58%; top: 56%; width: 8px; height: 8px; transform: rotate(45deg); background: #39e75f; box-shadow: 0 0 8px #39e75f; }
+.sw-hologram::before { content: ""; position: absolute; left: 14%; top: 30%; width: 44%; height: 32%; border-left: 2px solid #8b8fff; border-bottom: 2px solid #8b8fff; box-shadow: -2px 2px 8px rgba(139,143,255,.5); }
+.sw-hologram::after { content: ""; position: absolute; left: 56%; top: 50%; width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid #b8e8f0;
+  background: radial-gradient(ellipse 30% 50% at 50% 50%, transparent 80%, rgba(184,232,240,.7) 85%, transparent 92%); box-shadow: 0 0 8px #8b8fff; }
 .notify-opt { display: flex; gap: 10px; align-items: flex-start; padding: 8px 6px; border-radius: 10px; cursor: pointer; }
 .notify-opt:hover { background: rgba(0,0,0,.03); }
 .notify-opt input { margin: 3px 0 0; accent-color: var(--accent); width: 15px; height: 15px; flex: none; }

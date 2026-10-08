@@ -7,8 +7,8 @@ import { bucket, faded, sprite, stamp, type Sprite, type StampMemo } from "./spr
 export type RGB = [number, number, number];
 
 export type MapStyle = {
-  /** How a file is drawn: a dot, a turning glass cube, a hologram floor tile or a metro station. */
-  node: "dot" | "cube" | "plate" | "station";
+  /** How a file is drawn: a dot, a turning glass cube, a turning wireframe globe or a metro station. */
+  node: "dot" | "cube" | "globe" | "station";
   /** Imports (the hovered or selected file's): plain lines, or metro lines (horizontal, vertical and 45°). */
   link: "line" | "metro";
   halo: string; fileInk: string; fileInkQuiet: string;
@@ -76,16 +76,16 @@ const STYLES: Record<ThemeId, MapStyle> = {
     reach: [1.25, 1.95],                 // a turning cube's corners (0.78r, tilted); active: 1.3x and the floor ring
   },
   hologram: {
-    ...BASE, node: "plate", route: "elbow",
+    ...BASE, node: "globe", route: "elbow",
     halo: "rgba(8,14,16,0.9)", fileInk: "#dcf6f8", fileInkQuiet: "rgba(160,205,215,0.6)",
     moduleInk: "rgba(143,233,240,0.28)", moduleInkLively: "rgba(143,233,240,0.7)",
     moduleFont: `"Arial Narrow", "Helvetica Neue", sans-serif`, labelFont: `"Arial Narrow", "Helvetica Neue", sans-serif`,
     linkIdle: "rgba(120,170,180,0.16)",
-    imports: "rgba(95,227,224,0.9)", usedBy: "rgba(57,231,95,0.85)",
+    imports: "rgba(95,227,224,0.9)", usedBy: "rgba(140,146,255,0.9)",
     markerStroke: "#0b1214", markerText: "#0b1214", glow: true,
-    palette: ["#5fe3e0", "#7cc8ff", "#b6f0ff", "#9ef7c8", "#3fc1c9", "#8fe9f0", "#6fd3a8", "#a3d8ff"],
+    palette: ["#5fe3e0", "#7cc8ff", "#b6f0ff", "#a9a4ff", "#3fc1c9", "#8fe9f0", "#c7b8ff", "#a3d8ff"],
     marker: "disc",
-    reach: [1.35, 2.05],                 // a tile is 2.4r by 1.24r (its corners 1.35r out); active: the rectangle around it
+    reach: [0.95, 1.6],                  // a globe is 0.9r; active: 1.25x and the ring around it
   },
 };
 
@@ -183,46 +183,59 @@ export function stampCube(ctx: CanvasRenderingContext2D, x: number, y: number, s
   return true;
 }
 
-// ---------- Hologram: a floor tile, a low slab seen from above ----------
-const TILE_W = 1.2, TILE_H = 0.62;   // half its width and half its height, in radii
-function plateBody(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: RGB, lit: boolean, scale: number) {
-  const hx = r * TILE_W, hy = r * TILE_H, depth = Math.max(r * 0.35, 2.5 / scale), cr = hy * 0.28;
-  ctx.fillStyle = "rgba(16,24,26,0.95)";   // the slab's edge, showing under its top
-  ctx.beginPath(); ctx.roundRect(x - hx, y - hy + depth, hx * 2, hy * 2, cr); ctx.fill();
-  ctx.fillStyle = lit ? rgba(c, 0.85) : "rgba(92,108,112,0.92)";
-  ctx.beginPath(); ctx.roundRect(x - hx, y - hy, hx * 2, hy * 2, cr); ctx.fill();
-  ctx.strokeStyle = lit ? rgba(c, 1) : "rgba(150,190,198,0.35)"; ctx.lineWidth = 1 / scale; ctx.stroke();
-  if (lit) {
-    const g = ctx.createRadialGradient(x, y, 0, x, y, hx * 2.2);
-    g.addColorStop(0, rgba(c, 0.28)); g.addColorStop(1, rgba(c, 0));
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, hx * 2.2, 0, TAU); ctx.fill();
+// ---------- Hologram: a wireframe globe, turning slowly ----------
+const MERIDIANS = 4;                     // a globe looks the same a 1/MERIDIANS half turn on
+const LATS = [-0.55, 0, 0.55];           // its parallels, as sines of their latitude
+/** The globe: a faint body, its outline, meridians turning about the vertical axis and parallels seen a little from above. */
+function globeBody(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, angle: number, c: RGB, lit: boolean, lineWidth: number) {
+  const wire: RGB = [Math.round(c[0] + (235 - c[0]) * 0.45), Math.round(c[1] + (245 - c[1]) * 0.45), Math.round(c[2] + (255 - c[2]) * 0.45)];
+  ctx.lineWidth = lineWidth;
+  ctx.beginPath(); ctx.arc(x, y, s, 0, TAU);
+  ctx.fillStyle = rgba(c, lit ? 0.26 : 0.14); ctx.fill();
+  ctx.strokeStyle = rgba(lit ? c : wire, lit ? 1 : 0.7); ctx.stroke();
+  ctx.strokeStyle = rgba(wire, lit ? 0.6 : 0.38);
+  ctx.beginPath();
+  for (let k = 0; k < MERIDIANS; k++) {
+    const rx = s * Math.abs(Math.cos(angle + (k * Math.PI) / MERIDIANS));
+    if (rx < s * 0.04) { ctx.moveTo(x, y - s); ctx.lineTo(x, y + s); continue; }
+    ctx.moveTo(x + rx, y); ctx.ellipse(x, y, rx, s, 0, 0, TAU);
   }
+  for (const l of LATS) {
+    const rx = s * Math.sqrt(1 - l * l), py = y + s * l;
+    ctx.moveTo(x + rx, py); ctx.ellipse(x, py, rx, rx * 0.22, 0, 0, TAU);
+  }
+  ctx.stroke();
 }
-export function drawPlate(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: RGB, lit: boolean, scale: number, here: string | null = null) {
-  if (here) { // where an agent is: one holographic rectangle projected on the floor around the tile
-    const qx = r * TILE_W * 1.45 + 5 / scale, qy = r * TILE_H * 1.6 + 4 / scale;
+export function drawGlobe(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, angle: number, c: RGB, lit: boolean, scale: number, here: string | null = null) {
+  if (here) { // where an agent is: one glowing ring around its equator, wider than the globe
     ctx.save();
-    ctx.beginPath(); ctx.roundRect(x - qx, y - qy, qx * 2, qy * 2, 3 / scale);
-    ctx.strokeStyle = here; ctx.lineWidth = 1.5 / scale; ctx.shadowColor = here; ctx.shadowBlur = 10; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, y + s * 0.15, s * 1.55, s * 0.42, 0, 0, TAU);
+    ctx.strokeStyle = here; ctx.lineWidth = 1.8 / scale; ctx.shadowColor = here; ctx.shadowBlur = 12; ctx.stroke();
     ctx.restore();
   }
-  plateBody(ctx, x, y, r, c, lit, scale);
+  if (lit) cubeGlow(ctx, x, y, s * 0.8, c);
+  globeBody(ctx, x, y, s, angle, c, lit, 0.9 / scale);
 }
-const PLATE_STAMP_PX = 40;
-/** A Hologram tile as a stamp (up to PLATE_STAMP_PX on screen, no agent rectangle); false when drawPlate must draw it. */
-export function stampPlate(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: RGB, css: string, lit: boolean, scale: number, memo: StampMemo = {}, alpha = 1): boolean {
-  const R = r * scale;
-  if (R > PLATE_STAMP_PX) return false;
-  const b = bucket(R), key = lit ? css : "", fa = faded(alpha);
+const GLOBE_STAMP_PX = 14;   // up to here a globe is stamped at one of GLOBE_ANGLES angles; bigger ones are drawn as they turn
+const GLOBE_ANGLES = 24;     // per 1/MERIDIANS half turn
+/** A Hologram globe as a stamp (up to GLOBE_STAMP_PX on screen, no agent ring); false when drawGlobe must draw it. */
+export function stampGlobe(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, angle: number, c: RGB, css: string, lit: boolean, scale: number, memo: StampMemo = {}, alpha = 1): boolean {
+  const S = s * scale;
+  if (S > GLOBE_STAMP_PX) return false;
+  const b = bucket(S), k = (1 / scale) * (S / b), period = Math.PI / MERIDIANS, fa = faded(alpha);
+  let a = angle % period; if (a < 0) a += period;
+  const step = Math.round((a / period) * GLOBE_ANGLES) % GLOBE_ANGLES, half = lit ? b * 2.9 : b + 1.5, key = lit ? css + "|1" : css;
   let sp: Sprite | null | undefined = memo.s;
-  if (!sp || memo.a !== key || memo.c !== b || memo.e !== fa) {
-    const rx = b * TILE_W, ry = b * TILE_H, depth = Math.max(b * 0.35, 2.5);
-    const half = lit ? rx * 2.2 : rx + 1, top = lit ? rx * 2.2 : ry + 1, h = top + Math.max(lit ? rx * 2.2 : 0, depth + ry + 1);
-    sp = memo.s = sprite("p|" + key + "|" + b + "|" + fa, half * 2, h, half, top, (cx) => { cx.globalAlpha = fa; plateBody(cx, half, top, b, c, lit, 1); });
-    memo.a = key; memo.c = b; memo.e = fa;
+  if (!sp || memo.a !== key || memo.c !== b || memo.d !== step || memo.e !== fa) {
+    sp = memo.s = sprite("gl|" + key + "|" + b + "|" + step + "|" + fa, half * 2, half * 2, half, half, (cx) => {
+      cx.globalAlpha = fa;
+      if (lit) cubeGlow(cx, half, half, b * 0.8, c);
+      globeBody(cx, half, half, b, (step / GLOBE_ANGLES) * period, c, lit, 0.9);
+    });
+    memo.a = key; memo.c = b; memo.d = step; memo.e = fa;
   }
   if (!sp) return false;
-  stamp(ctx, sp, x, y, (1 / scale) * (R / b), fa < 1);
+  stamp(ctx, sp, x, y, k, fa < 1);
   return true;
 }
 

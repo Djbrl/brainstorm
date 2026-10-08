@@ -1,4 +1,4 @@
-// Owner: perf-canvas. Small pictures drawn once and stamped many times: a themed file mark (a plate, a station, a cube at
+// Owner: perf-canvas. Small pictures drawn once and stamped many times: a themed file mark (a globe, a station, a cube at
 // one of a few angles) costs one drawImage a frame instead of its paths, gradients and strokes. Kept per colour and
 // screen size (in half pixels), at the screen's pixel density so they stay sharp; the oldest go first when there are
 // too many. A file also remembers its last stamp (StampMemo), so a frame where nothing changed looks nothing up.

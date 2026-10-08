@@ -74,7 +74,7 @@
     radial-gradient(80% 80% at 50% 50%, transparent 55%, rgba(0,0,0,.5) 100%);
 }
 
-/* ---------- Hologram: floor tiles in a dark room ---------- */
+/* ---------- Hologram: wireframe globes in a dark room ---------- */
 :root[data-theme="hologram"] {
   --bg: #0c1012;
   --surface: #121a1c;
@@ -82,9 +82,9 @@
   --ink-2: #a9cdd3;
   --ink-3: #6f9399;
   --line: rgba(143,233,240,.16);
-  --accent: #39e75f;        /* the locator: agents */
-  --accent-soft: rgba(57,231,95,.14);
-  --cool: #5c6c70;
+  --accent: #8b8fff;        /* the locator: agents, a blue going violet */
+  --accent-soft: rgba(139,143,255,.16);
+  --cool: #5d6a8e;          /* a quiet globe: slate blue */
   --warm: #5fe3e0;          /* changed recently: cyan */
   --hot: #ff7a45;           /* just now: the warning orange, so it never reads like the cyan of "since you last looked" */
   --chrome: rgba(10,16,18,.85);

@@ -10,7 +10,7 @@ export const THEMES: { id: ThemeId; name: string; note: string; dark: boolean }[
   { id: "default", name: "Rundown", note: "Light and quiet. Colour shows what changed.", dark: false },
   { id: "metro", name: "Metro", note: "A regional rail map: files as stations, folders as fare zones.", dark: false },
   { id: "prism", name: "Prism", note: "Glass cubes in a violet haze.", dark: true },
-  { id: "hologram", name: "Hologram", note: "Floor tiles and a cyan locator line, in a dark room.", dark: true },
+  { id: "hologram", name: "Hologram", note: "Turning wireframe globes and a violet locator line, in a dark room.", dark: true },
 ];
 
 const KEY = "rundown-theme";

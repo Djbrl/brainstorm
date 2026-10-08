@@ -5,8 +5,8 @@ import type { Look } from "./replay/layer";
 import { drawName, textWidth, type LabelSpace, type QueuedLabel } from "./labels";
 import { Motion } from "./redraw";
 import {
-  CUBE_STILL_PX, drawCube, drawPlate, drawStation, LAND_MS, landings, metroPoints, octagonPath, polyPath, reachOf, upTo, type Pt2,
-  stampCube, stampPlate, stampStation, type MapStyle, type RGB,
+  CUBE_STILL_PX, drawCube, drawGlobe, drawStation, LAND_MS, landings, metroPoints, octagonPath, polyPath, reachOf, upTo, type Pt2,
+  stampCube, stampGlobe, stampStation, type MapStyle, type RGB,
 } from "./themes";
 import { css, mixRGB, recencyRGB, same, steps, type Tokens } from "./color";
 import type { GLink, GNode } from "./graph";
@@ -285,7 +285,15 @@ export function drawFile(ctx: CanvasRenderingContext2D, n: GNode, scale: number,
     if (active || flash || !stampCube(ctx, x, y, s, angle, col, rgbCss, lit, scale, (n.stamp ??= {}), alpha))
       drawCube(ctx, x, y, s, angle, col, lit || flash > 0, scale, active ? tokens.accent : null);
   }
-  else if (st.node === "plate") { if (active || !stampPlate(ctx, x, y, r * 0.9, rgb, rgbCss, lit, scale, (n.stamp ??= {}), alpha)) drawPlate(ctx, x, y, r * 0.9, rgb, lit, scale, active ? tokens.accent : null); }
+  else if (st.node === "globe") {
+    // A wireframe globe turning slowly about its axis (faster where an agent is); a few pixels wide, it stands still.
+    const g = r * 0.9 * (active ? 1.25 : 1);
+    const still = STILL || (g * scale < CUBE_STILL_PX && !active);
+    const angle = (still ? 0 : t / (active ? 900 : 3400)) + (n.sp ??= spin(n.id));
+    if (!still) moreMotion(F, Motion.Slow);
+    if (active || !stampGlobe(ctx, x, y, g, angle, rgb, rgbCss, lit, scale, (n.stamp ??= {}), alpha))
+      drawGlobe(ctx, x, y, g, angle, rgb, lit, scale, active ? tokens.accent : null);
+  }
   else if (st.node === "station") {
     const fill = same(rgb, tokens.cool) ? "#fff" : rgbCss, ring = lineOf(n, st) ?? F.coolCss;
     if (active || !stampStation(ctx, x, y, r, fill, ring, isSel, scale, (n.stamp ??= {}), alpha)) drawStation(ctx, x, y, r, fill, ring, active ? css(tokens.hot) : null, isSel, scale);
@@ -428,7 +436,7 @@ export function labelFor(n: GNode, prio: number, F: Frame): QueuedLabel {
   const focusing = !!look && look.tone > 0.5, inFocus = focusing && !!look.named && look.alpha > 0.3;
   const forced = isSel || isHover || (active && !focusing);
   const fs = Math.max(11, Math.min(14, 11 + r * scale * 0.08)) / scale;
-  // Clear of what the theme draws (a cube's corners, a plate's rim) and of the selection ring.
+  // Clear of what the theme draws (a cube's corners, a globe's ring) and of the selection ring.
   const ringR = n.dir ? r : Math.max(reachOf(r, active, st), isSel || isHover ? (st.node === "dot" ? r : r * 1.35 + 2 / scale) : 0);
   return {
     text: (n.bn ??= n.dir ? folderName(n) : baseName(n.id)), x, y: y + ringR + 3 / scale, size: fs, scale,

@@ -105,7 +105,7 @@ async function start() {
   const env = {
     ...process.env,
     RUNDOWN_VERSION: VERSION, RUNDOWN_PORT: String(port), RUNDOWN_DATA_DIR: DATA,
-    RUNDOWN_WEB_DIR: WEB, RUNDOWN_ROOT: PROJECT, NODE_NO_WARNINGS: "1",
+    RUNDOWN_WEB_DIR: WEB, RUNDOWN_ROOT: PROJECT, RUNDOWN_PLUGIN_ID: `rundown@${MARKET}`, NODE_NO_WARNINGS: "1",
   };
   if (KEY) env.ANTHROPIC_API_KEY = KEY;
   const child = spawn(process.execPath, [SERVER], { cwd: DATA, env, detached: true, stdio: ["ignore", out, out] });

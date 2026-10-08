@@ -59,7 +59,7 @@ export class WorkspaceService implements OnModuleInit {
   private log = new Logger("Workspace");
   private root: string | null = null;
   private claudeStep: SetupStep = { id: "claude", label: "Connecting to your agents", state: "pending" };
-  private nemotronStep: SetupStep = { id: "nemotron", label: "Nemotron on NVIDIA Brev", state: "pending" };
+  private nemotronStep: SetupStep = { id: "nemotron", label: "Nemotron for file summaries", state: "pending" };
   private anthropicStep: SetupStep = { id: "anthropic", label: "Claude for questions", state: "pending" };
   private lastBroadcast = "";
   private pollTimer?: NodeJS.Timeout;
@@ -105,7 +105,10 @@ export class WorkspaceService implements OnModuleInit {
     const scan = this.scanStep(this.root);
     const imports = this.importsStep(this.root);
     const summaries = this.summariesStep();
-    const steps: SetupStep[] = [scan, imports, this.claudeStep, this.nemotronStep, this.anthropicStep, summaries];
+    // Nemotron (file summaries) is listed only where it's set up (NEMOTRON_URL): a hackathon extra most people won't have.
+    const steps: SetupStep[] = process.env.NEMOTRON_URL
+      ? [scan, imports, this.claudeStep, this.nemotronStep, this.anthropicStep, summaries]
+      : [scan, imports, this.claudeStep, this.anthropicStep];
     const ready = scan.state === "done" && imports.state === "done" && this.claudeStep.state !== "error";
     return { root: this.root, name: basename(this.root), ready, steps };
   }
@@ -255,7 +258,7 @@ export class WorkspaceService implements OnModuleInit {
     this.root = abs;
     this.cfg.defaultRoot = abs;
     this.claudeStep = { id: "claude", label: "Connecting to your agents", state: "running" };
-    this.nemotronStep = { id: "nemotron", label: "Nemotron on NVIDIA Brev", state: "running" };
+    this.nemotronStep = { id: "nemotron", label: "Nemotron for file summaries", state: "running" };
     this.anthropicStep = { id: "anthropic", label: "Claude for questions", state: "running" };
 
     this.bus.emit("workspace", { root: abs }); // listener re-scopes, mapper rebuilds+watches, reader re-summarizes
@@ -281,7 +284,12 @@ export class WorkspaceService implements OnModuleInit {
   private scanStep(root: string): SetupStep {
     const label = "Reading your code";
     const cached = this.mapper.getCached(root);
-    if (cached) return { id: "scan", label, state: "done", detail: `${cached.map.files.length} files` };
+    if (cached) {
+      // Past the file cap (mapper/ignore.ts), say so: "3,000 of 18,913 files", not a bare "3000 files".
+      const shown = cached.map.files.length, total = cached.map.totalFiles ?? shown;
+      const detail = total > shown ? `${shown.toLocaleString("en-US")} of ${total.toLocaleString("en-US")} files on the map, the ones that matter most` : `${shown.toLocaleString("en-US")} files`;
+      return { id: "scan", label, state: "done", detail };
+    }
     if (this.mapper.isBuilding(root)) return { id: "scan", label, state: "running" };
     return { id: "scan", label, state: this.root === root ? "running" : "pending" };
   }
@@ -364,7 +372,7 @@ export class WorkspaceService implements OnModuleInit {
   // ---- step: nemotron ----
 
   private async checkNemotron(): Promise<SetupStep> {
-    const label = "Nemotron on NVIDIA Brev";
+    const label = "Nemotron for file summaries";
     if (!process.env.NEMOTRON_URL) return { id: "nemotron", label, state: "warn", detail: "not set up: file summaries are off" };
     try {
       const ctrl = new AbortController();

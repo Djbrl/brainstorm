@@ -6,7 +6,7 @@ import { clock, isReplay } from "../lib/live";
 import { sinceMs } from "../lib/visit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-force-graph-2d";
-import type { FileNode } from "@contract";
+import type { FileNode, ProjectMap } from "@contract";
 import { useLive } from "../lib/live";
 import { mapPrefs, useNav } from "../lib/nav";
 import { drawAgents } from "./agents";
@@ -478,10 +478,18 @@ export function MapView() {
   return (
     <div className="map-wrap" ref={wrapRef}>
       {graph.nodes.length === 0 ? (
-        <div className="map-empty">
-          <h2>Mapping the codebase…</h2>
-          <p>Files appear here as soon as the mapper has read them.</p>
-        </div>
+        // The map arrives once it's built (GET /api/map waits for it): a map with no files is an empty folder, not one still loading.
+        map && map.files.length === 0 ? (
+          <div className="map-empty">
+            <h2>No files here yet</h2>
+            <p>This folder has no files Rundown can map. They show up here as soon as an agent or you create some.</p>
+          </div>
+        ) : (
+          <div className="map-empty">
+            <h2>Mapping the codebase…</h2>
+            <p>Files appear here as soon as the mapper has read them.</p>
+          </div>
+        )
       ) : (
         <ForceGraph2D<GNode, never>
           ref={fg as never}
@@ -511,6 +519,7 @@ export function MapView() {
       {map && map.files.length > 0 && map.files.length <= 3 && (
         <p className="map-sparse">This project has only {map.files.length === 1 ? "one file" : `${map.files.length} files`} on the map.</p>
       )}
+      {map && <CapNote map={map} />}
       <TalkCard />
       <LensSwitch />
 
@@ -524,3 +533,21 @@ export function MapView() {
 
 const nodeVal = (n: NodeObject) => (n as GNode).r * (n as GNode).r;
 const noLabel = () => "";
+
+/**
+ * A big project past the file cap (mapper/ignore.ts): the map says it shows some of the files, not all, until you close
+ * the note (remembered per project). The Files tab says how they're picked.
+ */
+function CapNote({ map }: { map: ProjectMap }) {
+  const key = "rundown-cap-note:" + map.root;
+  const [closed, setClosed] = useState(() => { try { return localStorage.getItem(key) === "1"; } catch { return false; } });
+  const total = map.totalFiles ?? 0, shown = map.files.length;
+  if (closed || total <= shown) return null;
+  const close = () => { setClosed(true); try { localStorage.setItem(key, "1"); } catch { /* shown again next time */ } };
+  return (
+    <p className="map-cap">
+      The map shows {shown.toLocaleString()} of this project's {total.toLocaleString()} files, the ones that matter most. Files says how they're picked.
+      <button onClick={close} aria-label="Close this note">×</button>
+    </p>
+  );
+}

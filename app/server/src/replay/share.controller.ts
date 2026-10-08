@@ -7,6 +7,7 @@ import { ListenerService } from "../listener/listener.service";
 import { ReplayService } from "./replay.service";
 import { threadMarkdown } from "./markdown";
 import { forSharing, slug } from "./privacy";
+import { slimMap } from "./slim";
 import { UsageService } from "../usage/usage.service";
 import { env } from "../core/local";
 
@@ -40,14 +41,16 @@ export class ShareController {
     return s;
   }
 
-  /** A replay of one thread for someone else: only this thread, its answers, secrets masked, no screenshots. */
+  /** A replay of one thread for someone else: only this thread, its answers, the part of the map it touched (slim.ts),
+   *  secrets masked, no screenshots. */
   sharedReplay(session: Session): Replay {
     const raw = this.replays.build(session.id);
     const stepIds = new Set(raw.steps.map((s) => s.id));
     const touched = new Set(raw.steps.map((s) => s.filePath).filter(Boolean) as string[]);
     const answers = raw.answers.filter((a) => (a.request.stepId ? stepIds.has(a.request.stepId) : !!a.request.filePath && touched.has(a.request.filePath)));
     const shared = { title: session.title || "Untitled thread", createdAt: new Date().toISOString(), version: env("VERSION") ?? "dev" };
-    return forSharing({ ...raw, answers, shared });
+    const map = raw.map && slimMap(raw.map, raw.steps);
+    return forSharing({ ...raw, map, answers, shared });
   }
 
   @Get("share") share(@Query("sessionId") sessionId: string | undefined, @Query("format") format: string | undefined, @Res() res: Response) {

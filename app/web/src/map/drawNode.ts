@@ -5,7 +5,7 @@ import type { Look } from "./replay/layer";
 import { drawName, textWidth, type LabelSpace, type QueuedLabel } from "./labels";
 import { Motion } from "./redraw";
 import {
-  CUBE_STILL_PX, drawCube, drawPlate, drawStation, LAND_MS, landings, metroPoints, polyPath, reachOf, upTo, type Pt2,
+  CUBE_STILL_PX, drawCube, drawPlate, drawStation, LAND_MS, landings, metroPoints, octagonPath, polyPath, reachOf, upTo, type Pt2,
   stampCube, stampPlate, stampStation, type MapStyle, type RGB,
 } from "./themes";
 import { css, mixRGB, recencyRGB, same, steps, type Tokens } from "./color";
@@ -18,6 +18,24 @@ const TAU = Math.PI * 2;
 const STILL = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 const spin = (id: string) => { let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0; return (h % 628) / 100; };
 const baseName = (p: string) => p.split("/").pop() || p;
+
+/**
+ * Metro: the line a file or folder is on, the colour of the folder two levels down it sits in (one level for a small
+ * project), so a folder's files read as the stops of one line. Undefined outside any (files at the top, islands).
+ */
+const lineCache = new WeakMap<GNode, string | null>();
+function lineOf(n: GNode, st: MapStyle): string | undefined {
+  if (!st.lines) return undefined;
+  let v = lineCache.get(n);
+  if (v === undefined) {
+    let d: GNode | undefined = n.dir ? n : n.up, pick: GNode | undefined;
+    for (; d?.dir; d = d.up) if (d.dir.depth <= 2 && !d.dir.island && !d.dir.more) { pick = d; if (d.dir.depth === 2) break; }
+    if (pick) { let h = 0; for (let i = 0; i < pick.id.length; i++) h = (h * 31 + pick.id.charCodeAt(i)) >>> 0; v = st.lines[h % st.lines.length]; }
+    else v = null;
+    lineCache.set(n, v);
+  }
+  return v ?? undefined;
+}
 
 // ---------- import links ----------
 // Their colours (imports, used by) belong to the map theme: see themes.ts.
@@ -269,7 +287,7 @@ export function drawFile(ctx: CanvasRenderingContext2D, n: GNode, scale: number,
   }
   else if (st.node === "plate") { if (active || !stampPlate(ctx, x, y, r * 0.9, rgb, rgbCss, lit, scale, (n.stamp ??= {}), alpha)) drawPlate(ctx, x, y, r * 0.9, rgb, lit, scale, active ? tokens.accent : null); }
   else if (st.node === "station") {
-    const fill = same(rgb, tokens.cool) ? "#fff" : rgbCss, ring = F.coolCss;
+    const fill = same(rgb, tokens.cool) ? "#fff" : rgbCss, ring = lineOf(n, st) ?? F.coolCss;
     if (active || !stampStation(ctx, x, y, r, fill, ring, isSel, scale, (n.stamp ??= {}), alpha)) drawStation(ctx, x, y, r, fill, ring, active ? css(tokens.hot) : null, isSel, scale);
   }
   else if (isSel || isHover || active || rippling) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = rgbCss; ctx.fill(); }
@@ -329,7 +347,15 @@ function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: F
   const isle = !!n.dir!.more || (!!n.dir!.island && n.dir!.rel === n.dir!.island);   // the island's own outline, not its folders'
   if (isle) ctx.setLineDash([5 / scale, 4 / scale]);
   // Open: the outline, and a breath of fill so folders inside folders read as levels.
-  if (open > 0) {
+  const zones = !!st.zoneInk && !isle;
+  if (open > 0 && zones) {
+    // Metro: a fare zone, peach and cream by turns as they nest, its edge a thin orange line.
+    octagonPath(ctx, x, y, r);
+    ctx.globalAlpha = alpha * open * (n.dir!.depth % 2 ? 0.5 : 0.85); ctx.fillStyle = n.dir!.depth % 2 ? "#fae1bd" : "#fdf8e8"; ctx.fill();
+    ctx.globalAlpha = alpha * open * 0.7; ctx.lineWidth = 1.2 / scale; ctx.strokeStyle = st.zoneInk!; ctx.stroke();
+    const line = lineOf(n, st);
+    if (line) drawLine(ctx, n, line, alpha * open * 0.9, scale);
+  } else if (open > 0) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, TAU);
     if (n.dir!.depth <= 3) { ctx.globalAlpha = alpha * open * 0.02; ctx.fillStyle = tokens.ink; ctx.fill(); }   // deeper, the levels would add up to grey
     // No blue on an open folder: its files show their own rings, and every folder around an edit turning blue was too much.
@@ -343,12 +369,13 @@ function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: F
   if (look && look.tone >= 1) rgbCss = focusColour(look.edited, F, c.focusColours).css;
   ctx.beginPath(); ctx.arc(x, y, r, 0, TAU);
   // Metro: a white disc like its stations, its lines passing under it; elsewhere a tint of the folder's colour.
-  const metro = st.node === "station";
-  if (metro) { ctx.globalAlpha = closed * 0.92; ctx.fillStyle = "#fff"; ctx.fill(); if (!same(own.c!, tokens.cool)) { ctx.globalAlpha = closed * 0.22; ctx.fillStyle = rgbCss; ctx.fill(); } }
+  // Metro: a white roundel ringed in its line's colour, like a terminus; elsewhere a tint of the folder's colour.
+  const metro = st.node === "station", line = lineOf(n, st);
+  if (metro) { ctx.globalAlpha = closed * 0.94; ctx.fillStyle = "#fff"; ctx.fill(); if (!same(own.c!, tokens.cool)) { ctx.globalAlpha = closed * 0.22; ctx.fillStyle = rgbCss; ctx.fill(); } }
   else { ctx.globalAlpha = closed * (isHover ? 0.24 : 0.16); ctx.fillStyle = rgbCss; ctx.fill(); }
-  ctx.globalAlpha = closed * (isHover || isSel ? 0.9 : 0.5);
-  ctx.lineWidth = (isHover || isSel ? 1.8 : 1.2) / scale;
-  ctx.strokeStyle = active ? tokens.accent : isHover || isSel ? tokens.ink : rgbCss;
+  ctx.globalAlpha = closed * (isHover || isSel || line ? 0.9 : 0.5);
+  ctx.lineWidth = (line ? 2.6 : isHover || isSel ? 1.8 : 1.2) / scale;
+  ctx.strokeStyle = active ? tokens.accent : line ?? (isHover || isSel ? tokens.ink : rgbCss);
   ctx.stroke();
   if (isle) ctx.setLineDash([]);
   const gitRing = F.onlyDirs?.get(n.id);   // Show git: something inside it
@@ -369,7 +396,7 @@ function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: F
   // A few sizes only, stamped from cached pictures (labels.ts drawName): zooming doesn't draw new text every frame.
   const name = folderName(n), family = st.labelFont ?? tokens.body, size = px > 110 ? 20 : px > 70 ? 16 : px > 40 ? 13 : 11;
   const clear = "rgba(0,0,0,0)", k = 1 / scale;
-  drawName(ctx, name, x, y - 0.75 * size * k, size, 650, family, st.fileInk, clear, said * (isHover || active ? 1 : 0.85));
+  drawName(ctx, name, x, y - 0.75 * size * k, size, 650, family, st.folderInk ?? st.fileInk, clear, said * (isHover || active ? 1 : 0.85));
   if (px > 34) drawName(ctx, count === 1 ? "1 file" : `${count} files`, x, y + 0.35 * size * k, 11, 500, family, st.fileInkQuiet, clear, said * 0.9);
 }
 
@@ -388,9 +415,63 @@ export function drawFolderNames(ctx: CanvasRenderingContext2D, scale: number, fo
     const box = { x0: x - w / 2 - pad, x1: x + w / 2 + pad, y0: top - h / 2 - pad / 2, y1: top + h / 2 + pad / 2 };
     if (!space.claim(box)) continue;
     const look = n.lf === F.id ? n.lk ?? null : null;
-    drawName(ctx, name, x, top - h / 2, px, 650, family, n.file.activeSessionId ? st.fileInk : st.fileInkQuiet, st.halo, shown * open * Math.max(0.55, look?.alpha ?? 1));
+    drawName(ctx, name, x, top - h / 2, px, st.zoneInk ? 700 : 650, family, st.zoneInk ?? (n.file.activeSessionId ? st.fileInk : st.fileInkQuiet), st.halo, shown * open * Math.max(0.55, look?.alpha ?? 1));
   }
 }
+/**
+ * Metro: a folder's own files as the stops of one line, in its line's colour: a chain from the leftmost file, each
+ * time on to the nearest one not yet on it, drawn straight, then 45°, then straight. The order is kept per folder until
+ * its files change; the positions are read every frame (they glide when files come or go).
+ */
+const lineOrder = new WeakMap<GNode, { n: number; stops: GNode[] }>();
+function stopsOf(n: GNode): GNode[] {
+  const kids = n.dir!.kids;
+  let o = lineOrder.get(n);
+  if (!o || o.n !== kids.length) {
+    const left = kids.filter((k) => !k.dir && k.x !== undefined), stops: GNode[] = [];
+    if (left.length > 1 && left.length <= 400) {   // a folder of hundreds of files: no line, only its stations
+      let i = left.reduce((b, k, j) => (k.x! < left[b].x! ? j : b), 0);
+      while (left.length) {
+        const cur = left.splice(i, 1)[0]; stops.push(cur);
+        let best = Infinity; i = 0;
+        left.forEach((k, j) => { const d = (k.x! - cur.x!) ** 2 + (k.y! - cur.y!) ** 2; if (d < best) { best = d; i = j; } });
+      }
+      untangle(stops);
+    }
+    lineOrder.set(n, (o = { n: kids.length, stops }));
+  }
+  return o.stops;
+}
+/** A nearest-neighbour chain ends with long jumps back across itself: reverse any stretch that makes it shorter (2-opt). */
+function untangle(p: GNode[]) {
+  const d = (a: GNode, b: GNode) => Math.hypot(a.x! - b.x!, a.y! - b.y!);
+  for (let pass = 0, better = true; better && pass < 8; pass++) {
+    better = false;
+    for (let i = 0; i < p.length - 2; i++)
+      for (let j = i + 2; j < p.length; j++) {
+        const before = d(p[i], p[i + 1]) + (j + 1 < p.length ? d(p[j], p[j + 1]) : 0);
+        const after = d(p[i], p[j]) + (j + 1 < p.length ? d(p[i + 1], p[j + 1]) : 0);
+        if (after < before - 1e-6) { p.splice(i + 1, j - i, ...p.slice(i + 1, j + 1).reverse()); better = true; }
+      }
+  }
+}
+function drawLine(ctx: CanvasRenderingContext2D, n: GNode, color: string, alpha: number, scale: number) {
+  const stops = stopsOf(n);
+  if (stops.length < 2) return;
+  ctx.save();
+  ctx.globalAlpha = alpha; ctx.strokeStyle = color; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.lineWidth = Math.min(Math.max(3.4 / scale, 2.4), 6 / scale);
+  ctx.beginPath();
+  for (let i = 1; i < stops.length; i++) {
+    const a = stops[i - 1], b = stops[i];
+    const pts = metroPoints(a.x!, a.y!, b.x!, b.y!);
+    if (i === 1) ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 /** A folder's name: its last folder, or two when the last alone says little ("src", "lib"). */
 const folderName = (n: GNode) => {
   const segs = n.dir!.name.split("/"), last = segs[segs.length - 1];

@@ -40,18 +40,18 @@
   radial-gradient(circle at 44% 70%, #c7cbd6 0 4px, transparent 4.5px),
   radial-gradient(circle at 80% 66%, #c7cbd6 0 3px, transparent 3.5px), #f9f9f7; }
 .sw-metro { background:
-  linear-gradient(transparent 46%, #2f7ae5 46% 56%, transparent 56%),
-  linear-gradient(45deg, transparent 47%, #c2409a 47% 55%, transparent 55%),
-  linear-gradient(90deg, transparent 66%, #2e9e4f 66% 74%, transparent 74%), #fbfaf6; }
-.sw-metro::after { content: ""; position: absolute; left: 44%; top: 39%; width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 2px solid #1d1d1f; }
+  linear-gradient(transparent 44%, #e3051c 44% 54%, transparent 54%),
+  linear-gradient(45deg, transparent 47%, #4f8fcf 47% 55%, transparent 55%),
+  linear-gradient(90deg, transparent 66%, #f2bb00 66% 74%, transparent 74%), #fae1bd; }
+.sw-metro::after { content: ""; position: absolute; left: 44%; top: 37%; width: 8px; height: 8px; border-radius: 50%; background: #fff; border: 2px solid #e3051c; }
 .sw-prism { background: radial-gradient(circle at 50% 50%, #4a4a86, #15153a 70%); }
-.sw-prism::after { content: ""; position: absolute; left: 50%; top: 50%; width: 13px; height: 13px; transform: translate(-50%,-50%) rotate(30deg);
-  border: 1.5px solid rgba(235,242,255,.9); background: rgba(255,214,110,.35); box-shadow: 0 0 10px rgba(255,214,110,.6); }
+.sw-prism::after { content: ""; position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; transform: translate(-50%,-50%); border-radius: 50%;
+  background: radial-gradient(circle at 40% 38%, #fff, #9fd0ff 60%, #5a8cff); box-shadow: 0 0 10px 3px rgba(120,190,255,.7); }
 .sw-hologram { background:
-  linear-gradient(rgba(143,233,240,.08) 1px, transparent 1px) 0 0 / 8px 8px,
-  linear-gradient(90deg, rgba(143,233,240,.08) 1px, transparent 1px) 0 0 / 8px 8px, #0c1012; }
-.sw-hologram::before { content: ""; position: absolute; left: 14%; top: 30%; width: 44%; height: 32%; border-left: 2px solid #5fe3e0; border-bottom: 2px solid #5fe3e0; box-shadow: -2px 2px 8px rgba(95,227,224,.5); }
-.sw-hologram::after { content: ""; position: absolute; left: 58%; top: 56%; width: 8px; height: 8px; transform: rotate(45deg); background: #39e75f; box-shadow: 0 0 8px #39e75f; }
+  linear-gradient(rgba(127,200,240,.1) 1px, transparent 1px) 0 0 / 8px 8px,
+  linear-gradient(90deg, rgba(127,200,240,.1) 1px, transparent 1px) 0 0 / 8px 8px, #07121a; }
+.sw-hologram::before { content: ""; position: absolute; left: 14%; top: 28%; width: 46%; height: 34%; border: 1px solid #8cceF2; background: rgba(44,96,130,.6); border-radius: 2px; }
+.sw-hologram::after { content: ""; position: absolute; left: 62%; top: 54%; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid #f3cf4a; background: #08141e; box-shadow: 0 0 6px #f3cf4a; }
 .notify-opt { display: flex; gap: 10px; align-items: flex-start; padding: 8px 6px; border-radius: 10px; cursor: pointer; }
 .notify-opt:hover { background: rgba(0,0,0,.03); }
 .notify-opt input { margin: 3px 0 0; accent-color: var(--accent); width: 15px; height: 15px; flex: none; }

@@ -9,7 +9,7 @@ import { useLiveSelector } from "../../lib/live";
 import { replayCamera } from "./store";
 import { centerFor, type Camera } from "../camera";
 import { getCameraLock, getStepWindow, type StepWindow } from "../prefs";
-import { along, casing, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs } from "../themes";
+import { along, casing, drawMarker, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs } from "../themes";
 
 export type NodePos = { x?: number; y?: number; r: number };
 /**
@@ -512,16 +512,8 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
       }
 
       ctx.globalAlpha = 1;
-      ctx.shadowColor = "rgba(0,0,0,0.18)"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 1;
-      ctx.beginPath(); ctx.arc(a.x, a.y, 10 / scale, 0, Math.PI * 2);
-      ctx.fillStyle = mark; ctx.fill();
-      ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-      ctx.lineWidth = 2 / scale; ctx.strokeStyle = "#fff"; ctx.stroke();
       const num = String(mi + 1);
-      ctx.fillStyle = "#fff";
-      ctx.font = `700 ${(num.length > 2 ? 8 : 9.5) / scale}px ${font}`;
-      ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText(num, a.x, a.y + 0.5 / scale);
+      drawMarker(ctx, a.x, a.y, 10 / scale, mark, num, num.length > 2 ? 8 : 9.5, mapStyle().labelFont ?? font, scale);
 
       const lx = a.x + 14 / scale;
       ctx.textAlign = "left";

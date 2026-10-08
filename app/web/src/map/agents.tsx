@@ -1,7 +1,7 @@
 // Live agents on the Map: markers that glide between files, fading trails, lines of sight to the files they read.
 import type { AgentPresence } from "@contract";
 import { clock } from "../lib/live";
-import { along, casing, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs, type RGB } from "./themes";
+import { along, casing, drawMarker, drawOrbRing, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs, type RGB } from "./themes";
 import { css, hex, mixRGB } from "./color";
 
 /** Main threads get the accent (Metro: their own ink line); subagents a colour from the theme's palette, by id. */
@@ -106,10 +106,10 @@ export function drawAgents(opts: {
   /** Agents in the background (you look back through the thread, or at another agent of it): drawn faint. */
   dimmed?: ReadonlySet<string>;
 }) {
-  const { ctx, scale, agents, anim, resolve, accent, font, hoverFile, followId, resolveId, showReads, quiet, waiting, thinking, keep, dimmed } = opts;
+  const { ctx, scale, agents, anim, resolve, accent, hoverFile, followId, resolveId, showReads, quiet, waiting, thinking, keep, dimmed } = opts;
   const t = performance.now();
   const now = clock();
-  const style = mapStyle();
+  const style = mapStyle(), font = style.labelFont ?? opts.font;
 
   // Fan out agents standing on the same file.
   const groups = new Map<string, AgentPresence[]>();
@@ -244,7 +244,8 @@ export function drawAgents(opts: {
       if (trip) drawTrip(ctx, style.route, trip, p, e, color, 9 / scale, st.alpha, scale);
 
       // Thinking: a slow ring in its colour, swelling and fading, until its next step.
-      if (st.thinkA > 0.01) {
+      if (st.thinkA > 0.01 && style.marker === "orb") drawOrbRing(ctx, st.x, st.y, 17 / scale, color, st.alpha * st.thinkA, t, scale);
+      else if (st.thinkA > 0.01) {
         const b = (t % THINK_MS) / THINK_MS;
         ctx.globalAlpha = st.alpha * st.thinkA * Math.sin(b * Math.PI) * 0.7;
         ctx.beginPath(); ctx.arc(st.x, st.y, (11 + b * 9) / scale, 0, Math.PI * 2);
@@ -266,16 +267,7 @@ export function drawAgents(opts: {
 
       // Marker
       ctx.globalAlpha = st.alpha;
-      if (style.glow) { ctx.shadowColor = color; ctx.shadowBlur = 16; }
-      else { ctx.shadowColor = "rgba(0,0,0,0.18)"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 1; }
-      ctx.beginPath(); ctx.arc(st.x, st.y, 9 / scale, 0, Math.PI * 2);
-      ctx.fillStyle = markCss; ctx.fill();
-      ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-      ctx.lineWidth = 2 / scale; ctx.strokeStyle = style.markerStroke; ctx.stroke();
-      ctx.fillStyle = style.markerText;
-      ctx.font = `700 ${10 / scale}px ${font}`;
-      ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText(initial(a), st.x, st.y + 0.5 / scale);
+      drawMarker(ctx, st.x, st.y, 9 / scale, markCss, initial(a), 10, font, scale, style);
 
       if (scale > 1.6 || hoverFile === key || followId === a.id || erring || waitLabel || (thinks && keep)) {
         const label = waitLabel ? `${shortName(a, 20)} · ${waitLabel}` : erring && a.error ? `${shortName(a, 20)} · ${a.error.slice(0, 48)}`

@@ -216,6 +216,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 - 02:00 (8 Oct) [sidebar, ask] Phone: an open thread shows below the map, picture-in-picture style. The map keeps the top 42% of the screen (no scrim, still live and touchable, the camera frames in it), the thread's steps fill the sheet under it: scroll them back and watch the map follow, the player rides on the sheet's edge. The Ask box no longer offers suggested questions.
 - 02:20 (8 Oct) [sidebar] The thread list's sections under quiet labels (option A of three mockups): small grey words with the caret on the right, still folding; tighter rows. Threads of other projects share one "Other projects" section, each row naming its project where the time was (the time on hover).
 
+- **8 Oct 2026** · [themes] Metro is an RER map now: cream paper, folders as fare zones (octagons, peach and cream), each folder's files joined as one coloured line (RER colours), stations ringed in their line, Frutiger-like names, line-badge agent markers. Prism: the console menu's plain sans and grey names (cyan when picked), agents as glowing orbs, thinking as a ring of orbs. Hologram: a deck plan, blueprint rooms with a bevel and a hatch on a navy grid, waypoint agent markers with a locator triangle, yellow paths, DIN names.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

@@ -238,6 +238,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - **8 Oct 2026** · [release] Plugin 0.6.0: the security pass, tester fixes (empty folders, the file cap said, keyboard and screen readers, failed commands, slimmer shares with their own project's map), Metro as an RER map, Hologram globes, quiet sidebar sections, fewer false Needs you. A stray CSS line in sidebar.css (it swallowed the Share button's rule) removed.
 
+- **8 Oct 2026** · [demo] New hosted demo recording: a real Claude Code thread in a small demo app (~/demos/trailhead, trails within a distance): the miles search bug found and fixed, a difficulty badge and a weather cache by two subagents in parallel, tests from 2 failing to 10 passing. Home folder written as ~, the opening "read the readme" exchange cut, the edits' diffs taken from git (the agents edited by command). The demo's copy no longer says it's agents building Rundown. A step's +/− count now counts changed lines, not every line of a whole-file diff.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

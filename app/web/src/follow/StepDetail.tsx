@@ -114,8 +114,7 @@ function EditDiff({ step }: { step: Step }) {
   const page = !!pair && !pair.before && isHtml(step.filePath) && PAGE_MARKUP.test(pair.after);
   const [view, setView] = useState<"page" | "code">("page");
   if (!pair) return <p className="sd-muted">No diff recorded for this edit.</p>;
-  const added = pair.after ? pair.after.split("\n").length : 0;
-  const removed = pair.before ? pair.before.split("\n").length : 0;
+  const { added, removed } = lineCounts(pair.before, pair.after);
   return (
     <div className="sd-diff">
       <div className="sd-diffstat"><span className="add">+{added}</span><span className="del">−{removed}</span>{page && <ViewSwitch view={view} onView={setView} />}</div>
@@ -177,4 +176,26 @@ export function StepDetail({ step, result }: { step: Step; result?: Step; onClos
       </div>
     </aside>
   );
+}
+
+/**
+ * Lines added and removed between two versions. An edit tool's pair is just the changed part, but a command's (or a
+ * whole file written) is the whole file before and after: count what changed, not every line of it. The lines both
+ * share at the start and end are left out, and what's between is matched by longest common subsequence (skipped, as a
+ * plain count, when that would be slow: a big rewrite).
+ */
+function lineCounts(before: string, after: string): { added: number; removed: number } {
+  const a = before ? before.split("\n") : [], b = after ? after.split("\n") : [];
+  let s = 0, ea = a.length, eb = b.length;
+  while (s < ea && s < eb && a[s] === b[s]) s++;
+  while (ea > s && eb > s && a[ea - 1] === b[eb - 1]) { ea--; eb--; }
+  const n = ea - s, m = eb - s;
+  if (!n || !m || n * m > 4_000_000) return { added: m, removed: n };
+  let prev = new Uint32Array(m + 1), cur = new Uint32Array(m + 1);
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) cur[j] = a[s + i - 1] === b[s + j - 1] ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]);
+    [prev, cur] = [cur, prev];
+  }
+  const same = prev[m];
+  return { added: m - same, removed: n - same };
 }

@@ -26,10 +26,10 @@ export function Welcome() {
   const demo = isReplay();
   return (
     <div className="welcome" role="dialog" aria-modal="true" aria-labelledby="welcome-title" tabIndex={-1} ref={card}>
-      <h2 id="welcome-title">{demo ? "Agents building Rundown" : "This is your project"}</h2>
+      <h2 id="welcome-title">{demo ? "A recorded thread" : "This is your project"}</h2>
       <p>
         Each dot is a file, grouped by folder. When an agent works, it shows up here as a dot moving between the files
-        it reads and changes.{demo ? " This is a recording of Claude Code agents building this app." : ""}
+        it reads and changes.{demo ? " This one is a recording: Claude Code and two subagents fixing a bug in a small trail-finder app." : ""}
       </p>
       <p className="welcome-sub">Your threads are on the left. Open one to see what it touched, then its steps or its replay.</p>
       <div className="welcome-actions">

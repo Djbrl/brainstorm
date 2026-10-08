@@ -150,7 +150,7 @@ function Shell() {
       </header>
       {state.preview && (
         <div className="preview-banner">
-          A recording of Claude Code agents building Rundown, played back. To see your own agents live,{" "}
+          A recording of a real Claude Code thread, played back. To see your own agents live,{" "}
           <a href="https://github.com/Djbrl/brainstorm#install-claude-code-plugin-preview" target="_blank" rel="noopener">install the plugin</a>.
         </div>
       )}

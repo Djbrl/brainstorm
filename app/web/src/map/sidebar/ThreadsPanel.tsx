@@ -179,26 +179,28 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
             const following = followId === a.id;
             const hidden = hiddenAgents.has(a.id);
             const name = a.isSubagent ? shortName(a, 22) : "Main agent";
+            // The row follows the agent (its name is the button, and a click anywhere on the row lands on it); the file
+            // it's on is its own button beside it, not inside it.
             return (
               <li key={a.id} className={`${following ? "following" : ""} ${hidden ? "hidden-agent" : ""}`}>
-                <button className="sidebar-agent-main" onClick={() => onFollow(following ? null : a.id)} title={following ? "Stop following" : a.file ? "Follow this agent on the map, and see only its steps" : "See only its steps (it hasn't touched a file on the map yet)"}>
-                  <i className="sidebar-agent-avatar" style={{ background: agentColor(a, accent) }}>{initial(a)}</i>
+                <div className="sidebar-agent-main">
+                  <i className="sidebar-agent-avatar" style={{ background: agentColor(a, accent) }} aria-hidden="true">{initial(a)}</i>
                   <span className="sidebar-agent-text">
-                    <span className="sidebar-agent-name">{name}</span>
-                    <span className="sidebar-agent-doing">
+                    <button className="sidebar-agent-name sidebar-agent-follow" onClick={() => onFollow(following ? null : a.id)} aria-pressed={following}
+                      aria-describedby={`agent-doing-${a.id}`} title={following ? "Stop following" : a.file ? "Follow this agent on the map, and see only its steps" : "See only its steps (it hasn't touched a file on the map yet)"}>{name}</button>
+                    <span className="sidebar-agent-doing" id={`agent-doing-${a.id}`}>
                       {a.away && a.active ? a.away : <>
                         {a.active ? verbIng(a.action) : a.file ? "Stopped at" : "Stopped"}
                         {a.file && (
                           <>
                             {" "}
-                            <span role="button" tabIndex={0} className="sidebar-agent-file" onClick={(e) => { e.stopPropagation(); onFocusFile(a.file!); }}
-                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onFocusFile(a.file!); } }}>{baseName(a.file)}</span>
+                            <button className="sidebar-agent-file" onClick={() => onFocusFile(a.file!)} title={`Show ${a.file} on the map`}>{baseName(a.file)}</button>
                           </>
                         )}
                       </>}
                     </span>
                   </span>
-                </button>
+                </div>
                 <button className="sidebar-agent-eye" onClick={() => toggleAgent(a.id)} aria-label={hidden ? `Show ${name} on the map` : `Hide ${name} from the map`} title={hidden ? "Show on map" : "Hide from map"}>
                   <EyeIcon off={hidden} />
                 </button>

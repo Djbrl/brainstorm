@@ -98,7 +98,7 @@ export class AskService implements OnModuleInit {
     } catch (e) {
       this.log.warn(`Claude failed, falling back to Nemotron: ${(e as Error).message}`);
       if (!this.nemotron.enabled) {
-        const answer = this.cfg.claude.key ? "Could not reach Claude right now. Try again in a moment." : "To ask questions, add an Anthropic API key: run /plugin configure brainstorm@brainstorm in Claude Code, then start a new session.";
+        const answer = this.cfg.claude.key ? "Could not reach Claude right now. Try again in a moment." : `To ask questions, add an Anthropic API key: run /plugin configure ${process.env.RUNDOWN_PLUGIN_ID || "rundown@rundown"} in Claude Code, then start a new session.`;
         return { answer, model: "none", tokensIn: 0, tokensOut: 0, costUsd: 0, fallback: true };
       }
       try {

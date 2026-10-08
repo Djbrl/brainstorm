@@ -16,8 +16,7 @@ export const SHORTCUTS: { title: string; keys: { keys: string[]; what: string }[
     keys: [
       { keys: [`${MOD} K`], what: "Find a thread, here or in another project" },
       { keys: ["1", "…", "9"], what: "Open a thread in the bar" },
-      { keys: ["Tab", "Shift Tab"], what: "The next or the previous thread in the bar" },
-      { keys: ["[", "]"], what: "The thread before or after" },
+      { keys: ["[", "]"], what: "The thread before or after in the bar" },
       { keys: ["Esc"], what: "Step back: close the step, stop following, close the thread" },
     ],
   },

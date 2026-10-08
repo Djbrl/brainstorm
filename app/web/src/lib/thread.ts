@@ -140,7 +140,8 @@ export function countParts(c: SummaryCounts): string[] {
 }
 
 function headlineOf(steps: Step[], c: SummaryCounts): string {
-  for (let i = steps.length - 1; i >= 0; i--) {
+  // Something failed: say what it was doing ("Ran 3 commands"), not what it said after, so "failed" sits on the command.
+  if (!c.failed) for (let i = steps.length - 1; i >= 0; i--) {
     const s = steps[i];
     if (s.kind !== "text" || !(s.text?.trim() || s.label)) continue;
     const words = realLabel(s) ?? firstSentence(displayLabel(s));
@@ -151,6 +152,7 @@ function headlineOf(steps: Step[], c: SummaryCounts): string {
   if (c.browser) return `Worked in the browser`;
   if (c.subagents) return `Delegated to ${plural(c.subagents, "subagent")}`;
   if (c.searches) return `Searched the codebase`;
+  if (c.tools) return `Used ${plural(c.tools, "tool")}`;
   if (c.thinking) return "Thought it through";
   return "Worked";
 }

@@ -20,17 +20,16 @@ export function ThreadBar({ project, onFind, onHelp, onAllProjects }: { project:
   // The thread you open joins the bar for the next hours.
   useEffect(() => { if (openId && root) rememberThread(root, openId); }, [openId, root]);
 
-  // 1 to 9 open the bar's tabs; [ and ] (or Tab and Shift Tab, when nothing on the page has the focus) the one before
-  // or after the open one.
+  // 1 to 9 open the bar's tabs; [ and ] the one before or after the open one. Tab is left alone: it moves the focus
+  // from button to button, as on any page.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target) || !tabs.length) return;
-      const tab = e.key === "Tab" && (!document.activeElement || document.activeElement === document.body);
       let to: BarThread | undefined;
       if (/^[1-9]$/.test(e.key)) to = tabs[Number(e.key) - 1];
-      else if (e.key === "[" || e.key === "]" || tab) {
+      else if (e.key === "[" || e.key === "]") {
         const i = tabs.findIndex((t) => t.session.id === openId);
-        const d = e.key === "]" || (tab && !e.shiftKey) ? 1 : -1;
+        const d = e.key === "]" ? 1 : -1;
         to = tabs[i === -1 ? (d > 0 ? 0 : tabs.length - 1) : (i + d + tabs.length) % tabs.length];
       } else return;
       e.preventDefault();

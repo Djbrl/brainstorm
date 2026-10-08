@@ -3,8 +3,10 @@ import type { SetupStatus } from "@contract";
 
 /** True when summaries can be written now; false when no model is set up or it's offline; null while unknown. */
 export function summariesOn(setup: SetupStatus | null): boolean | null {
-  const step = setup?.steps.find((s) => s.id === "nemotron");
-  if (!step || step.state === "pending" || step.state === "running") return null;
+  if (!setup?.steps.length) return null;
+  const step = setup.steps.find((s) => s.id === "nemotron");
+  if (!step) return false;   // not listed: no model is set up for summaries
+  if (step.state === "pending" || step.state === "running") return null;
   return step.state === "done";
 }
 

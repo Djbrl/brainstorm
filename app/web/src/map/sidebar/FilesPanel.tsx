@@ -2,7 +2,7 @@
 // dots and, during a replay, which files that thread touched.
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { ProjectMap } from "@contract";
-import { clock } from "../../lib/live";
+import { clock, useLiveSelector } from "../../lib/live";
 import { useNav } from "../../lib/nav";
 import { useThread } from "../../lib/thread";
 import { repoBase } from "../../lib/paths";
@@ -45,6 +45,7 @@ export function FilesPanel({ map, onFocusFile, hidden = false }: {
   useTick(20000);
   const now = clock();
   const { replay } = useNav();
+  const shared = useLiveSelector((s) => !!s.shared);
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
   const [search, setSearch] = useState("");
   const [touchedOnly, setTouchedOnly] = useState(false);
@@ -83,12 +84,17 @@ export function FilesPanel({ map, onFocusFile, hidden = false }: {
       <div className="sidebar-search">
         <input type="search" placeholder="Search files" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search files" />
       </div>
-      {(map.totalFiles ?? 0) > map.files.length && (
+      {(map.totalFiles ?? 0) > map.files.length && (shared ? (
+        <p className="sidebar-files-note">
+          This shared replay shows {map.files.length.toLocaleString()} of the project's {map.totalFiles!.toLocaleString()} files: the
+          ones the thread touched, and a few around them.
+        </p>
+      ) : (
         <p className="sidebar-files-note">
           The map shows {map.files.length.toLocaleString()} of {map.totalFiles!.toLocaleString()} files: from every folder, the ones agents
           touched, changed lately or that many files use. A file an agent edits always joins.
         </p>
-      )}
+      ))}
       {(map.scanStopped || !!map.unread) && (
         <p className="sidebar-files-note">
           {map.scanStopped && "This folder isn't a git project and holds a lot: Rundown mapped what it found in a few seconds. "}

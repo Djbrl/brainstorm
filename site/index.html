@@ -223,7 +223,7 @@ nav .links a:hover { color: var(--text); }
 #install .wrap { position: relative; }
 #install .h2 .o { color: var(--claude); }
 #install .sub, #install .needs { color: #a3a09a; }
-#install .sub { max-width: 46ch; }
+#install .sub { max-width: 54ch; }
 #install .needs { max-width: 62ch; margin-left: auto; margin-right: auto; font-size: 15px; }
 .cc { max-width: 780px; margin: 80px auto 0; text-align: left; background: #262624; border: 1px solid #3a3935; border-radius: 18px; overflow: hidden;
   box-shadow: 0 40px 100px -40px rgba(0,0,0,.8), 0 0 0 1px rgba(217,119,87,.06); }
@@ -247,35 +247,69 @@ nav .links a:hover { color: var(--text); }
 .needs { margin-top: 48px; font-weight: 500; }
 #install .more { color: #f0a58a; }
 
-/* brev: dark, in NVIDIA's colors */
-#brev { background: #000; color: #fff; position: relative; overflow: hidden; }
-#brev::before {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background-image: linear-gradient(rgba(118,185,0,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(118,185,0,.08) 1px, transparent 1px);
-  background-size: 56px 56px;
-  -webkit-mask-image: radial-gradient(ellipse 70% 55% at 50% 45%, #000, transparent); mask-image: radial-gradient(ellipse 70% 55% at 50% 45%, #000, transparent);
-}
-#brev .wrap { position: relative; }
-#brev .h2 .g { color: var(--nvidia); }
-#brev .sub { color: #a1a1a6; }
-.chip { display: block; width: min(560px, 100%); height: auto; margin: 90px auto 0; overflow: visible; }
-.chip .trace { fill: none; stroke: #1d2710; stroke-width: 2; }
-.chip .pulse { fill: none; stroke: var(--nvidia); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: .07 .93; animation: flow 2.6s linear infinite; filter: drop-shadow(0 0 3px #76b900); }
-@keyframes flow { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 1; } }
-.chip .pkg { fill: #080b04; stroke: #2c3a14; stroke-width: 1.5; }
-.chip .die { fill: #0d1307; stroke: rgba(118,185,0,.55); stroke-width: 1.2; }
-.chip .core { fill: #18220d; transition: fill .45s; }
-.chip .core.on { fill: var(--nvidia); }
-.why3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 90px; text-align: left; }
-.why3 > div { border-top: 3px solid var(--nvidia); padding-top: 22px; }
-.why3 h3 { font-size: 26px; letter-spacing: -0.025em; }
-.why3 p { color: #a1a1a6; margin-top: 10px; font-weight: 500; }
-.nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 64px 48px; margin-top: 110px; }
-.nums:empty { display: none; }
-.num .v { font: 900 clamp(48px, 5.5vw, 76px)/1 var(--display); letter-spacing: -0.045em; color: var(--nvidia); }
-.num .k { color: #a1a1a6; font-weight: 500; margin-top: 12px; }
-.brev-foot { margin-top: 80px; display: flex; justify-content: center; flex-wrap: wrap; gap: 10px 28px; font-size: 14px; color: #86868b; font-weight: 500; }
-.brev-foot a { color: var(--nvidia); }
+/* every agent, every project: one app window, its agents moving on the map, Find a thread over it */
+.h2 .r { color: var(--red); }
+.crew { position: relative; max-width: 980px; margin: 72px auto 0; text-align: left; background: #fff; border-radius: 22px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 40px 100px -40px rgba(0,0,0,.25); }
+.crew header { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; }
+.cw-proj { font-weight: 700; margin-right: 8px; }
+.cw-proj::after { content: ""; display: inline-block; width: 6px; height: 6px; margin: 0 0 3px 7px; border: solid var(--muted); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.cw-tab { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 10px; color: var(--muted); }
+.cw-tab.on { color: var(--text); box-shadow: inset 0 0 0 1px var(--line); }
+.cw-tab em, .cw-row em { font-style: normal; font-size: 11.5px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: #e8efff; color: var(--blue); }
+.cw-tab em { margin-left: 2px; }
+.cw-row em.need { background: #fff0e8; color: #c2410c; }
+.cw-chip { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--line); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); display: inline-block; flex: none; }
+.dot.work { background: var(--blue); animation: breathe 1.6s ease-in-out infinite; }
+@keyframes breathe { 50% { opacity: .35; } }
+.cw-body { position: relative; aspect-ratio: 16 / 9; background: #f7f7f4; }
+.cw-map { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cw-map .fold { fill: rgba(0,0,0,.018); stroke: #dcdcd6; stroke-width: 1; }
+.cw-map .fname { font: 600 10.5px var(--body); fill: #8e8e93; text-anchor: middle; }
+.cw-map .file { fill: #e1e3e8; }
+.cw-map .file.hot { fill: #ffd29a; }
+.cw-map .route { fill: none; stroke-width: 1.6; stroke-linecap: round; opacity: .32; }
+.cw-map .pill text { font: 700 10.5px var(--body); }
+.cw-find { position: absolute; right: 20px; bottom: 20px; width: min(330px, 46%); background: rgba(255,255,255,.95); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  border-radius: 16px; box-shadow: 0 24px 60px -20px rgba(0,0,0,.3), 0 0 0 1px rgba(0,0,0,.05); padding: 8px; font-size: 13.5px;
+  opacity: 0; transform: translateY(16px); transition: opacity .8s .9s var(--ease), transform .9s .9s var(--ease); }
+.crew.in .cw-find { opacity: 1; transform: none; }
+.cw-q { padding: 8px 10px 10px; color: var(--faint); border-bottom: 1px solid var(--line); margin-bottom: 4px; font-size: 15px; font-weight: 500; }
+.cw-row { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 10px; }
+.cw-row.on { background: #eef3ff; }
+.cw-row b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.cw-row small { color: var(--muted); font-size: 12.5px; margin-left: auto; white-space: nowrap; }
+.cw-row b + em { margin-left: auto; }
+.cw-sep { padding: 10px 10px 3px; font-size: 12px; color: var(--muted); font-weight: 600; }
+
+/* the live states, over the notifications */
+.ft-notes .states { align-self: stretch; display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: auto; }
+.st { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: rgba(255,255,255,.8); font-size: 12.5px; font-weight: 600; }
+.st::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.st.work { color: var(--blue); } .st.work::before { animation: breathe 1.6s ease-in-out infinite; }
+.st.think { color: #6e6e73; } .st.need { color: #c2410c; } .st.turn { color: #1f7a5c; }
+/* the replay player, over the share menu */
+.ft-player { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 14px; background: var(--alt); }
+.ft-player .pb { width: 26px; height: 26px; border-radius: 50%; background: var(--blue); flex: none; position: relative; }
+.ft-player .pb::after { content: ""; position: absolute; left: 10px; top: 7px; border-left: 9px solid #fff; border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
+.ft-player .scrub { position: relative; flex: 1; height: 6px; border-radius: 3px; background: #dcdce2; }
+.ft-player .scrub b { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--blue); }
+.ft-player .scrub i { position: absolute; top: -3px; width: 2px; height: 12px; border-radius: 1px; background: var(--risk); z-index: 1; }
+.ft-player .sp { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.ft-player .sp em { font-style: normal; color: var(--text); }
+
+/* themes: one big picture, the four names under it */
+#themes .th { max-width: 960px; margin: 64px auto 0; }
+.th-frame { position: relative; aspect-ratio: 1120 / 700; border-radius: 20px; overflow: hidden; background: var(--alt);
+  box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 40px 100px -40px rgba(0,0,0,.28); }
+.th-frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .7s var(--ease); }
+.th-frame img.on { opacity: 1; }
+.th-pick { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-top: 28px; padding: 4px; border-radius: 999px; background: var(--alt); }
+.th-pick button { border: 0; background: none; font: 600 15px var(--body); color: var(--muted); padding: 8px 18px; border-radius: 999px; cursor: pointer; transition: background .2s, color .2s; }
+.th-pick button:hover { color: var(--text); }
+.th-pick button.on { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.th-pick button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 /* waitlist band, above the nav */
 html { scroll-padding-top: 96px; }
@@ -348,7 +382,6 @@ footer a:hover { text-decoration: underline; }
 .rv.d1 { transition-delay: .1s; } .rv.d2 { transition-delay: .2s; } .rv.d3 { transition-delay: .3s; }
 
 @media (max-width: 820px) {
-  .nums, .why3 { grid-template-columns: 1fr; gap: 48px; }
   .block { padding: 120px 0; }
   nav .links { display: none; }
   nav .btn.small { margin-left: auto; }
@@ -403,13 +436,21 @@ footer a:hover { text-decoration: underline; }
   .tasks-head .sub { display: block; }
   .tk-line li small { display: block; white-space: normal; }  /* the features list: each says what it is */
   .tk-line li { opacity: 1; }
+  .crew { margin-top: 48px; border-radius: 18px; }
+  .crew header { font-size: 12.5px; padding: 10px 12px; }
+  .cw-tab:not(.on), .cw-chip { display: none; }
+  .cw-body { aspect-ratio: auto; }
+  .cw-map { position: relative; display: block; height: auto; aspect-ratio: 16 / 9; }
+  .cw-find { position: relative; right: auto; bottom: auto; width: auto; margin: 0; border-radius: 0; box-shadow: none; border-top: 1px solid var(--line); background: #fff; }
+  .th-pick button { padding: 7px 13px; font-size: 14px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .chip .pulse { animation: none; opacity: 0; }
   .rv { opacity: 1; transform: none; transition: none; }
   .cc-body > * { opacity: 1; transform: none; transition: none; }
   .cc-note .spark { animation: none; }
   .tk-line li, .tk-pane, .tk-agent { transition: none; }
+  .cw-find, .th-frame img { transition: none; }
+  .dot.work, .st.work::before { animation: none; }
   .hero-type h1 .line span, .hero-type p, .hero-type .btns { animation: none; transform: none; opacity: 1; }
 }
 </style>
@@ -417,7 +458,7 @@ footer a:hover { text-decoration: underline; }
 <body>
 <div class="band" id="band">
   <div class="wrap">
-    <span><b>Rundown is a prototype.</b> <span class="dim">The full release lands in late October.</span></span>
+    <span><b>Rundown 0.6 is out.</b> <span class="dim">The full release lands in late October.</span></span>
     <form class="wl-mini" data-waitlist hidden><input type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" class="hp"><input type="email" name="email" required placeholder="Your email" aria-label="Your email" autocomplete="email"><button type="submit">Join the waitlist</button></form>
     <a class="band-link" href="#roadmap">Join the waitlist</a>
   </div>
@@ -430,8 +471,8 @@ footer a:hover { text-decoration: underline; }
     </a>
     <div class="links">
       <a href="#tasks">Features</a>
+      <a href="#themes">Themes</a>
       <a href="#roadmap">Roadmap</a>
-      <a href="#brev">NVIDIA</a>
       <a data-link="demo" href="#">Live demo</a>
     </div>
     <a class="btn small nav-install" data-link="install" href="#">Install</a>
@@ -460,6 +501,33 @@ footer a:hover { text-decoration: underline; }
       <div class="btns" style="margin-top:24px">
         <a class="btn" data-link="demo" href="#">Try the live demo</a>
         <a class="more" data-link="install" href="#">Install for Claude Code</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Every agent, every project: subagents on the map, the other projects one click away -->
+<section class="block alt" id="crew">
+  <div class="wrap center">
+    <h2 class="h2 rv">Every agent.<br><span class="r">Every project.</span></h2>
+    <p class="sub rv d1">Subagents get their own marker. Your other projects are one click away.</p>
+    <div class="crew rv d2" id="crew-win">
+      <header>
+        <b class="cw-proj">acme-web</b>
+        <span class="cw-tab on"><i class="dot work"></i>Checkout redesign</span>
+        <span class="cw-tab">Fix flaky tests<em>Your turn</em></span>
+        <span class="cw-chip"><i class="dot work"></i>2 agents in 2 other projects</span>
+      </header>
+      <div class="cw-body">
+        <svg class="cw-map" id="crewMap" viewBox="0 0 640 360" aria-hidden="true"></svg>
+        <div class="cw-find" role="img" aria-label="Find a thread: this project's threads, then the ones at work in your other projects">
+          <div class="cw-q">Find a thread</div>
+          <div class="cw-row on"><b>Checkout redesign</b><small>Open</small></div>
+          <div class="cw-row"><b>Fix flaky tests</b><em>Your turn</em></div>
+          <div class="cw-sep">In your other projects</div>
+          <div class="cw-row"><b>Migrate to Postgres 17</b><small>api-server</small><em class="need">Needs you</em></div>
+          <div class="cw-row"><b>Rewrite the setup guide</b><small>docs-site · Working</small></div>
+        </div>
       </div>
     </div>
   </div>
@@ -496,7 +564,7 @@ footer a:hover { text-decoration: underline; }
   <div class="stage">
     <div class="tasks-head">
       <h2 class="h2">Not just code.</h2>
-      <p class="sub">Your agents read the web, test your apps and run commands. Rundown follows all of it, in Claude Code and soon Codex.</p>
+      <p class="sub">Your agents read the web, test your apps and run commands. Rundown follows all of it, in Claude Code and Codex.</p>
     </div>
     <div class="tk">
       <div class="tk-track">
@@ -504,10 +572,10 @@ footer a:hover { text-decoration: underline; }
       <ol class="tk-line" id="tkLine">
         <li class="f-track"><span class="tk-ico"><svg viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><path d="M4 5.1v5.8M8 3.5h5M8 8h5M8 12.5h5"/></svg></span><span class="tk-body"><b>The Track</b><small>Every step beside the map, failures in red</small></span></li>
         <li class="f-places"><span class="tk-ico"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c1.8 1.7 2.6 3.7 2.6 6S9.8 12.3 8 14M8 2C6.2 3.7 5.4 5.7 5.4 8s.8 4.3 2.6 6"/></svg></span><span class="tk-body"><b>Places</b><small>The websites and apps each thread used</small></span></li>
-        <li class="f-codex"><span class="tk-ico"><svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="m5 6.5 2 1.5-2 1.5M8.5 10H11"/></svg></span><span class="tk-body"><b>Codex</b><small>Coming soon · on the same map as Claude Code</small></span></li>
-        <li class="f-cmd"><span class="tk-ico"><svg viewBox="0 0 16 16"><path d="M3 4.5 6.5 8 3 11.5M8.5 12H13"/></svg></span><span class="tk-body"><b>Commands that change files</b><small>Coming soon · sed, scripts and redirects count as edits</small></span></li>
-        <li class="f-bell"><span class="tk-ico"><svg viewBox="0 0 16 16"><path d="M4 11V7.5a4 4 0 0 1 8 0V11l1 1.5H3zM6.5 14h3"/></svg></span><span class="tk-body"><b>Waiting for you</b><small>A nudge when a thread needs you</small></span></li>
-        <li class="f-share"><span class="tk-ico"><svg viewBox="0 0 16 16"><path d="M8 10V2.5M5 5.5 8 2.5l3 3M3 9.5V13h10V9.5"/></svg></span><span class="tk-body"><b>Share a thread</b><small>One page anyone can replay, or Markdown</small></span></li>
+        <li class="f-codex"><span class="tk-ico"><svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="m5 6.5 2 1.5-2 1.5M8.5 10H11"/></svg></span><span class="tk-body"><b>Codex</b><small>On the same map as Claude Code</small></span></li>
+        <li class="f-cmd"><span class="tk-ico"><svg viewBox="0 0 16 16"><path d="M3 4.5 6.5 8 3 11.5M8.5 12H13"/></svg></span><span class="tk-body"><b>Commands that change files</b><small>sed, scripts and redirects count as edits</small></span></li>
+        <li class="f-bell"><span class="tk-ico"><svg viewBox="0 0 16 16"><path d="M4 11V7.5a4 4 0 0 1 8 0V11l1 1.5H3zM6.5 14h3"/></svg></span><span class="tk-body"><b>Waiting for you</b><small>Working, thinking, or waiting on you</small></span></li>
+        <li class="f-share"><span class="tk-ico"><svg viewBox="0 0 16 16"><path d="M8 10V2.5M5 5.5 8 2.5l3 3M3 9.5V13h10V9.5"/></svg></span><span class="tk-body"><b>Replay and share</b><small>Play any thread back, or share it as one page</small></span></li>
       </ol>
       </div>
       <div class="tk-win" id="tkWin">
@@ -530,17 +598,19 @@ footer a:hover { text-decoration: underline; }
           <div class="tk-pane"><ul class="ft-threads">
             <li class="on"><span class="hx claude">Claude Code</span><b>Landing page, new brand</b><small>live</small></li>
             <li><span class="hx codex">Codex</span><b>Codex reader tests</b><small>12 min ago</small></li>
-            <li><span class="hx claude">Claude Code</span><b>Plugin 0.5.0</b><small>9 h ago</small></li>
+            <li><span class="hx claude">Claude Code</span><b>Plugin 0.6.0</b><small>9 h ago</small></li>
             <li><span class="hx codex">Codex</span><b>Map: more languages</b><small>yesterday</small></li>
           </ul></div>
           <div class="tk-pane"><pre class="term"><span class="pr">$</span> sed -i 's/4000/4747/' server/config.ts
 <span class="dim">(no output)</span></pre>
             <div class="ft-diff"><b>Edit server/config.ts</b><span>by a command</span><code class="del">- const PORT = 4000;</code><code class="add">+ const PORT = 4747;</code></div></div>
           <div class="tk-pane"><div class="ft-notes">
-            <div class="note"><b>Plugin 0.5.0 is waiting for you</b><span>Allow Bash: npm publish?</span></div>
+            <div class="states"><span class="st work">Working</span><span class="st think">Thinking</span><span class="st need">Needs you</span><span class="st turn">Your turn</span></div>
+            <div class="note"><b>Plugin 0.6.0 is waiting for you</b><span>Allow Bash: npm publish?</span></div>
             <div class="note"><b>Landing page, new brand finished</b><span>12 files changed · 1 command failed</span></div>
           </div></div>
           <div class="tk-pane"><div class="ft-share">
+            <div class="ft-player"><span class="pb" aria-hidden="true"></span><span class="scrub"><i class="bad" style="left:31%"></i><i class="bad" style="left:38%"></i><i class="bad" style="left:72%"></i><b style="width:58%"></b></span><span class="sp"><em>1×</em> 2× 4×</span></div>
             <div class="opt on"><span class="fi">.html</span><div><b>Replay file</b><span>One page that opens in any browser, with the map, every step and the code changes.</span></div></div>
             <div class="opt"><span class="fi md">.md</span><div><b>Summary</b><span>What was asked, the files changed, what failed.</span></div></div>
             <p>Secrets are masked and your home folder is hidden.</p>
@@ -560,23 +630,22 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- NVIDIA: the first read of a codebase, on Nemotron -->
-<section class="block" id="brev">
+<!-- Themes: the same map four ways, real screenshots, one at a time -->
+<section class="block" id="themes">
   <div class="wrap center">
-    <h2 class="h2 rv">Read everything.<br><span class="g">On NVIDIA Nemotron.</span></h2>
-    <p class="sub rv d1">Coming in the full release: Rundown reads your whole project once, so every file and every agent step gets a short summary.</p>
-    <svg class="chip rv d2" id="chip" viewBox="0 0 520 300" aria-hidden="true"></svg>
-    <div class="why3">
-      <div class="rv"><h3>Flat price.</h3><p>A GPU rented by the hour, not billed by the token. The thousandth file costs the same as the first.</p></div>
-      <div class="rv d1"><h3>Open weights.</h3><p>NVIDIA Nemotron 3 Nano, served with vLLM on NVIDIA Brev.</p></div>
-      <div class="rv d2"><h3>Your choice.</h3><p>Rather use your own Claude Code, or a local model? That will be a setting.</p></div>
+    <h2 class="h2 rv">Pick your map.</h2>
+    <p class="sub rv d1">Light and quiet, a rail map, glass, or a dark room. Switch any time in Settings.</p>
+    <div class="th rv d2">
+      <div class="th-frame">
+        <img class="on" src="img/themes/rundown.jpg" width="1120" height="700" alt="The Rundown theme: a light map of a project's folders, with an agent's trail between files">
+        <img src="img/themes/metro.jpg" width="1120" height="700" loading="lazy" alt="The Metro theme: folders as fare zones and an agent's route as a rail line">
+        <img src="img/themes/prism.jpg" width="1120" height="700" loading="lazy" alt="The Prism theme: folders as glass circles in a violet haze, an agent's trail glowing">
+        <img src="img/themes/hologram.jpg" width="1120" height="700" loading="lazy" alt="The Hologram theme: wireframe globes in a dark room, an agent reading a file">
+      </div>
+      <div class="th-pick" role="tablist" aria-label="Map themes">
+        <button class="on" role="tab" aria-selected="true">Rundown</button><button role="tab" aria-selected="false">Metro</button><button role="tab" aria-selected="false">Prism</button><button role="tab" aria-selected="false">Hologram</button>
+      </div>
     </div>
-    <div class="nums">
-      <div class="num rv"><div class="v">81k</div><div class="k">lines of code read, 311 files</div></div>
-      <div class="num rv d1"><div class="v">73 s</div><div class="k">for the whole read</div></div>
-      <div class="num rv d2"><div class="v">$0.02</div><div class="k">of GPU time, about 35× less than Claude Haiku</div></div>
-    </div>
-    <div class="brev-foot rv"><span>Measured on the Hono web framework at the GOMYCODE × NVIDIA hackathon</span><a data-link="numbers" href="#">How we measured ›</a></div>
   </div>
 </section>
 
@@ -584,7 +653,7 @@ footer a:hover { text-decoration: underline; }
 <section class="block" id="install">
   <div class="wrap center">
     <h2 class="h2 rv">Runs on your machine.<br><span class="o">Installs in Claude Code.</span></h2>
-    <p class="sub rv d1">No account, no cloud: Rundown reads your agents' logs where they are. Secrets are masked before anything is stored, and nothing goes to Claude unless you ask. Free.</p>
+    <p class="sub rv d1">No account, no cloud: Rundown reads your agents' logs where they are, and only its own page can talk to it. Secrets are masked before anything is stored or shared, and nothing goes to Claude unless you ask. Free.</p>
     <div class="cc rv d2">
       <header><i></i><i></i><i></i><span>claude</span></header>
       <div class="cc-body">
@@ -607,12 +676,12 @@ footer a:hover { text-decoration: underline; }
 <section class="block" id="roadmap">
   <div class="wrap center">
     <h2 class="h2 rv">What's next.</h2>
-    <p class="sub rv d1">Rundown is a prototype today. The full release lands in late October.</p>
+    <p class="sub rv d1">Rundown 0.6 is out today. The full release lands in late October.</p>
     <div class="road">
-      <div class="now rv"><span class="dot"></span><h3>Today</h3><p class="when">Version 0.5</p>
-        <ul><li>Live map and replays</li><li>The Track</li><li>Places</li><li>Notifications</li><li>Sharing</li><li>Claude Code plugin</li></ul></div>
+      <div class="now rv"><span class="dot"></span><h3>Today</h3><p class="when">Version 0.6</p>
+        <ul><li>Live map and replays</li><li>Every agent, every project</li><li>The Track and Places</li><li>Claude Code and Codex</li><li>Commands as edits</li><li>Notifications and sharing</li><li>Four map themes</li></ul></div>
       <div class="next rv d1"><span class="dot"></span><h3>Late October</h3><p class="when">Full release</p>
-        <ul><li>Codex</li><li>Commands as edits</li><li>Summaries on NVIDIA Nemotron</li><li>Recap of what you missed</li><li>MCP and CLI</li></ul></div>
+        <ul><li>Summaries of every file</li><li>Recap of what you missed</li><li>MCP and CLI</li></ul></div>
       <div class="later rv d2"><span class="dot"></span><h3>After</h3><p class="when">Later</p>
         <ul><li>Cursor and Gemini CLI</li><li>Agents that coordinate</li><li>Replays on pull requests</li><li>Steering from the map</li></ul></div>
     </div>
@@ -632,7 +701,7 @@ footer a:hover { text-decoration: underline; }
       <a class="more" data-link="demo" href="#">Try the live demo</a>
       <a class="more" data-link="video" href="#">Watch the film</a>
     </div>
-    <a class="award rv d2" data-link="award" href="#"><b>3rd place</b> at GOMYCODE × NVIDIA “Come Build with AI” 2026</a>
+    <a class="award rv d2" data-link="award" href="#"><b>3rd place</b> at GOMYCODE × NVIDIA “Come Build with AI” 2026, first built on NVIDIA Nemotron</a>
   </div>
 </section>
 </main>
@@ -656,7 +725,6 @@ const SITE = {
     guide: "https://github.com/Djbrl/brainstorm/blob/main/plugin/README.md",
     repo: "https://github.com/Djbrl/brainstorm",
     award: "https://hackathon.gomycode.com/onboarding/winners",
-    numbers: "https://github.com/Djbrl/brainstorm/blob/main/docs/numbers.md",
     video: null,   // a film link, when there is one
   },
   // Where the waitlist forms POST the email (form-encoded, field "email"). /api/waitlist is site/api/waitlist.js,
@@ -1049,7 +1117,7 @@ const hero = (() => {
 const tasks = (() => {
   const el = $("#tasks"), stops = [...document.querySelectorAll("#tkLine li")], panes = [...document.querySelectorAll(".tk-pane")];
   const agent = $("#tkAgent"), winEl = $("#tkWin"), title = $("#tkTitle"), time = $("#tkTime");
-  const META = [["The Track", "Fix the replay bar"], ["Places", "This week"], ["Threads", "Claude Code and Codex"], ["server/config.ts", "Edited by a command"], ["Notifications", "Now"], ["Share this thread", "Landing page, new brand"]];
+  const META = [["The Track", "Fix the replay bar"], ["Places", "This week"], ["Threads", "Claude Code and Codex"], ["server/config.ts", "Edited by a command"], ["Notifications", "Now"], ["Replay and share", "Landing page, new brand"]];
   let cur = -1;
   function show(i) {
     if (i === cur) return; cur = i;
@@ -1066,22 +1134,56 @@ const tasks = (() => {
   return { set(p) { show(flat ? stops.length - 1 : Math.min(stops.length - 1, Math.floor(win(p, .04, .92) * stops.length))); } };
 })();
 
-/* brev: a GPU with data running along its traces and cores lighting up */
+/* every agent, every project: folders and their files, three agents going from file to file along their routes */
 (() => {
-  const svg = $("#chip");
-  const T = ["M190 110H120L100 90H0", "M190 140H0", "M190 170H110L90 190H0", "M190 198H130L112 216V300",
-    "M330 110H400L420 90H520", "M330 140H520", "M330 170H410L430 190H520", "M330 198H390L408 216V300",
-    "M230 90V40L210 20V0", "M260 90V0", "M290 90V40L310 20V0", "M232 210V250L214 268V300", "M288 210V250L306 268V300"];
-  let h = T.map(d => `<path class="trace" d="${d}"/>`).join("")
-    + T.map((d, i) => `<path class="pulse" pathLength="1" d="${d}" style="animation-delay:-${(i * .61) % 2.6}s"/>`).join("")
-    + `<rect class="pkg" x="186" y="86" width="148" height="128" rx="8"/><rect class="die" x="194" y="94" width="132" height="112" rx="4"/>`;
-  for (let r = 0; r < 5; r++) for (let c = 0; c < 7; c++) h += `<rect class="core" x="${199 + c * 18}" y="${101 + r * 20}" width="14" height="16" rx="2"/>`;
+  const svg = $("#crewMap");
+  let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const F = [["checkout", 140, 172, 96], ["api", 292, 90, 58], ["tests", 424, 118, 62], ["docs", 566, 72, 44], ["components", 292, 264, 64], ["lib", 82, 312, 38]];  // the bottom right is under Find a thread
+  const spots = {};
+  let h = "";
+  for (const [name, cx, cy, r] of F) {
+    h += `<circle class="fold" cx="${cx}" cy="${cy}" r="${r}"/>`;
+    const pts = [];
+    for (let tries = 0; pts.length < Math.round(r / 5.5) && tries < 500; tries++) {
+      const a = rnd() * Math.PI * 2, d = Math.sqrt(rnd()) * (r - 15), x = cx + Math.cos(a) * d, y = cy + 6 + Math.sin(a) * d * .9, fr = 3 + rnd() * 6;
+      if (pts.every(q => Math.hypot(q.x - x, q.y - y) > q.r + fr + 3)) pts.push({ x, y, r: fr });
+    }
+    spots[name] = pts;
+    h += pts.map(q => `<circle class="file${rnd() < .16 ? " hot" : ""}" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="${q.r.toFixed(1)}"/>`).join("");
+    h += `<text class="fname" x="${cx}" y="${cy - r + 15}">${name}</text>`;
+  }
   svg.innerHTML = h;
-  const cores = [...svg.querySelectorAll(".core")];
-  let vis = false;
-  new IntersectionObserver(([e]) => vis = e.isIntersecting).observe(svg);
-  cores.forEach(c => c.classList.toggle("on", Math.random() < .3));
-  if (!still) setInterval(() => { if (vis) cores.forEach(c => c.classList.toggle("on", Math.random() < .3)); }, 450);
+  const NS = "http://www.w3.org/2000/svg";
+  const A = [["Main", "#ff5b1f", ["checkout", "components", "checkout", "api"], 11], ["Tests", "#2563eb", ["tests", "tests", "api", "tests"], 9], ["Docs", "#121214", ["docs", "docs", "tests"], 12]];
+  for (const [name, color, folders, dur] of A) {
+    const stops = folders.map(f => { const list = spots[f]; return list[Math.floor(rnd() * list.length)]; });
+    stops.push(stops[0]);
+    // each hop a gentle curve; its length measured so the agent rests the same time on every file
+    const segs = stops.slice(1).map((b, i) => { const a = stops[i], mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, k = .22 * (i % 2 ? 1 : -1);
+      return `Q${(mx - (b.y - a.y) * k).toFixed(1)} ${(my + (b.x - a.x) * k).toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`; });
+    const d = `M${stops[0].x.toFixed(1)} ${stops[0].y.toFixed(1)} ` + segs.join(" ");
+    const route = document.createElementNS(NS, "path"); route.setAttribute("class", "route"); route.setAttribute("d", d); route.setAttribute("stroke", color); svg.appendChild(route);
+    const lens = segs.map((sg, i) => { const t = document.createElementNS(NS, "path"); t.setAttribute("d", `M${stops[i].x} ${stops[i].y} ${sg}`); svg.appendChild(t); const l = t.getTotalLength(); t.remove(); return l; });
+    const total = lens.reduce((a, b) => a + b, 0), n = lens.length;
+    const times = [0], points = [0]; let acc = 0;
+    lens.forEach((l, i) => { acc += l; times.push((i + .45) / n, (i + 1) / n); points.push(points[points.length - 1], Math.min(1, acc / total)); });
+    const w = name.length * 6.6 + 16;
+    const g = document.createElementNS(NS, "g");
+    g.innerHTML = `<circle r="8" fill="${color}" stroke="#fff" stroke-width="2.5"/><g class="pill" transform="translate(12 -9)"><rect width="${w}" height="18" rx="9" fill="#fff" stroke="#e4e4de"/><text x="8" y="13" fill="${color}">${name}</text></g>`
+      + `<animateMotion dur="${dur}s" repeatCount="indefinite" calcMode="linear" keyTimes="${times.map(t => t.toFixed(4)).join(";")}" keyPoints="${points.map(t => t.toFixed(4)).join(";")}" path="${d}"/>`;
+    svg.appendChild(g);
+  }
+  if (still) svg.pauseAnimations();
+})();
+
+/* themes: one picture at a time, every few seconds while in view, until someone picks one */
+(() => {
+  const imgs = [...document.querySelectorAll(".th-frame img")], btns = [...document.querySelectorAll(".th-pick button")];
+  let at = 0, picked = false, vis = false;
+  const show = i => { at = i; imgs.forEach((im, k) => im.classList.toggle("on", k === i)); btns.forEach((b, k) => { b.classList.toggle("on", k === i); b.setAttribute("aria-selected", k === i); }); };
+  btns.forEach((b, i) => b.addEventListener("click", () => { picked = true; show(i); }));
+  new IntersectionObserver(([e]) => vis = e.isIntersecting, { threshold: .5 }).observe($(".th-frame"));
+  if (!still) setInterval(() => { if (vis && !picked) show((at + 1) % imgs.length); }, 3200);
 })();
 
 /* ---------- the research: each number comes in on its own stretch of the scroll and counts up with it ---------- */

@@ -236,6 +236,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - **8 Oct 2026** · [share, security] Merged the security pass into main. The replay's map stays the open project's for anything a link asks; only a share passes the root the server worked out for its thread (ReplayService.build `share`), and only a share finds a thread from another project by id.
 
+- **8 Oct 2026** · [release] Plugin 0.6.0: the security pass, tester fixes (empty folders, the file cap said, keyboard and screen readers, failed commands, slimmer shares with their own project's map), Metro as an RER map, Hologram globes, quiet sidebar sections, fewer false Needs you. A stray CSS line in sidebar.css (it swallowed the Share button's rule) removed.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

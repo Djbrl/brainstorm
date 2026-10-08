@@ -438,6 +438,9 @@ export function MapView() {
   useEffect(() => {
     const canvas = wrapRef.current?.querySelector("canvas");
     if (!canvas) return;
+    // Screen readers hear what the picture is (the threads and files themselves are in the sidebar).
+    canvas.setAttribute("role", "img");
+    canvas.setAttribute("aria-label", "Map of the project's files, grouped by folder. Agents show up as dots moving to the files they work on. Click a file to open it, scroll to zoom.");
     const at = (e: PointerEvent) => {
       const g = fg.current, r = canvas.getBoundingClientRect();
       if (!g) return null;

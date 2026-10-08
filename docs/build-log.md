@@ -222,6 +222,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - **8 Oct 2026** · [themes] Hologram: files are wireframe globes turning slowly (faster where an agent is, stamped at 24 angles), the agents' locator and its accent a blue going violet instead of green, quiet globes slate blue. The floor tiles are gone.
 
+- **8 Oct 2026** · [themes] Hologram: agents ride metro tracks like in Metro (straight, 45°, straight; a dark casing), the track half as thick; globes drawn with two meridians and the equator. The elbow route and its dashed locator line are gone.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

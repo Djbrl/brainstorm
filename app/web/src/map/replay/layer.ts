@@ -420,7 +420,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
       const w = Math.pow(0.9, mi - k), tail = Math.min(1, (moves[k].beatIndex - fogBefore + 1) / TAPER);
       ctx.globalAlpha = (0.12 + 0.63 * w) * tail;
       ctx.strokeStyle = line;
-      ctx.lineWidth = (1.1 + 2 * w) / scale;
+      ctx.lineWidth = ((1.1 + 2 * w) * (style.trackWidth ?? 1)) / scale;
       const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2, dx = p1.x - p0.x, dy = p1.y - p0.y;
       if (routed) { polyPath(ctx, routePoints(style.route, p0.x, p0.y, p1.x, p1.y)); if (metro) casing(ctx, scale); }  // the way it went
       else { ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.quadraticCurveTo(mx - dy * 0.15, my + dx * 0.15, p1.x, p1.y); }

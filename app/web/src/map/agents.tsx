@@ -190,7 +190,7 @@ export function drawAgents(opts: {
           const w = (k + 1) / (pts.length - 1);
           ctx.globalAlpha = st.alpha * (0.1 + 0.55 * w);
           ctx.strokeStyle = color;
-          ctx.lineWidth = (1.2 + 1.6 * w) / scale;
+          ctx.lineWidth = ((1.2 + 1.6 * w) * (style.trackWidth ?? 1)) / scale;
           const mx = (a0.x + a1.x) / 2, my = (a0.y + a1.y) / 2;
           const dx = a1.x - a0.x, dy = a1.y - a0.y;
           if (style.route !== "glide") { polyPath(ctx, routePoints(style.route, a0.x, a0.y, a1.x, a1.y)); if (style.route === "metro") casing(ctx, scale); } // the way it went
@@ -240,7 +240,7 @@ export function drawAgents(opts: {
         ctx.strokeStyle = ERROR_RED; ctx.lineWidth = 2.4 / scale; ctx.stroke();
       }
 
-      // The trip under way: Hologram's locator line ahead, Prism's afterimages behind.
+      // The trip under way: Prism's afterimages behind.
       if (trip) drawTrip(ctx, style.route, trip, p, e, color, 9 / scale, st.alpha, scale);
 
       // Thinking: a slow ring in its colour, swelling and fading, until its next step.

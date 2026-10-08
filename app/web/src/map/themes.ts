@@ -16,8 +16,10 @@ export type MapStyle = {
   linkIdle: string; imports: string; usedBy: string;
   markerStroke: string; markerText: string; glow: boolean;
   /** How an agent travels between files, and the shape of the trail it leaves (see routePoints):
-   *  a straight glide (trails curve softly), metro track, a locator line with one right angle, or a hop in an arc. */
-  route: "glide" | "metro" | "elbow" | "hop";
+   *  a straight glide (trails curve softly), metro track (Metro and Hologram), or a hop in an arc. */
+  route: "glide" | "metro" | "hop";
+  /** How thick an agent's track is, against the usual (Hologram: a fine line). */
+  trackWidth?: number;
   /** Metro: the agent's own line (the main thread and a replay), in ink, apart from the folder colours. Others use the accent. */
   track?: string;
   /** Subagent colours (main threads take the theme's accent). */
@@ -76,7 +78,7 @@ const STYLES: Record<ThemeId, MapStyle> = {
     reach: [1.25, 1.95],                 // a turning cube's corners (0.78r, tilted); active: 1.3x and the floor ring
   },
   hologram: {
-    ...BASE, node: "globe", route: "elbow",
+    ...BASE, node: "globe", route: "metro", trackWidth: 0.5,
     halo: "rgba(8,14,16,0.9)", fileInk: "#dcf6f8", fileInkQuiet: "rgba(160,205,215,0.6)",
     moduleInk: "rgba(143,233,240,0.28)", moduleInkLively: "rgba(143,233,240,0.7)",
     moduleFont: `"Arial Narrow", "Helvetica Neue", sans-serif`, labelFont: `"Arial Narrow", "Helvetica Neue", sans-serif`,
@@ -184,8 +186,8 @@ export function stampCube(ctx: CanvasRenderingContext2D, x: number, y: number, s
 }
 
 // ---------- Hologram: a wireframe globe, turning slowly ----------
-const MERIDIANS = 4;                     // a globe looks the same a 1/MERIDIANS half turn on
-const LATS = [-0.55, 0, 0.55];           // its parallels, as sines of their latitude
+const MERIDIANS = 2;                     // a globe looks the same a 1/MERIDIANS half turn on
+const LATS = [0];                        // its parallels, as sines of their latitude: the equator
 /** The globe: a faint body, its outline, meridians turning about the vertical axis and parallels seen a little from above. */
 function globeBody(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, angle: number, c: RGB, lit: boolean, lineWidth: number) {
   const wire: RGB = [Math.round(c[0] + (235 - c[0]) * 0.45), Math.round(c[1] + (245 - c[1]) * 0.45), Math.round(c[2] + (255 - c[2]) * 0.45)];
@@ -281,10 +283,11 @@ export function stampStation(ctx: CanvasRenderingContext2D, x: number, y: number
 export const platform = (x: number, y: number, r: number, scale: number, angle = -Math.PI / 4) =>
   ({ x: x + Math.cos(angle) * (r + 11 / scale), y: y + Math.sin(angle) * (r + 11 / scale) });
 
-/** Metro: a white casing under an agent's track, so it reads over the import lines it crosses (the caller strokes the track after). */
+/** A casing under an agent's metro track, in the theme's outline colour (paper in Metro, the dark room in Hologram), so it
+ *  reads over the lines it crosses (the caller strokes the track after). */
 export function casing(ctx: CanvasRenderingContext2D, scale: number) {
   const { strokeStyle, lineWidth, globalAlpha } = ctx;
-  ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = lineWidth + 3 / scale; ctx.globalAlpha = Math.min(1, globalAlpha * 1.4);
+  ctx.strokeStyle = mapStyle().halo; ctx.lineWidth = lineWidth + 3 / scale; ctx.globalAlpha = Math.min(1, globalAlpha * 1.4);
   ctx.stroke();
   ctx.strokeStyle = strokeStyle; ctx.lineWidth = lineWidth; ctx.globalAlpha = globalAlpha;
 }
@@ -311,11 +314,10 @@ export function along(pts: Pt2[], k: number): { x: number; y: number } {
 }
 
 /** The way between two points for a route, as a polyline: the marker rides it and the trail draws it.
- *  metro: straight, 45°, straight. elbow: along the longer axis, one right angle, like a corridor on a deck plan.
+ *  metro: straight, 45°, straight.
  *  hop: an arc that rises on screen and lands. glide: a straight line. */
 export function routePoints(route: MapStyle["route"], x1: number, y1: number, x2: number, y2: number): Pt2[] {
   if (route === "metro") return metroPoints(x1, y1, x2, y2);
-  if (route === "elbow") return Math.abs(x2 - x1) >= Math.abs(y2 - y1) ? [[x1, y1], [x2, y1], [x2, y2]] : [[x1, y1], [x1, y2], [x2, y2]];
   if (route === "hop") {
     const h = Math.hypot(x2 - x1, y2 - y1) * 0.32, cx = (x1 + x2) / 2, cy = (y1 + y2) / 2 - h, pts: Pt2[] = [];
     for (let i = 0; i <= 16; i++) { const k = i / 16, m = 1 - k; pts.push([m * m * x1 + 2 * m * k * cx + k * k * x2, m * m * y1 + 2 * m * k * cy + k * k * y2]); }
@@ -393,22 +395,12 @@ export function settleLandings(now = performance.now()) {
 
 /**
  * The trip itself, drawn under the marker while it travels (p: 0..1 of the trip, e: the eased position on it).
- * Hologram: a dashed locator line projects ahead to the destination, then the marker follows it.
  * Prism: fading afterimages of the marker along the arc behind it.
  */
 export function drawTrip(ctx: CanvasRenderingContext2D, route: MapStyle["route"], pts: Pt2[], p: number, e: number, color: string, r: number, alpha: number, scale: number) {
   if (p >= 1) return;
   ctx.save();
-  if (route === "elbow") {
-    ctx.setLineDash([6 / scale, 4 / scale]);
-    ctx.lineDashOffset = -performance.now() / 40 / scale;          // dashes running toward the destination
-    ctx.strokeStyle = color; ctx.lineWidth = 1.8 / scale; ctx.lineCap = "butt"; ctx.lineJoin = "miter";
-    ctx.shadowColor = color; ctx.shadowBlur = 8;
-    ctx.globalAlpha = alpha * 0.9 * Math.min(1, (1 - p) * 3);
-    polyPath(ctx, upTo(pts, Math.min(1, p / 0.3))); ctx.stroke();  // reaches the destination in the first third of the trip
-    const end = pts[pts.length - 1];
-    if (p >= 0.3) { ctx.setLineDash([]); ctx.beginPath(); ctx.arc(end[0], end[1], 3 / scale, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); }
-  } else if (route === "hop") {
+  if (route === "hop") {
     ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 10;
     for (let i = 1; i <= 3; i++) {
       const k = e - i * 0.07;
@@ -422,5 +414,5 @@ export function drawTrip(ctx: CanvasRenderingContext2D, route: MapStyle["route"]
 }
 
 /** How long a trip takes: a bent route is longer than a glide, so it gets a little more time; a fast replay shortens it so the marker arrives before the next step. */
-const TRIP: Record<MapStyle["route"], number> = { glide: 1, metro: 1.45, elbow: 1.35, hop: 1.2 };
+const TRIP: Record<MapStyle["route"], number> = { glide: 1, metro: 1.45, hop: 1.2 };
 export const tripMs = (route: MapStyle["route"], glideMs: number, speed = 1) => (glideMs * TRIP[route]) / Math.max(1, speed);

@@ -230,6 +230,7 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 - **8 Oct 2026** · [a11y] Tester's accessibility pass: Tab moves the focus again (threads cycle on [ and ]); the welcome card, Shortcuts and Settings take the focus, keep Tab inside, close on Esc and give it back (lib/useDialogFocus.ts); the map canvas is labelled for screen readers; --ink-3 darker (#6e6e73, 4.8:1 on the page); agent rows no longer nest a button in a button.
 
 - 04:05 (8 Oct) [share] Shared replays carry only their part of the map (server `replay/slim.ts`): the files the thread touched, up to 60 around them (their imports first, then files from the same folders) and the imports between those, instead of the whole project (up to 3,000 files and 23,000 imports). A one-minute thread on a 3,000-file project: the map goes from 5.2 MB to 58 kB. The Files tab says "This shared replay shows N of the project's M files".
+- 04:20 (8 Oct) [security] Security fixes on `claude/security-csrf-replay`: live feed needs a per-start token (other localhost apps can't listen in); Ask, map and replay stay in the open project; masking covers YAML/lowercase secrets, cookies, URL tokens, Stripe, GitLab, npm and more, in model summaries and shared files too; CSP on the page and a hash-pinned one in shared files; launcher and hooks verify the server with a secret in server.json (0600); share names are plain file names; git runs without fsmonitor or hooks. 151 tests pass; checked end to end in a plugin-style test server.
 
 ## Requests
 

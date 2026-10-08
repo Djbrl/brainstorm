@@ -659,7 +659,7 @@ footer a:hover { text-decoration: underline; }
 <!-- Local, and installed in Claude Code: in Claude's colors, one Claude Code window -->
 <section class="block" id="install">
   <div class="wrap center">
-    <h2 class="h2 rv">Runs on your machine.<br><span class="o">Installs in Claude Code.</span></h2>
+    <h2 class="h2 rv">Runs <span class="o">on your machine.</span></h2>
     <p class="sub rv d1">No account, no cloud. Rundown reads your agents' logs where they are and masks secrets. Free.</p>
     <div class="cc rv d2">
       <header><i></i><i></i><i></i><span>claude</span></header>
@@ -754,7 +754,7 @@ $("#footLinks").innerHTML = [["repo", "GitHub"], ["demo", "Live demo"], ["video"
 /* waitlist: shown only once there's somewhere to send the email */
 if (SITE.waitlist) {
   document.body.classList.add("has-waitlist");
-  $("#wlNote").textContent = "One email when the full release is out. Nothing else.";
+  $("#wlNote").textContent = "We only email you when it's necessary.";
   document.querySelectorAll("[data-waitlist]").forEach(form => {
     form.hidden = false;
     form.addEventListener("submit", async e => {

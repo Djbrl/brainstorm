@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useNavActions, useNavState } from "../lib/nav";
 import { getCameraLock, setCameraLock } from "../map/prefs";
 import { Picker } from "./Picker";
+import { useDialogFocus } from "../lib/useDialogFocus";
 import { isTyping, SHORTCUTS } from "./shortcuts";
 
 export function Keys({ finding, setFinding, help, setHelp }: {
@@ -45,16 +46,19 @@ export function Keys({ finding, setFinding, help, setHelp }: {
 }
 
 function Help({ onClose }: { onClose: () => void }) {
+  // The window has the keyboard while open (Esc closes it, Tab stays in it); ? closes it too.
+  const sheet = useRef<HTMLDivElement>(null);
+  useDialogFocus(sheet, onClose);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" || e.key === "?") { e.preventDefault(); e.stopPropagation(); onClose(); } };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "?") { e.preventDefault(); e.stopPropagation(); onClose(); } };
     addEventListener("keydown", onKey, true);
     return () => removeEventListener("keydown", onKey, true);
   }, [onClose]);
   return createPortal(
     <div className="picker-veil" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="keys-sheet" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+      <div className="keys-sheet" role="dialog" aria-modal="true" aria-labelledby="keys-title" tabIndex={-1} ref={sheet}>
         <header className="settings-head">
-          <h2>Keyboard shortcuts</h2>
+          <h2 id="keys-title">Keyboard shortcuts</h2>
           <button className="settings-close" aria-label="Close" onClick={onClose}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg></button>
         </header>
         <div className="keys-body">

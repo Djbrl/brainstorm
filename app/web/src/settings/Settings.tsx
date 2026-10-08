@@ -10,6 +10,7 @@ import { useNavActions, useNavState } from "../lib/nav";
 import { setFoldOn, useFoldOn } from "../map/fold";
 import { EDITORS, setEditor, useEditor } from "../lib/editor";
 import { useUsageSetting } from "../lib/usage";
+import { useDialogFocus } from "../lib/useDialogFocus";
 import "./settings.css";
 
 export function SettingsButton() {
@@ -17,24 +18,24 @@ export function SettingsButton() {
   const theme = useTheme();
   const box = useRef<HTMLDivElement>(null), pop = useRef<HTMLDivElement>(null);
 
-  // Close on a click outside or Esc (Esc closes the window only, it doesn't also step back out of a thread).
+  // Close on a click outside or Esc (Esc closes the window only, it doesn't also step back out of a thread). While open,
+  // the window has the keyboard (lib/useDialogFocus.ts).
   useEffect(() => {
     if (!open) return;
     const inside = (t: Node) => !!box.current?.contains(t) || !!pop.current?.contains(t);
     const onDown = (e: PointerEvent) => { if (!inside(e.target as Node)) setOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); setOpen(false); } };
     addEventListener("pointerdown", onDown);
-    addEventListener("keydown", onKey, true);
-    return () => { removeEventListener("pointerdown", onDown); removeEventListener("keydown", onKey, true); };
+    return () => removeEventListener("pointerdown", onDown);
   }, [open]);
+  useDialogFocus(pop, () => setOpen(false), open);
 
   return (
     <div className="settings" ref={box}>
       <button className="ws-chip settings-btn" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen((o) => !o)}>Settings</button>
       {open && createPortal(
-        <div className="settings-pop" role="dialog" aria-modal="true" aria-label="Settings" ref={pop}>
+        <div className="settings-pop" role="dialog" aria-modal="true" aria-labelledby="settings-title" tabIndex={-1} ref={pop}>
           <header className="settings-head">
-            <h2>Settings</h2>
+            <h2 id="settings-title">Settings</h2>
             <button className="settings-close" aria-label="Close settings" onClick={() => setOpen(false)}>
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
             </button>

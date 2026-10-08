@@ -223,7 +223,7 @@ nav .links a:hover { color: var(--text); }
 #install .wrap { position: relative; }
 #install .h2 .o { color: var(--claude); }
 #install .sub, #install .needs { color: #a3a09a; }
-#install .sub { max-width: 54ch; }
+#install .sub { max-width: 40ch; }
 #install .needs { max-width: 62ch; margin-left: auto; margin-right: auto; font-size: 15px; }
 .cc { max-width: 780px; margin: 80px auto 0; text-align: left; background: #262624; border: 1px solid #3a3935; border-radius: 18px; overflow: hidden;
   box-shadow: 0 40px 100px -40px rgba(0,0,0,.8), 0 0 0 1px rgba(217,119,87,.06); }
@@ -244,7 +244,9 @@ nav .links a:hover { color: var(--text); }
 .cc.in .cc-body > :nth-child(2) { transition-delay: .5s; } .cc.in .cc-body > :nth-child(3) { transition-delay: 1s; } .cc.in .cc-body > :nth-child(4) { transition-delay: 1.5s; }
 #install .alt-cmd { margin-top: 28px; font-size: 14px; color: #8a877f; font-weight: 500; }
 #install .alt-cmd code { font: 12.5px var(--mono); color: #d6d3cc; background: #2c2b28; border-radius: 5px; padding: 1px 6px; overflow-wrap: anywhere; }
-.needs { margin-top: 48px; font-weight: 500; }
+.needs { margin-top: 10px; font-weight: 500; }
+.tele { margin-top: 44px; font-size: 18px; font-weight: 500; color: #d6d3cc; }
+.tele b { color: #f0a58a; font-weight: 700; }
 #install .more { color: #f0a58a; }
 
 /* every agent, every project: one app window, its agents moving on the map, Find a thread over it */
@@ -283,6 +285,20 @@ nav .links a:hover { color: var(--text); }
 .cw-row b + em { margin-left: auto; }
 .cw-sep { padding: 10px 10px 3px; font-size: 12px; color: var(--muted); font-weight: 600; }
 
+/* Claude Code and Codex: the threads list beside the map */
+.duo { max-width: 980px; margin: 72px auto 0; display: grid; grid-template-columns: 250px 1fr; text-align: left; background: #fff; border-radius: 22px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 40px 100px -40px rgba(0,0,0,.25); }
+.duo-side { border-right: 1px solid var(--line); padding: 12px 10px; font-size: 13.5px; }
+.duo-h { padding: 12px 8px 6px; }
+.duo .hx { font-size: 11.5px; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
+.duo .hx.claude { background: #fbeee8; color: #b4532a; } .duo .hx.codex { background: #ececef; color: var(--text); }
+.duo-row { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 10px; }
+.duo-row.on { background: #eef3ff; }
+.duo-row b { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.duo-row small { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.duo-row em { font-style: normal; font-size: 11.5px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: #e8efff; color: var(--blue); white-space: nowrap; }
+.duo-map { position: relative; aspect-ratio: 640 / 360; background: #f7f7f4; }
+
 /* the live states, over the notifications */
 .ft-notes .states { align-self: stretch; display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: auto; }
 .st { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: rgba(255,255,255,.8); font-size: 12.5px; font-weight: 600; }
@@ -298,18 +314,6 @@ nav .links a:hover { color: var(--text); }
 .ft-player .scrub i { position: absolute; top: -3px; width: 2px; height: 12px; border-radius: 1px; background: var(--risk); z-index: 1; }
 .ft-player .sp { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; }
 .ft-player .sp em { font-style: normal; color: var(--text); }
-
-/* themes: one big picture, the four names under it */
-#themes .th { max-width: 960px; margin: 64px auto 0; }
-.th-frame { position: relative; aspect-ratio: 1120 / 700; border-radius: 20px; overflow: hidden; background: var(--alt);
-  box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 40px 100px -40px rgba(0,0,0,.28); }
-.th-frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .7s var(--ease); }
-.th-frame img.on { opacity: 1; }
-.th-pick { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-top: 28px; padding: 4px; border-radius: 999px; background: var(--alt); }
-.th-pick button { border: 0; background: none; font: 600 15px var(--body); color: var(--muted); padding: 8px 18px; border-radius: 999px; cursor: pointer; transition: background .2s, color .2s; }
-.th-pick button:hover { color: var(--text); }
-.th-pick button.on { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
-.th-pick button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 /* waitlist band, above the nav */
 html { scroll-padding-top: 96px; }
@@ -439,17 +443,19 @@ footer a:hover { text-decoration: underline; }
   .crew { margin-top: 48px; border-radius: 18px; }
   .crew header { font-size: 12.5px; padding: 10px 12px; }
   .cw-tab:not(.on), .cw-chip { display: none; }
+  .duo { grid-template-columns: 1fr; margin-top: 48px; border-radius: 18px; }
+  .duo-side { border-right: 0; border-bottom: 1px solid var(--line); }
+  .duo-row.x { display: none; }
   .cw-body { aspect-ratio: auto; }
   .cw-map { position: relative; display: block; height: auto; aspect-ratio: 16 / 9; }
   .cw-find { position: relative; right: auto; bottom: auto; width: auto; margin: 0; border-radius: 0; box-shadow: none; border-top: 1px solid var(--line); background: #fff; }
-  .th-pick button { padding: 7px 13px; font-size: 14px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .rv { opacity: 1; transform: none; transition: none; }
   .cc-body > * { opacity: 1; transform: none; transition: none; }
   .cc-note .spark { animation: none; }
   .tk-line li, .tk-pane, .tk-agent { transition: none; }
-  .cw-find, .th-frame img { transition: none; }
+  .cw-find { transition: none; }
   .dot.work, .st.work::before { animation: none; }
   .hero-type h1 .line span, .hero-type p, .hero-type .btns { animation: none; transform: none; opacity: 1; }
 }
@@ -471,7 +477,7 @@ footer a:hover { text-decoration: underline; }
     </a>
     <div class="links">
       <a href="#tasks">Features</a>
-      <a href="#themes">Themes</a>
+      <a href="#codex">Codex</a>
       <a href="#roadmap">Roadmap</a>
       <a data-link="demo" href="#">Live demo</a>
     </div>
@@ -529,6 +535,26 @@ footer a:hover { text-decoration: underline; }
           <div class="cw-row"><b>Rewrite the setup guide</b><small>docs-site · Working</small></div>
         </div>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- Claude Code and Codex: both agents' threads side by side, both on the map -->
+<section class="block" id="codex">
+  <div class="wrap center">
+    <h2 class="h2 rv">Claude Code. Codex.<br><span class="r">One map.</span></h2>
+    <p class="sub rv d1">Rundown reads both agents' logs. Their threads sit side by side, and they work on the same map.</p>
+    <div class="duo rv d2">
+      <div class="duo-side" role="img" aria-label="The threads list: Claude Code threads, then Codex threads">
+        <div class="duo-h"><span class="hx claude">Claude Code</span></div>
+        <div class="duo-row on"><i class="dot work"></i><b>Checkout redesign</b><small>live</small></div>
+        <div class="duo-row"><i class="dot"></i><b>Fix flaky tests</b><em>Your turn</em></div>
+        <div class="duo-row x"><i class="dot"></i><b>Landing page copy</b><small>Tue</small></div>
+        <div class="duo-h"><span class="hx codex">Codex</span></div>
+        <div class="duo-row"><i class="dot work"></i><b>Migrate the API client</b><small>live</small></div>
+        <div class="duo-row x"><i class="dot"></i><b>Retry failed uploads</b><small>2 h ago</small></div>
+      </div>
+      <div class="duo-map"><svg class="cw-map" id="duoMap" viewBox="0 0 640 360" aria-hidden="true"></svg></div>
     </div>
   </div>
 </section>
@@ -630,30 +656,11 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- Themes: the same map four ways, real screenshots, one at a time -->
-<section class="block" id="themes">
-  <div class="wrap center">
-    <h2 class="h2 rv">Pick your map.</h2>
-    <p class="sub rv d1">Light and quiet, a rail map, glass, or a dark room. Switch any time in Settings.</p>
-    <div class="th rv d2">
-      <div class="th-frame">
-        <img class="on" src="img/themes/rundown.jpg" width="1120" height="700" alt="The Rundown theme: a light map of a project's folders, with an agent's trail between files">
-        <img src="img/themes/metro.jpg" width="1120" height="700" loading="lazy" alt="The Metro theme: folders as fare zones and an agent's route as a rail line">
-        <img src="img/themes/prism.jpg" width="1120" height="700" loading="lazy" alt="The Prism theme: folders as glass circles in a violet haze, an agent's trail glowing">
-        <img src="img/themes/hologram.jpg" width="1120" height="700" loading="lazy" alt="The Hologram theme: wireframe globes in a dark room, an agent reading a file">
-      </div>
-      <div class="th-pick" role="tablist" aria-label="Map themes">
-        <button class="on" role="tab" aria-selected="true">Rundown</button><button role="tab" aria-selected="false">Metro</button><button role="tab" aria-selected="false">Prism</button><button role="tab" aria-selected="false">Hologram</button>
-      </div>
-    </div>
-  </div>
-</section>
-
 <!-- Local, and installed in Claude Code: in Claude's colors, one Claude Code window -->
 <section class="block" id="install">
   <div class="wrap center">
     <h2 class="h2 rv">Runs on your machine.<br><span class="o">Installs in Claude Code.</span></h2>
-    <p class="sub rv d1">No account, no cloud: Rundown reads your agents' logs where they are, and only its own page can talk to it. Secrets are masked before anything is stored or shared, and nothing goes to Claude unless you ask. Free.</p>
+    <p class="sub rv d1">No account, no cloud. Rundown reads your agents' logs where they are and masks secrets. Free.</p>
     <div class="cc rv d2">
       <header><i></i><i></i><i></i><span>claude</span></header>
       <div class="cc-body">
@@ -663,8 +670,8 @@ footer a:hover { text-decoration: underline; }
         <p class="cc-note"><span class="spark" aria-hidden="true">✻</span><span>The map opens in your browser, for the project you're in.</span></p>
       </div>
     </div>
-    <p class="alt-cmd rv">On an older Claude Code: <code>/plugin marketplace add Djbrl/brainstorm</code>, then <code>/plugin install rundown@rundown</code>.</p>
-    <p class="needs rv">You need Claude Code and Node.js 22.13 or later. Once a day Rundown sends anonymous usage counts, never your code; one click in Settings turns that off.</p>
+    <p class="tele rv">Anonymous usage stats, once a day. <b>Opt out in Settings.</b></p>
+    <p class="needs rv">Needs Claude Code and Node.js 22.13 or later.</p>
     <div class="btns rv" style="margin-top:28px">
       <a class="btn" data-link="install" href="#">Install from GitHub</a>
       <a class="more" data-link="guide" href="#">Settings, updates and uninstall</a>
@@ -683,7 +690,7 @@ footer a:hover { text-decoration: underline; }
       <div class="next rv d1"><span class="dot"></span><h3>Late October</h3><p class="when">Full release</p>
         <ul><li>Summaries of every file</li><li>Recap of what you missed</li><li>MCP and CLI</li></ul></div>
       <div class="later rv d2"><span class="dot"></span><h3>After</h3><p class="when">Later</p>
-        <ul><li>Cursor and Gemini CLI</li><li>Agents that coordinate</li><li>Replays on pull requests</li><li>Steering from the map</li></ul></div>
+        <ul><li>Summaries on NVIDIA Nemotron</li><li>Cursor and Gemini CLI</li><li>Agents that coordinate</li><li>Replays on pull requests</li><li>Steering from the map</li></ul></div>
     </div>
     <form class="wl-big rv" id="waitlist" data-waitlist hidden><input type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" class="hp"><input type="email" name="email" required placeholder="you@example.com" aria-label="Your email" autocomplete="email"><button class="btn" type="submit">Join the waitlist</button></form>
     <p class="wl-note rv" id="wlNote"></p>
@@ -1134,11 +1141,9 @@ const tasks = (() => {
   return { set(p) { show(flat ? stops.length - 1 : Math.min(stops.length - 1, Math.floor(win(p, .04, .92) * stops.length))); } };
 })();
 
-/* every agent, every project: folders and their files, three agents going from file to file along their routes */
-(() => {
-  const svg = $("#crewMap");
-  let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const F = [["checkout", 140, 172, 96], ["api", 292, 90, 58], ["tests", 424, 118, 62], ["docs", 566, 72, 44], ["components", 292, 264, 64], ["lib", 82, 312, 38]];  // the bottom right is under Find a thread
+/* the two map pictures: folders and their files, agents going from file to file along their routes */
+function agentMap(svg, seed, F, A) {
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const spots = {};
   let h = "";
   for (const [name, cx, cy, r] of F) {
@@ -1154,7 +1159,6 @@ const tasks = (() => {
   }
   svg.innerHTML = h;
   const NS = "http://www.w3.org/2000/svg";
-  const A = [["Main", "#ff5b1f", ["checkout", "components", "checkout", "api"], 11], ["Tests", "#2563eb", ["tests", "tests", "api", "tests"], 9], ["Docs", "#121214", ["docs", "docs", "tests"], 12]];
   for (const [name, color, folders, dur] of A) {
     const stops = folders.map(f => { const list = spots[f]; return list[Math.floor(rnd() * list.length)]; });
     stops.push(stops[0]);
@@ -1174,17 +1178,15 @@ const tasks = (() => {
     svg.appendChild(g);
   }
   if (still) svg.pauseAnimations();
-})();
-
-/* themes: one picture at a time, every few seconds while in view, until someone picks one */
-(() => {
-  const imgs = [...document.querySelectorAll(".th-frame img")], btns = [...document.querySelectorAll(".th-pick button")];
-  let at = 0, picked = false, vis = false;
-  const show = i => { at = i; imgs.forEach((im, k) => im.classList.toggle("on", k === i)); btns.forEach((b, k) => { b.classList.toggle("on", k === i); b.setAttribute("aria-selected", k === i); }); };
-  btns.forEach((b, i) => b.addEventListener("click", () => { picked = true; show(i); }));
-  new IntersectionObserver(([e]) => vis = e.isIntersecting, { threshold: .5 }).observe($(".th-frame"));
-  if (!still) setInterval(() => { if (vis && !picked) show((at + 1) % imgs.length); }, 3200);
-})();
+}
+// Every agent: three agents of one thread; the bottom right is under Find a thread
+agentMap($("#crewMap"), 11,
+  [["checkout", 140, 172, 96], ["api", 292, 90, 58], ["tests", 424, 118, 62], ["docs", 566, 72, 44], ["components", 292, 264, 64], ["lib", 82, 312, 38]],
+  [["Main", "#ff5b1f", ["checkout", "components", "checkout", "api"], 11], ["Tests", "#2563eb", ["tests", "tests", "api", "tests"], 9], ["Docs", "#121214", ["docs", "docs", "tests"], 12]]);
+// Claude Code and Codex: one agent each, on the same project
+agentMap($("#duoMap"), 29,
+  [["web", 150, 160, 98], ["api", 330, 112, 70], ["client", 486, 214, 84], ["uploads", 312, 282, 58], ["docs", 568, 70, 44], ["styles", 74, 306, 40]],
+  [["Claude Code", "#d97757", ["web", "styles", "web", "api"], 10], ["Codex", "#121214", ["client", "uploads", "client", "api"], 11]]);
 
 /* ---------- the research: each number comes in on its own stretch of the scroll and counts up with it ---------- */
 const stats = (() => {

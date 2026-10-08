@@ -223,6 +223,7 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 - **8 Oct 2026** · [themes] Hologram: files are wireframe globes turning slowly (faster where an agent is, stamped at 24 angles), the agents' locator and its accent a blue going violet instead of green, quiet globes slate blue. The floor tiles are gone.
 
 - **8 Oct 2026** · [themes] Hologram: agents ride metro tracks like in Metro (straight, 45°, straight; a dark casing), the track half as thick; globes drawn with two meridians and the equator. The elbow route and its dashed locator line are gone.
+- 03:50 (8 Oct) [security] Pre-launch test pass. Fixed on `claude/security-csrf-replay`: write requests need JSON from a local page (cross-site forms could switch the project or spend the Ask key), `?replay=` loads same-site files only, links built from logs are http(s) only. Still open: masking misses YAML/lowercase secrets (they reach shared files), Tab key traps keyboard users, empty folder says "Mapping…" forever, the 3,000-file cap is silent, the no-key Ask message names `brainstorm@brainstorm`.
 
 ## Requests
 

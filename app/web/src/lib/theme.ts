@@ -8,9 +8,9 @@ export type ThemeId = "default" | "prism" | "hologram" | "metro";
 
 export const THEMES: { id: ThemeId; name: string; note: string; dark: boolean }[] = [
   { id: "default", name: "Rundown", note: "Light and quiet. Colour shows what changed.", dark: false },
-  { id: "metro", name: "Metro", note: "A regional rail map: folders as coloured lines, files as stations, fare zones.", dark: false },
-  { id: "prism", name: "Prism", note: "Glass cubes in a violet haze, agents as glowing orbs.", dark: true },
-  { id: "hologram", name: "Hologram", note: "A deck plan: blueprint rooms and waypoints on a dark grid.", dark: true },
+  { id: "metro", name: "Metro", note: "A regional rail map: files as stations, folders as fare zones.", dark: false },
+  { id: "prism", name: "Prism", note: "Glass cubes in a violet haze.", dark: true },
+  { id: "hologram", name: "Hologram", note: "Floor tiles and a cyan locator line, in a dark room.", dark: true },
 ];
 
 const KEY = "rundown-theme";

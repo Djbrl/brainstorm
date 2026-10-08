@@ -218,6 +218,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - **8 Oct 2026** · [themes] Metro is an RER map now: cream paper, folders as fare zones (octagons, peach and cream), each folder's files joined as one coloured line (RER colours), stations ringed in their line, Frutiger-like names, line-badge agent markers. Prism: the console menu's plain sans and grey names (cyan when picked), agents as glowing orbs, thinking as a ring of orbs. Hologram: a deck plan, blueprint rooms with a bevel and a hatch on a navy grid, waypoint agent markers with a locator triangle, yellow paths, DIN names.
 
+- **8 Oct 2026** · [themes] Metro: no lines between files of a folder (they claimed links that aren't there): only agents' tracks and the imports of the file you point at or pick; stations and closed folders keep their folder's RER colour; the bars are a lighter cream. Prism and Hologram back to how they were.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

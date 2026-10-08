@@ -513,7 +513,9 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
 
       ctx.globalAlpha = 1;
       const num = String(mi + 1);
-      drawMarker(ctx, a.x, a.y, 10 / scale, mark, num, num.length > 2 ? 8 : 9.5, mapStyle().labelFont ?? font, scale);
+      const ms = mapStyle();   // Metro: its line badge; elsewhere a disc ringed white with a white number, in every theme
+      if (ms.marker === "badge") drawMarker(ctx, a.x, a.y, 10 / scale, mark, num, num.length > 2 ? 8 : 9.5, ms.labelFont ?? font, scale, ms);
+      else drawMarker(ctx, a.x, a.y, 10 / scale, mark, num, num.length > 2 ? 8 : 9.5, font, scale, { ...ms, glow: false, markerStroke: "#fff", markerText: "#fff" });
 
       const lx = a.x + 14 / scale;
       ctx.textAlign = "left";

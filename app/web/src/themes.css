@@ -2,11 +2,11 @@
    backdrop, and, for the dark ones, the frosted surfaces that are hard-coded light elsewhere. The canvas side is
    in map/themes.ts. */
 
-/* ---------- Metro: an RER map. Cream paper, fare zones, coloured lines, Frutiger-like names ---------- */
+/* ---------- Metro: an RER map. Cream paper, fare zones, stations ringed in colour, Frutiger-like names ---------- */
 :root[data-theme="metro"] {
-  --bg: #fbf6e7;
+  --bg: #fffdf6;            /* the bars: a light cream, for reading */
   --line: #ece2c8;
-  --cool: #2c2c30;          /* stations outside any line */
+  --cool: #2c2c30;          /* stations outside any folder colour */
   --warm: #ff9f0a;
   --hot: #ff375f;
   --font-display: "Avenir Next", Frutiger, "Segoe UI", "Helvetica Neue", sans-serif;
@@ -59,7 +59,7 @@
   --sheet: rgba(26,26,66,.82);
   --hover: rgba(160,170,255,.12);
   --hover-2: rgba(160,170,255,.2);
-  --font-display: "Helvetica Neue", Helvetica, Arial, sans-serif;   /* the console menu's plain sans */
+  --font-display: "Arial Rounded MT Bold", "Nunito", system-ui, sans-serif;
 }
 :root[data-theme="prism"] .map-wrap {
   background:
@@ -74,35 +74,35 @@
     radial-gradient(80% 80% at 50% 50%, transparent 55%, rgba(0,0,0,.5) 100%);
 }
 
-/* ---------- Hologram: a deck plan, blueprint rooms on a dark navy grid ---------- */
+/* ---------- Hologram: floor tiles in a dark room ---------- */
 :root[data-theme="hologram"] {
-  --bg: #07121a;
-  --surface: #0d1c26;
-  --ink: #e2f1fa;
-  --ink-2: #a6c6d8;
-  --ink-3: #6f90a4;
-  --line: rgba(127,200,240,.16);
-  --accent: #f3cf4a;        /* the path: agents */
-  --accent-soft: rgba(243,207,74,.14);
-  --cool: #3d6f8f;          /* a quiet room */
-  --warm: #7fd6ff;          /* changed recently: bright blue */
-  --hot: #ff7a45;           /* just now: the warning orange */
-  --chrome: rgba(7,16,24,.86);
-  --sheet: rgba(10,22,32,.86);
-  --hover: rgba(127,200,240,.08);
-  --hover-2: rgba(127,200,240,.15);
-  --font-display: "DIN Alternate", "DIN Condensed", Bahnschrift, "Arial Narrow", "Helvetica Neue", sans-serif;
+  --bg: #0c1012;
+  --surface: #121a1c;
+  --ink: #dcf6f8;
+  --ink-2: #a9cdd3;
+  --ink-3: #6f9399;
+  --line: rgba(143,233,240,.16);
+  --accent: #39e75f;        /* the locator: agents */
+  --accent-soft: rgba(57,231,95,.14);
+  --cool: #5c6c70;
+  --warm: #5fe3e0;          /* changed recently: cyan */
+  --hot: #ff7a45;           /* just now: the warning orange, so it never reads like the cyan of "since you last looked" */
+  --chrome: rgba(10,16,18,.85);
+  --sheet: rgba(14,22,24,.84);
+  --hover: rgba(143,233,240,.08);
+  --hover-2: rgba(143,233,240,.15);
+  --font-display: "Arial Narrow", "Helvetica Neue", sans-serif;
 }
 :root[data-theme="hologram"] .map-wrap {
   background:
-    linear-gradient(rgba(127,200,240,.05) 1px, transparent 1px) 0 0 / 32px 32px,
-    linear-gradient(90deg, rgba(127,200,240,.05) 1px, transparent 1px) 0 0 / 32px 32px,
-    radial-gradient(70% 70% at 45% 50%, #12304a 0%, #0a1a26 55%, #03080c 100%);
+    linear-gradient(rgba(143,233,240,.035) 1px, transparent 1px) 0 0 / 32px 32px,
+    linear-gradient(90deg, rgba(143,233,240,.035) 1px, transparent 1px) 0 0 / 32px 32px,
+    radial-gradient(70% 70% at 45% 50%, #1c2427 0%, #0e1315 55%, #050707 100%);
 }
 :root[data-theme="hologram"] .force-graph-container::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background:
-    repeating-linear-gradient(transparent 0 2px, rgba(127,200,240,.025) 2px 3px),
+    repeating-linear-gradient(transparent 0 2px, rgba(143,233,240,.025) 2px 3px),
     radial-gradient(85% 85% at 50% 50%, transparent 55%, rgba(0,0,0,.55) 100%);
   animation: ds-flicker 7s steps(1) infinite;
 }

@@ -237,6 +237,7 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 - **8 Oct 2026** · [share, security] Merged the security pass into main. The replay's map stays the open project's for anything a link asks; only a share passes the root the server worked out for its thread (ReplayService.build `share`), and only a share finds a thread from another project by id.
 
 - **8 Oct 2026** · [release] Plugin 0.6.0: the security pass, tester fixes (empty folders, the file cap said, keyboard and screen readers, failed commands, slimmer shares with their own project's map), Metro as an RER map, Hologram globes, quiet sidebar sections, fewer false Needs you. A stray CSS line in sidebar.css (it swallowed the Share button's rule) removed.
+- 05:10 (8 Oct) [site] Landing page for 0.6 on `claude/landing-launch`: Every agent, every project section (subagents on the map, Find a thread across projects); Codex and commands as edits no longer "coming soon"; live states and a replay player in the features; Pick your map with real screenshots of the four themes (from the bench repo, no private names); the NVIDIA section folded into a credit line; roadmap and banner at 0.6; one privacy line. The demo link still points at an older recording.
 
 ## Requests
 

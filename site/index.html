@@ -20,9 +20,11 @@
 <meta name="twitter:description" content="Let the agents work. Keep your brain in the loop.">
 <meta name="twitter:image" content="https://brainstorm-landing.vercel.app/img/og.png">
 <meta name="theme-color" content="#ffffff">
-<link rel="preconnect" href="https://api.fontshare.com">
-<link href="https://api.fontshare.com/v2/css?f[]=satoshi@1&display=swap" rel="stylesheet">
+<link rel="preload" href="/fonts/Satoshi-Variable.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+/* Satoshi (Indian Type Foundry, ITF Free Font License), served from this site: no visitor's browser talks to a font
+   service. The files aren't in the repo (the licence forbids that): sh tools/fetch-fonts.sh before deploying. */
+@font-face { font-family: "Satoshi"; src: url("/fonts/Satoshi-Variable.woff2") format("woff2"); font-weight: 300 900; font-style: normal; font-display: swap; }
 :root {
   --claude: #d97757;   /* Claude orange, for the install section */
   --bg: #ffffff;
@@ -379,6 +381,7 @@ nav { top: 40px; }
 .wl-big input:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(37,99,235,.15); }
 .wl-big .btn { border: 0; cursor: pointer; font-family: var(--body); background: var(--blue); }
 .wl-note { margin-top: 16px; color: var(--muted); font-size: 14px; font-weight: 500; }
+.wl-note a { color: var(--blue); }
 .wl-big + .wl-note:empty { display: none; }
 
 /* privacy: three lines */
@@ -736,7 +739,7 @@ main:focus { outline: none; }
 
 <footer>
   <div class="wrap">
-    <span>Rundown. Source-available under FSL-1.1. Built with Claude Code. Release emails are kept private and never shared.</span>
+    <span>Rundown. Source-available under FSL-1.1. Built with Claude Code. Rundown is an independent project and is not affiliated with, sponsored by, or endorsed by Anthropic, OpenAI, or NVIDIA. Claude and Claude Code are trademarks of Anthropic, PBC; OpenAI and Codex are trademarks of OpenAI; NVIDIA and Nemotron are trademarks of NVIDIA Corporation.</span>
     <span id="footLinks"></span>
   </div>
 </footer>
@@ -771,12 +774,13 @@ document.querySelectorAll("[data-link]").forEach(a => {
   if (url) { a.href = url; a.target = "_blank"; a.rel = "noopener"; } else a.hidden = true;
 });
 $("#footLinks").innerHTML = [["repo", "GitHub"], ["demo", "Live demo"], ["video", "Film"], ["contact", "Contact"]]
-  .filter(([k]) => SITE.links[k]).map(([k, t]) => `<a href="${esc(SITE.links[k])}" target="_blank" rel="noopener">${t}</a>`).join(" · ");
+  .filter(([k]) => SITE.links[k]).map(([k, t]) => `<a href="${esc(SITE.links[k])}" target="_blank" rel="noopener">${t}</a>`)
+  .concat(['<a href="/privacy.html">Privacy</a>', '<a href="/terms.html">Terms</a>']).join(" · ");
 
 /* waitlist: shown only once there's somewhere to send the email */
 if (SITE.waitlist) {
   document.body.classList.add("has-waitlist");
-  $("#wlNote").textContent = "We only email you when it's necessary.";
+  $("#wlNote").innerHTML = 'We only email you when it\'s necessary, with an unsubscribe link in every email. <a href="/privacy.html#release-email">Privacy</a>';
   document.querySelectorAll("[data-waitlist]").forEach(form => {
     form.hidden = false;
     form.addEventListener("submit", async e => {

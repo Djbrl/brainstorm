@@ -21,7 +21,8 @@ module.exports = async (req, res) => {
 
   const r = await fetch("https://vercel.com/api/blob/?" + new URLSearchParams({ pathname: `waitlist/${email}.json` }), {
     method: "PUT",
-    body: JSON.stringify({ email, at: new Date().toISOString() }),
+    // What they agreed to, kept with the address (the privacy page's "release email" section).
+    body: JSON.stringify({ email, at: new Date().toISOString(), consent: "Release email: we only email when it's necessary; unsubscribe link in every email", policy: "privacy-2026-10-08" }),
     headers: {
       authorization: `Bearer ${auth.token}`,
       "x-api-version": "12",

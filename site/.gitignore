@@ -1,2 +1,7 @@
 .vercel
 .env*
+# Satoshi: served by the site, never in the public repo (its licence). sh tools/fetch-fonts.sh before deploying.
+fonts/
+
+# Personal data from tools/release-email.mjs: never commit.
+recipients*.csv

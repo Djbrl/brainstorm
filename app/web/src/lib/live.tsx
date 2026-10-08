@@ -287,8 +287,10 @@ export function createLiveStore(start: LiveState = initial): LiveStore {
 // Hosted demo: built with VITE_REPLAY_URL=/replay.json so it opens straight into the recording.
 // Both can't change without a reload (links keep ?replay=, see nav.tsx), so they're read once.
 let replayUrlValue: string | null | undefined;
+/** ?replay= only loads a file from this same site: a link can't pour someone else's recording into your Rundown. */
+const sameSite = (u: string | null) => { if (!u) return null; try { return new URL(u, location.href).origin === location.origin ? u : null; } catch { return null; } };
 const replayUrl = () => (replayUrlValue === undefined
-  ? (replayUrlValue = new URLSearchParams(location.search).get("replay") ?? (import.meta.env.VITE_REPLAY_URL as string | undefined) ?? null)
+  ? (replayUrlValue = sameSite(new URLSearchParams(location.search).get("replay")) ?? (import.meta.env.VITE_REPLAY_URL as string | undefined) ?? null)
   : replayUrlValue);
 
 /** A shared replay file (GET /api/share) carries its recording inline, so it opens with no server. */

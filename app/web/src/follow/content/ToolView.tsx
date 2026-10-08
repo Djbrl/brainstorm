@@ -7,7 +7,7 @@ import { useNav } from "../../lib/nav";
 import { highlightLines, langOf, renderPieces, useGrammar, usePalette } from "../../lib/highlight";
 import { basename, displayLabel } from "../format";
 import { JsonView } from "./JsonView";
-import { UrlLink } from "../../lib/links";
+import { safeHref, UrlLink } from "../../lib/links";
 import { HtmlPreview, isHtml, PAGE_MARKUP, ViewSwitch } from "./HtmlPreview";
 import { Lightbox } from "./Lightbox";
 import { cleanResult, formatCommand, hostOf, humanKey, parseJson, parseNumbered, parseSearch, parseShell, splitBatch, splitTabContext, type Tab } from "./parse";
@@ -217,7 +217,7 @@ function WebSearchView({ input, result }: { input: Input; result?: Step }) {
         <>
           <Block title="Results" aside={`${parsed.links.length} links`}>
             <ul className="cv-links">{parsed.links.map((l) => (
-              <li key={l.url}><a href={l.url} target="_blank" rel="noreferrer noopener" title={l.url}>{l.title}</a><UrlLink url={l.url} max={56} className="cv-src" /></li>
+              <li key={l.url}><a href={safeHref(l.url)} target="_blank" rel="noreferrer noopener" title={l.url}>{l.title}</a><UrlLink url={l.url} max={56} className="cv-src" /></li>
             ))}</ul>
           </Block>
           {parsed.summary && <Output text={parsed.summary} title="What it found" />}
@@ -249,7 +249,7 @@ function describe(name: string, input: Input): { verb: string; detail?: ReactNod
   const ref = str(input.ref), coord = Array.isArray(input.coordinate) ? `(${(input.coordinate as number[]).join(", ")})` : undefined;
   const target = ref ?? coord;
   switch (n) {
-    case "navigate": return { verb: input.url === "back" ? "Go back" : input.url === "forward" ? "Go forward" : "Open", detail: str(input.url) && input.url !== "back" && input.url !== "forward" ? <a href={str(input.url)} target="_blank" rel="noreferrer noopener">{str(input.url)}</a> : undefined };
+    case "navigate": return { verb: input.url === "back" ? "Go back" : input.url === "forward" ? "Go forward" : "Open", detail: str(input.url) && input.url !== "back" && input.url !== "forward" ? <a href={safeHref(input.url)} target="_blank" rel="noreferrer noopener">{str(input.url)}</a> : undefined };
     case "preview_start": return { verb: "Open a preview", detail: str(input.url) ?? str(input.name) };
     case "javascript_tool": return { verb: "Run a script", code: str(input.text) };
     case "find": return { verb: "Look for", detail: `“${str(input.query) ?? ""}”` };
@@ -337,7 +337,7 @@ function DiskPicture({ path, label }: { path: string; label: string }) {
 function PageChip({ tab }: { tab?: Tab }) {
   if (!tab?.url && !tab?.title) return null;
   return (
-    <a className="cv-page" href={tab.url} target="_blank" rel="noreferrer noopener" title={tab.url}>
+    <a className="cv-page" href={safeHref(tab.url)} target="_blank" rel="noreferrer noopener" title={tab.url}>
       <svg width="12" height="12" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" /><path d="M2 6h12" stroke="currentColor" strokeWidth="1.6" /></svg>
       <span className="t">{tab.title || hostOf(tab.url ?? "")}</span>
       {tab.url && <span className="u">{hostOf(tab.url)}</span>}

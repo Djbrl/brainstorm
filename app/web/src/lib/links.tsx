@@ -4,6 +4,9 @@
 import type { ReactNode } from "react";
 import "./links.css";
 
+/** The address when it's http(s), else undefined: for an href built from a log or a replay (never `javascript:`). */
+export const safeHref = (u: unknown): string | undefined => (typeof u === "string" && /^https?:\/\//i.test(u) ? u : undefined);
+
 /** An http(s) address in running text. Trailing punctuation and an unmatched ")" are left out (see `trimUrl`). */
 export const URL_RE = /https?:\/\/[^\s<>"'`]+/g;
 

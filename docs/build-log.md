@@ -226,6 +226,8 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 
 - **8 Oct 2026** · [map, workspace, ask, replay] Tester fixes: an empty folder says "No files here yet" instead of loading forever; past the file cap the map and Setup say "3,000 of 18,913 files" (a closable note on the map); the no-key Ask message names the plugin as installed (RUNDOWN_PLUGIN_ID from launch.mjs); a group of steps where a command failed is named for the commands, not the agent's last message; Setup lists Nemotron only where NEMOTRON_URL is set.
 
+- **8 Oct 2026** · [a11y] Tester's accessibility pass: Tab moves the focus again (threads cycle on [ and ]); the welcome card, Shortcuts and Settings take the focus, keep Tab inside, close on Esc and give it back (lib/useDialogFocus.ts); the map canvas is labelled for screen readers; --ink-3 darker (#6e6e73, 4.8:1 on the page); agent rows no longer nest a button in a button.
+
 ## Requests
 
 Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.

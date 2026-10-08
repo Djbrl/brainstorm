@@ -9,6 +9,16 @@
 <meta name="description" content="See where your AI agents go, what they touch and where they break, in code or any other work. Replay any session step by step. A free Claude Code plugin that runs on your machine.">
 <meta property="og:title" content="Rundown: keep up with your agents">
 <meta property="og:description" content="Let the agents work. Keep your brain in the loop.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://brainstorm-landing.vercel.app/">
+<meta property="og:image" content="https://brainstorm-landing.vercel.app/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Rundown: a live map of your agents. Claude Code and Codex at work on one project's map.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Rundown: keep up with your agents">
+<meta name="twitter:description" content="Let the agents work. Keep your brain in the loop.">
+<meta name="twitter:image" content="https://brainstorm-landing.vercel.app/img/og.png">
 <meta name="theme-color" content="#ffffff">
 <link rel="preconnect" href="https://api.fontshare.com">
 <link href="https://api.fontshare.com/v2/css?f[]=satoshi@1&display=swap" rel="stylesheet">
@@ -80,7 +90,7 @@ nav .links a:hover { color: var(--text); }
 .stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; }
 
 /* hero */
-#hero { height: 420vh; }
+#hero { height: 300vh; }
 #hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero-type {
   position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -107,8 +117,8 @@ nav .links a:hover { color: var(--text); }
 }
 
 /* stats: a static row, the numbers count up once in view */
-#stats { height: 300vh; text-align: center; }
-#stats .stage { display: flex; align-items: center; padding: 104px 0 24px; box-sizing: border-box; }  /* 104: under the band and the nav */
+#stats { text-align: center; padding: 136px 0; }
+#stats .stage { position: relative; height: auto; overflow: visible; }
 #stats .stage > .wrap { width: 100%; }
 #stats .stats-head { font-size: clamp(30px, min(4.8vw, 8.5vh), 64px); }
 #stats .stats3 { margin-top: min(52px, 5vh); }
@@ -116,7 +126,7 @@ nav .links a:hover { color: var(--text); }
 #stats .stat3 p { font-size: clamp(15px, 2.6vh, 19px); margin-top: min(14px, 1.6vh); }
 #stats .study { margin-top: min(20px, 2.4vh); padding-top: min(14px, 1.6vh); font-size: clamp(12px, 1.9vh, 13.5px); }
 .stats-head { font-size: clamp(34px, 4.8vw, 64px); line-height: 1; }
-.stats3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 52px; }
+.stats3 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 56px; margin: 52px auto 0; max-width: 780px; }
 .stat3 .n { font: 900 clamp(56px, 6.4vw, 84px)/1 var(--display); letter-spacing: -0.045em; white-space: nowrap; }
 .stat3 .n.warm { color: var(--blue); }
 .stat3 p { color: var(--muted); font-size: 19px; font-weight: 500; margin: 14px auto 0; max-width: 22ch; }
@@ -135,6 +145,12 @@ nav .links a:hover { color: var(--text); }
 .ask-pill .q { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, var(--warm), var(--hot)); flex: none; }
 .caret { display: inline-block; width: 2px; height: 1.1em; background: var(--orange); vertical-align: -0.15em; margin-left: 2px; animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
+.ask-ans { max-width: 580px; margin: 22px auto 0; text-align: left; background: #fff; border-radius: 22px; padding: 20px 24px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 24px 60px -24px rgba(0,0,0,.18); opacity: 0; transform: translateY(14px); transition: opacity .7s var(--ease), transform .8s var(--ease); }
+.ask-ans.on { opacity: 1; transform: none; }
+.ask-ans p { font-size: 18px; line-height: 1.5; font-weight: 500; }
+.ask-ans code { font: 15px var(--mono); background: #f0f0f3; border-radius: 6px; padding: 1px 6px; }
+.ask-ans small { display: block; margin-top: 10px; color: var(--muted); font-size: 14px; font-weight: 500; }
 
 /* tasks: one agent's work outside code, as a track of stops with a window */
 #tasks { height: 300vh; background: var(--alt); }
@@ -146,7 +162,7 @@ nav .links a:hover { color: var(--text); }
 .tk-track { position: relative; }
 .tk-line { list-style: none; margin: 0; padding: 0; position: relative; }
 .tk-line::before { content: ""; position: absolute; left: 13px; top: 20px; bottom: 20px; width: 2px; background: var(--line); }
-.tk-line li { position: relative; display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 36px; border-radius: 12px; opacity: .28; transition: opacity .45s var(--ease), background .3s, box-shadow .3s; }
+.tk-line li { position: relative; display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 36px; border-radius: 12px; opacity: .6; transition: opacity .45s var(--ease), background .3s, box-shadow .3s; }
 .tk-line li.past { opacity: .75; }
 .tk-line li.on { opacity: 1; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 10px 30px -12px rgba(0,0,0,.18); }
 .tk-line li::before { content: ""; position: absolute; left: 8px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; background: #fff; border: 2px solid currentColor; box-sizing: border-box; }
@@ -216,13 +232,13 @@ nav .links a:hover { color: var(--text); }
 .plain li { padding: 2px 0; }
 .plain code { font: 12.5px var(--mono); color: var(--text); background: #f0f0f3; border-radius: 5px; padding: 1px 6px; margin-right: 8px; }
 
-/* install: in Claude's colors, one Claude Code window */
-#install { background: #1f1e1d; color: #faf9f5; position: relative; overflow: hidden; }
+/* install: Rundown's ink, one Claude Code window */
+#install { background: var(--text); color: #fafafa; position: relative; overflow: hidden; }
 #install::before { content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(ellipse 60% 45% at 50% 0%, rgba(217,119,87,.22), transparent 70%), radial-gradient(ellipse 40% 30% at 50% 100%, rgba(217,119,87,.10), transparent 70%); }
+  background: radial-gradient(ellipse 60% 45% at 50% 0%, rgba(37,99,235,.22), transparent 70%), radial-gradient(ellipse 40% 30% at 50% 100%, rgba(255,91,31,.08), transparent 70%); }
 #install .wrap { position: relative; }
-#install .h2 .o { color: var(--claude); }
-#install .sub, #install .needs { color: #a3a09a; }
+#install .h2 .o { color: var(--red); }
+#install .sub, #install .needs { color: #a1a1a6; }
 #install .sub { max-width: 40ch; }
 #install .needs { max-width: 62ch; margin-left: auto; margin-right: auto; font-size: 15px; }
 .cc { max-width: 780px; margin: 80px auto 0; text-align: left; background: #262624; border: 1px solid #3a3935; border-radius: 18px; overflow: hidden;
@@ -245,9 +261,9 @@ nav .links a:hover { color: var(--text); }
 #install .alt-cmd { margin-top: 28px; font-size: 14px; color: #8a877f; font-weight: 500; }
 #install .alt-cmd code { font: 12.5px var(--mono); color: #d6d3cc; background: #2c2b28; border-radius: 5px; padding: 1px 6px; overflow-wrap: anywhere; }
 .needs { margin-top: 10px; font-weight: 500; }
-.tele { margin-top: 44px; font-size: 18px; font-weight: 500; color: #d6d3cc; }
-.tele b { color: #f0a58a; font-weight: 700; }
-#install .more { color: #f0a58a; }
+.tele { margin-top: 44px; font-size: 18px; font-weight: 500; color: #e4e4e7; }
+.tele b { color: #ff7a45; font-weight: 700; }
+#install .more { color: #8fb1ff; }
 
 /* every agent, every project: one app window, its agents moving on the map, Find a thread over it */
 .h2 .r { color: var(--red); }
@@ -329,7 +345,7 @@ html { scroll-padding-top: 96px; }
 .wl-mini button::after { content: " ›"; }
 .wl-mini button:hover { text-decoration: underline; }
 .band .wl-done { color: var(--text); }
-.band-link { color: var(--blue); font-weight: 600; white-space: nowrap; display: none; }
+.band-link { color: var(--blue); font-weight: 600; white-space: nowrap; }
 .band-link::after { content: " ›"; }
 nav { top: 40px; }
 [data-waitlist][hidden] { display: none; }
@@ -380,6 +396,10 @@ footer { border-top: 1px solid var(--line); padding: 22px 0 40px; font-size: 12p
 footer .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 footer a:hover { text-decoration: underline; }
 
+.skip { position: fixed; left: 12px; top: -60px; z-index: 100; background: var(--blue); color: #fff; padding: 8px 16px; border-radius: 999px; font-weight: 600; font-size: 14px; transition: top .2s; }
+.skip:focus { top: 12px; }
+main:focus { outline: none; }
+
 /* reveal */
 .rv { opacity: 0; transform: translateY(40px); transition: opacity 1s var(--ease), transform 1.2s var(--ease); }
 .rv.in { opacity: 1; transform: none; }
@@ -392,8 +412,6 @@ footer a:hover { text-decoration: underline; }
   .stats3 { grid-template-columns: 1fr; gap: 44px; margin-top: 48px; }
   .cc { margin-top: 56px; }
   .band .wrap { gap: 10px; font-size: 12.5px; }
-  .wl-mini, .has-waitlist .band .dim { display: none; }
-  .has-waitlist .band-link { display: inline; }
   .road { grid-template-columns: 1fr; gap: 40px; margin-top: 64px; padding-left: 36px; }
   .road::before { display: none; }
   .road > div::before { content: ""; position: absolute; left: -29px; top: 16px; bottom: -40px; width: 2px; background: var(--text); }  /* each stop's colour down to the next */
@@ -422,6 +440,9 @@ footer a:hover { text-decoration: underline; }
 .nav-demo { display: none; }
 @media (max-width: 699px) {
   .nav-install { display: none; }
+  .band { display: none; }
+  nav { top: 0; }
+  html { scroll-padding-top: 60px; }
   .nav-demo { display: inline-block; }
   .block { padding: 88px 0; }
   #stats { padding: 88px 0; height: auto; }
@@ -430,7 +451,7 @@ footer a:hover { text-decoration: underline; }
   .scene, #hero, #tasks { height: auto; }
   .scene .stage { position: relative; height: auto; overflow: visible; }
   #hero .stage { display: flex; flex-direction: column; }
-  .hero-type { position: relative; inset: auto; order: -1; padding: 124px 16px 0; }
+  .hero-type { position: relative; inset: auto; order: -1; padding: 92px 16px 0; }
   .hero-type .btns { margin-top: 28px; }
   #hero canvas { position: relative; display: block; height: min(128vw, 64svh); margin-top: 12px; }
   .hcap { display: none; }
@@ -447,13 +468,16 @@ footer a:hover { text-decoration: underline; }
   .duo-side { border-right: 0; border-bottom: 1px solid var(--line); }
   .duo-row.x { display: none; }
   .cw-body { aspect-ratio: auto; }
-  .cw-map { position: relative; display: block; height: auto; aspect-ratio: 16 / 9; }
+  .cw-map { position: relative; display: block; height: auto; aspect-ratio: 16 / 9; width: 140%; margin-left: -20%; }
+  .duo-map { aspect-ratio: 457 / 360; overflow: hidden; }
+  .duo-map .cw-map { position: absolute; inset: 0 auto 0 -20%; margin: 0; aspect-ratio: auto; height: 100%; }
   .cw-find { position: relative; right: auto; bottom: auto; width: auto; margin: 0; border-radius: 0; box-shadow: none; border-top: 1px solid var(--line); background: #fff; }
 }
 @media (prefers-reduced-motion: reduce) {
   .rv { opacity: 1; transform: none; transition: none; }
   .cc-body > * { opacity: 1; transform: none; transition: none; }
   .cc-note .spark { animation: none; }
+  .ask-ans { transition: none; }
   .tk-line li, .tk-pane, .tk-agent { transition: none; }
   .cw-find { transition: none; }
   .dot.work, .st.work::before { animation: none; }
@@ -462,11 +486,11 @@ footer a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <div class="band" id="band">
   <div class="wrap">
     <span><b>Rundown 0.6 is out.</b> <span class="dim">The full release lands in late October.</span></span>
-    <form class="wl-mini" data-waitlist hidden><input type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" class="hp"><input type="email" name="email" required placeholder="Your email" aria-label="Your email" autocomplete="email"><button type="submit">Join the waitlist</button></form>
-    <a class="band-link" href="#roadmap">Join the waitlist</a>
+    <a class="band-link" href="#install">Install</a>
   </div>
 </div>
 
@@ -477,16 +501,15 @@ footer a:hover { text-decoration: underline; }
     </a>
     <div class="links">
       <a href="#tasks">Features</a>
-      <a href="#codex">Codex</a>
       <a href="#roadmap">Roadmap</a>
       <a data-link="demo" href="#">Live demo</a>
     </div>
-    <a class="btn small nav-install" data-link="install" href="#">Install</a>
+    <a class="btn small nav-install" href="#install">Install</a>
     <a class="btn small nav-demo" data-link="demo" href="#">Try the demo</a>
   </div>
 </nav>
 
-<main>
+<main id="main" tabindex="-1">
 <!-- 1. Hero: the title holds the first screen; scrolling dissolves it, follows the three agents into the work, then zooms out -->
 <section class="scene" id="hero">
   <div class="stage">
@@ -495,8 +518,8 @@ footer a:hover { text-decoration: underline; }
       <h1><span class="line"><span>A live map</span></span><span class="line"><span class="grad">of your agents.</span></span></h1>
       <p>Where they go, what they touch, where they break.</p>
       <div class="btns" id="heroBtns">
-        <a class="btn" data-link="demo" href="#">Try the live demo</a>
-        <a class="more" data-wl-link href="#waitlist">Join the waitlist</a>
+        <a class="btn" href="#install">Install for Claude Code</a>
+        <a class="more" data-link="demo" href="#">Try the live demo</a>
       </div>
     </div>
     <p class="hcap" data-in=".08" data-out=".28">One agent, you can follow.</p>
@@ -505,8 +528,8 @@ footer a:hover { text-decoration: underline; }
     <div class="hero-end" id="heroEnd">
       <h2>We give you the rundown.</h2>
       <div class="btns" style="margin-top:24px">
-        <a class="btn" data-link="demo" href="#">Try the live demo</a>
-        <a class="more" data-link="install" href="#">Install for Claude Code</a>
+        <a class="btn" href="#install">Install for Claude Code</a>
+        <a class="more" data-link="demo" href="#">Try the live demo</a>
       </div>
     </div>
   </div>
@@ -559,26 +582,21 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
-<!-- 2. Research: pinned for a while, each number comes in and counts up as you scroll -->
-<section class="scene" id="stats">
+<!-- 2. Research: two numbers that count up once in view -->
+<section id="stats">
   <div class="stage">
   <div class="wrap">
     <h2 class="stats-head rv">Agents write more.<br>We understand less.</h2>
     <div class="stats3">
-      <div class="stat3">
+      <div class="stat3 rv">
         <div class="n" data-to="240">240%</div>
         <p>more commits with autonomous coding agents. <b>Only 30% more releases.</b></p>
         <a class="study" href="https://www.nber.org/papers/w35275" target="_blank" rel="noopener"><cite>Writing Code vs. Shipping Code: Productivity Effects Across Generations of AI Coding Tools</cite>NBER, 2026 · 500,000+ developers</a>
       </div>
-      <div class="stat3">
+      <div class="stat3 rv d1">
         <div class="n" data-to="50">50%</div>
         <p>comprehension when learning with AI, <b>vs 67% without.</b></p>
         <a class="study" href="https://www.anthropic.com/research/AI-assistance-coding-skills" target="_blank" rel="noopener"><cite>How AI assistance impacts the formation of coding skills</cite>Anthropic, 2026 · 52 developers</a>
-      </div>
-      <div class="stat3">
-        <div class="n warm" data-to="65" data-to2="86">65–86%</div>
-        <p>for those who used AI <b>to ask questions.</b></p>
-        <a class="study" href="https://www.anthropic.com/research/AI-assistance-coding-skills" target="_blank" rel="noopener"><cite>How AI assistance impacts the formation of coding skills</cite>Anthropic, 2026 · same study</a>
       </div>
     </div>
   </div>
@@ -653,6 +671,7 @@ footer a:hover { text-decoration: underline; }
     <h2 class="h2 rv">Ask why.</h2>
     <p class="sub rv d1">Click any step or file and ask Claude, with your own key. Answers stay grounded in the diff and the code around it.</p>
     <div class="ask-pill rv d2" id="askPill"><span class="q"></span><span id="askText"></span><span class="caret"></span></div>
+    <div class="ask-ans" id="askAns"><p>It moved the retry into <code>uploads/client.ts</code>: the old loop also retried failed sign-ins. Now only network errors are retried, once.</p><small>From the diff and the code around it</small></div>
   </div>
 </section>
 
@@ -673,13 +692,13 @@ footer a:hover { text-decoration: underline; }
     <p class="tele rv">Anonymous usage stats, once a day. <b>Opt out in Settings.</b></p>
     <p class="needs rv">Needs Claude Code and Node.js 22.13 or later.</p>
     <div class="btns rv" style="margin-top:28px">
-      <a class="btn" data-link="install" href="#">Install from GitHub</a>
+      <a class="more" data-link="install" href="#">Install from GitHub</a>
       <a class="more" data-link="guide" href="#">Settings, updates and uninstall</a>
     </div>
   </div>
 </section>
 
-<!-- Roadmap and the waitlist -->
+<!-- Roadmap and the release email -->
 <section class="block" id="roadmap">
   <div class="wrap center">
     <h2 class="h2 rv">What's next.</h2>
@@ -692,7 +711,7 @@ footer a:hover { text-decoration: underline; }
       <div class="later rv d2"><span class="dot"></span><h3>After</h3><p class="when">Later</p>
         <ul><li>Summaries on NVIDIA Nemotron</li><li>Cursor and Gemini CLI</li><li>Agents that coordinate</li><li>Replays on pull requests</li><li>Steering from the map</li></ul></div>
     </div>
-    <form class="wl-big rv" id="waitlist" data-waitlist hidden><input type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" class="hp"><input type="email" name="email" required placeholder="you@example.com" aria-label="Your email" autocomplete="email"><button class="btn" type="submit">Join the waitlist</button></form>
+    <form class="wl-big rv" id="waitlist" data-waitlist hidden><input type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" class="hp"><input type="email" name="email" required placeholder="you@example.com" aria-label="Your email" autocomplete="email"><button class="btn" type="submit">Get the release email</button></form>
     <p class="wl-note rv" id="wlNote"></p>
   </div>
 </section>
@@ -702,7 +721,7 @@ footer a:hover { text-decoration: underline; }
   <div class="wrap center">
     <h2 class="rv"><span class="grad">Keep your brain in the loop.</span></h2>
     <div class="btns rv d1">
-      <a class="btn big" data-link="install" href="#">Install for Claude Code</a>
+      <a class="btn big" href="#install">Install for Claude Code</a>
     </div>
     <div class="btns rv d2" style="margin-top:22px">
       <a class="more" data-link="demo" href="#">Try the live demo</a>
@@ -715,7 +734,7 @@ footer a:hover { text-decoration: underline; }
 
 <footer>
   <div class="wrap">
-    <span>Rundown. Source-available under FSL-1.1. Built with Claude Code.</span>
+    <span>Rundown. Source-available under FSL-1.1. Built with Claude Code. Release emails are kept private and never shared.</span>
     <span id="footLinks"></span>
   </div>
 </footer>
@@ -731,6 +750,7 @@ const SITE = {
     install: "https://github.com/Djbrl/brainstorm#install-claude-code-plugin-preview", // the README's install section
     guide: "https://github.com/Djbrl/brainstorm/blob/main/plugin/README.md",
     repo: "https://github.com/Djbrl/brainstorm",
+    contact: "https://github.com/Djbrl/brainstorm/issues",
     award: "https://hackathon.gomycode.com/onboarding/winners",
     video: null,   // a film link, when there is one
   },
@@ -748,7 +768,7 @@ document.querySelectorAll("[data-link]").forEach(a => {
   const url = SITE.links[a.dataset.link];
   if (url) { a.href = url; a.target = "_blank"; a.rel = "noopener"; } else a.hidden = true;
 });
-$("#footLinks").innerHTML = [["repo", "GitHub"], ["demo", "Live demo"], ["video", "Film"]]
+$("#footLinks").innerHTML = [["repo", "GitHub"], ["demo", "Live demo"], ["video", "Film"], ["contact", "Contact"]]
   .filter(([k]) => SITE.links[k]).map(([k, t]) => `<a href="${esc(SITE.links[k])}" target="_blank" rel="noopener">${t}</a>`).join(" · ");
 
 /* waitlist: shown only once there's somewhere to send the email */
@@ -803,8 +823,9 @@ document.querySelectorAll(".rv").forEach(el => io.observe(el));
 
 function typeQuestion() {
   const q = "Why did you change this?", out = $("#askText");
-  if (still) { out.textContent = q; return; }
-  let i = 0; setTimeout(function tick() { out.textContent = q.slice(0, ++i); if (i < q.length) setTimeout(tick, 45 + Math.random() * 60); }, 500);
+  const answer = () => $("#askAns").classList.add("on");
+  if (still) { out.textContent = q; answer(); return; }
+  let i = 0; setTimeout(function tick() { out.textContent = q.slice(0, ++i); if (i < q.length) setTimeout(tick, 45 + Math.random() * 60); else setTimeout(answer, 600); }, 500);
 }
 
 /* ---------- hero story (an illustration, not product data) ----------
@@ -1188,19 +1209,20 @@ agentMap($("#duoMap"), 29,
   [["web", 150, 160, 98], ["api", 330, 112, 70], ["client", 486, 214, 84], ["uploads", 312, 282, 58], ["docs", 568, 70, 44], ["styles", 74, 306, 40]],
   [["Claude Code", "#d97757", ["web", "styles", "web", "api"], 10], ["Codex", "#121214", ["client", "uploads", "client", "api"], 11]]);
 
-/* ---------- the research: each number comes in on its own stretch of the scroll and counts up with it ---------- */
-const stats = (() => {
-  const items = [...document.querySelectorAll("#stats .stat3")];
+/* ---------- the research: each number counts up once, when it comes into view ---------- */
+(() => {
   const fmt = n => n.dataset.to2 ? (k => `${Math.round(+n.dataset.to * k)}–${Math.round(+n.dataset.to2 * k)}%`) : (k => Math.round(+n.dataset.to * k) + "%");
-  return { set(p) {
-    items.forEach((it, i) => {
-      const a = .1 + i * .27, n = it.querySelector(".n");
-      if (flat || still) { it.style.opacity = ""; it.style.transform = ""; n.textContent = fmt(n)(1); return; }
-      const k = ease(win(p, a, a + .08));                              // in
-      it.style.opacity = k; it.style.transform = `translateY(${(1 - k) * 36}px)`;
-      n.textContent = fmt(n)(ease(win(p, a, a + .2)));                  // and counting
-    });
-  } };
+  const nums = [...document.querySelectorAll("#stats .stat3 .n")];
+  if (still) { nums.forEach(n => n.textContent = fmt(n)(1)); return; }
+  nums.forEach(n => n.textContent = fmt(n)(0));
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (!e.isIntersecting) return;
+    io.unobserve(e.target);
+    const n = e.target, t0 = performance.now() + 250;
+    const step = now => { const k = clamp((now - t0) / 1400); n.textContent = fmt(n)(ease(k)); if (k < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  }), { threshold: .6 });
+  nums.forEach(n => io.observe(n));
 })();
 
 /* ---------- scroll-driven scenes ---------- */
@@ -1240,7 +1262,6 @@ hero.onFrame((p, s) => {
 function onScroll() {
   hero.set(progress(heroEl));
   tasks.set(progress(tasksEl));        /* beyond code: one stop per slice of the scroll */
-  stats.set(progress($("#stats")));
 }
 let ticking = false;
 addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(() => { onScroll(); ticking = false; }); } }, { passive: true });

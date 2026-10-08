@@ -1,6 +1,6 @@
 {
   "name": "rundown",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "A live map and replay of what your agents do: every session, every file and place they touch, what broke.",
   "author": {
     "name": "Djbrl",

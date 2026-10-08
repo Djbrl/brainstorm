@@ -44,4 +44,7 @@ run("node scripts/build-share.mjs", join(APP, "web"));
 copyFileSync(join(APP, "web/dist-share/share.html"), join(OUT, "share.html"));
 
 const kb = (f) => Math.round(statSync(f).size / 1024);
+// 4. The licences of the open-source packages bundled above (most ask that their notice go with every copy).
+run("node scripts/third-party-notices.mjs", APP);
+
 console.log(`plugin/build ready: server.js ${kb(join(OUT, "server.js"))} kB + web/ + share.html ${kb(join(OUT, "share.html"))} kB`);

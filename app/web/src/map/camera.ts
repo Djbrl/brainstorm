@@ -17,7 +17,7 @@ const LEFT = ".map-sidebar:not(.sidebar-overlay), .sidebar-collapsed"; // the na
 const RIGHT = ".map-panel.open";
 const FLOAT_RIGHT = ".map-peek";                         // floats in from the right edge: covers from its left side on
 const TOP = ".lens-switch";
-const BOTTOM = ".dock, .rp-bar";
+const BOTTOM = ".dock, .rp-bar, .map-sidebar.pip"; // the phone's thread sheet under the map (MapSidebar's pip)
 const WATCH = [LEFT, ".map-panel", FLOAT_RIGHT, TOP, BOTTOM].join(", ");
 
 /** Measure the safe area of the canvas living in `host` (the covering elements are looked up in its .map-wrap). */

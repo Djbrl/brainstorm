@@ -173,7 +173,18 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
   .sidebar-collapsed { top: 16px; left: 12px; width: auto; height: 38px; padding: 0 14px 0 16px; flex-direction: row; gap: 6px; border-radius: 999px; z-index: 6; }
   .sidebar-collapsed span { writing-mode: horizontal-tb; font-size: 13.5px; letter-spacing: 0; }
   .map-sidebar.sidebar-overlay { left: 10px; right: 10px; top: 10px; bottom: 10px; width: auto; max-width: none; height: auto; }
+  /* An open thread: the map keeps the top 42% like a video (no scrim: it stays live and touchable), its steps below. */
+  .map-sidebar.sidebar-overlay.pip { top: 42%; left: 0; right: 0; bottom: 0; border-radius: 18px 18px 0 0; border-bottom: 0;
+    box-shadow: 0 -10px 30px rgba(0,0,0,.08); animation: sidebar-pip-in .26s cubic-bezier(.2,.8,.2,1); }
+  .map-sidebar.pip .sidebar-head { padding-top: 10px; }
+  /* The player rides on the sheet's edge, over the map's bottom. */
+  .map-wrap:has(.map-sidebar.pip) .dock { bottom: calc(58% + 10px); z-index: 11; }
+  /* The map's top fade and the lens pill: the video area is short, keep the fade small. */
+  .map-wrap:has(.map-sidebar.pip) { --fade-top: 64px; --fade-bottom: 0px; }
+  .map-wrap:has(.map-sidebar.pip) .sidebar-collapsed { display: none; } /* the sheet is open: no tab to open it */
 }
+@keyframes sidebar-pip-in { from { transform: translateY(24px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .map-sidebar.pip { animation: none; } }
 
 
 /* The Track tab: the step list scrolls by itself (its scroll moves the tracer), so the body doesn't. */

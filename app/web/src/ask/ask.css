@@ -16,10 +16,6 @@
 .ask-shimmer.short { width: 55%; }
 .ask-shimmer.mid { width: 75%; }
 
-.ask-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.ask-chip { border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); padding: 6px 14px; border-radius: 999px; font-size: 14px; transition: border-color .15s, color .15s, background .15s; }
-.ask-chip:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.ask-chip:disabled { opacity: .5; cursor: default; }
 
 .ask-form { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 6px 6px 18px; transition: border-color .15s, box-shadow .15s; }
 .ask-form:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }

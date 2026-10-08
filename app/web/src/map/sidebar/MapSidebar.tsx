@@ -69,14 +69,15 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
 
   useEffect(() => { try { localStorage.setItem(TAB_KEY, tab); } catch { /* storage blocked: tab resets on reload */ } }, [tab]);
   useEffect(() => { try { localStorage.setItem(COLLAPSED_KEY, folded ? "1" : "0"); } catch { /* storage blocked */ } }, [folded]);
-  // Opening a thread shows it under Threads; closing it, the list. On a phone the sheet folds away to show the map.
+  // Opening a thread shows it under Threads; closing it, the list. On a phone the thread opens below the map, which
+  // keeps the top of the screen like a video (the "pip" sheet): scroll its steps back and still see the agents work.
   const thread = replay?.sessionId ?? null;
   const opened = useRef(false); // the first render already picked its tab
   useEffect(() => {
     if (opened.current && thread) setTab("threads");
     opened.current = true;
     setListing(false);
-    if (phone) setOver(false);
+    if (phone) setOver(!!thread);
   }, [thread]);
   const shown: Tab = tab;
   const inThread = shown === "threads" && !!thread && !listing;
@@ -102,6 +103,7 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
   const body = useRef<HTMLDivElement>(null);
   const viewing = shown === "files" && file ? file.path : null;
   const view = viewing ? `file:${viewing}` : inThread ? "thread" : shown; // "files" is the tree
+  const pip = phone && over && inThread && !viewing;
   const viewRef = useRef(view); viewRef.current = view;
   const treeTop = useRef(0), lastView = useRef(view);
   useLayoutEffect(() => {
@@ -123,8 +125,8 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
   // Narrow: the folded tab stays in place under the open sheet, so the content behind it doesn't move.
   return (
     <>
-    {narrow && <>{tabButton}<button className="sidebar-scrim" aria-label="Close sidebar" tabIndex={-1} onClick={() => setOver(false)} /></>}
-    <div className={`map-sidebar${narrow ? " sidebar-overlay" : ""}`}>
+    {narrow && <>{tabButton}{!pip && <button className="sidebar-scrim" aria-label="Close sidebar" tabIndex={-1} onClick={() => setOver(false)} />}</>}
+    <div className={`map-sidebar${narrow ? " sidebar-overlay" : ""}${pip ? " pip" : ""}`}>
       <div className="sidebar-head">
         <nav className="sidebar-tabs" role="tablist" aria-label="Sidebar view">
           <button role="tab" aria-selected={shown === "threads"} onClick={() => setTab("threads")}>Threads</button>

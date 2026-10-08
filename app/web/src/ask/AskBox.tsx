@@ -7,7 +7,6 @@ import "./ask.css";
 
 type QA = { id: number; question: string; answer?: AskResponse; error?: string };
 
-const SUGGESTIONS = ["Why this change?", "What could break?", "Explain like I'm new here"];
 
 let nextId = 1;
 
@@ -20,7 +19,7 @@ export function formatCost(usd: number): string {
 
 const fmtTokens = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
-export function AskBox({ context, placeholder, suggestions = SUGGESTIONS }: { context: Omit<AskRequest, "question">; placeholder?: string; suggestions?: string[] }) {
+export function AskBox({ context, placeholder }: { context: Omit<AskRequest, "question">; placeholder?: string }) {
   const [items, setItems] = useState<QA[]>([]);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
@@ -93,12 +92,6 @@ export function AskBox({ context, placeholder, suggestions = SUGGESTIONS }: { co
           <div ref={endRef} />
         </div>
       )}
-
-      <div className="ask-chips">
-        {suggestions.map((s) => (
-          <button key={s} type="button" className="ask-chip" disabled={busy} onClick={() => submit(s)}>{s}</button>
-        ))}
-      </div>
 
       <form className="ask-form" onSubmit={onSubmit}>
         <input

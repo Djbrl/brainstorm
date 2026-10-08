@@ -34,8 +34,8 @@
   --blue: #2563eb;     /* cobalt, the second step: buttons, links, focus */
   --orange: #ff5b1f;   /* the lead step: what is happening now */
   --red: #ef3b2d;
-  --accent: var(--blue);   /* accented words in the headlines */
-  --accent-on-dark: #6f9bff;
+  --accent: var(--red);   /* accented words in the headlines */
+  --accent-on-dark: var(--red);
   --cool: #b4c2d4;   /* unchanged file */
   --warm: #ff9f0a;   /* changed recently */
   --hot: #ff375f;    /* agent editing now */
@@ -79,8 +79,8 @@ nav .links a:hover { color: var(--text); }
 
 /* ---------- buttons ---------- */
 .btns { display: flex; justify-content: center; flex-wrap: wrap; gap: 14px 28px; align-items: center; margin-top: 40px; }
-.btn { background: var(--orange); color: #fff; padding: 12px 24px; border-radius: 999px; font-weight: 600; font-size: 17px; transition: background .2s; }
-.btn:hover { background: #e94a12; }
+.btn { background: var(--blue); color: #fff; padding: 12px 24px; border-radius: 999px; font-weight: 600; font-size: 17px; transition: background .2s; }
+.btn:hover { background: #1d4fd0; }
 .btn.small { padding: 5px 14px; font-size: 13px; margin-left: 4px; }
 .more { color: var(--blue); font-size: 17px; font-weight: 500; }
 .more::after { content: " ›"; }
@@ -98,13 +98,13 @@ nav .links a:hover { color: var(--text); }
   position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center;
   text-align: center; will-change: transform, opacity; padding: 104px 16px 0;
 }
-.hero-type h1 { font-size: clamp(44px, min(8.6vw, 15svh), 150px); line-height: .9; letter-spacing: -0.05em; }
+.hero-type h1 { font-size: clamp(56px, min(11.5vw, 18svh), 184px); line-height: .86; letter-spacing: -0.055em; }
 .hero-type .btns { margin-top: 36px; opacity: 0; animation: fade 1s .8s var(--ease) forwards; }
-.hero-type h1 .line { display: block; overflow: hidden; padding-bottom: .06em; }
-.hero-type h1 .line span { display: inline-block; transform: translateY(105%); animation: rise 1.2s var(--ease) forwards; }
+.hero-type h1 .line { display: block; overflow: hidden; padding: .08em 0 .2em; margin: -.08em 0 -.14em; }
+.hero-type h1 .line span { display: inline-block; transform: translateY(135%); animation: rise 1.2s var(--ease) forwards; }
 .hero-type h1 .line:nth-child(2) span { animation-delay: .12s; }
 .hero-type h1 .grad { color: var(--accent); }
-.hero-type p { font: 500 clamp(20px, 2.4vw, 28px)/1.3 var(--body); color: var(--muted); margin-top: 28px; opacity: 0; animation: fade 1s .6s var(--ease) forwards; }
+.hero-type p { font: 500 clamp(20px, 2.4vw, 28px)/1.3 var(--body); color: var(--muted); margin-top: 36px; opacity: 0; animation: fade 1s .6s var(--ease) forwards; }
 @keyframes rise { to { transform: none; } }
 @keyframes fade { to { opacity: 1; } }
 .hero-end {
@@ -264,7 +264,7 @@ nav .links a:hover { color: var(--text); }
 #install .alt-cmd code { font: 12.5px var(--mono); color: #d6d3cc; background: #2c2b28; border-radius: 5px; padding: 1px 6px; overflow-wrap: anywhere; }
 .needs { margin-top: 10px; font-weight: 500; }
 .tele { margin-top: 44px; font-size: 18px; font-weight: 500; color: #e4e4e7; }
-.tele b { color: var(--accent-on-dark); font-weight: 700; }
+.tele b { color: #ff7a45; font-weight: 700; }
 #install .more { color: #8fb1ff; }
 
 /* every agent, every project: one app window, its agents moving on the map, Find a thread over it */
@@ -377,7 +377,7 @@ nav { top: 40px; }
 .wl-big { display: flex; justify-content: center; gap: 10px; margin: 96px auto 0; max-width: 520px; }
 .wl-big input { flex: 1; min-width: 0; height: 52px; border: 1px solid var(--line); border-radius: 999px; padding: 0 22px; font: 500 17px var(--body); background: #fff; outline: none; transition: border-color .2s, box-shadow .2s; }
 .wl-big input:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(37,99,235,.15); }
-.wl-big .btn { border: 0; cursor: pointer; font-family: var(--body); background: var(--orange); }
+.wl-big .btn { border: 0; cursor: pointer; font-family: var(--body); background: var(--blue); }
 .wl-note { margin-top: 16px; color: var(--muted); font-size: 14px; font-weight: 500; }
 .wl-big + .wl-note:empty { display: none; }
 
@@ -517,8 +517,8 @@ main:focus { outline: none; }
   <div class="stage">
     <canvas id="map" aria-hidden="true"></canvas>
     <div class="hero-type" id="heroType">
-      <h1><span class="line"><span>Not just a live map</span></span><span class="line"><span class="grad">of your agents.</span></span></h1>
-      <p>Scroll down to learn more.</p>
+      <h1><span class="line"><span>A live map</span></span><span class="line"><span class="grad">of your agents.</span></span></h1>
+      <p>And a whole lot more.</p>
       <div class="btns" id="heroBtns">
         <a class="btn" href="#install">Install for Claude Code</a>
         <a class="more" data-link="demo" href="#">Try the live demo</a>

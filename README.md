@@ -77,7 +77,7 @@ Local-first. Session logs are read from `~/.claude/projects` on your machine and
 
 ### Usage stats
 
-To know how many people use Rundown, roughly where, and which parts matter, the plugin sends one anonymous report a day. It never contains code, file paths, prompts, thread titles, names or anything you typed. Exactly what it sends:
+Off unless you say yes. The first time you use Rundown it asks, once, whether to share anonymous usage stats; until you answer yes, nothing is counted or sent (installs from 0.6 and older are asked too). If you say yes, it sends one report a day, to know how many people use Rundown, roughly where, and which parts matter. It never contains code, file paths, prompts, thread titles, names or anything you typed. Exactly what it sends:
 
 | Field | What it is |
 | --- | --- |
@@ -87,9 +87,9 @@ To know how many people use Rundown, roughly where, and which parts matter, the 
 | `tm` | The map theme in use |
 | `c` | Counts since the last report: app opened, threads opened, replays played, live follows, threads shared, questions asked, projects opened, agent sessions seen working, agent steps seen |
 
-The landing site that receives it adds the country from the request (two letters) and keeps no IP address. Reports are kept as empty files whose names hold the fields above, in a private store only the maintainer can read.
+The landing site that receives it adds the country from the request (two letters) and keeps no IP address. Reports are kept as empty files whose names hold the fields above, in a private store only the maintainer can read, and deleted after 13 months (a daily job, `site/api/usage-prune.js`). The site's [privacy page](https://brainstorm-landing.vercel.app/privacy.html#usage-stats) says the same for people who don't read READMEs.
 
-**To turn it off:** Settings → Usage stats, or set `DO_NOT_TRACK=1` or `RUNDOWN_USAGE=off` in your environment (that also locks the setting off). Turned off, nothing is counted or sent. A development build (`npm run dev`) never sends anything. The code: [`app/server/src/usage/`](app/server/src/usage/) and [`site/api/usage.js`](site/api/usage.js).
+**To turn it off:** Settings → Usage stats, or set `DO_NOT_TRACK=1` or `RUNDOWN_USAGE=off` in your environment (that also locks the setting off). Turned off, nothing is counted or sent. **To delete what was sent:** Settings → Usage stats → Delete the stats already sent (the site removes every report with your install id; `site/api/usage-forget.js`). A development build (`npm run dev`) never sends anything. The code: [`app/server/src/usage/`](app/server/src/usage/) and [`site/api/usage.js`](site/api/usage.js).
 
 ## Documentation
 
@@ -115,3 +115,7 @@ Claude Code only today (Codex is next). No file summaries or model-written step 
 ## License
 
 [Functional Source License 1.1, Apache 2.0 future license](LICENSE.md) (`FSL-1.1-ALv2`). You can use, read, change and self-host Rundown, including at work. You can't offer it, or something built from it, as a competing product or service. Two years after each release, that release is also available under the Apache License 2.0.
+
+## Trademarks
+
+Rundown is an independent project and is not affiliated with, sponsored by, or endorsed by Anthropic, OpenAI, or NVIDIA. Claude and Claude Code are trademarks of Anthropic, PBC; OpenAI and Codex are trademarks of OpenAI; NVIDIA and Nemotron are trademarks of NVIDIA Corporation.

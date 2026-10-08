@@ -11,9 +11,16 @@ import { isErrorResult } from "../failures/failures.service";
 // turn) and made certain by the plugin's hooks (PermissionRequest, Notification, Stop) when they're installed.
 
 /** A call with no result and no activity this long, for a tool that's normally instant, is probably a permission prompt. */
-const QUIET_MS = 8_000;
-/** Tools that return at once unless something (you) holds them up. Bash, subagents and browsers can legitimately take long. */
-const INSTANT = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit", "Read", "Glob", "Grep", "LS", "WebSearch", "WebFetch", "TodoWrite"]);
+const QUIET_MS = 12_000;
+/**
+ * Tools that ask you before they run (by default) and return at once otherwise: one of these held up is probably your
+ * OK it waits for. Not Read, Glob, Grep or the web tools: they don't ask in your project, and they can take long (the
+ * model looks at an image for a minute; 4% of reads, 20 to 40% of web fetches and searches pass 8 s), which flagged
+ * threads that were only working.
+ */
+const INSTANT = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
+/** The plugin's hooks were heard this recently: they say for certain when you're needed, so no guessing. */
+const HOOKS_TRUSTED_MS = 24 * 60 * 60_000;
 const ASKS = new Set(["AskUserQuestion"]);
 const PLANS = new Set(["ExitPlanMode"]);
 const STUCK_AFTER = 3;
@@ -93,7 +100,7 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     this.bus.on("step", (s) => { try { this.onStep(s); } catch { /* never break the listener */ } });
     // A turn an agent's log says is over (Codex's task_complete): what the plugin's Stop hook says for Claude Code.
-    this.bus.on("turn-ended", ({ sessionId }) => { try { this.signal({ event: "Stop", session_id: sessionId }); } catch { /* never break the listener */ } });
+    this.bus.on("turn-ended", ({ sessionId }) => { try { this.signal({ event: "Stop", session_id: sessionId }, false); } catch { /* never break the listener */ } });
     this.bus.on("workspace", () => { this.trackers.clear(); this.last.clear(); this.scope = undefined; this.rechecked.clear(); });
     this.timer = setInterval(() => this.sweep(), 2_000);
     this.timer.unref?.();
@@ -106,9 +113,13 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
     return [...this.last.values()].filter((a) => a.state !== "working" && a.state !== "idle").sort((a, b) => b.since.localeCompare(a.since)); // thinking included: pages show it
   }
 
-  /** From the plugin's hooks. */
-  signal(sig: HookSignal) {
+  /** When a hook last reached this server (null: never; then the log's guesses stand in for them). */
+  private hooksAt: number | null = null;
+
+  /** From the plugin's hooks (`fromHook` false: the same signal worked out from a log, Codex's task_complete). */
+  signal(sig: HookSignal, fromHook = true) {
     if (!sig?.session_id || !sig.event) return;
+    if (fromHook) this.hooksAt = Date.now();
     const t = this.tracker(sig.session_id);
     if (sig.event === "UserPromptSubmit") { t.hook = undefined; t.streak = null; }
     else t.hook = { ...sig, at: Date.now() };
@@ -208,8 +219,10 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
 
     if (quiet > FORGET_MS) return make("idle", true, t.lastTs);
 
-    // 3. An instant tool that hasn't come back, with nothing else moving: most likely a permission prompt.
-    const held = pending.find((c) => INSTANT.has(c.tool ?? (c.kind === "edit" ? "Edit" : "")));
+    // 3. An edit or a write that hasn't come back, with nothing else moving: most likely a permission prompt. Only
+    // without the hooks: with them, a prompt is always announced (PermissionRequest), so a guess could only be wrong.
+    const hooks = this.hooksAt !== null && now - this.hooksAt < HOOKS_TRUSTED_MS;
+    const held = hooks ? undefined : pending.find((c) => INSTANT.has(c.tool ?? (c.kind === "edit" ? "Edit" : "")));
     if (held && quiet > QUIET_MS) return make("permission", false, Date.parse(held.ts), about(held));
 
     // 4. The same tool failing over and over.

@@ -104,7 +104,7 @@
 /* Threads: click to open (its Track). The open one is a pill; a running one pulses blue. */
 button.sidebar-thread-head { width: calc(100% + 16px); border: 0; background: transparent; padding: 7px 8px; margin: -7px -8px; border-radius: 10px; text-align: left; color: var(--ink); cursor: pointer; box-sizing: border-box; }
 button.sidebar-thread-head:hover { background: #f4f4f7; }
-.sidebar-thread.selected button.sidebar-thread-head { background: var(--accent-soft); cursor: default; }
+.sidebar-thread.selected button.sidebar-thread-head { background: var(--accent-soft); }
 .sidebar-thread-status.running { background: var(--accent); box-shadow: 0 0 0 0 rgba(37,99,235,.55); animation: sidebar-pulse 1.6s infinite; }
 .sidebar-thread-head time { font-variant-numeric: tabular-nums; }
 
@@ -117,6 +117,8 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .sidebar-thread-headrow { display: flex; align-items: center; gap: 2px; margin: -7px -8px; border-radius: 10px; }
 .sidebar-thread-headrow:hover { background: #f4f4f7; }
 .sidebar-thread.selected .sidebar-thread-headrow { background: var(--accent-soft); }
+/* The open thread is a link too (back to its steps): the same hand and a hover, a shade deeper. */
+.sidebar-thread.selected .sidebar-thread-headrow:hover { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
 .sidebar-thread-headrow button.sidebar-thread-head { flex: 1; min-width: 0; width: auto; margin: 0; background: transparent; }
 .sidebar-thread-headrow button.sidebar-thread-head:hover, .sidebar-thread.selected .sidebar-thread-headrow button.sidebar-thread-head { background: transparent; }
 .sidebar-thread-headrow .sidebar-agent-eye { margin-right: 4px; }

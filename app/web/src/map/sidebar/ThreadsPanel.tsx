@@ -79,7 +79,7 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
   const add = (key: string, title: string, s: Session) => (sections.get(key) ?? sections.set(key, { key, title, list: [] }).get(key)!).list.push(s);
   for (const k of ["claude", "codex"]) sections.set(k, { key: k, title: harnessName(k as "claude" | "codex"), list: [] });
   for (const x of sessions) {
-    const home = visitorHome(x.cwd, state.map);
+    const home = visitorHome(x.home ?? x.cwd, state.map);
     if (home) { const name = home.slice(home.lastIndexOf("/") + 1); add(`p:${home}`, `From ${name}`, x); }
     else add(harnessOf(x), "", x);
   }
@@ -153,7 +153,7 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
   return (
     <li className={`sidebar-thread ${selected ? "selected" : ""}${blocked ? " needs-you" : ""}`}>
       <div className="sidebar-thread-headrow">
-        <button className="sidebar-thread-head" onClick={onSelect} aria-pressed={selected} title={selected ? "Close this thread" : running ? "Open this thread and follow it live" : "Open this thread"}>
+        <button className="sidebar-thread-head" onClick={onSelect} aria-pressed={selected} title={selected ? "Show this thread's steps" : running ? "Open this thread and follow it live" : "Open this thread"}>
           <span className={`sidebar-thread-status ${session.status}${blocked ? " waiting" : ""}`} aria-hidden="true" />
           <span className="sidebar-thread-title">{session.title || "Untitled thread"}</span>
           {say && <span className={`sidebar-thread-attn ${blocked ? "blocked" : "turn"}`} title={`${say.line}${attention?.detail ? `\n${attention.detail}` : ""}`}>{say.badge}</span>}

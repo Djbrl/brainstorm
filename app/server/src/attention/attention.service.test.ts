@@ -54,8 +54,8 @@ test("catch-up reads the newest 600 steps, oldest first", () => {
 test("the sweep turns a quiet instant call into a guessed permission, and only re-reads the thread list when needed", () => {
   const { sent, store, session, sweep, listed } = setup();
   session("a", iso(10_000));
-  store({ sessionId: "a", kind: "prompt", text: "edit it", ts: iso(10_000) });
-  store({ sessionId: "a", kind: "edit", tool: "Edit", toolUseId: "e1", ts: iso(10_000) });
+  store({ sessionId: "a", kind: "prompt", text: "edit it", ts: iso(20_000) });
+  store({ sessionId: "a", kind: "edit", tool: "Edit", toolUseId: "e1", ts: iso(20_000) });
   sweep(); sweep(); sweep();
   assert.deepEqual(sent.map((a) => [a.state, a.sure]), [["permission", false]]);
   assert.equal(listed(), 1);
@@ -70,10 +70,28 @@ test("the sweep turns a quiet instant call into a guessed permission, and only r
 test("catch-up from the store keeps which subagent is waiting", () => {
   const { sent, store, session, sweep } = setup();
   session("a", iso(10_000));
-  store({ sessionId: "a", kind: "prompt", text: "go", ts: iso(20_000) });
-  store({ sessionId: "a", kind: "tool_call", tool: "Read", toolUseId: "r1", isSubagent: true, agentId: "ag7", ts: iso(10_000) });
+  store({ sessionId: "a", kind: "prompt", text: "go", ts: iso(30_000) });
+  store({ sessionId: "a", kind: "edit", tool: "Edit", toolUseId: "r1", isSubagent: true, agentId: "ag7", ts: iso(20_000) });
   sweep();
   assert.deepEqual(sent.map((a) => [a.state, a.agentId]), [["permission", "ag7"]]);
+});
+
+test("a long read, search or web fetch is work, not a permission prompt (the model looks at an image for a minute)", () => {
+  const { att, store, session } = setup();
+  session("a", iso(90_000));
+  store({ sessionId: "a", kind: "prompt", text: "look at these", ts: iso(90_000) });
+  store({ sessionId: "a", kind: "tool_call", tool: "Read", filePath: "/r/shot.png", toolUseId: "r1", ts: iso(60_000) });
+  store({ sessionId: "a", kind: "tool_call", tool: "WebFetch", toolUseId: "w1", ts: iso(60_000) });
+  assert.equal(att.list().find((a) => a.sessionId === "a")?.state ?? "working", "working");
+});
+
+test("with the plugin's hooks heard, a held edit isn't guessed to be a prompt (the hook would have said)", () => {
+  const { att, store, session } = setup();
+  att.signal({ event: "UserPromptSubmit", session_id: "other" });
+  session("a", iso(30_000));
+  store({ sessionId: "a", kind: "prompt", text: "edit it", ts: iso(30_000) });
+  store({ sessionId: "a", kind: "edit", tool: "Edit", toolUseId: "e1", ts: iso(20_000) });
+  assert.notEqual(att.list().find((a) => a.sessionId === "a")?.state, "permission");
 });
 
 test("threads outside the workspace are left out of the sweep", () => {

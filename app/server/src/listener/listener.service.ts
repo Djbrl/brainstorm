@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from "@nestjs/common";
 import { HttpAdapterHost } from "@nestjs/core";
-import { closeSync, existsSync, openSync, readdirSync, readSync, statSync } from "node:fs";
+import { closeSync, existsSync, openSync, readdirSync, readSync, realpathSync, statSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import type { Harness, Session, Step } from "../types";
 import { DbService } from "../core/db.service";
@@ -725,7 +725,22 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
 
   private rowToSession(row: SessionRow): Session {
     const idle = Date.now() - Date.parse(row.last_event_at) > IDLE_AFTER_MS;
-    return { id: row.id, cwd: row.cwd, title: row.title, startedAt: row.started_at, lastEventAt: row.last_event_at, status: idle ? "idle" : "running", harness: row.harness === "codex" ? "codex" : "claude" };
+    const home = this.homeOf(row.cwd);
+    return { id: row.id, cwd: row.cwd, title: row.title, startedAt: row.started_at, lastEventAt: row.last_event_at, status: idle ? "idle" : "running", harness: row.harness === "codex" ? "codex" : "claude", ...(home && home !== row.cwd ? { home } : {}) };
+  }
+
+  /** A thread folder's repo, its real path (see Session.home), remembered per folder. */
+  private homes = new Map<string, string>();
+  private homeOf(cwd: string): string {
+    if (!cwd) return cwd;
+    let h = this.homes.get(cwd);
+    if (h === undefined) {
+      let real = cwd;
+      try { real = realpathSync(cwd); } catch { /* gone: as it was */ }
+      this.homes.set(cwd, (h = repoBase(real)));
+      if (this.homes.size > 2000) this.homes.delete(this.homes.keys().next().value!);
+    }
+    return h;
   }
 
   getSession(id: string): Session | undefined {

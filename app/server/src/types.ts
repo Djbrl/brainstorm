@@ -3,7 +3,9 @@
 /** The coding agent a thread ran in (its logs: listener/claude.source.ts, listener/codex.source.ts). */
 export type Harness = "claude" | "codex";
 /** `harness`: added 6 Oct 2026 ("claude" for every thread stored before). */
-export type Session = { id: string; cwd: string; title: string; startedAt: string; lastEventAt: string; status: "running" | "idle"; harness: Harness };
+/** `home`: the repo the thread works in, its real folder (links followed, a worktree's repo): one name for a repo that
+ *  moved or is reached through a link (~/brainstorm, ~/Documents/brainstorm and ~/rundown are one project). */
+export type Session = { id: string; cwd: string; title: string; startedAt: string; lastEventAt: string; status: "running" | "idle"; harness: Harness; home?: string };
 export type StepKind = "prompt" | "text" | "thinking" | "tool_call" | "tool_result" | "edit";
 export type Step = {
   id: string; sessionId: string; seq: number; ts: string; kind: StepKind;

@@ -264,9 +264,7 @@ nav .links a:hover { color: var(--text); }
 .cc.in .cc-body > :nth-child(2) { transition-delay: .5s; } .cc.in .cc-body > :nth-child(3) { transition-delay: 1s; } .cc.in .cc-body > :nth-child(4) { transition-delay: 1.5s; }
 #install .alt-cmd { margin-top: 28px; font-size: 14px; color: #8a877f; font-weight: 500; }
 #install .alt-cmd code { font: 12.5px var(--mono); color: #d6d3cc; background: #2c2b28; border-radius: 5px; padding: 1px 6px; overflow-wrap: anywhere; }
-.needs { margin-top: 10px; font-weight: 500; }
-.tele { margin-top: 44px; font-size: 18px; font-weight: 500; color: #e4e4e7; }
-.tele b { color: #ff7a45; font-weight: 700; }
+.needs { margin-top: 44px; font-weight: 500; }
 #install .more { color: #8fb1ff; }
 
 /* every agent, every project: one app window, its agents moving on the map, Find a thread over it */
@@ -397,9 +395,11 @@ nav { top: 40px; }
 .award b { color: var(--text); font-weight: 600; }
 .team-line { margin-top: 64px; color: var(--muted); font-weight: 500; }
 .team-line:empty { display: none; }
-footer { border-top: 1px solid var(--line); padding: 22px 0 40px; font-size: 12px; color: var(--muted); }
-footer .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-footer a:hover { text-decoration: underline; }
+footer { border-top: 1px solid var(--line); padding: 28px 0 44px; color: var(--muted); }
+.foot-links { display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 14px; font-weight: 500; }
+.foot-links a { color: var(--text); }
+.foot-links a:hover { text-decoration: underline; }
+.foot-legal { margin-top: 14px; max-width: 760px; font-size: 12px; line-height: 1.5; }
 
 .skip { position: fixed; left: 12px; top: -60px; z-index: 100; background: var(--blue); color: #fff; padding: 8px 16px; border-radius: 999px; font-weight: 600; font-size: 14px; transition: top .2s; }
 .skip:focus { top: 12px; }
@@ -694,7 +694,6 @@ main:focus { outline: none; }
         <p class="cc-note"><span class="spark" aria-hidden="true">✻</span><span>The map opens in your browser, for the project you're in.</span></p>
       </div>
     </div>
-    <p class="tele rv">Anonymous usage stats, once a day. <b>Opt out in Settings.</b></p>
     <p class="needs rv">Needs Claude Code and Node.js 22.13 or later.</p>
     <div class="btns rv" style="margin-top:28px">
       <a class="more" data-link="install" href="#">Install from GitHub</a>
@@ -739,8 +738,8 @@ main:focus { outline: none; }
 
 <footer>
   <div class="wrap">
-    <span>Rundown. Source-available under FSL-1.1. Built with Claude Code. Rundown is an independent project and is not affiliated with, sponsored by, or endorsed by Anthropic, OpenAI, or NVIDIA. Claude and Claude Code are trademarks of Anthropic, PBC; OpenAI and Codex are trademarks of OpenAI; NVIDIA and Nemotron are trademarks of NVIDIA Corporation.</span>
-    <span id="footLinks"></span>
+    <div class="foot-links" id="footLinks"></div>
+    <p class="foot-legal">Rundown. Source-available under FSL-1.1. Built with Claude Code. Rundown is an independent project and is not affiliated with, sponsored by, or endorsed by Anthropic, OpenAI, or NVIDIA. Claude and Claude Code are trademarks of Anthropic, PBC; OpenAI and Codex are trademarks of OpenAI; NVIDIA and Nemotron are trademarks of NVIDIA Corporation.</p>
   </div>
 </footer>
 
@@ -773,9 +772,9 @@ document.querySelectorAll("[data-link]").forEach(a => {
   const url = SITE.links[a.dataset.link];
   if (url) { a.href = url; a.target = "_blank"; a.rel = "noopener"; } else a.hidden = true;
 });
-$("#footLinks").innerHTML = [["repo", "GitHub"], ["demo", "Live demo"], ["video", "Film"], ["contact", "Contact"]]
-  .filter(([k]) => SITE.links[k]).map(([k, t]) => `<a href="${esc(SITE.links[k])}" target="_blank" rel="noopener">${t}</a>`)
-  .concat(['<a href="/privacy.html">Privacy</a>', '<a href="/terms.html">Terms</a>']).join(" · ");
+$("#footLinks").innerHTML = ['<a href="/privacy.html">Privacy</a>', '<a href="/terms.html">Terms</a>']
+  .concat([["contact", "Contact"], ["repo", "GitHub"], ["demo", "Live demo"], ["video", "Film"]]
+    .filter(([k]) => SITE.links[k]).map(([k, t]) => `<a href="${esc(SITE.links[k])}" target="_blank" rel="noopener">${t}</a>`)).join("");
 
 /* waitlist: shown only once there's somewhere to send the email */
 if (SITE.waitlist) {

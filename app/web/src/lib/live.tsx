@@ -351,8 +351,15 @@ export function LiveProvider({ children }: { children: ReactNode }) {
 
     let ws: WebSocket | null = null;
     let stop = false, opened = false;
+    const retry = () => { store.dispatch({ type: "connected", value: false }); if (!stop) setTimeout(connect, 1500); };
+    // The live feed needs a token only this page can read (another site, or another app on localhost, can't). It changes
+    // when the server restarts, so it's fetched again on every connection.
     const connect = () => {
-      const sock = (ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`));
+      fetch("/api/live-token").then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+        .then(({ token }: { token: string }) => { if (!stop) open(token); }, retry);
+    };
+    const open = (token: string) => {
+      const sock = (ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?t=${encodeURIComponent(token)}`));
       // A server that's up but stuck accepts the connection and never answers: the socket would wait forever without
       // closing. Give up after a few seconds and try again (so the page can say it can't reach it).
       const giveUp = setTimeout(() => { if (sock.readyState === WebSocket.CONNECTING) sock.close(); }, 5000);
@@ -364,7 +371,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
         if (opened || !store.get().setup) loadAll(store.dispatch);
         opened = true;
       };
-      sock.onclose = () => { clearTimeout(giveUp); store.dispatch({ type: "connected", value: false }); if (!stop) setTimeout(connect, 1500); };
+      sock.onclose = () => { clearTimeout(giveUp); retry(); };
       sock.onmessage = (e) => { try { store.enqueue(JSON.parse(e.data) as WsMessage); } catch {} };
     };
     connect();

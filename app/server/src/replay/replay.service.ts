@@ -6,7 +6,7 @@ import { ConfigService } from "../core/config.service";
 import { FailuresService } from "../failures/failures.service";
 import { WorkspaceService } from "../workspace/workspace.service";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import type { Replay, Step } from "../types";
 import { summarizePlaces } from "../cowork/cowork.service";
 
@@ -72,7 +72,8 @@ export class ReplayService {
     const wanted = sessionId ? sessionId.split(",") : [];
     const sessions = wanted.length ? all.filter((s) => wanted.includes(s.id)) : all.slice(0, 1);
     const steps = sessions.flatMap((s) => this.listener.listSteps(s.id)).filter((st) => !until || st.ts <= until);
-    const map = this.mapper.getMap(root || this.cfg.defaultRoot);
+    // The open project only (or the same folder written another way): never a walk of any folder a link names.
+    const map = this.mapper.getMap(root && resolve(root) === resolve(this.cfg.defaultRoot) ? root : this.cfg.defaultRoot);
     const answers = this.askService.listAnswers();
     const failures = this.failures.list(sessions.map((s) => s.id).join(","), until);
     const cowork = Object.fromEntries(sessions.map((s) => [s.id, summarizePlaces([s.id], (id) => steps.filter((st) => st.sessionId === id))])); // Places, for the hosted demo

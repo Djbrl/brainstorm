@@ -11,6 +11,8 @@ import { ClaudeService } from "../llm/claude.service";
 import { NemotronService } from "../llm/nemotron.service";
 import { maskSecrets } from "../privacy/mask";
 import { UsageService } from "../usage/usage.service";
+import { insideAny } from "../core/roots";
+import { tooBroad } from "../workspace/workspace.service";
 
 // Owner: D.
 const SYSTEM = `You are Rundown, a guide to a codebase that AI coding agents are editing live.
@@ -59,25 +61,31 @@ export class AskService implements OnModuleInit {
   }
 
   async ask(req: AskRequest): Promise<AskResponse> {
-    const question = (req.question ?? "").trim();
+    if (typeof req !== "object" || req === null) req = {} as AskRequest;
+    const text = (v: unknown) => (typeof v === "string" ? v : undefined);
+    const question = (text(req.question) ?? "").trim().slice(0, 4000);
     if (!question) return { answer: "Ask a question about this code.", model: "none", tokensIn: 0, tokensOut: 0, costUsd: 0, fallback: false };
     this.usage.bump("ak");
 
-    const step: Step | undefined = req.stepId ? this.safe(() => this.listener.getStep(req.stepId!)) : undefined;
-    let filePath = req.filePath ?? step?.filePath;
-    if (filePath && !isAbsolute(filePath)) filePath = resolve(req.root ?? this.cfg.defaultRoot, filePath);
+    const stepId = text(req.stepId);
+    const step: Step | undefined = stepId ? this.safe(() => this.listener.getStep(stepId)) : undefined;
+    let filePath = text(req.filePath) ?? step?.filePath;
+    if (filePath && !isAbsolute(filePath)) filePath = resolve(this.cfg.defaultRoot, filePath);
+    // Only a file of the project or of a thread's folder goes to the model, never any other file on the disk.
+    const roots = [this.cfg.defaultRoot, ...this.listener.listSessions().map((s) => s.cwd)].filter((r): r is string => !!r && !tooBroad(r));
+    if (filePath && !insideAny(filePath, roots)) filePath = undefined;
     const content = filePath ? this.safe(() => readFileSync(filePath!, "utf8")) : undefined;
     const fileHash = content !== undefined ? createHash("sha1").update(content).digest("hex") : "";
-    const target = req.stepId ?? "";
+    const target = stepId ?? "";
 
     // Cache: same question + same target + unchanged file (only real Claude answers, so a fixed key is picked up).
     // Answers of exactly 700 tokens were cut off by the old limit (before 5 Oct 2026): ask again.
     const cached = this.dbs.db
       .prepare(`SELECT response FROM ask_answers WHERE question = ? AND step_id = ? AND file_path = ? AND file_hash = ? AND json_extract(response, '$.fallback') = 0 AND json_extract(response, '$.tokensOut') != 700 ORDER BY id DESC LIMIT 1`)
-      .get(question, target, req.filePath ?? "", fileHash) as { response: string } | undefined;
+      .get(question, target, text(req.filePath) ?? "", fileHash) as { response: string } | undefined;
     if (cached) return JSON.parse(cached.response) as AskResponse;
 
-    const user = maskSecrets(this.buildContext(question, step, filePath, content, req.root));
+    const user = maskSecrets(this.buildContext(question, step, filePath, content, this.cfg.defaultRoot));
 
     let res: AskResponse;
     try {
@@ -104,7 +112,7 @@ export class AskService implements OnModuleInit {
 
     this.safe(() => this.dbs.db
       .prepare(`INSERT INTO ask_answers (question, step_id, file_path, file_hash, request, response, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .run(question, target, req.filePath ?? "", fileHash, JSON.stringify(req), JSON.stringify(res), new Date().toISOString()));
+      .run(question, target, text(req.filePath) ?? "", fileHash, JSON.stringify({ question, stepId, filePath: text(req.filePath) }), JSON.stringify(res), new Date().toISOString()));
     return res;
   }
 

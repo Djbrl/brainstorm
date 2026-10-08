@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { createHash } from "node:crypto";
+import { maskSecrets } from "../privacy/mask";
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import type { StatementSync } from "node:sqlite";
@@ -329,7 +330,7 @@ export class ReaderService implements OnModuleInit {
       summary = cached.summary;
     } else {
       const rel = relative(this.cfg.defaultRoot, path);
-      const user = `<file path="${rel}">\n${content.slice(0, 4000)}\n</file>\n\nSummarize the file above.`;
+      const user = maskSecrets(`<file path="${rel}">\n${content.slice(0, 4000)}\n</file>\n\nSummarize the file above.`); // masked, like everything sent to a model
       const { text, tokensIn, tokensOut } = await this.nemotron.complete(FILE_SUMMARY_SYSTEM, user, 120, isBadSummary);
       summary = text.trim();
       if (!summary) return;

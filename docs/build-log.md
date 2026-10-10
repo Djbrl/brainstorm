@@ -262,6 +262,7 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 - **10 Oct 2026** · [cowork] The Places list reads like the Track: one line per stretch in a place, saying what the agent did there (its most telling event: 'Clicked button "Send"', 'Searched "…"', "Fetched with curl · /api/health") instead of the link, the place quiet at the right, the Track's dots. Scrolling reaches the first and the last rows (the list no longer pulls back to the middle while a scroll coasts).
 - **10 Oct 2026** · [cowork] Fix: every row of the Places list can be gone to. Several stretches can share one moment of the thread (light detail folds quick steps together): the list remembers the row you went to, and the map's path stops at its event, so the marker stands on that place.
 - **10 Oct 2026** · [cowork, replay] Places has the player: Space plays place by place (about a second each, faster at 2× 4×), ‹ › and ← → go one place back or forward, Home and End the first and last. The places now go by the thread's steps (full detail, always in order) and map to the app's moments only to sync: the light thread folds stretches of steps into moments not always in order, which scrambled the list and the trail. A row whose step the light thread leaves out goes to the nearest moment before.
+- **10 Oct 2026** · [replay] Play at the end of a replay starts again from the first step (Space or the button, on the Map and Places); the button says "Play from the start" there.
 
 ## Requests
 

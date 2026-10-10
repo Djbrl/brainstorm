@@ -89,8 +89,10 @@ function Player({ steps }: { steps?: Steps }) {
       {steps
         ? <button className="rp-icon" onClick={() => steps.go(steps.at - 1)} disabled={steps.at <= 0} aria-label={`Previous ${steps.noun}`} title={`Previous ${steps.noun} (←)`}>{Icon.back}</button>
         : <button className="rp-icon" onClick={() => set(index - 1)} disabled={index === 0} aria-label="Previous step" title="Previous step (←)">{Icon.back}</button>}
-      <button className="rp-icon rp-play" onClick={() => togglePlay(replay.playing, setReplayPlaying)}
-        aria-label={replay.playing ? "Pause" : "Play"} title={replay.playing ? "Pause (Space)" : "Play (Space)"}>
+      <button className="rp-icon rp-play" onClick={() => steps
+          ? togglePlay(replay.playing, setReplayPlaying, steps.at >= steps.count - 1, () => steps.go(0))
+          : togglePlay(replay.playing, setReplayPlaying, index >= len - 1, () => setReplayIndex(0))}
+        aria-label={replay.playing ? "Pause" : "Play"} title={replay.playing ? "Pause (Space)" : (steps ? steps.at >= steps.count - 1 : index >= len - 1) ? "Play from the start (Space)" : "Play (Space)"}>
         {replay.playing ? Icon.pause : Icon.play}
       </button>
       {steps

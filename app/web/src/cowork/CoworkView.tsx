@@ -103,8 +103,7 @@ export function PlacesView() {
         case " ": {
           if ((e.target as HTMLElement | null)?.tagName === "BUTTON") return;
           if (r.mode !== "play") navRef.current.setThreadMode("play");
-          if (!p && i >= rs.length - 1) to(0);   // at the end: from the start
-          togglePlay(p, navRef.current.setReplayPlaying);
+          togglePlay(p, navRef.current.setReplayPlaying, i >= rs.length - 1, () => to(0));   // at the end: from the start
           break;
         }
         case "ArrowLeft": if (r.mode !== "play") return; to(Math.max(0, i - 1)); break;

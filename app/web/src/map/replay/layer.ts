@@ -215,7 +215,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
         case "End": setReplayPlaying(false); setReplayIndex(st.current.len - 1); break;
         case " ": {
           if ((e.target as HTMLElement | null)?.tagName === "BUTTON") return; // let the focused button click
-          togglePlay(replayPlayingRef.current, setReplayPlaying);
+          togglePlay(replayPlayingRef.current, setReplayPlaying, st.current.index >= st.current.len - 1, () => setReplayIndex(0));
           break;
         }
         default: return;
@@ -613,11 +613,11 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
 }
 
 /**
- * Play/pause from the step you're on, whatever it is (a thread opened with no step picked is on its last). At the last
- * one the player opens there, paused, and you go back from it (scrolling the Track, ←, Home or the slider): it never
- * jumps to the first step by itself. Shared by the keyboard and the ReplayBar.
+ * Play/pause from the step you're on. At the last one, play starts again from the first (`restart` goes there). Shared
+ * by the keyboard and the ReplayBar (the map's and Places').
  */
-export function togglePlay(playing: boolean, setPlaying: (p: boolean) => void) {
+export function togglePlay(playing: boolean, setPlaying: (p: boolean) => void, atEnd = false, restart?: () => void) {
+  if (!playing && atEnd) restart?.();
   setPlaying(!playing);
 }
 

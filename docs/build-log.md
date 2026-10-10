@@ -264,6 +264,7 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 - **10 Oct 2026** · [cowork, replay] Places has the player: Space plays place by place (about a second each, faster at 2× 4×), ‹ › and ← → go one place back or forward, Home and End the first and last. The places now go by the thread's steps (full detail, always in order) and map to the app's moments only to sync: the light thread folds stretches of steps into moments not always in order, which scrambled the list and the trail. A row whose step the light thread leaves out goes to the nearest moment before.
 - **10 Oct 2026** · [replay] Play at the end of a replay starts again from the first step (Space or the button, on the Map and Places); the button says "Play from the start" there.
 - **10 Oct 2026** · [sidebar] Phone: the thread's sheet under the map has a grab bar; drag it to set its height, within a thumb's reach (its top no higher than a quarter of the map and 96 px, no lower than 170 px above the bottom), past the lowest to fold it. Each page load starts it at the middle. Folding slides the sheet away (down on a phone, left on a tablet), the scrim fades; opening slides it up.
+- **10 Oct 2026** · [sidebar] Phone: the folded sidebar is a strip along the bottom (the sheet's top peeking up, a grab bar and its name), not a pill in the top-left corner; tap it or drag it up to open. The camera counts it as covering the bottom; the player sits above it.
 
 ## Requests
 

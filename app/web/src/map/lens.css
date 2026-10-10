@@ -6,7 +6,7 @@
 @media (min-width: 601px) and (max-width: 1100px) {
   .map-wrap:has(.map-panel.open) .lens-switch { left: calc((100% - 440px) / 2); }
 }
-/* Phone: the pill moves to the right of the top row, beside the folded sidebar's tab. */
+/* Phone: the pill at the right of the top row (the folded sidebar is a strip along the bottom). */
 @media (max-width: 600px) {
   .lens-switch { top: 16px; left: auto; right: 12px; transform: none; }
   .lens-switch button { padding: 6px 13px; }

@@ -150,7 +150,17 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
   });
   const onScroll = () => { if (viewRef.current === "files" && body.current) treeTop.current = body.current.scrollTop; };
 
-  const tabButton = thread && !phone ? <NowCard onOpen={() => setCollapsed(false)} /> : (
+  // Folded on a phone: a strip along the bottom, the sheet's top peeking up (tap it, or drag it up, to open it).
+  const lift = useRef<number | null>(null);
+  const tabButton = thread && !phone ? <NowCard onOpen={() => setCollapsed(false)} /> : phone ? (
+    <button className="sidebar-collapsed at-bottom" onClick={() => setCollapsed(false)} aria-label="Open sidebar" aria-expanded={!collapsed} title="Open sidebar (T)"
+      onPointerDown={(e) => { lift.current = e.clientY; }}
+      onPointerMove={(e) => { if (lift.current !== null && lift.current - e.clientY > 24) { lift.current = null; setCollapsed(false); } }}
+      onPointerUp={() => { lift.current = null; }}>
+      <b className="pip-bar" aria-hidden="true" />
+      <span>{shown === "threads" ? "Threads" : "Files"}</span>
+    </button>
+  ) : (
     <button className="sidebar-collapsed" onClick={() => setCollapsed(false)} aria-label="Open sidebar" aria-expanded={!collapsed} title="Open sidebar (T)">
       <span>{shown === "threads" ? "Threads" : "Files"}</span>
       <i aria-hidden="true">›</i>

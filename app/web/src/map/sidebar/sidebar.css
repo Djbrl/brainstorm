@@ -225,8 +225,14 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 /* Phone: the folded tab is a small pill in the top-left corner (the lens pill sits at the right of the same row), and
    the open sheet takes the whole view but a margin. */
 @media (max-width: 600px) {
-  .sidebar-collapsed { top: 16px; left: 12px; width: auto; height: 38px; padding: 0 14px 0 16px; flex-direction: row; gap: 6px; border-radius: 999px; z-index: 6; }
-  .sidebar-collapsed span { writing-mode: horizontal-tb; font-size: 13.5px; letter-spacing: 0; }
+  /* Folded: a strip along the bottom, the sheet's top peeking up (MapSidebar: tap or drag it up). */
+  .sidebar-collapsed.at-bottom { top: auto; bottom: 0; left: 0; right: 0; width: auto; height: 50px; padding: 6px 0 0; flex-direction: column; gap: 6px;
+    justify-content: flex-start; border-radius: 18px 18px 0 0; border-bottom: 0; z-index: 6; box-shadow: 0 -10px 30px rgba(0,0,0,.08); touch-action: none;
+    animation: sidebar-strip-in .22s cubic-bezier(.2,.8,.2,1); }
+  .sidebar-collapsed.at-bottom span { writing-mode: horizontal-tb; font-size: 13.5px; font-weight: 600; letter-spacing: 0; }
+  .sidebar-collapsed .pip-bar { width: 38px; height: 4px; border-radius: 4px; background: #d2d2d8; }
+  .map-wrap:has(.sidebar-collapsed.at-bottom) .dock { bottom: 62px; }
+  .map-wrap:has(.sidebar-collapsed.at-bottom) { --fade-bottom: 56px; }
   .map-sidebar.sidebar-overlay { left: 10px; right: 10px; top: 10px; bottom: 10px; width: auto; max-width: none; height: auto; }
   /* An open thread: the map keeps the top 42% like a video (no scrim: it stays live and touchable), its steps below. */
   .map-sidebar.sidebar-overlay.pip { top: var(--pip-top, 50%); left: 0; right: 0; bottom: 0; border-radius: 18px 18px 0 0; border-bottom: 0;
@@ -250,6 +256,7 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .map-sidebar.sidebar-overlay.pip.leaving { animation: sidebar-pip-out .22s cubic-bezier(.4,0,.7,.2) forwards; }
 .sidebar-scrim.leaving { animation: sidebar-scrim-out .22s ease-in forwards; }
 @keyframes sidebar-pip-out { to { transform: translateY(100%); } }
+@keyframes sidebar-strip-in { from { transform: translateY(100%); } }
 @keyframes sidebar-sheet-out { to { opacity: 0; transform: translateX(-16px); } }
 @keyframes sidebar-scrim-out { to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .map-sidebar.pip, .map-sidebar.sidebar-overlay.leaving, .sidebar-scrim.leaving { animation: none; } }

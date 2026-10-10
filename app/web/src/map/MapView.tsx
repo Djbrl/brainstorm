@@ -203,14 +203,14 @@ export function MapView() {
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
   }, []);
-  /** The minimap draws what agents read with the map's own rules (agents.tsx): with a thread open, its agents; on the
-   *  project overview, only the one followed. */
+  /** The minimap follows what agents read, with the map's own rules (agents.tsx): with a thread open, its agents; on
+   *  the project overview, only the one followed. */
   const minimapReads = useCallback(() => {
     if (!mapPrefs.showReads) return null;
     const open = openRef.current, follow = followRef.current;
     return {
       resolveId,
-      at: (id: string) => { const n = nodeIndexRef.current.get(id); return n && n.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y, r: n.r } : undefined; },
+      at: (id: string) => nodeIndexRef.current.get(id),
       whose: (a: { id: string }) => open || a.id === follow,
     };
   }, [resolveId]);

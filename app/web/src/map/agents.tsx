@@ -89,14 +89,24 @@ export const isWrite = (action?: string) => action === "edit" || action === "wri
 /** The files an agent read lately (map node ids), newest first: the last few distinct ones in its trail, but `except`
  *  (the file it stands on). The map draws them as dotted lines, the minimap too (often they're out of view). */
 export function recentReads(a: AgentPresence, resolveId: (file: string) => string | undefined, except?: string, max = READS_SHOWN): string[] {
-  const reads: string[] = [];
+  return readsWithTimes(a, resolveId, except, max).map((r) => r.id);
+}
+/** The same, with when each was read (ms). */
+export function readsWithTimes(a: AgentPresence, resolveId: (file: string) => string | undefined, except?: string, max = READS_SHOWN): { id: string; at: number }[] {
+  const reads: { id: string; at: number }[] = [];
   for (let i = a.trail.length - 1; i >= 0 && reads.length < max; i--) {
     const m = a.trail[i];
-    if (isWrite(m.action)) continue;
+    if (m.action !== "read") continue;   // a file it opened (not a search's folder, nor a command's)
     const id = resolveId(m.file);
-    if (id && id !== except && !reads.includes(id)) reads.push(id);
+    if (id && id !== except && !reads.some((r) => r.id === id)) reads.push({ id, at: Date.parse(m.ts) || 0 });
   }
   return reads;
+}
+
+/** When an agent last read a file (ms), or 0. */
+export function lastReadAt(a: AgentPresence): number {
+  for (let i = a.trail.length - 1; i >= 0; i--) if (a.trail[i].action === "read") return Date.parse(a.trail[i].ts) || 0;
+  return 0;
 }
 
 /** Where the marker stands: the last file written, or before any write, the first file touched. */

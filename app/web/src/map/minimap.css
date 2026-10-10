@@ -1,12 +1,12 @@
 /* Owner: camera. The minimap (Minimap.tsx): a small card in the top-right corner of the map, over it like a picture in
-   picture. Its buttons follow an agent. Hidden while a side panel covers that corner. */
+   picture, following what the agent reads. Its buttons pick the agent. Hidden while a side panel covers that corner. */
 .minimap { position: absolute; top: var(--sb-top, 24px); right: 24px; z-index: 5; width: 210px;
   background: rgba(255,255,255,.9); backdrop-filter: saturate(180%) blur(18px); -webkit-backdrop-filter: saturate(180%) blur(18px);
   border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.08); overflow: hidden;
   animation: minimap-in .22s cubic-bezier(.2,.85,.25,1); }
 @keyframes minimap-in { from { opacity: 0; transform: scale(.96); transform-origin: top right; } }
 @media (prefers-reduced-motion: reduce) { .minimap { animation: none; } }
-.minimap canvas { display: block; cursor: crosshair; touch-action: none; }
+.minimap canvas { display: block; cursor: pointer; }
 .mm-hide { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border: 0; border-radius: 50%; padding: 0;
   display: grid; place-content: center; background: var(--surface); color: var(--ink-3); opacity: 0; transition: opacity .15s;
   box-shadow: 0 1px 3px rgba(0,0,0,.12); }

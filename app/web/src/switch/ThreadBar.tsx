@@ -8,6 +8,7 @@ import { attentionText, needsYou, yourTurn } from "../lib/attention";
 import { forgetThread, openThread, rememberThread, useBarThreads, type BarThread } from "../lib/switcher";
 import { isTyping, MOD } from "./shortcuts";
 import { WorkspaceMenu } from "./WorkspaceMenu";
+import { LensSwitch } from "../map/LensSwitch";
 import "./switch.css";
 
 export function ThreadBar({ project, onFind, onHelp, onAllProjects }: { project: string; onFind: () => void; onHelp: () => void; onAllProjects: () => void }) {
@@ -63,6 +64,7 @@ export function ThreadBar({ project, onFind, onHelp, onAllProjects }: { project:
           onOpen={() => openThread(nav, t.session)}
           onClose={() => { forgetThread(root, t.session.id); if (t.session.id === openId) nav.stopReplay(); }} />)}
       </div>
+      <LensSwitch inBar />
       <KeyHints open={!!openId} onHelp={onHelp} />
       <button className="threadbar-find" onClick={onFind} title={`Find any thread, in this project or another (${MOD} K)`}>
         <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5 14 14" /></svg>

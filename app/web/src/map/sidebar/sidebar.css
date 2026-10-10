@@ -52,6 +52,14 @@
 .sn-step .sn-failed { color: var(--risk); font-weight: 600; }
 .sn-open { grid-column: 2; grid-row: 1 / span 2; font-style: normal; font-size: 15px; color: var(--ink-3); }
 @media (prefers-reduced-motion: reduce) { .sn-dot.working { animation: none; } }
+/* Small window: the card takes the top row up to the minimap (Map | Places moved to the thread bar), and the step reads
+   in full, on up to three lines. */
+@media (min-width: 601px) and (max-width: 1100px) {
+  .sidebar-now { width: auto; min-width: 0; right: 258px; }
+  :is(.map-wrap, .cw-wrap):not(:has(.minimap)) .sidebar-now { right: 72px; }
+  .sn-step { align-items: flex-start; }
+  .sn-step > span { white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; line-height: 1.35; }
+}
 
 .sidebar-empty { color: var(--ink-3); font-size: 14px; padding: 16px 4px; margin: 0; }
 

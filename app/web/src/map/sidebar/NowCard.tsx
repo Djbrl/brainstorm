@@ -6,6 +6,7 @@ import { useLiveSelector } from "../../lib/live";
 import { beatLabel, useThread } from "../../lib/thread";
 import { injectedLabel } from "../../lib/chapters";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
+import { displayLabel, isVisible } from "../../follow/format";
 
 export function NowCard({ onOpen }: { onOpen: () => void }) {
   const { replay } = useNavState();
@@ -18,7 +19,10 @@ export function NowCard({ onOpen }: { onOpen: () => void }) {
 
   const beats = thread?.beats ?? [];
   const beat = beats.length ? beats[Math.min(index, beats.length - 1)] : undefined;
-  const step = beat ? injectedLabel(beat.step) ?? beatLabel(beat) : "Loading its steps…";
+  // Live, the newest step itself (a moment can sum up a stretch of work: "Worked in the browser"); looking back, the
+  // moment you're on, as the Track says it.
+  const newest = replay.live && beat ? [...beat.steps].reverse().find(isVisible) : undefined;
+  const step = newest ? injectedLabel(newest) ?? displayLabel(newest) : beat ? injectedLabel(beat.step) ?? beatLabel(beat) : "Loading its steps…";
   const failed = !!beat && beat.failed > 0;
   const [state, word] = needsYou(attn) ? ["blocked", attentionText(attn!).badge]
     : yourTurn(attn) ? ["turn", "Your turn"]

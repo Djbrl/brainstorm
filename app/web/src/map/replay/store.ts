@@ -11,4 +11,7 @@ export const replayCamera = {
   pinned: false,
   /** Unlocked camera: the tracer left the view. MapView frames the recent window again, unless you moved the camera. */
   lost: null as (() => void) | null,
+  /** How far inside the view's edges the tracer counts as in view (px): more on a small map, where the camera follows it
+   *  before it reaches the edge (useMapCamera). */
+  margin: () => 24,
 };

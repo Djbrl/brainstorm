@@ -160,6 +160,9 @@ export function MapView() {
     cam, camRef, nodeIndex, nodeIndexRef, replayRef, replayActive: replayLayer.active, replay, step, selected, selectedRef, setSelected,
     resolveId, anim, hasNodes, focusFile, setFocusFile, smallRef,
   });
+  // Looking back through the thread (its replay's marker on the map), the camera follows the marker, not an agent where
+  // it is now: following stops (back at the newest moment, autoTrack follows the agent again).
+  useEffect(() => { if (replay && !replay.live && replayLayer.tracing && followId) setFollowId(null); }, [replay?.live, replayLayer.tracing, followId, setFollowId]);
   // A small map with a thread followed live: the camera follows its agent at work by itself (autoTrack.ts).
   useAutoTrack({ on: small && !!replay?.live && replayLayer.active, sessionId: replay?.sessionId ?? null, agents: drawnAgents, followId, setFollowId });
 

@@ -62,7 +62,22 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
     framed.current = true;
   }, [fitAll, lockedOn]);
   // Unlocked, the tracer left the view: frame the recent window again (applyIntent: unless you moved the camera since).
-  useEffect(() => { replayCamera.lost = () => applyIntent(700); return () => { replayCamera.lost = null; }; }, [applyIntent]);
+  // On a small map it follows the marker instead, as it follows an agent (the frame it's in, not the recent window: that
+  // can span the whole project), unless you moved the camera since.
+  useEffect(() => {
+    replayCamera.lost = () => {
+      const c = camRef.current, m = replayRef.current.subject();
+      if (!smallRef.current || !m) { applyIntent(700); return; }
+      if (c.userAt() > intentAt.current) return;
+      c.lookAt(m.x, m.y, undefined, 600);
+    };
+    replayCamera.margin = () => {
+      if (!smallRef.current) return 24;
+      const s = camRef.current.safe.current;
+      return Math.max(24, Math.min(s.w - s.left - s.right, s.h - s.top - s.bottom) * 0.2);
+    };
+    return () => { replayCamera.lost = null; replayCamera.margin = () => 24; };
+  }, [applyIntent]);
   // The safe area changed (a panel opened, the sidebar collapsed, the window resized): frame the same thing in it.
   useEffect(() => {
     const t = setTimeout(() => applyIntent(450), 60);

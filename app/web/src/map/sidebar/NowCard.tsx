@@ -6,7 +6,7 @@
 // T, unfolds the sidebar. Scrolling on the card steps through the thread as the Track's list does: up goes back (into the
 // replay, paused, the map's marker on that moment), down comes forward, and back at the newest a running thread
 // follows live again (App's LiveFollow).
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { useNavActions, useNavState, useReplayCursor } from "../../lib/nav";
 import { useLiveSelector } from "../../lib/live";
 import { useThread } from "../../lib/thread";
@@ -15,6 +15,8 @@ import { textOf } from "../replay/ReplaySteps";
 
 const NOTCH = 40;   // px of wheel per moment (a mouse notch, or a stretch of a trackpad's glide)
 const ROWS = 4;     // moments on the card
+const ROW_H = 31;   // a row and the gap under it (sidebar.css .sn-m): how far the rows slide per moment
+const SLIDE_MS = 170;
 
 export function NowCard({ onOpen }: { onOpen: () => void }) {
   const { replay } = useNavState();
@@ -55,31 +57,45 @@ export function NowCard({ onOpen }: { onOpen: () => void }) {
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, [!!replay]);
-  if (!replay) return null;
-
   const beats = thread?.beats ?? [];
   const at = Math.min(index, beats.length - 1);
   // Always the same four rows (fewer only in a thread that short), so the card keeps its height as you scroll: the
   // moment you're on third, with one after it, or last at the newest (three before it).
   const start = Math.max(0, Math.min(at - 2, beats.length - ROWS));
+  // Moving a moment, the rows slide by one, as the Track's list scrolls, instead of jumping (a fast scroll that moves
+  // several at once slides by up to three).
+  // Only when the window of rows moves: at the thread's ends it stays put and the highlight moves instead.
+  const list = useRef<HTMLSpanElement>(null), was = useRef(start);
+  useLayoutEffect(() => {
+    const el = list.current, d = Math.max(-3, Math.min(3, start - was.current));
+    was.current = start;
+    if (!el || !d || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    el.getAnimations().forEach((a) => a.cancel());
+    el.animate([{ transform: `translateY(${d * ROW_H}px)` }, { transform: "none" }], { duration: SLIDE_MS, easing: "cubic-bezier(.2,.7,.25,1)" });
+  }, [start]);
+  if (!replay) return null;
+
   const rows = beats.length ? Array.from({ length: Math.min(ROWS, beats.length) }, (_, k) => start + k) : [];
   const working = running && !needsYou(attn) && !yourTurn(attn);
   const cur = beats[at];
+
 
   return (
     <div className="sidebar-now" ref={card} title="Scroll to step through the thread">
       <button className="sn-rows" onClick={onOpen} aria-expanded={false}
         aria-label={`Open the thread's steps (T). ${cur ? `On: ${textOf(cur).label}` : "Loading its steps"}`} title="Open the thread's steps (T)">
-        {!rows.length && <span className="sn-m current"><b /><span>Loading its steps…</span></span>}
-        {rows.map((i) => {
-          const { label, tone } = textOf(beats[i]);
-          const state = i === at ? "current" : i < at ? `done d${at - i}` : "todo";
-          return (
-            <span key={beats[i].step.id} className={`sn-m ${tone} ${state}${i === at && working ? " working" : ""}`} aria-hidden="true">
-              <b /><span>{label}</span>{beats[i].failed > 0 && <em>failed</em>}
-            </span>
-          );
-        })}
+        <span className="sn-list" ref={list}>
+          {!rows.length && <span className="sn-m current"><b /><span>Loading its steps…</span></span>}
+          {rows.map((i) => {
+            const { label, tone } = textOf(beats[i]);
+            const state = i === at ? "current" : i < at ? `done d${at - i}` : "todo";
+            return (
+              <span key={beats[i].step.id} className={`sn-m ${tone} ${state}${i === at && working ? " working" : ""}`} aria-hidden="true">
+                <b /><span>{label}</span>{beats[i].failed > 0 && <em>failed</em>}
+              </span>
+            );
+          })}
+        </span>
       </button>
       {beats.length > 1 && <Scroller len={beats.length} at={at} go={(i) => go.current(() => i)} />}
     </div>

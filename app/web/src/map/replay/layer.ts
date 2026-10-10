@@ -246,7 +246,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
           if (v) { const t = centerFor(cam.safe.current, a.cam.x, a.cam.y, v.k); busy = Math.hypot(t.x - v.x, t.y - v.y) * v.k > 1.5; }
           if (busy) cam.easeToward(a.cam.x, a.cam.y, 0.08);
         } else {
-          busy = !cam.sees(a.cam.x, a.cam.y);
+          busy = !cam.sees(a.cam.x, a.cam.y, replayCamera.margin());
           if (busy && performance.now() - L.lostAt > 1200) { L.lostAt = performance.now(); replayCamera.lost?.(); }
         }
       }

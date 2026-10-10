@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-force-graph-2d";
 import type { CoworkArea, CoworkPage, CoworkSite, CoworkSummary } from "@contract";
 import { AREA_NAME } from "./data";
-import { boxOf, isFitKey, useCamera, type Camera, type View } from "../map/camera";
+import { boxOf, useCamera, type Camera, type View } from "../map/camera";
 import { LabelSpace } from "../map/labels";
 import { mapStyle } from "../map/themes";
 import { useTheme } from "../lib/theme";
@@ -216,12 +216,6 @@ export function WorldMap({ data, areas, selected, highlight, onSelect, rightInse
     else { setIntent("fit"); apply(700); }
   }, [focus]);
 
-  const fitNow = () => { setIntent("fit"); fitAll(700); };
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (isFitKey(e)) { e.preventDefault(); fitNow(); } };
-    addEventListener("keydown", onKey);
-    return () => removeEventListener("keydown", onKey);
-  }, []);
 
   const usedAreas = useMemo(() => [...new Set(graph.nodes.map((n) => n.area))], [graph]);
   // Lit: the focused place, its site and its pages. Everything else fades.

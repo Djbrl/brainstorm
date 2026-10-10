@@ -5,7 +5,7 @@ import type { ThreadReplay } from "../lib/nav";
 import { getCameraLock, setCameraLock } from "./prefs";
 import { replayCamera } from "./replay/store";
 import type { ReplayLayerApi } from "./replay/layer";
-import { boxOf, fitView, isFitKey, type Camera, type View } from "./camera";
+import { boxOf, fitView, type Camera, type View } from "./camera";
 import type { AgentAnim } from "./agents";
 import type { GNode } from "./graph";
 
@@ -83,17 +83,6 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
     const t = setTimeout(() => applyIntent(450), 60);
     return () => clearTimeout(t);
   }, [cam.version, applyIntent]);
-  /** The fit button and F / 0: the open thread's recent window, or the whole project (and stop following an agent). */
-  const fitNow = useCallback(() => {
-    setFollowId(null);
-    setIntent({ kind: "fit" });
-    fitAll(700);
-  }, [fitAll, setIntent]);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (isFitKey(e)) { e.preventDefault(); fitNow(); } };
-    addEventListener("keydown", onKey);
-    return () => removeEventListener("keydown", onKey);
-  }, [fitNow]);
   // The arrow keys glide the map while they're held (two at once go diagonally); with Shift, ↑ and ↓ zoom in and out
   // instead (+ and − too, = and _ without Shift); all easing in and out: the map without a mouse or trackpad. In the
   // replay player ← → step through it, so only Shift ↑ ↓ zoom there; none in the Track's list (there they scroll it).
@@ -305,5 +294,5 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
     else { setIntent({ kind: "fit" }); applyIntent(700); }
   }, [panelFile, setIntent, applyIntent]);
 
-  return { followId, setFollowId, refollow, followRef, fitNow, focusOnFile, applyIntent };
+  return { followId, setFollowId, refollow, followRef, focusOnFile, applyIntent };
 }

@@ -1,5 +1,5 @@
-// Owner: switcher. The app-wide keys: ⌘K finds a thread, ? lists every shortcut, L locks the camera, R shows reads,
-// P switches between the map and Places. A key that flips something you can't see says so for a moment.
+// Owner: switcher. The app-wide keys: ⌘K finds a thread, ? lists every shortcut, L locks the camera, P switches between
+// the map and Places. (Reads show or hide in Settings.) A key that flips something you can't see says so for a moment.
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavActions, useNavState } from "../lib/nav";
@@ -12,23 +12,22 @@ export function Keys({ finding, setFinding, help, setHelp }: {
   finding: boolean; setFinding: (v: boolean) => void;
   help: boolean; setHelp: (v: boolean | ((h: boolean) => boolean)) => void;
 }) {
-  const { replay, lens, showReads } = useNavState();
-  const { setShowReads, setLens } = useNavActions();
+  const { replay, lens } = useNavState();
+  const { setLens } = useNavActions();
   const [toast, setToast] = useState<string | null>(null);
   const toastT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const say = (s: string) => { setToast(s); clearTimeout(toastT.current); toastT.current = setTimeout(() => setToast(null), 1400); };
-  const now = useRef({ replay, lens, showReads }); now.current = { replay, lens, showReads };
+  const now = useRef({ replay, lens }); now.current = { replay, lens };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
       if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") { e.preventDefault(); setFinding(!finding); return; }
       if (e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target) || finding) return;
-      const { replay, lens, showReads } = now.current;
+      const { replay, lens } = now.current;
       switch (e.key) {
         case "?": setHelp((h) => !h); break;
         case "l": case "L": { const on = !getCameraLock(); setCameraLock(on); say(on ? "Camera locked on the agent" : "Camera free"); break; }
-        case "r": case "R": if (!replay) return; setShowReads(!showReads); say(showReads ? "Reads hidden" : "Showing reads"); break;
         case "p": case "P": if (!replay) return; setLens(lens === "places" ? "map" : "places"); break;
         default: return;
       }
@@ -36,7 +35,7 @@ export function Keys({ finding, setFinding, help, setHelp }: {
     };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
-  }, [finding, setFinding, setHelp, setShowReads, setLens]);
+  }, [finding, setFinding, setHelp, setLens]);
 
   return <>
     {finding && <Picker onClose={() => setFinding(false)} />}

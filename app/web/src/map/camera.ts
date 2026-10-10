@@ -243,11 +243,3 @@ export function useCamera(fg: RefObject<Graph | undefined | null>, hostRef: RefO
     return { safe, version, measure, userAt: () => userAt.current, view, moveTo, lookAt, nudge, zoomBy, frame, reveal, easeToward, sees, stop, touch };
   }, [fg, hostRef, version]);
 }
-
-/** F or 0 (not while typing, no modifiers) fits the map. */
-export function isFitKey(e: KeyboardEvent) {
-  if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return false;
-  const t = e.target as HTMLElement | null;
-  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return false;
-  return e.key === "f" || e.key === "F" || e.key === "0";
-}

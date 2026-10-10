@@ -45,7 +45,7 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
   /** The replay's marker, while it shows (replay/layer.ts), or null. */
   subject: () => { x: number; y: number } | null;
   /** The map's resolver and nodes, and whose reads count (the open thread's agents, or on the project overview only
-   *  the one followed); null when reads are hidden (R). */
+   *  the one followed); null when reads are hidden (Settings). */
   reads: () => ReadmapReads | null;
   /** The agents you can follow from here, in order (the open thread's: main first). */
   agents: AgentPresence[];

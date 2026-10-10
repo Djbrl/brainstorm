@@ -83,7 +83,7 @@ function WindowSetting() {
   );
 }
 
-/** While you follow or replay a thread: the file window (replay/Peek.tsx) and lines to the files it reads (R). */
+/** While you follow or replay a thread: the file window (replay/Peek.tsx) and the dotted lines to the files it reads. */
 function FollowSetting() {
   const file = useShowFile();
   const { showReads } = useNavState();
@@ -97,7 +97,7 @@ function FollowSetting() {
       </label>
       <label className="notify-opt">
         <input type="checkbox" checked={showReads} onChange={() => setShowReads(!showReads)} />
-        <span><b>Show reads</b><small>A line to each file the agent reads, as it reads it (R)</small></span>
+        <span><b>Show reads</b><small>A dotted line to each file the agent read lately, on the map and the Readmap</small></span>
       </label>
     </section>
   );

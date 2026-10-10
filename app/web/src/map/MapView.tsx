@@ -156,7 +156,7 @@ export function MapView() {
 
   // ---- the camera (useMapCamera.ts) ----
   const hasNodes = graph.nodes.length > 0;
-  const { followId, setFollowId, refollow, followRef, fitNow, focusOnFile, applyIntent } = useMapCamera({
+  const { followId, setFollowId, refollow, followRef, focusOnFile, applyIntent } = useMapCamera({
     cam, camRef, nodeIndex, nodeIndexRef, replayRef, replayActive: replayLayer.active, replay, step, selected, selectedRef, setSelected,
     resolveId, anim, hasNodes, focusFile, setFocusFile, smallRef,
   });

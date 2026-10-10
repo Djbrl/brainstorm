@@ -1,25 +1,21 @@
-// Owner: cowork. The open thread's places in the sidebar (Places view): the same rows as the step list, one per
-// stretch of work in a place, and the same way back through the thread as the Track: the row the thread is at is the
+// Owner: cowork. The open thread's places in the sidebar (Places view): the Track's rows (one line, a dot), one per
+// stretch of work in a place, saying what the agent did there ('Searched "…"', 'Clicked "Send"', data.ts runWords), the
+// place quiet at the right; and the same way back through the thread as the Track: the row the thread is at is the
 // highlighted one (its newest while it follows live), scrolling the list moves the thread there (the moment at the
 // list's middle; the map's marker goes with it), and the list follows the replay. A row selects its place on the map,
 // takes the thread there and opens its newest step in the side panel. Between its trips out, a row for Your computer:
 // the thread back in the code (its first row too, where it starts).
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useNavActions, useNavState, useReplayCursor } from "../lib/nav";
 import { useThread } from "../lib/thread";
-import type { CoworkArea } from "@contract";
-import { timeIn } from "../follow/format";
-import { HOME_NAME, VERB_NAME, placeRuns, placeTitle, placesStore, selectPlace, usePlaces, type PlaceRun } from "./data";
+import { displayLabel } from "../follow/format";
+import { injectedLabel } from "../lib/chapters";
+import { useLiveSelector } from "../lib/live";
+import { LinkedLabel } from "../lib/links";
+import { HOME_NAME, placeRuns, placesStore, runWords, selectPlace, usePlaces, type PlaceRun } from "./data";
 import "../map/replay/replay.css"; // the row styles (.rp-list, .rp-row) it shares with the replay
 
-const ICON: Record<CoworkArea, ReactNode> = {
-  web: <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6" /><path d="M2 8h12M8 2c1.7 1.7 2.5 3.7 2.5 6S9.7 12.3 8 14M8 2C6.3 3.7 5.5 5.7 5.5 8s.8 4.3 2.5 6" /></svg>,
-  local: <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="3" width="12" height="8.5" rx="1.5" /><path d="M5.5 14h5M8 11.5V14" /></svg>,
-  services: <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4.5 12.5h7a3 3 0 0 0 .3-6A4 4 0 0 0 4.2 7a2.8 2.8 0 0 0 .3 5.5Z" /></svg>,
-  apps: <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="2.5" width="12" height="11" rx="1.5" /><path d="M2 5.5h12" /></svg>,
-};
 
-const HOME_ICON = <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"><rect x="3" y="3" width="10" height="7" rx="1.2" /><path d="M1.5 12.8h13" /></svg>;
 const USER_MS = 400;   // the list stops following the thread this long after you scroll it (as the Track's does)
 
 export function PlaceSteps() {
@@ -28,6 +24,8 @@ export function PlaceSteps() {
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
   const index = useReplayCursor((c) => c.index);
   const { setReplayIndex, setReplayPlaying, setThreadMode } = useNavActions();
+  const steps = useLiveSelector((st) => (replay ? st.steps[replay.sessionId] : undefined));
+  const stepById = useMemo(() => new Map((steps ?? []).map((x) => [x.id, x])), [steps]);
   // The rows: each stretch in a place, and Your computer before, between and after them (moments with no place: the
   // code). Each with the moment it starts at and the one a click goes to.
   const runs = data ? placeRuns(data.events) : [];
@@ -60,34 +58,36 @@ export function PlaceSteps() {
 
   // Scrolling: the row at the list's middle is where the thread goes. The thread moving (playing, the card, a link):
   // the list brings its row to the middle, unless you scrolled it just now.
-  const list = useRef<HTMLDivElement>(null), userAt = useRef(0), raf = useRef(0);
+  const list = useRef<HTMLDivElement>(null), userAt = useRef(0), ownAt = useRef(0), raf = useRef(0);
   useEffect(() => {
     const el = list.current;
     if (!el) return;
-    const mark = () => { userAt.current = performance.now(); };
     const onScroll = () => {
-      if (performance.now() - userAt.current > USER_MS) return;   // a scroll the list made itself
+      // Its own glide to the thread's row isn't you: only a scroll that starts away from one counts (a wheel's coast too).
+      if (performance.now() - ownAt.current < 700) return;
+      userAt.current = performance.now();
       cancelAnimationFrame(raf.current);
       raf.current = requestAnimationFrame(() => {
-        const r = el.getBoundingClientRect(), mid = r.top + r.height / 2;
-        let best = -1, d = Infinity;
-        el.querySelectorAll<HTMLElement>("[data-run]").forEach((row) => {
-          const b = row.getBoundingClientRect(), dd = Math.abs(b.top + b.height / 2 - mid);
-          if (dd < d) { d = dd; best = Number(row.dataset.run); }
-        });
-        if (el.scrollTop + el.clientHeight >= el.scrollHeight - 4) best = Number(el.querySelector<HTMLElement>("[data-run]:last-of-type")?.dataset.run ?? best);
+        const rowsEl = [...el.querySelectorAll<HTMLElement>("[data-run]")];
+        if (!rowsEl.length) return;
+        let best = -1;
+        if (el.scrollTop <= 4) best = 0;                                                     // at the top: the first
+        else if (el.scrollTop + el.clientHeight >= el.scrollHeight - 4) best = rowsEl.length - 1;   // at the bottom: the last
+        else {
+          const r = el.getBoundingClientRect(), mid = r.top + r.height / 2;
+          let d = Infinity;
+          for (const row of rowsEl) { const b = row.getBoundingClientRect(), dd = Math.abs(b.top + b.height / 2 - mid); if (dd < d) { d = dd; best = Number(row.dataset.run); } }
+        }
         if (best >= 0 && best !== atRef.current) goRef.current(best);
       });
     };
-    el.addEventListener("wheel", mark, { passive: true });
-    el.addEventListener("touchmove", mark, { passive: true });
-    el.addEventListener("pointerdown", mark);
     el.addEventListener("scroll", onScroll, { passive: true });
-    return () => { el.removeEventListener("wheel", mark); el.removeEventListener("touchmove", mark); el.removeEventListener("pointerdown", mark); el.removeEventListener("scroll", onScroll); };
+    return () => el.removeEventListener("scroll", onScroll);
   }, [!!data]);
   useEffect(() => {
     const el = list.current, row = el?.querySelector<HTMLElement>(`[data-run="${at}"]`);
     if (!el || !row || performance.now() - userAt.current < USER_MS) return;
+    ownAt.current = performance.now();
     el.scrollTo({ top: row.offsetTop - el.clientHeight / 2 + row.offsetHeight / 2, behavior: "smooth" });
   }, [at]);
 
@@ -99,41 +99,32 @@ export function PlaceSteps() {
   // Light the row holding the step in the panel; if none does (a whole site picked on the map), every row of that place.
   const holder = runs.find((r) => atPlace(r.place) && !!stepId && r.stepIds.has(stepId));
   const isSel = (r: (typeof runs)[number]) => (holder ? r === holder : atPlace(r.place));
+  /** What a stretch in a place was: its most telling event's words; else its first step's, as the Track says it. */
+  const said = (r: PlaceRun) => { const w = runWords(r); if (w) return w; const st = stepById.get(r.first.stepId); return st ? injectedLabel(st) ?? displayLabel(st) : ""; };
   return (
     <div className="rp-list pl-list" ref={list}>
       {rows.map((row, i) => {
+        const state = i === at ? "current" : i > at ? "todo" : "done";
         const r = row.run;
         if (!r) {
           return (
-            <div key={`home-${row.start}`} data-run={i} className={`rp-row pl-home ${i === at ? "current" : ""} ${i > at ? "todo" : ""}`}>
-              <button className="rp-row-main" onClick={() => go(i)}>
-                <span className="rp-glyph" aria-hidden="true">{HOME_ICON}</span>
-                <span className="rp-row-text">
-                  <span className="rp-row-label">{HOME_NAME}</span>
-                  <span className="rp-row-meta"><span>{i === 0 ? "Starts in the code" : "Back in the code"}{row.moments > 1 ? ` · ${row.moments} moments` : ""}</span></span>
-                </span>
-              </button>
-            </div>
+            <button key={`home-${row.start}`} data-run={i} className={`rp-m pl-m pl-home ${state}`} onClick={() => go(i)}
+              title={`${HOME_NAME}: ${i === 0 ? "the thread starts in the code" : "back in the code"}${row.moments > 1 ? `, ${row.moments} moments` : ""}`}>
+              <b aria-hidden="true" /><span>{i === 0 ? "Starts in the code" : "Back in the code"}</span><small>{HOME_NAME}</small>
+            </button>
           );
         }
-        const e = r.last, cur = isSel(r) || i === at, changed = r.verbs.size > 0;
-        const title = placeTitle(e) === e.site ? e.site : `${e.site} · ${placeTitle(e)}`;
+        const e = r.last, picked = isSel(r), tone = r.failed > 0 ? "fl" : r.verbs.size > 0 ? "edit" : "";
+        const label = said(r), where = e.site;
         return (
-          <div key={r.key} data-run={i} className={`rp-row ${cur ? "current" : ""} ${i > at ? "todo" : ""} ${changed ? "a-edit" : ""}`}>
-            <button className="rp-row-main" onClick={() => { if (isSel(r)) { selectPlace(null); return; } selectPlace(r.place, e.stepId); go(i); }}
-              onMouseEnter={() => placesStore.set({ highlight: r.place })} onMouseLeave={() => placesStore.set({ highlight: null })}>
-              <span className="rp-glyph" aria-hidden="true">{ICON[e.area]}</span>
-              <span className="rp-row-text">
-                <span className="rp-row-label">{title}</span>
-                <span className="rp-row-meta">
-                  <time>{timeIn(r.first.ts)}</time>
-                  {changed && <span className="pl-verbs">{[...r.verbs].map(([v, n]) => `${VERB_NAME[v].toLowerCase()}${n > 1 ? ` ×${n}` : ""}`).join(", ")}</span>}
-                  {!changed && r.count > 1 && <span>{r.count} steps</span>}
-                  {r.failed > 0 && <span className="rp-fail-dot" aria-label={`${r.failed} failed`} />}
-                </span>
-              </span>
-            </button>
-          </div>
+          <button key={r.key} data-run={i} className={`rp-m pl-m ${tone} ${picked ? "current" : state}`}
+            onClick={() => { if (picked) { selectPlace(null); return; } selectPlace(r.place, e.stepId); go(i); }}
+            onMouseEnter={() => placesStore.set({ highlight: r.place })} onMouseLeave={() => placesStore.set({ highlight: null })}
+            title={`${label}\n${where}${r.count > 1 ? ` · ${r.count} steps` : ""}`}>
+            <b aria-hidden="true" /><span><LinkedLabel text={label} max={40} /></span>
+            {r.failed > 0 && <em>failed</em>}
+            <small>{where}</small>
+          </button>
         );
       })}
     </div>

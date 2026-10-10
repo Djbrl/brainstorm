@@ -59,14 +59,14 @@ export function selectPlace(id: string | null, stepId?: string) {
 }
 
 /** A stretch of steps in one place, in order (consecutive steps on the same page fold into one row). */
-export type PlaceRun = { key: string; place: string; first: CoworkEvent; last: CoworkEvent; count: number; verbs: Map<CoworkVerb, number>; failed: number; stepIds: Set<string> };
+export type PlaceRun = { key: string; place: string; first: CoworkEvent; last: CoworkEvent; count: number; verbs: Map<CoworkVerb, number>; failed: number; stepIds: Set<string>; events: CoworkEvent[] };
 export function placeRuns(events: CoworkEvent[]): PlaceRun[] {
   const runs: PlaceRun[] = [];
   for (const e of events) {
     const place = `${e.area}|${e.page}`;
     let r = runs[runs.length - 1];
-    if (!r || r.place !== place) runs.push(r = { key: e.id, place, first: e, last: e, count: 0, verbs: new Map(), failed: 0, stepIds: new Set() });
-    r.last = e; r.count++; r.stepIds.add(e.stepId);
+    if (!r || r.place !== place) runs.push(r = { key: e.id, place, first: e, last: e, count: 0, verbs: new Map(), failed: 0, stepIds: new Set(), events: [] });
+    r.last = e; r.count++; r.stepIds.add(e.stepId); r.events.push(e);
     if (e.failed) r.failed++;
     if (e.change && !e.failed && e.change.confidence !== "maybe") r.verbs.set(e.change.verb, (r.verbs.get(e.change.verb) ?? 0) + 1);
   }
@@ -82,3 +82,16 @@ export const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocal
  *  map and its list (PlacesMap, PlaceSteps) put it beside the other places. */
 export const HOME = "home";
 export const HOME_NAME = "Your computer";
+
+/** What a stretch in a place was, in one line: its most telling event's words (a change first, a click, typing, a send;
+ *  then a search, then a fetch or a read, then a visit), as the step panel says it ('Searched "…"', 'Clicked "Envoyer"'). */
+const TELLING: Record<CoworkEvent["action"], number> = { write: 6, click: 5, input: 4, search: 3, read: 2, visit: 1 };
+export function runWords(r: PlaceRun): string {
+  let best = r.events[0];
+  for (const e of r.events) if (TELLING[e.action] > TELLING[best.action] || (e.change && !best.change)) best = e;
+  const where = placeTitle(best);
+  if (!best.what) return where;
+  // Words that don't say which page ("Fetched with curl", "Opened the page"): the page beside them.
+  return GENERIC.test(best.what) && where && where !== best.site ? `${best.what} · ${where}` : best.what;
+}
+const GENERIC = /^(Fetched with curl|Sent a request|Opened the page|Looked at the page|Clicked on the page|Read the page( text| structure)?|Ran a script on the page|Couldn't open the page)$/;

@@ -17,6 +17,7 @@ import "./readmap.css";
 const W = 208, H = 132;      // the picture, in CSS pixels
 const GLIDE = 0.28;          // seconds for the camera to (nearly) reach a new file
 const READ_FLASH_MS = 1500;  // a read as it happens (the map's line of sight lasts as long: agents.tsx)
+const PAST_ALPHA = 0.38;     // the replay's marker (the thread in its past), beside the agents where they are now
 const NAMES_MAX = 7;         // file names besides the ones read
 const TOGETHER_MS = 15_000;  // reads this close to the last one are one look around (several files read at once)
 const READABLE = 3.5;        // a file's radius in the picture (px) from which its name goes under it
@@ -276,11 +277,12 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
           ctx.closePath(); ctx.fill();
         }
       }
-      // A replay's marker, where the thread is in its past.
+      // A replay's marker, where the thread is in its past: the same blue, faint, so it doesn't read as the agent now.
       const mk = subjectRef.current();
       if (mk) {
-        ctx.globalAlpha = 1;
+        ctx.globalAlpha = 0.9;
         ctx.beginPath(); ctx.arc(X(mk.x), Y(mk.y), 5.5, 0, Math.PI * 2); ctx.fillStyle = st.halo; ctx.fill();
+        ctx.globalAlpha = PAST_ALPHA;
         ctx.beginPath(); ctx.arc(X(mk.x), Y(mk.y), 4, 0, Math.PI * 2); ctx.fillStyle = accentRef.current; ctx.fill();
       }
       ctx.globalAlpha = 1;

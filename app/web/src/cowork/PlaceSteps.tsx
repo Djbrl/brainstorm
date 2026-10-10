@@ -6,57 +6,25 @@
 // takes the thread there and opens its newest step in the side panel. Between its trips out, a row for Your computer:
 // the thread back in the code (its first row too, where it starts).
 import { useEffect, useMemo, useRef } from "react";
-import { useNavActions, useNavState, useReplayCursor } from "../lib/nav";
-import { useThread } from "../lib/thread";
+import { useNavState } from "../lib/nav";
+import { usePlaceRows } from "./rows";
 import { displayLabel } from "../follow/format";
 import { injectedLabel } from "../lib/chapters";
 import { useLiveSelector } from "../lib/live";
 import { LinkedLabel } from "../lib/links";
-import { HOME_NAME, placeRuns, placesStore, runWords, selectPlace, usePlaces, type PlaceRun } from "./data";
+import { HOME_NAME, placesStore, runWords, selectPlace, usePlaces, type PlaceRun } from "./data";
 import "../map/replay/replay.css"; // the row styles (.rp-list, .rp-row) it shares with the replay
 
 
 const USER_MS = 400;   // the list stops following the thread this long after you scroll it (as the Track's does)
 
 export function PlaceSteps() {
-  const { data, selected, stepId, row: picked } = usePlaces();
+  const { data, selected, stepId } = usePlaces();
   const { replay } = useNavState();
-  const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
-  const index = useReplayCursor((c) => c.index);
-  const { setReplayIndex, setReplayPlaying, setThreadMode } = useNavActions();
   const steps = useLiveSelector((st) => (replay ? st.steps[replay.sessionId] : undefined));
   const stepById = useMemo(() => new Map((steps ?? []).map((x) => [x.id, x])), [steps]);
-  // The rows: each stretch in a place, and Your computer before, between and after them (moments with no place: the
-  // code). Each with the moment it starts at and the one a click goes to.
-  const runs = data ? placeRuns(data.events) : [];
-  const beatAt = (id: string) => thread?.stepBeat.get(id);
-  type Row = { run?: PlaceRun; start: number; to: number; moments: number };
-  const rows: Row[] = [];
-  let prev = -1;
-  for (const r of runs) {
-    const first = beatAt(r.first.stepId), last = beatAt(r.last.stepId) ?? first;
-    if (first === undefined || last === undefined) continue;
-    if (first - prev > 1) rows.push({ start: prev + 1, to: prev + 1, moments: first - prev - 1 });
-    rows.push({ run: r, start: first, to: last, moments: 0 });
-    prev = Math.max(prev, last);
-  }
-  const beats = thread?.beats.length ?? 0;
-  if (rows.length && beats - 1 > prev) rows.push({ start: prev + 1, to: prev + 1, moments: beats - 1 - prev });
-  if (rows[0]?.run) rows.unshift({ start: 0, to: 0, moments: 0 });   // every thread starts on Your computer
-  let at = -1;
-  if (replay?.live) at = rows.length - 1;
-  // The row you went to, while the thread is still on its moment (several rows can share one: a moment can hold several
-  // stretches); else the last row that starts by the cursor.
-  else if (picked && rows[picked.i] && rows[picked.i].to === index && picked.beat === index) at = picked.i;
-  else for (let i = 0; i < rows.length; i++) if (rows[i].start <= index) at = i;
-  const go = (i: number) => {
-    const b = rows[i]?.to;
-    if (b === undefined) return;
-    placesStore.set({ row: { i, beat: b, event: rows[i].run?.last.id ?? null } });
-    if (replay?.mode === "footprint") setThreadMode("steps");
-    setReplayPlaying(false);
-    setReplayIndex(b);
-  };
+  const { rows, at, go } = usePlaceRows();
+  const runs = rows.flatMap((r) => (r.run ? [r.run] : []));
   const goRef = useRef(go); goRef.current = go;
   const atRef = useRef(at); atRef.current = at;
 

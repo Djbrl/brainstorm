@@ -69,7 +69,10 @@ export function ShareMenu({ sessionId, className = "rp-text" }: { sessionId: str
   );
 }
 
-function Player() {
+/** `steps`, given: ‹ › go by those instead of the thread's moments (Places: by place), `at` of `count`. */
+type Steps = { at: number; count: number; go: (i: number) => void; noun: string };
+
+function Player({ steps }: { steps?: Steps }) {
   const { replay, setReplayIndex, setReplayPlaying, setReplaySpeed, setThreadMode } = useNav();
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
   if (!replay) return null;
@@ -83,12 +86,16 @@ function Player() {
   const pct = len > 1 ? (index / (len - 1)) * 100 : 100;
   return (
     <div className="rp-player" role="region" aria-label="Replay">
-      <button className="rp-icon" onClick={() => set(index - 1)} disabled={index === 0} aria-label="Previous step" title="Previous step (←)">{Icon.back}</button>
+      {steps
+        ? <button className="rp-icon" onClick={() => steps.go(steps.at - 1)} disabled={steps.at <= 0} aria-label={`Previous ${steps.noun}`} title={`Previous ${steps.noun} (←)`}>{Icon.back}</button>
+        : <button className="rp-icon" onClick={() => set(index - 1)} disabled={index === 0} aria-label="Previous step" title="Previous step (←)">{Icon.back}</button>}
       <button className="rp-icon rp-play" onClick={() => togglePlay(replay.playing, setReplayPlaying)}
         aria-label={replay.playing ? "Pause" : "Play"} title={replay.playing ? "Pause (Space)" : "Play (Space)"}>
         {replay.playing ? Icon.pause : Icon.play}
       </button>
-      <button className="rp-icon" onClick={() => set(index + 1)} disabled={index >= len - 1} aria-label="Next step" title="Next step (→)">{Icon.fwd}</button>
+      {steps
+        ? <button className="rp-icon" onClick={() => steps.go(steps.at + 1)} disabled={steps.at >= steps.count - 1} aria-label={`Next ${steps.noun}`} title={`Next ${steps.noun} (→)`}>{Icon.fwd}</button>
+        : <button className="rp-icon" onClick={() => set(index + 1)} disabled={index >= len - 1} aria-label="Next step" title="Next step (→)">{Icon.fwd}</button>}
       <div className="rp-slider" style={{ ["--rp-pct" as string]: `${pct}%` }}>
         <ChapterMarks thread={thread} />
         <input type="range" min={0} max={len - 1} step={1} value={index} aria-label="Replay position"
@@ -107,10 +114,10 @@ function Player() {
 
 /**
  * The footer: only the player, while replaying. Share sits by the thread's title in the sidebar's Track; the map's
- * switches are in Settings and on keys (R, L).
+ * switches are in Settings and on keys (L, M). On Places its ‹ › go place by place (CoworkView).
  */
-export function Dock() {
+export function Dock({ steps }: { steps?: Steps } = {}) {
   const { replay } = useNavState();
   if (replay?.mode !== "play") return null;
-  return <div className="dock"><Player /></div>;
+  return <div className="dock"><Player steps={steps} /></div>;
 }

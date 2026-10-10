@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-force-graph-2d";
 import { hierarchy, pack } from "d3-hierarchy";
 import type { CoworkArea, CoworkEvent, CoworkPage, CoworkSite, CoworkSummary } from "@contract";
-import { AREA_NAME, HOME, HOME_NAME, usePlaces } from "./data";
+import { AREA_NAME, HOME, HOME_NAME } from "./data";
 import { useCamera, type Camera, type View } from "../map/camera";
 import { mapStyle, drawMarker, platform } from "../map/themes";
 import { css, readTokens, recencyRGB } from "../map/color";
@@ -77,18 +77,19 @@ function layout(data: CoworkSummary): PlacesGraph {
 /** Which place a cowork event stands on: its page when the page has its own dot, else its site. */
 const placeOf = (e: CoworkEvent, ids: ReadonlySet<string>) => (ids.has(`${e.area}|${e.page}`) ? `${e.area}|${e.page}` : `${e.area}|${e.site}`);
 
-export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0, small, beatOf, beats, cursor, live, letter }: {
+export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0, small, beatOf, beats, cursor, until, live, letter }: {
   data: CoworkSummary; selected: string | null; highlight: string | null; onSelect: (id: string | null) => void;
   /** Set while the step panel is open on the right. */
   rightInset?: number;
   /** A small map (the Claude app's browser pane): the camera frames the site the thread is in. */
   small: boolean;
-  /** The thread's moment of a step (thread.stepBeat), to place the marker at the replay's cursor; and how many moments
-   *  it has (after its last trip out, it's back on Your computer). */
+  /** A step's place in the thread, step by step (cowork/rows.ts usePlaceTimeline), and how many steps it has (after
+   *  its last trip out, it's back on Your computer). */
   beatOf: (stepId: string) => number | undefined;
   beats: number;
-  /** The replay's cursor (a moment), and whether the thread follows live (the marker on its newest place). */
-  cursor: number; live: boolean;
+  /** Where the thread is, in the same steps as beatOf, and the event to stop at there (the list's row: a step can hold
+   *  several); whether it follows live (the marker on its newest place). */
+  cursor: number; until?: string | null; live: boolean;
   /** The letter on the marker (the thread's). */
   letter: string;
 }) {
@@ -135,8 +136,7 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
     };
   }, [data, ids, beatOf, beats]);
   const now = useMemo(() => placeAt(Infinity), [placeAt]);
-  const { row } = usePlaces();
-  const past = useMemo(() => (live ? null : placeAt(cursor, row && row.beat === cursor ? row.event : undefined)), [placeAt, cursor, live, row]);
+  const past = useMemo(() => (live ? null : placeAt(cursor, until)), [placeAt, cursor, live, until]);
   const path = past ?? now;                            // the trail the camera and the marker follow
   const here = path[path.length - 1]?.place ?? null;
   const nowAt = now[now.length - 1]?.place ?? null;    // the agent where it is now (solid while you look back)

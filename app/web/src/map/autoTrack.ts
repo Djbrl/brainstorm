@@ -34,7 +34,6 @@ export function useAutoTrack({ on, sessionId, agents, followId, setFollowId }: {
     if (!want || want.id === s.mine) return;
     const cur = agents.find((a) => a.id === s.mine);
     if (cur?.active && now - s.at < SWITCH_MS) return;
-   
     s.mine = want.id; s.at = now;
     setFollowId(want.id);
   }, [on, sessionId, agents, followId, setFollowId]);

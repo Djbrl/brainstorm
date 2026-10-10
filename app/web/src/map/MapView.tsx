@@ -44,7 +44,7 @@ import { isTyping } from "../switch/shortcuts";
 import "./map.css";
 
 /** Below this width the map is small (the Claude app's browser pane, a half screen): the camera follows an open
- *  thread's agent up close by itself, and the minimap shows the whole project. */
+ *  thread's agent up close by itself. */
 export const SMALL_MAP = 1100;
 
 /** A recording (the hosted demo) or a shared replay: fixed for the page's life, read once (it parses the URL). */
@@ -186,14 +186,14 @@ export function MapView() {
   }, [replay, agents, state.steps, setFollowId, refollow, nav0]);
 
   // ---- the minimap (Minimap.tsx) and its keys: M shows or hides it, A follows the next agent (Shift A, the one before) ----
-  const minimap = useMinimap(small);
+  const minimap = useMinimap();
   const tracks = useMemo(() => trackable(drawnAgents), [drawnAgents]);
-  const keysRef = useRef({ small, minimap, tracks, followId, follow }); keysRef.current = { small, minimap, tracks, followId, follow };
+  const keysRef = useRef({ minimap, tracks, followId, follow }); keysRef.current = { minimap, tracks, followId, follow };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target) || document.querySelector('[aria-modal="true"], .lightbox')) return;
       const k = keysRef.current;
-      if (e.key === "m" || e.key === "M") { e.preventDefault(); setMinimap(k.small, !k.minimap); return; }
+      if (e.key === "m" || e.key === "M") { e.preventDefault(); setMinimap(!k.minimap); return; }
       if ((e.key === "a" || e.key === "A") && k.tracks.length) {
         e.preventDefault();
         const i = k.tracks.findIndex((a) => a.id === k.followId), n = k.tracks.length;
@@ -212,6 +212,7 @@ export function MapView() {
       resolveId,
       at: (id: string) => nodeIndexRef.current.get(id),
       whose: (a: { id: string }) => open || a.id === follow,
+      past: replayRef.current.readsNow(),
     };
   }, [resolveId]);
   /** A click or drag on the minimap: look there, by hand (no agent followed any more). */
@@ -576,10 +577,11 @@ export function MapView() {
       <LensSwitch />
       {hasNodes && (minimap
         ? <Minimap graphRef={graphRef} anim={anim} drawnRef={agentsRef} cam={camRef} subject={() => replayRef.current.subject()} reads={minimapReads} agents={tracks} followId={followId} accent={tokens.accent}
-            onTrack={follow} onLook={lookAt} onHide={() => setMinimap(small, false)} />
-        : small && (
-          <button className="minimap-show" onClick={() => setMinimap(small, true)} aria-label="Show the minimap (M)" title="Show the minimap (M)">
-            <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="4" width="15" height="12" rx="2.5" /><rect x="10" y="9" width="5" height="4.5" rx="1" /></svg>
+            onTrack={follow} onLook={lookAt} onHide={() => setMinimap(false)} />
+        : (
+          <button className="minimap-show" onClick={() => setMinimap(true)} title="Show the minimap (M)">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="3" /><circle cx="11.5" cy="9" r="2.6" /><path d="M13.4 10.9 15.5 13" /></svg>
+            Minimap
           </button>
         ))}
 

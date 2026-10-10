@@ -7,7 +7,8 @@
 // Files, the file is still there until you let go of it.
 // Below 1100px wide it starts folded and opens over the content (tap outside or ‹ to fold it); on a phone, picking a
 // thread folds it too, and picking a file opens it. That narrow state isn't saved, so the desktop's folded-or-not
-// choice stays as it was. T folds and unfolds it anywhere. Folded with a thread open, it's a card with the thread's
+// choice stays as it was. On a wide window it's open: ‹ or T folds it for now, not for next time (it used to be saved,
+// and a fold left from a small window kept it folded on a wide one). T folds and unfolds it anywhere. Folded with a thread open, it's a card with the thread's
 // state and the step it's on (NowCard), except on a phone.
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { AgentPresence, FileNode, ProjectMap } from "@contract";
@@ -44,8 +45,9 @@ const COLLAPSED_KEY = "rundown-sidebar-collapsed";
 function loadTab(): Tab {
   try { return localStorage.getItem(TAB_KEY) === "files" ? "files" : "threads"; } catch { return "threads"; }
 }
-function loadCollapsed(): boolean {
-  try { return localStorage.getItem(COLLAPSED_KEY) === "1"; } catch { return false; }
+/** The fold that used to be saved: forgotten, so a wide window opens with the sidebar open. */
+function forgetCollapsed() {
+  try { localStorage.removeItem(COLLAPSED_KEY); } catch { /* storage blocked: nothing saved anyway */ }
 }
 
 /** Whether a media query matches, kept up to date as the window resizes. */
@@ -64,14 +66,16 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
   const [tab, setTab] = useState<Tab>(() => (fileLink ? "files" : replay ? "threads" : loadTab()));
   // Threads with a thread open: the thread, or (after its back arrow) the list.
   const [listing, setListing] = useState(false);
-  const [folded, setFolded] = useState<boolean>(loadCollapsed); // the desktop choice, saved
+  const [folded, setFolded] = useState(false); // wide: folded by hand, for now
   const narrow = useMedia(NARROW), phone = useMedia(PHONE);
   const [over, setOver] = useState(false); // narrow: open over the content, never saved
   const collapsed = narrow ? !over : folded;
   const setCollapsed = (c: boolean) => (narrow ? setOver(!c) : setFolded(c));
 
   useEffect(() => { try { localStorage.setItem(TAB_KEY, tab); } catch { /* storage blocked: tab resets on reload */ } }, [tab]);
-  useEffect(() => { try { localStorage.setItem(COLLAPSED_KEY, folded ? "1" : "0"); } catch { /* storage blocked */ } }, [folded]);
+  useEffect(forgetCollapsed, []);
+  // Back to a wide window: the sidebar opens again.
+  useEffect(() => { if (!narrow) setFolded(false); }, [narrow]);
   // Opening a thread shows it under Threads; closing it, the list. On a phone the thread opens below the map, which
   // keeps the top of the screen like a video (the "pip" sheet): scroll its steps back and still see the agents work.
   const thread = replay?.sessionId ?? null;

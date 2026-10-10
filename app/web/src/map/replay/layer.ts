@@ -42,6 +42,10 @@ export type ReplayLayerApi = {
   footprint: () => string[] | null;
   /** Whether the open thread touched a file at all (read or changed), at any point. */
   touches: (id: string) => boolean;
+  /** Looking back through the thread (the tracer drawn, not live): the files read at the moment the cursor is on, or
+   *  at the last read before it (up to a few moments back), newest first, or none; null when not looking back. The
+   *  minimap shows them (none: the whole project, not what the agents read now). */
+  readsNow: () => string[] | null;
   /** The tracer's camera target (the marker, or between it and a file it reads), or null: what a locked camera centres. */
   subject: () => { x: number; y: number } | null;
   /** Draw the tracer, numbered stops, the current marker and read flashes. Called every frame after the agent layer. */
@@ -55,6 +59,7 @@ type Box = { x0: number; y0: number; x1: number; y1: number };
 const GLIDE_MS = 650;       // same glide as the live agent markers (map/agents.tsx)
 const THINK_MS = 2400;      // the thinking ring's breath (as in agents.tsx)
 const FLASH_MS = 600;       // read flash
+const READS_BACK = 8;       // how many moments back the minimap still shows the last read (readsNow)
 const PULSE_MS = 700;       // edit pulse on the marker
 const RED = "#d93025";      // a beat with a failed tool call
 const ERR_PULSE_MS = 1100;
@@ -573,8 +578,17 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
   }, [focus]);
   const subject = useCallback(() => (st.current.active && st.current.mode !== "footprint" ? anim.current.cam : null), []);
   const touches = useCallback((id: string) => !!st.current.thread?.touched.has(id), []);
+  const readsNow = useCallback(() => {
+    const s = st.current;
+    if (!s.active || !s.thread || s.mode === "footprint" || s.live) return null;
+    for (let i = s.index; i >= 0 && i > s.index - READS_BACK; i--) {
+      const b = s.thread.beats[i];
+      if (b?.action === "read" && b.files.length) return [...b.files].reverse();
+    }
+    return [];
+  }, []);
 
-  return { active, thinking, tracing: active && mode !== "footprint", playable, footprintMode: active && mode === "footprint", footprint, touches, subject, nodeAlpha, look, draw, marks };
+  return { active, thinking, tracing: active && mode !== "footprint", playable, footprintMode: active && mode === "footprint", footprint, touches, readsNow, subject, nodeAlpha, look, draw, marks };
 }
 
 /**

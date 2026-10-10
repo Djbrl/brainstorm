@@ -1,7 +1,11 @@
 // Owner: sidebar agent. The folded sidebar with a thread open: a small card in the top-left corner says which thread, its
 // state (working, thinking, needs you, your turn) and the step it's on (the newest one while it follows live). Clicking
-// it, or T, unfolds the sidebar. On a small map it keeps you up to date without covering the map.
-import { useNavState, useReplayCursor } from "../../lib/nav";
+// it, or T, unfolds the sidebar. Scrolling on it steps through the thread as the Track's list does, folded: up goes
+// back (the replay's player opens, paused, the map's marker on that step), down comes forward, and back at the newest
+// step a running thread follows live again (App's LiveFollow). On a small map it keeps you up to date without covering
+// the map.
+import { useEffect, useRef } from "react";
+import { useNavActions, useNavState, useReplayCursor } from "../../lib/nav";
 import { useLiveSelector } from "../../lib/live";
 import { beatLabel, useThread } from "../../lib/thread";
 import { injectedLabel } from "../../lib/chapters";
@@ -15,6 +19,33 @@ export function NowCard({ onOpen }: { onOpen: () => void }) {
   const index = useReplayCursor((c) => c.index);
   const session = useLiveSelector((s) => (sid ? s.sessions.find((x) => x.id === sid) : undefined));
   const attn = useLiveSelector((s) => (sid ? s.attention[sid] : undefined));
+  const { setReplayIndex, setThreadMode, setReplayPlaying } = useNavActions();
+
+  // Scrolling on the card: one moment per notch (or per ~40 px of a trackpad's glide). Not the map's zoom.
+  const card = useRef<HTMLButtonElement>(null);
+  const now = useRef({ len: 0, mode: replay?.mode }); now.current = { len: thread?.beats.length ?? 0, mode: replay?.mode };
+  useEffect(() => {
+    const el = card.current;
+    if (!el) return;
+    let acc = 0, lastAt = 0;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const { len, mode } = now.current;
+      if (!len) return;
+      const t = performance.now();
+      if (t - lastAt > 250) acc = 0;   // a new gesture
+      lastAt = t;
+      acc += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
+      const steps = Math.trunc(acc / 40);
+      if (!steps) return;
+      acc -= steps * 40;
+      if (mode !== "play") setThreadMode("play");
+      setReplayPlaying(false);
+      setReplayIndex((i) => Math.max(0, Math.min(len - 1, Math.min(i, len - 1) + steps)));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [!!replay, setReplayIndex, setThreadMode, setReplayPlaying]);
   if (!replay) return null;
 
   const beats = thread?.beats ?? [];
@@ -34,9 +65,9 @@ export function NowCard({ onOpen }: { onOpen: () => void }) {
   const title = session?.title || "Untitled thread";
 
   return (
-    <button className="sidebar-now" onClick={onOpen} aria-expanded={false}
+    <button className="sidebar-now" ref={card} onClick={onOpen} aria-expanded={false}
       aria-label={`Open the sidebar. ${title}${word ? `, ${word}` : ""}. ${back ? `Step ${index + 1}` : "Now"}: ${step}`}
-      title="Open the sidebar (T)">
+      title="Scroll to step through the thread. Click to open the sidebar (T)">
       <span className="sn-top">
         <i className={`sn-dot ${state}`} aria-hidden="true" />
         <b>{title}</b>

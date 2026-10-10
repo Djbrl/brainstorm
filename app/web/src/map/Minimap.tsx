@@ -4,8 +4,7 @@
 // camera's view). Several files read together (within a few seconds of the last one) are framed together if their names
 // still read at that zoom; else it shows the last one, the others ringed fainter where they're in the picture. The agent
 // it watches is the one the big camera follows (its buttons below pick it), or else the one that read last. Nothing read yet: the whole project, with the big camera's frame. A click shows that place on the
-// big map. Shown on a small map (the Claude app's browser pane) unless turned off, on a big one only if turned on: M
-// flips it (prefs.ts).
+// big map. Shown unless turned off (its ×, or M; a Minimap button brings it back), on any map but a phone's.
 import { useEffect, useRef, type MouseEvent, type RefObject } from "react";
 import type { AgentPresence } from "@contract";
 import { agentColor, baseName, initial, lastReadAt, readsWithTimes, shortName, type AgentAnim } from "./agents";
@@ -23,7 +22,12 @@ const TOGETHER_MS = 15_000;  // reads this close to the last one are one look ar
 const READABLE = 3.5;        // a file's radius in the picture (px) from which its name goes under it
 
 type View = { x: number; y: number; k: number };
-export type MinimapReads = { resolveId: (file: string) => string | undefined; at: (id: string) => GNode | undefined; whose: (a: AgentPresence) => boolean };
+export type MinimapReads = {
+  resolveId: (file: string) => string | undefined; at: (id: string) => GNode | undefined; whose: (a: AgentPresence) => boolean;
+  /** Looking back through a thread: the files read at that moment (node ids, newest first), which it shows instead
+   *  (none: the whole project); null when not looking back. */
+  past: string[] | null;
+};
 
 export function Minimap({ graphRef, anim, drawnRef, cam, subject, reads, agents, followId, accent, onTrack, onLook, onHide }: {
   graphRef: RefObject<Graph>;
@@ -80,7 +84,11 @@ export function Minimap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
       // ---- what to show: the file the watched agent read last, or the whole map ----
       const R = readsRef.current(), drawn = drawnRef.current ?? [], A = anim.current;
       let who: AgentPresence | undefined, read: GNode | undefined, others: GNode[] = [], together: GNode[] = [];
-      if (R) {
+      if (R?.past) {
+        // A replay: what was read at that moment, all of it together.
+        const nodes = R.past.map((id) => R.at(id)).filter((n): n is GNode => n?.x !== undefined && n.y !== undefined);
+        read = nodes[0]; others = nodes.slice(1); together = nodes;
+      } else if (R) {
         const can = drawn.filter((a) => R.whose(a) && lastReadAt(a) > 0);   // its marker may be off the map: its reads still count
         who = can.find((a) => a.id === followRef.current) ?? can.sort((a, b) => lastReadAt(b) - lastReadAt(a))[0];
         if (who) {
@@ -237,7 +245,8 @@ export function Minimap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
       ctx.globalAlpha = 1;
 
       // What it shows, in words beside the agents' buttons.
-      const words = read && who ? `${who.isSubagent ? shortName(who, 16) : "Main agent"} read ${together.length > 1 ? `${together.length} files` : baseName(read.file?.path ?? read.id)}`
+      const words = read && R?.past ? `Read ${together.length > 1 ? `${together.length} files` : baseName(read.file?.path ?? read.id)} at this step`
+        : read && who ? `${who.isSubagent ? shortName(who, 16) : "Main agent"} read ${together.length > 1 ? `${together.length} files` : baseName(read.file?.path ?? read.id)}`
         : "The whole project";
       if (words !== said && caption.current) { said = words; caption.current.textContent = words; caption.current.title = words; }
     };

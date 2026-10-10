@@ -36,7 +36,7 @@ export type ReadmapReads = {
   past: string[] | null;
 };
 
-export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents, followId, accent, big, onTrack, onLook, onHide }: {
+export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, agents, followId, accent, big, onTrack, onLook, onHide }: {
   graphRef: RefObject<Graph>;
   anim: RefObject<Map<string, AgentAnim>>;
   /** The agents the map draws this frame (where each one is comes from `anim`). */
@@ -44,6 +44,8 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
   cam: RefObject<Camera>;
   /** The replay's marker, while it shows (replay/layer.ts), or null. */
   subject: () => { x: number; y: number } | null;
+  /** Where the thread is now when no live agent is on the map (replay/layer.ts nowAt), or null: drawn solid. */
+  now: () => { x: number; y: number } | null;
   /** The map's resolver and nodes, and whose reads count (the open thread's agents, or on the project overview only
    *  the one followed); null when reads are hidden (Settings). */
   reads: () => ReadmapReads | null;
@@ -67,6 +69,7 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
   const followRef = useRef(followId); followRef.current = followId;
   const accentRef = useRef(accent); accentRef.current = accent;
   const subjectRef = useRef(subject); subjectRef.current = subject;
+  const nowRef = useRef(now); nowRef.current = now;
   const readsRef = useRef(reads); readsRef.current = reads;
   // The Readmap's own camera (graph point (x, y) in the middle, k pixels per graph unit), and what it shows now: the
   // file read (its id) or the whole map (null). A click goes there.
@@ -88,10 +91,10 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
     const draw = (t: number) => {
       raf = requestAnimationFrame(draw);
       if (document.hidden) return;
-      const g = graphRef.current, st = mapStyle(), A0 = anim.current, c0 = cam.current?.view(), m0 = subjectRef.current();
+      const g = graphRef.current, st = mapStyle(), A0 = anim.current, c0 = cam.current?.view(), m0 = subjectRef.current(), n0 = nowRef.current();
       // Every frame while something in it moves (its own glide, an agent's, the big camera's frame, a read's ring), as
       // smooth as the big map; nothing at all while it all stands still.
-      let s = `${g?.id}|${document.documentElement.dataset.theme}|${followRef.current}|${c0 ? `${c0.x.toFixed(1)},${c0.y.toFixed(1)},${c0.k.toFixed(3)}` : ""}|${m0 ? `${m0.x.toFixed(1)},${m0.y.toFixed(1)}` : ""}`;
+      let s = `${g?.id}|${document.documentElement.dataset.theme}|${followRef.current}|${c0 ? `${c0.x.toFixed(1)},${c0.y.toFixed(1)},${c0.k.toFixed(3)}` : ""}|${m0 ? `${m0.x.toFixed(1)},${m0.y.toFixed(1)}` : ""}|${n0 ? `${n0.x.toFixed(1)},${n0.y.toFixed(1)}` : ""}`;
       for (const a of drawnRef.current ?? []) {
         const p = A0?.get(a.id);
         s += `|${a.id}:${a.ts}:${a.trail.length}:${p ? `${p.x.toFixed(1)},${p.y.toFixed(1)},${p.alpha.toFixed(2)},${p.flashes.length}` : ""}`;
@@ -273,6 +276,12 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
       if (mk) {
         ctx.globalAlpha = PAST_ALPHA;
         ctx.beginPath(); ctx.arc(X(mk.x), Y(mk.y), 4.6, 0, Math.PI * 2); ctx.fillStyle = accentRef.current; ctx.fill();
+      }
+      // The thread where it is now, when no live agent stands there: solid, like an agent's dot.
+      if (n0) {
+        ctx.globalAlpha = 1;
+        ctx.beginPath(); ctx.arc(X(n0.x), Y(n0.y), 6.1, 0, Math.PI * 2); ctx.fillStyle = st.halo; ctx.fill();
+        ctx.beginPath(); ctx.arc(X(n0.x), Y(n0.y), 4.6, 0, Math.PI * 2); ctx.fillStyle = accentRef.current; ctx.fill();
       }
       // ---- agents: those in the picture where they are; up close, the one watched, off the picture, is an arrow on the
       // edge pointing where it is ----

@@ -46,6 +46,8 @@ export type ReplayLayerApi = {
    *  at the last read before it (up to a few moments back), newest first, or none; null when not looking back. The
    *  readmap shows them (none: the whole project, not what the agents read now). */
   readsNow: () => string[] | null;
+  /** Looking back with no live agent on the map: where the thread is now (its newest move), the solid marker. */
+  nowAt: () => { x: number; y: number } | null;
   /** The tracer's camera target (the marker, or between it and a file it reads), or null: what a locked camera centres. */
   subject: () => { x: number; y: number } | null;
   /** Draw the tracer, numbered stops, the current marker and read flashes. Called every frame after the agent layer. */
@@ -170,6 +172,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
   const thinking = useLiveSelector((s) => !!replay && s.attention[replay.sessionId]?.state === "thinking") && active && index >= last;
   const st = useRef<{ active: boolean; thread: Thread | null; index: number; len: number; mode: string; speed: number; live: boolean; thinking: boolean }>({ active, thread, index, len, mode, speed, live, thinking });
   st.current = { active, thread, index, len, mode, speed, live, thinking };
+  const nowRef = useRef<{ x: number; y: number } | null>(null);
   const anim = useRef<Anim>({ x: 0, y: 0, fromX: 0, fromY: 0, t0: -1e9, file: null, lastIndex: -1, beatAt: -1e9, cam: null });
 
   // Bounds: clamp the cursor whenever the thread (or its length) changes.
@@ -487,8 +490,13 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     const failed = beat.failed > 0;
     const mark = failed ? RED : line;
     const ownMarker = !s.live || !liveShown?.current;
-    // Looking back with the agent on the map where it is now: the marker is the past, the same colour, faint, under it.
-    const past = !s.live && !!liveShown?.current ? PAST_ALPHA : 1;
+    // Where the thread is now (its newest move) when no live agent stands there (the server forgot it, half an hour after
+    // it stopped): the marker that says "now", solid, as the agent's would be.
+    const lastMove = moves.length - 1;
+    const nowFile = !liveShown?.current && lastMove >= 0 ? moves[lastMove].file : null;
+    const nowAt = nowFile && nowFile !== curFile ? markerAt(nowFile) : undefined;
+    // Looking back: the marker is the past, the same colour, faint, under the one for now (the agent, or nowAt).
+    const past = !s.live && (!!liveShown?.current || (!!nowFile && mi < lastMove)) ? PAST_ALPHA : 1;
     if (target && curFile && ownMarker) {
       if (trip) drawTrip(ctx, style.route, trip, tp, te, mark, 10 / scale, past, scale);
       const halo = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, 26 / scale);
@@ -539,6 +547,14 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
         ctx.strokeText(note, lx, ny); ctx.fillStyle = hexA(INK, 0.55); ctx.fillText(note, lx, ny);
       }
     }
+    if (nowAt && !s.live) {
+      const ms = mapStyle(), num = String(lastMove + 1);
+      ctx.globalAlpha = 1;
+      if (ms.marker === "badge") drawMarker(ctx, nowAt.x, nowAt.y, 10 / scale, line, num, num.length > 2 ? 8 : 9.5, ms.labelFont ?? font, scale, ms);
+      else drawMarker(ctx, nowAt.x, nowAt.y, 10 / scale, line, num, num.length > 2 ? 8 : 9.5, font, scale, { ...ms, glow: false, markerStroke: "#fff", markerText: "#fff" });
+    }
+    // For the Readmap: where now is, also when the marker stands on it (it draws its own marker faint, now solid on top).
+    nowRef.current = nowFile && !s.live ? nowAt ?? markerAt(nowFile) ?? null : null;
     ctx.restore();
   }, [accent, font, nodeIndexRef, stopsAt, kickCamera]);
 
@@ -592,7 +608,8 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     return [];
   }, []);
 
-  return { active, thinking, tracing: active && mode !== "footprint", playable, footprintMode: active && mode === "footprint", footprint, touches, readsNow, subject, nodeAlpha, look, draw, marks };
+  const nowAt = useCallback(() => nowRef.current, []);
+  return { active, thinking, tracing: active && mode !== "footprint", playable, footprintMode: active && mode === "footprint", footprint, touches, readsNow, nowAt, subject, nodeAlpha, look, draw, marks };
 }
 
 /**

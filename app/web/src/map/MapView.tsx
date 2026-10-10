@@ -577,7 +577,7 @@ export function MapView() {
       {map && <CapNote map={map} />}
       <LensSwitch />
       {hasNodes && readmap && (
-        <Readmap graphRef={graphRef} anim={anim} drawnRef={agentsRef} cam={camRef} subject={() => replayRef.current.subject()} reads={readmapReads} agents={tracks} followId={followId} accent={tokens.accent}
+        <Readmap graphRef={graphRef} anim={anim} drawnRef={agentsRef} cam={camRef} subject={() => replayRef.current.subject()} now={() => replayRef.current.nowAt()} reads={readmapReads} agents={tracks} followId={followId} accent={tokens.accent}
           big={!small} onTrack={follow} onLook={lookAt} onHide={() => setReadmap(false)} />
       )}
 

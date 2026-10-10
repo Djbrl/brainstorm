@@ -3,8 +3,9 @@
 // places always give the same map, nothing floats). A page is coloured by when it was last worked on, ringed orange if
 // something changed there, a red dot if a step failed there. The open thread's marker stands on the place it's at (its
 // newest while it follows live, the moment you're on when you look back: then a faint second marker, the agent where it
-// is now stays solid), its trail through the places it went before. The camera follows it from site to site: on a small
-// map it frames the site it's in. A click on a place opens its step (CoworkView).
+// is now stays solid), its trail through the places it went before. Looking back, only its recent places (the map's
+// "last 15 steps" setting, counted in places) are lit and named, the rest fades: what it did up to there, not everything.
+// The camera follows it from site to site: on a small map it frames the site it's in. A click on a place opens its step (CoworkView).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-force-graph-2d";
 import { hierarchy, pack } from "d3-hierarchy";
@@ -17,6 +18,7 @@ import { createRedraw, Motion } from "../map/redraw";
 import { useTheme } from "../lib/theme";
 import { clock, isReplay } from "../lib/live";
 import { sinceMs } from "../lib/visit";
+import { useStepWindow } from "../map/prefs";
 
 /** One circle of the places map. */
 export type PNode = NodeObject & {
@@ -120,6 +122,16 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
   const path = past ?? now;                            // the trail the camera and the marker follow
   const here = path[path.length - 1]?.place ?? null;
   const nowAt = now[now.length - 1]?.place ?? null;    // the agent where it is now (solid while you look back)
+  // Looking back: the places of its recent window, and the sites and areas that hold them.
+  const win = useStepWindow();
+  const focus = useMemo(() => {
+    if (!past) return null;
+    const set = new Set<string>();
+    for (const x of win === "all" ? past : past.slice(-win)) {
+      for (let n = byId.get(x.place); n; n = n.up) set.add(n.id);
+    }
+    return set;
+  }, [past, win, byId]);
 
   // The marker glides from place to place.
   const mark = useRef<{ x: number; y: number; fx: number; fy: number; t0: number; at: string | null }>({ x: 0, y: 0, fx: 0, fy: 0, t0: -1e9, at: null });
@@ -155,31 +167,32 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
   // The thread moved to another place: frame its site if it left the view (on a small map, as soon as it goes to
   // another site), unless you moved the camera since it last did.
   const sel = selected ? byId.get(selected) ?? null : null;
-  const focus = rightInset > 0 ? sel : null;
+  const panelOn = rightInset > 0 ? sel : null;
   useEffect(() => {
     const n = here ? byId.get(here) : undefined, c = camRef.current;
-    if (!n || focus || c.userAt() > userAt0.current) return;
+    if (!n || panelOn || c.userAt() > userAt0.current) return;
     const s = siteOf(n), m = small ? Math.min(c.safe.current.w, c.safe.current.h) * 0.18 : 24;
     const moved = s.id !== lastSite.current;
     lastSite.current = s.id;
     if ((small && moved) || !c.sees(n.x, n.y, m)) { frameSite(n); userAt0.current = performance.now(); }
-  }, [here, byId, small, focus, frameSite]);
+  }, [here, byId, small, panelOn, frameSite]);
   // A place's step open in the panel: the camera on it; closed: back where it was.
   const before = useRef<View | null>(null);
   useEffect(() => {
     const c = camRef.current;
-    if (focus) { before.current ??= c.view(); c.lookAt(focus.x, focus.y, Math.max(2.2, c.view()?.k ?? 0), 650); return; }
+    if (panelOn) { before.current ??= c.view(); c.lookAt(panelOn.x, panelOn.y, Math.max(2.2, c.view()?.k ?? 0), 650); return; }
     if (before.current) { c.moveTo(before.current, 650); before.current = null; }
-  }, [focus]);
+  }, [panelOn]);
 
   // ---- drawing ----
   const [hover, setHover] = useState<string | null>(null);
   const active = (hover ? byId.get(hover) : undefined) ?? (highlight ? byId.get(highlight) : undefined) ?? sel ?? undefined;
   // Lit: the place pointed at or picked, what it holds and what holds it. The rest fades.
-  const lit = (n: PNode) => !active || n === active || n.up === active || active.up === n || (active.kind === "page" && n.up === active.up);
+  const pointed = (n: PNode) => !active || n === active || n.up === active || active.up === n || (active.kind === "page" && n.up === active.up);
+  const lit = (n: PNode) => pointed(n) && (!focus || n.kind === "area" || focus.has(n.id));
   const st = mapStyle();
   const recorded = isReplay();
-  useEffect(() => { redraw.kick(); }, [graph, hover, highlight, selected, theme, here, nowAt, size.w, size.h, redraw]);
+  useEffect(() => { redraw.kick(); }, [graph, hover, highlight, selected, theme, here, nowAt, focus, size.w, size.h, redraw]);
 
   const drawNode = (n: PNode, ctx: CanvasRenderingContext2D, scale: number) => {
     const dim = lit(n) ? 1 : 0.35;
@@ -216,9 +229,9 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
     const cur = here ? byId.get(here) : undefined;
     if (cur) label(short(cur.label, 40), cur.x, cur.y + cur.r + 4 / scale, 12.5, 700, tokens.accent, 1, true);
     for (const n of g.nodes) if (n.kind === "area") label(n.label, n.x, n.y - n.r - 26 / scale, 17, 750, st.fileInk, 0.42);
-    for (const n of g.nodes) if (n.kind === "site" && n.r * scale > 26) label(short(n.label, 30), n.x, n.y - n.r + 6 / scale, 12.5, 650, st.fileInk, lit(n) ? 0.75 : 0.35);
+    for (const n of g.nodes) if (n.kind === "site" && n.r * scale > 26 && (!focus || focus.has(n.id))) label(short(n.label, 30), n.x, n.y - n.r + 6 / scale, 12.5, 650, st.fileInk, lit(n) ? 0.75 : 0.35);
     for (const n of g.nodes) {
-      if (n.dir || n === cur || n.r * scale < (n.kind === "page" && !n.up?.dir ? 3 : 5.5)) continue;
+      if (n.dir || n === cur || (focus && !focus.has(n.id)) || n.r * scale < (n.kind === "page" && !n.up?.dir ? 3 : 5.5)) continue;
       label(short(n.label, 32), n.x, n.y + n.r + 3 / scale, n.up?.kind === "site" ? 10.5 : 12, n.up?.kind === "site" ? 500 : 650, n.up?.kind === "site" ? st.fileInkQuiet : st.fileInk, lit(n) ? 1 : 0.4);
     }
     ctx.restore();

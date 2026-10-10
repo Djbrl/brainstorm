@@ -44,7 +44,7 @@ export const DIM = 0.4;
 
 export function agentAlpha(a: AgentPresence, now: number, busy: boolean, keep: boolean): number {
   if (a.active || busy) return 1;
-  if (keep) return 0.55;
+  if (keep) return 1;   // a thread open: its agent, done, stays where it is now, as solid as it was (map, Readmap)
   return Math.max(0, 0.35 * (1 - (now - Date.parse(a.ts) - 2 * 60_000) / (8 * 60_000)));
 }
 
@@ -186,7 +186,7 @@ export function drawAgents(opts: {
       const erring = t - st.errT0 < ERR_MS;
       const color = erring ? ERROR_RED : agentColor(a, accent);
       // Its state's colour, eased: its own while it works or thinks, red on an error, greyed once it rests.
-      const resting = !a.active && !thinks && !waiting?.has(a.id) && !erring;
+      const resting = !a.active && !thinks && !waiting?.has(a.id) && !erring && !keep;   // with its thread open it keeps its colour
       const want = resting ? mixRGB(rgbOf(color), REST_GREY, REST_MIX) : rgbOf(color);
       const f = 1 - Math.exp(-Math.min(0.1, Math.max(0, (t - (st.easeT ?? t)) / 1000)) / STATE_EASE);
       st.easeT = t;

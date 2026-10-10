@@ -256,6 +256,7 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 - **10 Oct 2026** · [sidebar] Fix: on the folded card only the newest moment's dot pulses while a thread works; a moment you scroll back to kept the pulsing blue over its own colour.
 - **10 Oct 2026** · [map] Full view: the Readmap and the file window are one column on the right, the same width, card and header ("Read build-log.md docs" over "Edited ThreadBar.tsx app/web/src/switch"), the file window right under the Readmap. The Readmap's pill is gone: M, its × or "M Readmap" in the thread bar's keys show and hide it.
 - **10 Oct 2026** · [switcher, map] Keys R (reads) and F / 0 (fit the map) removed: reads show or hide in Settings, and the camera frames by itself (following, the Readmap).
+- **10 Oct 2026** · [cowork] Places reworked in the code map's language: areas, sites and pages as packed circles (d3-hierarchy, no more floating bubbles), the thread's marker and trail on its places (faint when looking back, the agent where it is now solid), the camera following it from site to site (a small map frames the site). No Readmap on Places: a visit is the movement itself, which the camera follows. M works on the Map only.
 
 ## Requests
 

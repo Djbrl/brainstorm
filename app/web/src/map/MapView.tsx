@@ -188,7 +188,7 @@ export function MapView() {
     if (id && !replay.live) nav0.setReplayLive(true);
   }, [replay, agents, state.steps, setFollowId, refollow, nav0]);
 
-  // ---- the Readmap (Readmap.tsx) and its keys: M shows or hides it, A follows the next agent (Shift A, the one before) ----
+  // ---- the Readmap (Readmap.tsx; M, in switch/Keys.tsx, shows or hides it) and A: follow the next agent (Shift A, the one before) ----
   const readmap = useReadmap();
   const tracks = useMemo(() => trackable(drawnAgents), [drawnAgents]);
   const keysRef = useRef({ readmap, tracks, followId, follow }); keysRef.current = { readmap, tracks, followId, follow };
@@ -196,7 +196,6 @@ export function MapView() {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target) || document.querySelector('[aria-modal="true"], .lightbox')) return;
       const k = keysRef.current;
-      if (e.key === "m" || e.key === "M") { e.preventDefault(); setReadmap(!k.readmap); return; }
       if ((e.key === "a" || e.key === "A") && k.tracks.length) {
         e.preventDefault();
         const i = k.tracks.findIndex((a) => a.id === k.followId), n = k.tracks.length;

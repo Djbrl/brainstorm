@@ -1,21 +1,28 @@
 // Owner: cowork. Places: where the open thread went outside the code. The same screen as the Map (full-screen map,
-// threads sidebar, no legend: the places read without one); the open thread's panel in the sidebar lists its places (PlaceSteps).
+// threads sidebar, no legend: the places read without one), in the same language (PlacesMap); the open thread's panel
+// in the sidebar lists its places (PlaceSteps). No Readmap here: a visit is the thread's movement itself, which the
+// camera already follows.
 // Clicking a place opens its step in the side panel, the same step view as on the Map and the Track (and the same link: …/places/step/<id>).
-import { useEffect, useMemo, useRef } from "react";
-import type { CoworkArea } from "@contract";
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { useLive } from "../lib/live";
-import { useNav } from "../lib/nav";
+import { useNav, useReplayCursor } from "../lib/nav";
+import { useThread } from "../lib/thread";
+import { initial } from "../map/agents";
 import { MapSidebar } from "../map/sidebar/MapSidebar";
 import { LensSwitch } from "../map/LensSwitch";
-import { AREAS, eventsAt, placeOfStep, placeTitle, placesStore, selectPlace, useCowork, usePlaces } from "./data";
+import { eventsAt, placeOfStep, placeTitle, placesStore, selectPlace, useCowork, usePlaces } from "./data";
 import { StepDetail } from "../follow/StepDetail";
 import { pairResults } from "../follow/format";
-import { WorldMap } from "./WorldMap";
+import { PlacesMap } from "./PlacesMap";
 import "../map/map.css";
 import "../follow/follow.css";
 import "./cowork.css";
 
-const ALL = new Set<CoworkArea>(AREAS);
+const NARROW = "(max-width: 1100px)";
+const useNarrow = () => useSyncExternalStore(
+  (on) => { const m = matchMedia(NARROW); m.addEventListener("change", on); return () => m.removeEventListener("change", on); },
+  () => matchMedia(NARROW).matches,
+);
 
 export function PlacesView() {
   const { state } = useLive();
@@ -63,11 +70,18 @@ export function PlacesView() {
   const pos = stepId ? here.indexOf(stepId) : -1;
   const place = data && selected ? eventsAt(data, selected).find((e) => e.stepId === stepId) : undefined;
 
+  // Where the thread is, for the places map's marker: the replay's cursor, or its newest place while it follows live.
+  const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
+  const cursor = useReplayCursor((c) => c.index);
+  const beatOf = useCallback((id: string) => thread?.stepBeat.get(id), [thread]);
+  const small = useNarrow();
+
   return (
     <div className="map-wrap cw-wrap">
       {data && data.events.length > 0 && (
-        <WorldMap key={replay?.sessionId} data={data} areas={ALL} selected={selected} highlight={highlight} leftInset={380} rightInset={step ? 440 : 0}
-          onSelect={(id) => selectPlace(id)} />
+        <PlacesMap key={replay?.sessionId} data={data} selected={selected} highlight={highlight} rightInset={step ? 440 : 0}
+          onSelect={(id) => selectPlace(id)} small={small} beatOf={beatOf} cursor={cursor} live={!!replay?.live}
+          letter={initial({ name: session?.title ?? "", isSubagent: false })} />
       )}
       <MapSidebar agents={Object.values(state.agents)} accent="#2563eb" followId={null} onFollow={() => setLens("map")} onFocusFile={() => setLens("map")} map={state.map} />
       <LensSwitch />

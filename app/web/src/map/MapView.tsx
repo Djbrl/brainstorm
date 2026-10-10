@@ -14,7 +14,6 @@ import { MapSidebar } from "./sidebar/MapSidebar";
 import { Dock } from "./replay/ReplayBar";
 import { Peek } from "./replay/Peek";
 import { useStepWindow } from "./prefs";
-import { TalkCard } from "./replay/TalkCard";
 import { StepPanel } from "./StepPanel";
 import { useSelectedFile } from "./useSelectedFile";
 import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
@@ -573,7 +572,6 @@ export function MapView() {
         <p className="map-sparse">This project has only {map.files.length === 1 ? "one file" : `${map.files.length} files`} on the map.</p>
       )}
       {map && <CapNote map={map} />}
-      <TalkCard />
       <LensSwitch />
       {hasNodes && (readmap
         ? <Readmap graphRef={graphRef} anim={anim} drawnRef={agentsRef} cam={camRef} subject={() => replayRef.current.subject()} reads={readmapReads} agents={tracks} followId={followId} accent={tokens.accent}

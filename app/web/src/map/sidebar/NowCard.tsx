@@ -1,14 +1,19 @@
 // Owner: sidebar agent. The folded sidebar with a thread open: its Track, folded down to a few lines in the top-left
 // corner. The moment the thread is on (the newest while it follows live) as the Track's highlighted row, the two before
 // it fading out above, the next one below when you look back; the same words and dots as the Track (ReplaySteps'
-// textOf). The current row's dot breathes while the thread works. Clicking it, or T, unfolds the sidebar. Scrolling on
-// it steps through the thread as the Track's list does: up goes back (the replay's player opens, paused, the map's
-// marker on that moment), down comes forward, and back at the newest a running thread follows live again (App's
-// LiveFollow).
+// textOf). The current row's dot breathes while the thread works. Beside them, the player folded too: play or pause, and
+// a line down the thread (its start at the top, now at the bottom, red where a chapter failed) with a mark where you
+// are; click or drag it to go there. On a small window it stands in for the footer player. Clicking the rows, or T,
+// unfolds the sidebar. Scrolling on the card steps through the thread as the Track's list does: up goes back (into the
+// replay, paused, the map's marker on that moment), down comes forward, and back at the newest a running thread
+// follows live again (App's LiveFollow).
 import { useEffect, useRef } from "react";
 import { useNavActions, useNavState, useReplayCursor } from "../../lib/nav";
 import { useLiveSelector } from "../../lib/live";
-import { useThread } from "../../lib/thread";
+import { useThread, type Thread } from "../../lib/thread";
+import { chaptersOf } from "../../lib/chapters";
+import { Icon } from "../replay/ReplayBar";
+import { togglePlay } from "../replay/layer";
 import { needsYou, yourTurn } from "../../lib/attention";
 import { textOf } from "../replay/ReplaySteps";
 
@@ -19,21 +24,29 @@ export function NowCard({ onOpen }: { onOpen: () => void }) {
   const sid = replay?.sessionId ?? null;
   const thread = useThread(sid, replay?.detail ?? "light");
   const index = useReplayCursor((c) => c.index);
+  const playing = useReplayCursor((c) => c.playing);
   const running = useLiveSelector((s) => !!sid && s.sessions.find((x) => x.id === sid)?.status === "running");
   const attn = useLiveSelector((s) => (sid ? s.attention[sid] : undefined));
   const { setReplayIndex, setThreadMode, setReplayPlaying } = useNavActions();
 
-  // Scrolling on the card: one moment per notch. Not the map's zoom.
-  const card = useRef<HTMLButtonElement>(null);
+  // Going to a moment by hand (the wheel, the line): into the replay, paused there.
   const now = useRef({ len: 0, mode: replay?.mode }); now.current = { len: thread?.beats.length ?? 0, mode: replay?.mode };
+  const go = useRef((_to: (i: number) => number) => {});
+  go.current = (to) => {
+    const { len, mode } = now.current;
+    if (!len) return;
+    if (mode !== "play") setThreadMode("play");
+    setReplayPlaying(false);
+    setReplayIndex((i) => Math.max(0, Math.min(len - 1, to(Math.min(i, len - 1)))));
+  };
+  // Scrolling on the card: one moment per notch. Not the map's zoom.
+  const card = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = card.current;
     if (!el) return;
     let acc = 0, lastAt = 0;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const { len, mode } = now.current;
-      if (!len) return;
       const t = performance.now();
       if (t - lastAt > 250) acc = 0;   // a new gesture
       lastAt = t;
@@ -41,13 +54,11 @@ export function NowCard({ onOpen }: { onOpen: () => void }) {
       const steps = Math.trunc(acc / NOTCH);
       if (!steps) return;
       acc -= steps * NOTCH;
-      if (mode !== "play") setThreadMode("play");
-      setReplayPlaying(false);
-      setReplayIndex((i) => Math.max(0, Math.min(len - 1, Math.min(i, len - 1) + steps)));
+      go.current((i) => i + steps);
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [!!replay, setReplayIndex, setThreadMode, setReplayPlaying]);
+  }, [!!replay]);
   if (!replay) return null;
 
   const beats = thread?.beats ?? [];
@@ -55,26 +66,67 @@ export function NowCard({ onOpen }: { onOpen: () => void }) {
   const rows = beats.length ? [at - 2, at - 1, at, at + 1].filter((i) => i >= 0 && i < beats.length) : [];
   const working = running && !needsYou(attn) && !yourTurn(attn);
   const cur = beats[at];
+  const play = () => {
+    if (now.current.mode !== "play") setThreadMode("play");
+    togglePlay(playing, setReplayPlaying);
+  };
 
   return (
-    <button className="sidebar-now" ref={card} onClick={onOpen} aria-expanded={false}
-      aria-label={`Open the thread's steps. ${cur ? `On: ${textOf(cur).label}` : "Loading its steps"}`}
-      title="Scroll to step through the thread. Click to open it (T)">
-      <span className="sn-rows" aria-hidden="true">
+    <div className="sidebar-now" ref={card} title="Scroll to step through the thread">
+      <button className="sn-rows" onClick={onOpen} aria-expanded={false}
+        aria-label={`Open the thread's steps (T). ${cur ? `On: ${textOf(cur).label}` : "Loading its steps"}`} title="Open the thread's steps (T)">
         {!rows.length && <span className="sn-m current"><b /><span>Loading its steps…</span></span>}
         {rows.map((i) => {
           const { label, tone } = textOf(beats[i]);
           const state = i === at ? "current" : i < at ? `done d${at - i}` : "todo";
           return (
-            <span key={beats[i].step.id} className={`sn-m ${tone} ${state}${i === at && working ? " working" : ""}`}>
+            <span key={beats[i].step.id} className={`sn-m ${tone} ${state}${i === at && working ? " working" : ""}`} aria-hidden="true">
               <b /><span>{label}</span>{beats[i].failed > 0 && <em>failed</em>}
             </span>
           );
         })}
-      </span>
-      <span className="sn-open" aria-hidden="true">
-        <svg viewBox="0 0 16 16"><rect x="1.75" y="2.25" width="12.5" height="11.5" rx="2.5" /><path d="M6 2.5v11" /><path d="M9 6.5 10.75 8 9 9.5" /></svg>
-      </span>
-    </button>
+      </button>
+      {thread && beats.length > 1 && (
+        <div className="sn-player">
+          <button className="sn-play" onClick={play} aria-label={playing ? "Pause" : "Play"} title={playing ? "Pause (Space)" : "Play from here (Space)"}>
+            {playing ? Icon.pause : Icon.play}
+          </button>
+          <Line thread={thread} at={at} go={(i) => go.current(() => i)} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The thread as a line, top to bottom, red where a chapter failed: click or drag to go to a moment. */
+function Line({ thread, at, go }: { thread: Thread; at: number; go: (i: number) => void }) {
+  const el = useRef<HTMLDivElement>(null);
+  const len = thread.beats.length, n = Math.max(1, len - 1);
+  const pick = (y: number) => {
+    const r = el.current?.getBoundingClientRect();
+    if (r) go(Math.round(Math.max(0, Math.min(1, (y - r.top) / Math.max(1, r.height))) * n));
+  };
+  // Only where something failed (every chapter's tick would crowd a line this short), one mark per 4% of it.
+  const marks: number[] = [];
+  for (const c of chaptersOf(thread)) {
+    const y = (c.first / n) * 100;
+    if (c.failed > 0 && !marks.some((m) => Math.abs(m - y) < 4)) marks.push(y);
+  }
+  return (
+    <div className="sn-line" ref={el} role="slider" tabIndex={0} aria-orientation="vertical" aria-label="Where you are in the thread"
+      aria-valuemin={1} aria-valuemax={len} aria-valuenow={at + 1} aria-valuetext={`Step ${at + 1} of ${len}`}
+      style={{ ["--at" as string]: `${(at / n) * 100}%` }}
+      onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); pick(e.clientY); }}
+      onPointerMove={(e) => { if (e.buttons) pick(e.clientY); }}
+      onKeyDown={(e) => {
+        const d = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : e.key === "Home" ? -len : e.key === "End" ? len : 0;
+        if (!d) return;
+        e.preventDefault(); e.stopPropagation();
+        go(Math.max(0, Math.min(len - 1, at + d)));
+      }}>
+      <i className="sn-track" aria-hidden="true" />
+      {marks.map((y) => <i key={y} className="sn-mark" style={{ top: `${y}%` }} aria-hidden="true" />)}
+      <i className="sn-thumb" aria-hidden="true" />
+    </div>
   );
 }

@@ -112,3 +112,5 @@
 @media (prefers-reduced-motion: reduce) {
   :root[data-theme="hologram"] .force-graph-container::after { animation: none; }
 }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .sn-scroll::before { background: var(--hover); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .sn-scroll i { background: var(--hover-2); }

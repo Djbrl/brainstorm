@@ -15,7 +15,6 @@ import { mapStyle } from "./themes";
 import "./readmap.css";
 
 const W = 208, H = 132;      // the picture, in CSS pixels
-const FPS_MS = 33;           // about 30 frames a second while it glides, 15 at rest
 const GLIDE = 0.28;          // seconds for the camera to (nearly) reach a new file
 const READ_FLASH_MS = 1500;  // a read as it happens (the map's line of sight lasts as long: agents.tsx)
 const NAMES_MAX = 7;         // file names besides the ones read
@@ -69,14 +68,29 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
     el.width = W * dpr; el.height = H * dpr;
     const ctx = el.getContext("2d");
     if (!ctx) return;
-    let raf = 0, last = 0, settled = false, said = "";
+    let raf = 0, last = 0, settled = false, sig = "";
+    // The theme's colours and font, read again twice a second (a theme switch), not every frame (that's a style flush).
+    let tok = { ink: "", quiet: "", font: "", at: -1e9 };
     const draw = (t: number) => {
       raf = requestAnimationFrame(draw);
-      if (t - last < (settled ? FPS_MS * 2 : FPS_MS) || document.hidden) return;
+      if (document.hidden) return;
+      const g = graphRef.current, st = mapStyle(), A0 = anim.current, c0 = cam.current?.view(), m0 = subjectRef.current();
+      // Every frame while something in it moves (its own glide, an agent's, the big camera's frame, a read's ring), as
+      // smooth as the big map; nothing at all while it all stands still.
+      let s = `${g?.id}|${document.documentElement.dataset.theme}|${followRef.current}|${c0 ? `${c0.x.toFixed(1)},${c0.y.toFixed(1)},${c0.k.toFixed(3)}` : ""}|${m0 ? `${m0.x.toFixed(1)},${m0.y.toFixed(1)}` : ""}`;
+      for (const a of drawnRef.current ?? []) {
+        const p = A0?.get(a.id);
+        s += `|${a.id}:${a.ts}:${a.trail.length}:${p ? `${p.x.toFixed(1)},${p.y.toFixed(1)},${p.alpha.toFixed(2)},${p.flashes.length}` : ""}`;
+      }
+      const flashing = [...(A0?.values() ?? [])].some((p) => p.flashes.some((f) => t - f.t0 < READ_FLASH_MS));
+      if (settled && !flashing && s === sig) { last = t; return; }
+      sig = s;
       const dt = Math.min(0.1, (t - last) / 1000); last = t;
-      const g = graphRef.current, st = mapStyle(), cs = getComputedStyle(el);
-      const ink = cs.getPropertyValue("--ink").trim() || "#121214", quiet = cs.getPropertyValue("--cool").trim() || "#c7cbd6";
-      const font = cs.getPropertyValue("--font-body") || "sans-serif";
+      if (t - tok.at > 500) {
+        const cs = getComputedStyle(el);
+        tok = { ink: cs.getPropertyValue("--ink").trim() || "#121214", quiet: cs.getPropertyValue("--cool").trim() || "#c7cbd6", font: cs.getPropertyValue("--font-body") || "sans-serif", at: t };
+      }
+      const { ink, quiet, font } = tok;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
       if (!g?.nodes.length) return;
@@ -254,8 +268,9 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
       // What it shows, in words beside the agents' buttons.
       const words = read && R?.past ? `Read ${together.length > 1 ? `${together.length} files` : baseName(read.file?.path ?? read.id)} at this step`
         : read && who ? `${who.isSubagent ? shortName(who, 16) : "Main agent"} read ${together.length > 1 ? `${together.length} files` : baseName(read.file?.path ?? read.id)}`
-        : who && who.id === followRef.current ? `${who.isSubagent ? shortName(who, 16) : "Main agent"}: no file read yet` : "The whole project";
-      if (words !== said && caption.current) { said = words; caption.current.textContent = words; caption.current.title = words; }
+        : "";   // the whole project: nothing to say
+      const cap = caption.current;   // (the footer comes and goes with the agents: checked on the element itself)
+      if (cap && cap.textContent !== words) { cap.textContent = words; cap.title = words; }
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
@@ -277,7 +292,7 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
       <button className="mm-hide" onClick={onHide} aria-label="Hide the Readmap (M)" title="Hide (M)">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg>
       </button>
-      <div className="mm-agents" role="group" aria-label="Follow an agent">
+      {agents.length > 0 && <div className="mm-agents" role="group" aria-label="Follow an agent">
         {agents.map((a) => {
           const on = a.id === followId, color = agentColor(a, accent);
           return (
@@ -288,7 +303,7 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
           );
         })}
         <span className="mm-who" ref={caption} />
-      </div>
+      </div>}
     </section>
   );
 }

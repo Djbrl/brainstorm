@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useLiveSelector } from "../lib/live";
 import { useNavActions, useNavState, useReplayCursor } from "../lib/nav";
-import { setCameraLock, useCameraLock } from "../map/prefs";
+import { setCameraLock, setReadmap, useCameraLock, useReadmap } from "../map/prefs";
 import { attentionText, needsYou, yourTurn } from "../lib/attention";
 import { forgetThread, openThread, rememberThread, useBarThreads, type BarThread } from "../lib/switcher";
 import { isTyping, MOD } from "./shortcuts";
@@ -81,17 +81,21 @@ const press = (key: string) => dispatchEvent(new KeyboardEvent("keydown", { key,
 
 /**
  * The keys people use most, said quietly beside Find a thread, and clickable: play, center and the camera lock with a
- * thread open, and ? for the rest.
+ * thread open, the Readmap on the map, and ? for the rest.
  */
 function KeyHints({ open, onHelp }: { open: boolean; onHelp: () => void }) {
   const playing = useReplayCursor((c) => c.playing);
   const lock = useCameraLock();
+  const readmap = useReadmap();
+  const { lens } = useNavState();
   return (
     <div className="threadbar-keys" aria-label="Keyboard shortcuts">
       {open && <button className="threadbar-key-extra" onMouseDown={keepFocus} onClick={() => press(" ")} title={playing ? "Pause (Space)" : "Play from the step you're on (Space)"}><kbd>Space</kbd>{playing ? "Pause" : "Play"}</button>}
       {open && <button className="threadbar-key-extra" onMouseDown={keepFocus} onClick={() => press("c")} title="Center the camera on the agent (C)"><kbd>C</kbd>Center</button>}
       {open && <button className="threadbar-key-extra" role="switch" aria-checked={lock} onMouseDown={keepFocus} onClick={() => setCameraLock(!lock)}
         title={lock ? "The camera keeps the agent centred. Click to move the map freely (L)" : "Keep the agent centred as it moves (L)"}><kbd>L</kbd>{lock ? "Free camera" : "Lock camera"}</button>}
+      {lens === "map" && <button role="switch" aria-checked={readmap} onMouseDown={keepFocus} onClick={() => setReadmap(!readmap)}
+        title={readmap ? "Hide the Readmap, the small map of what the agent reads (M)" : "Show the Readmap, the small map of what the agent reads (M)"}><kbd>M</kbd>Readmap</button>}
       <button onMouseDown={keepFocus} onClick={onHelp} title="Every keyboard shortcut"><kbd>?</kbd>Shortcuts</button>
     </div>
   );

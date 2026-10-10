@@ -12,9 +12,15 @@ import { agentColor, baseName, initial, lastReadAt, readsWithTimes, shortName, t
 import type { Camera } from "./camera";
 import type { Graph, GNode } from "./graph";
 import { mapStyle } from "./themes";
+import { useLiveSelector } from "../lib/live";
+import { folderOf } from "./replay/Peek";
+import { Icon } from "./replay/ReplayBar";
+import "./replay/peek.css";
 import "./readmap.css";
 
-const W = 208, H = 132;      // the picture, in CSS pixels
+// The picture, in CSS pixels: small beside a small map; on a big one as wide as the file window under it (replay/Peek),
+// the two one column on the right.
+const SMALL = { w: 208, h: 132 }, BIG = { w: 358, h: 196 };
 const GLIDE = 0.28;          // seconds for the camera to (nearly) reach a new file
 const READ_FLASH_MS = 1500;  // a read as it happens (the map's line of sight lasts as long: agents.tsx)
 const PAST_ALPHA = 0.38;     // the replay's marker (the thread in its past), beside the agents where they are now
@@ -30,7 +36,7 @@ export type ReadmapReads = {
   past: string[] | null;
 };
 
-export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents, followId, accent, onTrack, onLook, onHide }: {
+export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents, followId, accent, big, onTrack, onLook, onHide }: {
   graphRef: RefObject<Graph>;
   anim: RefObject<Map<string, AgentAnim>>;
   /** The agents the map draws this frame (where each one is comes from `anim`). */
@@ -45,13 +51,19 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
   agents: AgentPresence[];
   followId: string | null;
   accent: string;
+  /** A big map: the picture as wide as the file window (replay/Peek) under it. */
+  big: boolean;
   onTrack: (id: string) => void;
   /** Show a point of the map (graph units) on the big map, as a hand move. */
   onLook: (x: number, y: number, ms: number) => void;
   onHide: () => void;
 }) {
+  const { w: W, h: H } = big ? BIG : SMALL;
   const canvas = useRef<HTMLCanvasElement>(null);
-  const caption = useRef<HTMLSpanElement>(null);
+  // Its header says what it shows, as the file window's does: "Read", the file, its folder.
+  const verbEl = useRef<HTMLSpanElement>(null), fileEl = useRef<HTMLElement>(null), dirEl = useRef<HTMLSpanElement>(null);
+  const roots = useLiveSelector((s) => (s.map ? [s.map.root, ...(s.map.formerRoots ?? [])].join("\n") : ""));
+  const rootsRef = useRef(roots); rootsRef.current = roots;
   const followRef = useRef(followId); followRef.current = followId;
   const accentRef = useRef(accent); accentRef.current = accent;
   const subjectRef = useRef(subject); subjectRef.current = subject;
@@ -96,7 +108,7 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
       if (!g?.nodes.length) return;
-      const whole = wholeView(g);
+      const whole = wholeView(g, W, H);
       if (!whole) return;
 
       // ---- what to show: the file the watched agent read last, or the whole map ----
@@ -286,16 +298,17 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
       }
       ctx.globalAlpha = 1;
 
-      // What it shows, in words beside the agents' buttons.
-      const words = read && R?.past ? `Read ${together.length > 1 ? `${together.length} files` : baseName(read.file?.path ?? read.id)} at this step`
-        : read && who ? `${who.isSubagent ? shortName(who, 16) : "Main agent"} read ${together.length > 1 ? `${together.length} files` : baseName(read.file?.path ?? read.id)}`
-        : "";   // the whole project: nothing to say
-      const cap = caption.current;   // (the footer comes and goes with the agents: checked on the element itself)
-      if (cap && cap.textContent !== words) { cap.textContent = words; cap.title = words; }
+      // What it shows, in its header: what was read, the file (or how many), its folder. Nothing over the whole project.
+      const verb = read ? (R?.past ? "Read at this step" : `${who?.isSubagent ? `${shortName(who, 14)} read` : "Read"}`) : "";
+      const file = read ? (together.length > 1 ? `${together.length} files` : baseName(read.file?.path ?? read.id)) : "";
+      const dir = read?.file?.path ? folderOf(read.file.path, rootsRef.current) : "";
+      for (const [el2, text] of [[verbEl.current, verb], [fileEl.current, file], [dirEl.current, dir]] as const) {
+        if (el2 && el2.textContent !== text) el2.textContent = text;
+      }
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [graphRef, anim, drawnRef, cam]);
+  }, [graphRef, anim, drawnRef, cam, W, H]);
 
   // A click: the big map shows that place (the file read, or the point clicked on the whole map).
   const onClick = (e: MouseEvent<HTMLCanvasElement>) => {
@@ -307,30 +320,33 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
   };
 
   return (
-    <section className="readmap" aria-label="Readmap: the file the agent is reading">
+    <section className={`readmap${big ? " big" : ""}`} aria-label="Readmap: the file the agent is reading" style={{ width: W + 2 }}>
+      <header className="peek-head mm-head">
+        <span className="peek-verb" ref={verbEl} />
+        <span className="peek-file"><strong ref={fileEl} /><span ref={dirEl} /></span>
+        {agents.length > 0 && (
+          <span className="mm-agents" role="group" aria-label="Follow an agent">
+            {agents.map((a) => {
+              const on = a.id === followId, color = agentColor(a, accent);
+              return (
+                <button key={a.id} className={on ? "on" : ""} style={{ ["--c" as string]: color }} onClick={() => onTrack(a.id)}
+                  aria-pressed={on} title={`${on ? "Following" : "Follow"} ${a.isSubagent ? shortName(a, 40) : "the main agent"} (A: the next one)`}>
+                  <i aria-hidden="true">{initial(a)}</i>
+                </button>
+              );
+            })}
+          </span>
+        )}
+        <button className="peek-close" onClick={onHide} aria-label="Hide the Readmap (M)" title="Hide (M)">{Icon.close}</button>
+      </header>
       <canvas ref={canvas} style={{ width: W, height: H }} role="img" onClick={onClick}
         aria-label="The file the agent read last, up close, with the files around it. Click to show it on the map." />
-      <button className="mm-hide" onClick={onHide} aria-label="Hide the Readmap (M)" title="Hide (M)">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg>
-      </button>
-      {agents.length > 0 && <div className="mm-agents" role="group" aria-label="Follow an agent">
-        {agents.map((a) => {
-          const on = a.id === followId, color = agentColor(a, accent);
-          return (
-            <button key={a.id} className={on ? "on" : ""} style={{ ["--c" as string]: color }} onClick={() => onTrack(a.id)}
-              aria-pressed={on} title={`${on ? "Following" : "Follow"} ${a.isSubagent ? shortName(a, 40) : "the main agent"} (A: the next one)`}>
-              <i aria-hidden="true">{initial(a)}</i>
-            </button>
-          );
-        })}
-        <span className="mm-who" ref={caption} />
-      </div>}
     </section>
   );
 }
 
 /** The view that shows the whole map in the picture. */
-function wholeView(g: Graph): View | null {
+function wholeView(g: Graph, W: number, H: number): View | null {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const n of g.nodes) {
     if (n.x === undefined || n.y === undefined || (!n.dir && n.up)) continue;   // a folder's files are inside it

@@ -68,7 +68,7 @@ function verbOf(step: Step, now: boolean): string {
 
 /** The folder in quiet text: from the repo root (or a root it had before it moved) when the file is in it, else the
  *  last few folders. */
-function folderOf(path: string, roots: string): string {
+export function folderOf(path: string, roots: string): string {
   let rel: string | null = null;
   for (const root of roots ? roots.split("\n") : []) if ((rel = repoRelative(path, repoBase(root))) !== null) break;
   const dir = (rel ?? path).split("/").slice(0, -1);

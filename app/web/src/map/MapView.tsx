@@ -577,15 +577,10 @@ export function MapView() {
       )}
       {map && <CapNote map={map} />}
       <LensSwitch />
-      {hasNodes && (readmap
-        ? <Readmap graphRef={graphRef} anim={anim} drawnRef={agentsRef} cam={camRef} subject={() => replayRef.current.subject()} reads={readmapReads} agents={tracks} followId={followId} accent={tokens.accent}
-            onTrack={follow} onLook={lookAt} onHide={() => setReadmap(false)} />
-        : (
-          <button className="readmap-show" onClick={() => setReadmap(true)} title="Show the Readmap (M)">
-            <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="3" /><circle cx="11.5" cy="9" r="2.6" /><path d="M13.4 10.9 15.5 13" /></svg>
-            Readmap
-          </button>
-        ))}
+      {hasNodes && readmap && (
+        <Readmap graphRef={graphRef} anim={anim} drawnRef={agentsRef} cam={camRef} subject={() => replayRef.current.subject()} reads={readmapReads} agents={tracks} followId={followId} accent={tokens.accent}
+          big={!small} onTrack={follow} onLook={lookAt} onHide={() => setReadmap(false)} />
+      )}
 
       <Peek />
       <Dock />

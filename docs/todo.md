@@ -27,7 +27,7 @@ Size: ½ day.
 - [x] **Switch threads in one move.** Done 7 Oct: a tab bar of your threads (at work, waiting on you, opened lately), keys 1 to 9 and [ ], Find a thread (⌘K), and the header says when agents work in your other projects, one click to go there. See `lib/switcher.ts` and `switch/`.
 - [ ] **Needs-you board.** With 2 or more threads running, one lane per thread with its state: working, waiting on you, failing, done. Clicking a lane opens the thread. Size: 1 day.
 - [ ] **Notifications on events only.** A macOS notification when a thread finishes, repeats the same error 3 times, or two threads write the same file. Clicking it opens that step. A setting to turn each kind off. Size: ½ day.
-- [ ] **Inside Claude Code (spike first).** A status line ("3 threads, 1 needs you") and, in the desktop app, Brainstorm in a pane beside the conversation. Not checked yet: how far a plugin can go on either. Spike: 2 hours.
+- [ ] **Inside Claude Code (spike first).** A status line ("3 threads, 1 needs you") and, in the desktop app, Brainstorm in a pane beside the conversation (pane done 10 Oct: `/rundown:open` opens the map in the app's browser pane). Not checked yet: how far a plugin can go on either. Spike: 2 hours.
 
 ## 3. Bigger features, in the order we'd build them
 
@@ -43,5 +43,5 @@ Size: ½ day.
 ## Open questions
 
 - Can a plugin set the status line, or does the user have to add it to their settings?
-- Can a plugin open a pane in the desktop app, and does it work in the terminal too?
+- ~~Can a plugin open a pane in the desktop app, and does it work in the terminal too?~~ Answered 10 Oct: not by itself, but `/rundown:open` has Claude open the map in the app's browser pane (the launcher sees `CLAUDE_CODE_ENTRYPOINT=claude-desktop`); the terminal and IDEs keep the default browser.
 - What is the longest a `PreToolUse` hook may wait for an answer from Brainstorm?

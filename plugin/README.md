@@ -49,7 +49,7 @@ To update automatically instead, turn on auto-update for the `rundown` marketpla
 
 ## Use
 
-- **`/rundown:open`** opens the map in your browser, for the project you're in.
+- **`/rundown:open`** opens the map for the project you're in. In the Claude desktop app it opens in the app's browser pane, beside your thread (Claude opens it there, so the first time the app may ask you to allow the page); `/rundown:open browser` opens it in your default browser instead, for the full window. In the terminal and in IDEs it opens in your default browser.
 - **`/rundown:share`** saves this thread to your Downloads folder as a replay file and a Markdown summary. The Share button on the map's replay player does the same for any thread.
 - **`/rundown:stop`** stops Rundown. It starts again with your next Claude Code session.
 
@@ -75,7 +75,7 @@ Summaries of files and labels written by a model are off in this release. They'l
 ## How it's built (for contributors)
 
 - `build/server.js` is the Rundown server (`app/server`) bundled into one file, and `build/web/` is the web app (`app/web`), which the server serves, and `build/share.html` is the same app in one file, which shared replays are poured into. Rebuild both from `app/` with `node scripts/build-plugin.mjs`, and commit `build/` with each release.
-- `scripts/launch.mjs` starts the server or reuses the running one, restarts it when the plugin version changed, and opens the browser. The `SessionStart` hook runs it through `scripts/hook.sh` (which checks for Node) with `--background`, where it prints at most one JSON `systemMessage` for the user: welcome, updated, update available, or Node too old.
+- `scripts/launch.mjs` starts the server or reuses the running one, restarts it when the plugin version changed, and opens the map: in the default browser, or, inside the Claude desktop app (`CLAUDE_CODE_ENTRYPOINT=claude-desktop`), it only prints the URL and the `open` skill has Claude open it in the app's browser pane (`--browser` forces the default browser). The `SessionStart` hook runs it through `scripts/hook.sh` (which checks for Node) with `--background`, where it prints at most one JSON `systemMessage` for the user: welcome, updated, update available, or Node too old.
 - The `PermissionRequest`, `Notification`, `Stop` and `UserPromptSubmit` hooks run `scripts/signal.mjs` in the background (async, they never slow a session): it posts the event to the running server's `/api/hooks`, which works out whether a thread needs you (see `docs/attention.md`).
 - `build/THIRD_PARTY_NOTICES.md` holds the licences of the open-source packages bundled into the build; the build writes it (`app/scripts/third-party-notices.mjs`).
 - Releasing: bump `version` in `.claude-plugin/plugin.json`, rebuild, commit, push. Users on a pinned version don't get new commits until the version changes.

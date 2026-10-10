@@ -4,7 +4,9 @@
 //
 //   --background   for the SessionStart hook: start if needed and return at once. Prints nothing, or one JSON line with a
 //                  `systemMessage` for the user (welcome, updated, update available); plain stdout would go into Claude's context
-//   --open         open the map in the browser
+//   --open         open the map: in the Claude desktop app, say so and leave it to the skill, which opens it in the app's
+//                  browser pane beside the thread; elsewhere (terminal, IDE), in the default browser
+//   --browser      with --open: always the default browser, in the desktop app too
 //   --switch       make the project the active workspace
 //   --project DIR  the project (default: CLAUDE_PROJECT_DIR, then the current folder)
 //   --stop         stop the running server
@@ -43,6 +45,8 @@ const NOTICES = join(DATA, "notices.json");
 const FIRST_PORT = 4747;
 const LATEST_URL = "https://raw.githubusercontent.com/Djbrl/brainstorm/main/plugin/.claude-plugin/plugin.json";
 const DAY = 24 * 60 * 60 * 1000;
+// Claude Code inside the Claude desktop app, which has a browser pane only Claude's tools can open.
+const DESKTOP = process.env.CLAUDE_CODE_ENTRYPOINT === "claude-desktop";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Which key the server runs with: an HMAC with the server's secret (from server.json), or a plain hash for a server
@@ -257,8 +261,10 @@ async function main() {
   if (flag("--share")) return share(port);
 
   const url = `http://localhost:${port}/`;
-  if (flag("--open")) openBrowser(url);
+  const pane = flag("--open") && DESKTOP && !flag("--browser");
+  if (flag("--open") && !pane) openBrowser(url);
   say(`Rundown ${VERSION} is running for ${PROJECT}: ${url}`);
+  if (pane) say(`Open it in the browser pane: ${url}`);
 }
 
 /** Saves the thread as a replay file and a Markdown summary, and says where. */

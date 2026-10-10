@@ -27,7 +27,7 @@ On Claude Code older than 2.1.275, use two commands instead:
 /plugin install rundown@rundown
 ```
 
-Then start a new session in your project and run `/rundown:open`: the map opens in your browser. You need Node.js 22.13 or later. Everything runs on your machine. Settings, updates and uninstall: [plugin/README.md](plugin/README.md). Had the plugin when it was called Brainstorm? See [moving from Brainstorm](plugin/README.md#moving-from-brainstorm-04-and-older).
+Then start a new session in your project and run `/rundown:open`: the map opens beside your thread in the Claude desktop app, or in your browser from the terminal (`/rundown:open browser` for your browser in the app too). You need Node.js 22.13 or later. Everything runs on your machine. Settings, updates and uninstall: [plugin/README.md](plugin/README.md). Had the plugin when it was called Brainstorm? See [moving from Brainstorm](plugin/README.md#moving-from-brainstorm-04-and-older).
 
 ## Try the live demo
 

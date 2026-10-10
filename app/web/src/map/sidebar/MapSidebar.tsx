@@ -7,7 +7,9 @@
 // Files, the file is still there until you let go of it.
 // Below 1100px wide it starts folded and opens over the content (tap outside or ‹ to fold it); on a phone, picking a
 // thread folds it too, and picking a file opens it. That narrow state isn't saved, so the desktop's folded-or-not
-// choice stays as it was. On a wide window it's open: ‹ or T folds it for now, not for next time (it used to be saved,
+// choice stays as it was. Folding the sheet slides it away (it leaves, then unmounts). On a phone the thread's sheet
+// under the map has a grab bar: drag it to set its height (until the page reloads), down past its lowest to fold it.
+// On a wide window it's open: ‹ or T folds it for now, not for next time (it used to be saved,
 // and a fold left from a small window kept it folded on a wide one). T folds and unfolds it anywhere. Folded with a thread open, it's a card with the thread's
 // state and the step it's on (NowCard), except on a phone.
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -58,6 +60,12 @@ function useMedia(query: string): boolean {
   );
 }
 export const NARROW = "(max-width: 1100px)";
+const LEAVE_MS = 220;                 // the sheet sliding away as it folds (sidebar.css)
+// Where its top may go, within a thumb's reach: no higher than a quarter of the map (and 96 px, under the map's top
+// controls), no lower than 170 px above the bottom (a few steps and the grab bar stay in view); dragged 6% past that, it folds.
+const PIP_MIN = 25, PIP_MAX = 72, TOP_PX = 96, BOTTOM_PX = 170, FOLD_PAST = 6;
+const pipRange = (h: number) => ({ lo: Math.max(PIP_MIN, (TOP_PX / Math.max(1, h)) * 100), hi: Math.max(PIP_MIN + 5, Math.min(PIP_MAX, ((h - BOTTOM_PX) / Math.max(1, h)) * 100)) });
+const PIP_START = 50;   // each page load starts the sheet at the middle (its height isn't remembered)
 const PHONE = "(max-width: 600px)";
 
 export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, map, file, picked, onCloseFile }: MapSidebarProps) {
@@ -68,7 +76,17 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
   const [listing, setListing] = useState(false);
   const [folded, setFolded] = useState(false); // wide: folded by hand, for now
   const narrow = useMedia(NARROW), phone = useMedia(PHONE);
-  const [over, setOver] = useState(false); // narrow: open over the content, never saved
+  const [over, setOverNow] = useState(false); // narrow: open over the content, never saved
+  // Folding the open sheet by hand: it slides away first (.leaving), then goes.
+  const [leaving, setLeaving] = useState(false);
+  const leaveT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const setOver = (on: boolean) => {
+    clearTimeout(leaveT.current);
+    if (on || !over || matchMedia("(prefers-reduced-motion: reduce)").matches) { setLeaving(false); setOverNow(on); return; }
+    setLeaving(true);
+    leaveT.current = setTimeout(() => { setLeaving(false); setOverNow(false); }, LEAVE_MS);
+  };
+  useEffect(() => () => clearTimeout(leaveT.current), []);
   const collapsed = narrow ? !over : folded;
   const setCollapsed = (c: boolean) => (narrow ? setOver(!c) : setFolded(c));
 
@@ -84,11 +102,11 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
     if (opened.current && thread) setTab("threads");
     opened.current = true;
     setListing(false);
-    if (phone) setOver(!!thread);
+    if (phone) setOverNow(!!thread);
   }, [thread]);
   const shown: Tab = tab;
   const inThread = shown === "threads" && !!thread && !listing;
-  useEffect(() => { if (!narrow) setOver(false); }, [narrow]);
+  useEffect(() => { if (!narrow) setOverNow(false); }, [narrow]);
   // A file picked: show it here, unfolded (over the content when narrow).
   useEffect(() => {
     if (!picked) return;
@@ -139,13 +157,51 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
     </button>
   );
 
+  // The phone's thread sheet: its top, as a share of the map's height, set by dragging its grab bar (for this page: a
+  // reload starts it at the middle again); the player rides on its edge (sidebar.css --pip-top).
+  const [pipTop, setPipTop] = useState(PIP_START);
+  const sheet = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => { (sheet.current?.closest(".map-wrap") as HTMLElement | null)?.style.setProperty("--pip-top", `${shownTop}%`); });
+  const drag = useRef<{ from: number } | null>(null);
+  const wrapBox = () => sheet.current?.closest(".map-wrap")?.getBoundingClientRect();
+  const toPct = (y: number) => { const w = wrapBox(); return w ? ((y - w.top) / Math.max(1, w.height)) * 100 : pipTop; };
+  const range = () => pipRange(wrapBox()?.height ?? 600);
+  const clampPip = (v: number) => { const r = range(); return Math.max(r.lo, Math.min(r.hi, v)); };
+  const grab = pip ? (
+    <div className="pip-grab" role="separator" aria-orientation="horizontal" aria-label="Drag to resize the thread's sheet" tabIndex={0}
+      aria-valuemin={PIP_MIN} aria-valuemax={PIP_MAX} aria-valuenow={Math.round(pipTop)}
+      onPointerDown={(e) => { try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* a pointer that's gone */ } drag.current = { from: pipTop }; }}
+      onPointerMove={(e) => { if (drag.current) { const r = range(); setPipTop(Math.max(r.lo, Math.min(r.hi + FOLD_PAST, toPct(e.clientY)))); } }}
+      onPointerUp={(e) => {
+        const d = drag.current; drag.current = null;
+        if (!d) return;
+        const v = toPct(e.clientY);
+        if (v > range().hi + FOLD_PAST * 0.6) { setPipTop(d.from); setOver(false); return; }   // dragged past the lowest: fold
+        setPipTop(clampPip(v));
+      }}
+      onPointerCancel={() => { if (drag.current) { setPipTop(drag.current.from); drag.current = null; } }}
+      onKeyDown={(e) => {
+        const d = e.key === "ArrowUp" ? -5 : e.key === "ArrowDown" ? 5 : 0;
+        if (!d) return;
+        e.preventDefault();
+        setPipTop(clampPip(pipTop + d));
+      }}>
+      <i aria-hidden="true" />
+    </div>
+  ) : null;
+
+  // While dragging it follows the finger (a little past the lowest, to fold); at rest, within reach on this screen.
+  const shownTop = drag.current ? pipTop : clampPip(pipTop);
+
   if (collapsed) return tabButton;
 
   // Narrow: the folded tab stays in place under the open sheet, so the content behind it doesn't move.
   return (
     <>
-    {narrow && <>{tabButton}{!pip && <button className="sidebar-scrim" aria-label="Close sidebar" tabIndex={-1} onClick={() => setOver(false)} />}</>}
-    <div className={`map-sidebar${narrow ? " sidebar-overlay" : ""}${pip ? " pip" : ""}`}>
+    {narrow && <>{tabButton}{!pip && <button className={`sidebar-scrim${leaving ? " leaving" : ""}`} aria-label="Close sidebar" tabIndex={-1} onClick={() => setOver(false)} />}</>}
+    <div ref={sheet} className={`map-sidebar${narrow ? " sidebar-overlay" : ""}${pip ? " pip" : ""}${leaving ? " leaving" : ""}`}
+      style={pip ? { top: `${shownTop}%` } : undefined}>
+      {grab}
       <div className="sidebar-head">
         <nav className="sidebar-tabs" role="tablist" aria-label="Sidebar view">
           <button role="tab" aria-selected={shown === "threads"} onClick={() => setTab("threads")}>Threads</button>

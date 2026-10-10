@@ -263,6 +263,7 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 - **10 Oct 2026** · [cowork] Fix: every row of the Places list can be gone to. Several stretches can share one moment of the thread (light detail folds quick steps together): the list remembers the row you went to, and the map's path stops at its event, so the marker stands on that place.
 - **10 Oct 2026** · [cowork, replay] Places has the player: Space plays place by place (about a second each, faster at 2× 4×), ‹ › and ← → go one place back or forward, Home and End the first and last. The places now go by the thread's steps (full detail, always in order) and map to the app's moments only to sync: the light thread folds stretches of steps into moments not always in order, which scrambled the list and the trail. A row whose step the light thread leaves out goes to the nearest moment before.
 - **10 Oct 2026** · [replay] Play at the end of a replay starts again from the first step (Space or the button, on the Map and Places); the button says "Play from the start" there.
+- **10 Oct 2026** · [sidebar] Phone: the thread's sheet under the map has a grab bar; drag it to set its height, within a thumb's reach (its top no higher than a quarter of the map and 96 px, no lower than 170 px above the bottom), past the lowest to fold it. Each page load starts it at the middle. Folding slides the sheet away (down on a phone, left on a tablet), the scrim fades; opening slides it up.
 
 ## Requests
 

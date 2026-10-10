@@ -114,3 +114,4 @@
 }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .sn-scroll::before { background: var(--hover); }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .sn-scroll i { background: var(--hover-2); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .pip-grab i { background: var(--hover-2); }

@@ -61,6 +61,7 @@ const THINK_MS = 2400;      // the thinking ring's breath (as in agents.tsx)
 const FLASH_MS = 600;       // read flash
 const READS_BACK = 8;       // how many moments back the Readmap still shows the last read (readsNow)
 const PULSE_MS = 700;       // edit pulse on the marker
+const PAST_ALPHA = 0.42;    // the marker, looking back, beside the agent where it is now (as on the Readmap)
 const RED = "#d93025";      // a beat with a failed tool call
 const ERR_PULSE_MS = 1100;
 const DIM = 0.3;            // files out of focus: the thread never touched them, or not in the recent window (0.15 hid the map)
@@ -134,8 +135,9 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
   font: string;
   /** MapView's camera: the follow keeps the marker in the middle of the part of the map no panel covers. */
   camera: RefObject<Camera>;
-  /** Following live, whether the live layer draws the thread's agent: if it's gone (the server forgets an agent after
-   *  half an hour), the replay's marker stands in for it at its last step. */
+  /** Whether the live layer draws the thread's agent where it is now. Following live, the replay's marker stands in for
+   *  it only if it's gone (the server forgets an agent after half an hour); looking back, the marker is drawn faint
+   *  beside it (the past, under the agent now), at full strength only without it. */
   liveShown?: RefObject<boolean>;
 }): ReplayLayerApi {
   const { replay, setReplayIndex, setReplayPlaying, landReplay } = useNav();
@@ -485,38 +487,40 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     const failed = beat.failed > 0;
     const mark = failed ? RED : line;
     const ownMarker = !s.live || !liveShown?.current;
+    // Looking back with the agent on the map where it is now: the marker is the past, the same colour, faint, under it.
+    const past = !s.live && !!liveShown?.current ? PAST_ALPHA : 1;
     if (target && curFile && ownMarker) {
-      if (trip) drawTrip(ctx, style.route, trip, tp, te, mark, 10 / scale, 1, scale);
+      if (trip) drawTrip(ctx, style.route, trip, tp, te, mark, 10 / scale, past, scale);
       const halo = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, 26 / scale);
       halo.addColorStop(0, hexA(mark, 0.28));
       halo.addColorStop(1, hexA(mark, 0));
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = past;
       ctx.fillStyle = halo;
       ctx.beginPath(); ctx.arc(a.x, a.y, 26 / scale, 0, Math.PI * 2); ctx.fill();
 
       if (s.thinking) { // a slow ring in its colour, swelling and fading, like a live agent's (agents.tsx)
         const b = (t % THINK_MS) / THINK_MS;
-        ctx.globalAlpha = Math.sin(b * Math.PI) * 0.7;
+        ctx.globalAlpha = Math.sin(b * Math.PI) * 0.7 * past;
         ctx.beginPath(); ctx.arc(a.x, a.y, (11 + b * 9) / scale, 0, Math.PI * 2);
         ctx.strokeStyle = line; ctx.lineWidth = 2 / scale; ctx.stroke();
       }
       if (failed) {
         const p = (t - a.beatAt) / ERR_PULSE_MS;
         if (p < 1) {
-          ctx.globalAlpha = 0.8 * (1 - p);
+          ctx.globalAlpha = 0.8 * (1 - p) * past;
           ctx.beginPath(); ctx.arc(a.x, a.y, (10 + p * 28) / scale, 0, Math.PI * 2);
           ctx.strokeStyle = RED; ctx.lineWidth = 2.4 / scale; ctx.stroke();
         }
       } else if (beat.action === "edit") { // pulse on every edit, even when the tracer stays on the same file
         const p = (t - a.beatAt) / PULSE_MS;
         if (p < 1) {
-          ctx.globalAlpha = 0.6 * (1 - p);
+          ctx.globalAlpha = 0.6 * (1 - p) * past;
           ctx.beginPath(); ctx.arc(a.x, a.y, (10 + p * 16) / scale, 0, Math.PI * 2);
           ctx.strokeStyle = line; ctx.lineWidth = 2 / scale; ctx.stroke();
         }
       }
 
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = past;
       const num = String(mi + 1);
       const ms = mapStyle();   // Metro: its line badge; elsewhere a disc ringed white with a white number, in every theme
       if (ms.marker === "badge") drawMarker(ctx, a.x, a.y, 10 / scale, mark, num, num.length > 2 ? 8 : 9.5, ms.labelFont ?? font, scale, ms);

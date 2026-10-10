@@ -148,7 +148,7 @@ export function MapView() {
     return id;
   }, []);
   const liveShown = useRef(false);
-  liveShown.current = !!replay?.live && drawnAgents.some((a) => a.sessionId === replay.sessionId);
+  liveShown.current = !!replay && drawnAgents.some((a) => a.sessionId === replay.sessionId);
   const replayLayer = useReplayLayer({ fg: fg as never, wrapRef, nodeIndexRef, accent: tokens.accent, font: tokens.body, camera: camRef, liveShown });
   const replayRef = useRef<ReplayLayerApi>(replayLayer); replayRef.current = replayLayer;
   const openRef = useRef(!!replay); openRef.current = !!replay;
@@ -163,13 +163,14 @@ export function MapView() {
   // A small map with a thread followed live: the camera follows its agent at work by itself (autoTrack.ts).
   useAutoTrack({ on: small && !!replay?.live && replayLayer.active, sessionId: replay?.sessionId ?? null, agents: drawnAgents, followId, setFollowId });
 
-  // Faint: with a thread open, its agents you aren't watching. Looking back through it (not live), all but the one you
-  // follow (the replay's marker is the thread then); one agent on its own (agentFocus), the others.
+  // Faint: with a thread open, its agents you aren't watching (one followed, or one on its own: agentFocus, the others).
+  // Looking back through it they stay as they are: solid where they are now, the replay's own marker faint where the
+  // thread was (replay/layer.ts).
   const focus = useAgentFocus(replay?.sessionId ?? null);
   dimmedRef.current = useMemo(() => {
     if (!replay) return new Set<string>();
     const lead = followId ?? focus;
-    return new Set(drawnAgents.filter((a) => a.id !== lead && (!replay.live || !!lead)).map((a) => a.id));
+    return new Set(lead ? drawnAgents.filter((a) => a.id !== lead).map((a) => a.id) : []);
   }, [replay?.sessionId, replay?.live, drawnAgents, followId, focus]);
   // Another thread: everyone's steps again.
   useEffect(() => () => { if (replay?.sessionId) setAgentFocus(replay.sessionId, null); }, [replay?.sessionId]);

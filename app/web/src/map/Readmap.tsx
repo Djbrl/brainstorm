@@ -255,6 +255,13 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
         }
       }
 
+      // ---- a replay's marker, where the thread was at that moment: the same blue, faint, under the agents where they are
+      // now (at the newest moment the two meet, the agent on top) ----
+      const mk = subjectRef.current();
+      if (mk) {
+        ctx.globalAlpha = PAST_ALPHA;
+        ctx.beginPath(); ctx.arc(X(mk.x), Y(mk.y), 4.6, 0, Math.PI * 2); ctx.fillStyle = accentRef.current; ctx.fill();
+      }
       // ---- agents: those in the picture where they are; up close, the one watched, off the picture, is an arrow on the
       // edge pointing where it is ----
       for (const a of drawn) {
@@ -262,7 +269,7 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
         if (!p || p.alpha < 0.05) continue;
         const ax = X(p.x), ay = Y(p.y), c = agentColor(a, accentRef.current), on = a.id === (who?.id ?? followRef.current);
         if (ax > -4 && ax < W + 4 && ay > -4 && ay < H + 4) {
-          ctx.globalAlpha = Math.max(0.35, p.alpha);
+          ctx.globalAlpha = p.alpha > 0.5 ? 1 : Math.max(0.3, p.alpha);   // solid where it is now (faint: another agent, while one is followed)
           ctx.beginPath(); ctx.arc(ax, ay, (on ? 4.6 : 3.4) + 1.5, 0, Math.PI * 2); ctx.fillStyle = st.halo; ctx.fill();
           ctx.beginPath(); ctx.arc(ax, ay, on ? 4.6 : 3.4, 0, Math.PI * 2); ctx.fillStyle = c; ctx.fill();
         } else if (close && on) {
@@ -276,14 +283,6 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
           ctx.lineTo(ex + Math.cos(ang - 2.4) * 6, ey + Math.sin(ang - 2.4) * 6);
           ctx.closePath(); ctx.fill();
         }
-      }
-      // A replay's marker, where the thread is in its past: the same blue, faint, so it doesn't read as the agent now.
-      const mk = subjectRef.current();
-      if (mk) {
-        ctx.globalAlpha = 0.9;
-        ctx.beginPath(); ctx.arc(X(mk.x), Y(mk.y), 5.5, 0, Math.PI * 2); ctx.fillStyle = st.halo; ctx.fill();
-        ctx.globalAlpha = PAST_ALPHA;
-        ctx.beginPath(); ctx.arc(X(mk.x), Y(mk.y), 4, 0, Math.PI * 2); ctx.fillStyle = accentRef.current; ctx.fill();
       }
       ctx.globalAlpha = 1;
 

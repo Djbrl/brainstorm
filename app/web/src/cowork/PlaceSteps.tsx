@@ -19,7 +19,7 @@ import "../map/replay/replay.css"; // the row styles (.rp-list, .rp-row) it shar
 const USER_MS = 400;   // the list stops following the thread this long after you scroll it (as the Track's does)
 
 export function PlaceSteps() {
-  const { data, selected, stepId } = usePlaces();
+  const { data, selected, stepId, row: picked } = usePlaces();
   const { replay } = useNavState();
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
   const index = useReplayCursor((c) => c.index);
@@ -45,10 +45,14 @@ export function PlaceSteps() {
   if (rows[0]?.run) rows.unshift({ start: 0, to: 0, moments: 0 });   // every thread starts on Your computer
   let at = -1;
   if (replay?.live) at = rows.length - 1;
+  // The row you went to, while the thread is still on its moment (several rows can share one: a moment can hold several
+  // stretches); else the last row that starts by the cursor.
+  else if (picked && rows[picked.i] && rows[picked.i].to === index && picked.beat === index) at = picked.i;
   else for (let i = 0; i < rows.length; i++) if (rows[i].start <= index) at = i;
   const go = (i: number) => {
     const b = rows[i]?.to;
     if (b === undefined) return;
+    placesStore.set({ row: { i, beat: b, event: rows[i].run?.last.id ?? null } });
     if (replay?.mode === "footprint") setThreadMode("steps");
     setReplayPlaying(false);
     setReplayIndex(b);

@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-force-graph-2d";
 import { hierarchy, pack } from "d3-hierarchy";
 import type { CoworkArea, CoworkEvent, CoworkPage, CoworkSite, CoworkSummary } from "@contract";
-import { AREA_NAME, HOME, HOME_NAME } from "./data";
+import { AREA_NAME, HOME, HOME_NAME, usePlaces } from "./data";
 import { useCamera, type Camera, type View } from "../map/camera";
 import { mapStyle, drawMarker, platform } from "../map/themes";
 import { css, readTokens, recencyRGB } from "../map/color";
@@ -117,7 +117,8 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
   // order, back on Your computer for each stretch of work in the code between them (a moment with no event) ----
   const placeAt = useMemo(() => {
     const evs = data.events.map((e) => ({ e, beat: beatOf(e.stepId) ?? Infinity, place: placeOf(e, ids) }));
-    return (upTo: number) => {
+    /** The path up to a moment, or up to one event in it (the list's row: a moment can hold several stretches). */
+    return (upTo: number, until?: string | null) => {
       const out: { place: string; e?: CoworkEvent }[] = [{ place: HOME }];
       const push = (place: string, e?: CoworkEvent) => { const l = out[out.length - 1]; if (l.place !== place) out.push({ place, e }); else if (e) l.e = e; };
       let prev = -1;
@@ -126,6 +127,7 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
         if (prev >= 0 && x.beat - prev > 1) push(HOME);   // moments between two trips out: back in the code
         push(x.place, x.e);
         prev = Math.max(prev, x.beat);
+        if (until && x.e.id === until) return out;
       }
       const end = Math.min(upTo, beats - 1);
       if (prev >= 0 && end > prev) push(HOME);
@@ -133,7 +135,8 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
     };
   }, [data, ids, beatOf, beats]);
   const now = useMemo(() => placeAt(Infinity), [placeAt]);
-  const past = useMemo(() => (live ? null : placeAt(cursor)), [placeAt, cursor, live]);
+  const { row } = usePlaces();
+  const past = useMemo(() => (live ? null : placeAt(cursor, row && row.beat === cursor ? row.event : undefined)), [placeAt, cursor, live, row]);
   const path = past ?? now;                            // the trail the camera and the marker follow
   const here = path[path.length - 1]?.place ?? null;
   const nowAt = now[now.length - 1]?.place ?? null;    // the agent where it is now (solid while you look back)

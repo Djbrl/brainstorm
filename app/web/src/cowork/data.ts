@@ -33,8 +33,11 @@ export const VERB_NAME: Record<CoworkVerb, string> = {
 
 /** The open thread's places, shared by the places map (canvas) and the list in the sidebar. */
 /** `selected` is a place (or site) id on the map; `stepId` the step its panel shows. */
-type PlacesState = { data: CoworkSummary | null; selected: string | null; stepId: string | null; highlight: string | null };
-let places: PlacesState = { data: null, selected: null, stepId: null, highlight: null };
+/** `row`: the list's row you went to (PlaceSteps), so several stretches in one moment of the thread can each be the one
+ *  you're on: its index, the moment, and its newest event (null: a Your computer row). */
+export type PlacesRow = { i: number; beat: number; event: string | null };
+type PlacesState = { data: CoworkSummary | null; selected: string | null; stepId: string | null; highlight: string | null; row?: PlacesRow | null };
+let places: PlacesState = { data: null, selected: null, stepId: null, highlight: null, row: null };
 const subs = new Set<() => void>();
 export const placesStore = {
   get: () => places,

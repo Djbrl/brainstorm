@@ -1,7 +1,8 @@
 // Owner: sidebar agent. The folded sidebar with a thread open: its Track, folded down to a few lines in the top-left
 // corner. The moment the thread is on (the newest while it follows live) as the Track's highlighted row, the ones before
 // it fading out above, the next one below when you look back, always four rows of the same height; the same words and dots as the Track (ReplaySteps'
-// textOf). The current row's dot breathes while the thread works. Beside them a scroller, as plain as a scroll bar: where
+// textOf). The newest moment's dot breathes while the thread works (only that one: a moment you scroll back to keeps
+// its own colour). Beside them a scroller, as plain as a scroll bar: where
 // you are in the thread (its start at the top, now at the bottom); click or drag it to go there. Clicking the rows, or
 // T, unfolds the sidebar. Scrolling on the card steps through the thread as the Track's list does: up goes back (into the
 // replay, paused, the map's marker on that moment), down comes forward, and back at the newest a running thread
@@ -90,7 +91,7 @@ export function NowCard({ onOpen }: { onOpen: () => void }) {
             const { label, tone } = textOf(beats[i]);
             const state = i === at ? "current" : i < at ? `done d${at - i}` : "todo";
             return (
-              <span key={beats[i].step.id} className={`sn-m ${tone} ${state}${i === at && working ? " working" : ""}`} aria-hidden="true">
+              <span key={beats[i].step.id} className={`sn-m ${tone} ${state}${i === beats.length - 1 && working ? " working" : ""}`} aria-hidden="true">
                 <b /><span>{label}</span>{beats[i].failed > 0 && <em>failed</em>}
               </span>
             );

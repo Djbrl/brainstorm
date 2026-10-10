@@ -253,6 +253,7 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 - **10 Oct 2026** · [map] The Readmap over the whole project names the folder the agent is in and the one above it, in its colour, and the second-level folders where they fit (it named only the top ones).
 - **10 Oct 2026** · [map, replay] Looking back through a thread, its agent stays where it is now, solid, on the map and the Readmap, and the replay's marker is a second dot, the same blue, faint, under it (they meet at the newest moment). Before, the agent went faint and the marker took its place, so the two read as one.
 - **10 Oct 2026** · [map, sidebar] Looking back through a thread, the camera (and the Readmap's frame) follows the replay's marker, not the agent where it is now: following an agent stops, and on a small map the camera frames the marker as it nears the edge instead of fitting the recent window. The folded card's rows slide by one per moment, as the Track's list scrolls, instead of jumping.
+- **10 Oct 2026** · [sidebar] Fix: on the folded card only the newest moment's dot pulses while a thread works; a moment you scroll back to kept the pulsing blue over its own colour.
 
 ## Requests
 

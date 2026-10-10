@@ -104,7 +104,7 @@ export type Camera = {
   sees: (x: number, y: number, m?: number) => boolean;
   /** Stop a glide in progress. */
   stop: () => void;
-  /** Count as a hand move now (a click on the minimap): what the camera framed by itself isn't framed again. */
+  /** Count as a hand move now (a click on the Readmap): what the camera framed by itself isn't framed again. */
   touch: () => void;
 };
 

@@ -1,17 +1,18 @@
-// Owner: camera. The minimap: a second, small camera in the top-right corner, like a picture in picture. The big camera
+// Owner: camera. The Readmap: a second, small camera in the top-right corner, like a picture in picture. The big camera
 // follows an agent's edits; this one follows what it reads, by itself: it glides to the file the agent last read, close
 // enough to read its name and its neighbours' (files read are often far from where the agent writes, out of the big
 // camera's view). Several files read together (within a few seconds of the last one) are framed together if their names
-// still read at that zoom; else it shows the last one, the others ringed fainter where they're in the picture. The agent
-// it watches is the one the big camera follows (its buttons below pick it), or else the one that read last. Nothing read yet: the whole project, with the big camera's frame. A click shows that place on the
-// big map. Shown unless turned off (its ×, or M; a Minimap button brings it back), on any map but a phone's.
+// still read at that zoom; else it shows the last one, the others ringed fainter where they're in the picture. Its
+// buttons below pick the agent: the big camera follows it, the Readmap its reads. With none picked, it watches the one
+// that read last. Nothing read: the whole project, with the big camera's frame. A click shows that place on the big
+// map. Shown unless turned off (its ×, or M; a Readmap button brings it back), on any map but a phone's.
 import { useEffect, useRef, type MouseEvent, type RefObject } from "react";
 import type { AgentPresence } from "@contract";
 import { agentColor, baseName, initial, lastReadAt, readsWithTimes, shortName, type AgentAnim } from "./agents";
 import type { Camera } from "./camera";
 import type { Graph, GNode } from "./graph";
 import { mapStyle } from "./themes";
-import "./minimap.css";
+import "./readmap.css";
 
 const W = 208, H = 132;      // the picture, in CSS pixels
 const FPS_MS = 33;           // about 30 frames a second while it glides, 15 at rest
@@ -22,14 +23,14 @@ const TOGETHER_MS = 15_000;  // reads this close to the last one are one look ar
 const READABLE = 3.5;        // a file's radius in the picture (px) from which its name goes under it
 
 type View = { x: number; y: number; k: number };
-export type MinimapReads = {
+export type ReadmapReads = {
   resolveId: (file: string) => string | undefined; at: (id: string) => GNode | undefined; whose: (a: AgentPresence) => boolean;
   /** Looking back through a thread: the files read at that moment (node ids, newest first), which it shows instead
    *  (none: the whole project); null when not looking back. */
   past: string[] | null;
 };
 
-export function Minimap({ graphRef, anim, drawnRef, cam, subject, reads, agents, followId, accent, onTrack, onLook, onHide }: {
+export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents, followId, accent, onTrack, onLook, onHide }: {
   graphRef: RefObject<Graph>;
   anim: RefObject<Map<string, AgentAnim>>;
   /** The agents the map draws this frame (where each one is comes from `anim`). */
@@ -39,7 +40,7 @@ export function Minimap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
   subject: () => { x: number; y: number } | null;
   /** The map's resolver and nodes, and whose reads count (the open thread's agents, or on the project overview only
    *  the one followed); null when reads are hidden (R). */
-  reads: () => MinimapReads | null;
+  reads: () => ReadmapReads | null;
   /** The agents you can follow from here, in order (the open thread's: main first). */
   agents: AgentPresence[];
   followId: string | null;
@@ -55,7 +56,7 @@ export function Minimap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
   const accentRef = useRef(accent); accentRef.current = accent;
   const subjectRef = useRef(subject); subjectRef.current = subject;
   const readsRef = useRef(reads); readsRef.current = reads;
-  // The minimap's own camera (graph point (x, y) in the middle, k pixels per graph unit), and what it shows now: the
+  // The Readmap's own camera (graph point (x, y) in the middle, k pixels per graph unit), and what it shows now: the
   // file read (its id) or the whole map (null). A click goes there.
   const view = useRef<View | null>(null);
   const shows = useRef<{ id: string | null; x: number; y: number }>({ id: null, x: 0, y: 0 });
@@ -89,8 +90,10 @@ export function Minimap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
         const nodes = R.past.map((id) => R.at(id)).filter((n): n is GNode => n?.x !== undefined && n.y !== undefined);
         read = nodes[0]; others = nodes.slice(1); together = nodes;
       } else if (R) {
-        const can = drawn.filter((a) => R.whose(a) && lastReadAt(a) > 0);   // its marker may be off the map: its reads still count
-        who = can.find((a) => a.id === followRef.current) ?? can.sort((a, b) => lastReadAt(b) - lastReadAt(a))[0];
+        // The agent followed (its button below, A, the sidebar): its reads, even none yet. Else whoever read last (its
+        // marker may be off the map: its reads still count).
+        who = drawn.find((a) => a.id === followRef.current && R.whose(a))
+          ?? drawn.filter((a) => R.whose(a) && lastReadAt(a) > 0).sort((a, b) => lastReadAt(b) - lastReadAt(a))[0];
         if (who) {
           const list = readsWithTimes(who, R.resolveId, A?.get(who.id)?.file)
             .map((r) => ({ n: R.at(r.id), at: r.at })).filter((r): r is { n: GNode; at: number } => r.n?.x !== undefined && r.n.y !== undefined);
@@ -247,7 +250,7 @@ export function Minimap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
       // What it shows, in words beside the agents' buttons.
       const words = read && R?.past ? `Read ${together.length > 1 ? `${together.length} files` : baseName(read.file?.path ?? read.id)} at this step`
         : read && who ? `${who.isSubagent ? shortName(who, 16) : "Main agent"} read ${together.length > 1 ? `${together.length} files` : baseName(read.file?.path ?? read.id)}`
-        : "The whole project";
+        : who && who.id === followRef.current ? `${who.isSubagent ? shortName(who, 16) : "Main agent"}: nothing read yet` : "The whole project";
       if (words !== said && caption.current) { said = words; caption.current.textContent = words; caption.current.title = words; }
     };
     raf = requestAnimationFrame(draw);
@@ -264,10 +267,10 @@ export function Minimap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
   };
 
   return (
-    <section className="minimap" aria-label="Minimap: the file the agent is reading">
+    <section className="readmap" aria-label="Readmap: the file the agent is reading">
       <canvas ref={canvas} style={{ width: W, height: H }} role="img" onClick={onClick}
         aria-label="The file the agent read last, up close, with the files around it. Click to show it on the map." />
-      <button className="mm-hide" onClick={onHide} aria-label="Hide the minimap (M)" title="Hide (M)">
+      <button className="mm-hide" onClick={onHide} aria-label="Hide the Readmap (M)" title="Hide (M)">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg>
       </button>
       <div className="mm-agents" role="group" aria-label="Follow an agent">
@@ -298,7 +301,7 @@ function wholeView(g: Graph): View | null {
   return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, k };
 }
 
-/** The agents you can follow from the minimap: the open thread's (main first, then its subagents), or else everyone on
+/** The agents you can follow from the Readmap: the open thread's (main first, then its subagents), or else everyone on
  *  the map at work or lately (main agents first). At most `max`, in an order that doesn't change as they work. */
 export function trackable(drawn: AgentPresence[], max = 6): AgentPresence[] {
   const byId = (a: AgentPresence, b: AgentPresence) => a.id.localeCompare(b.id);

@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 
 /** Clicks here move between steps or files rather than leave them: the panels, the sidebar (its Track tab too), the player, the header. */
-export const KEEPS_OPEN = ".map-panel, .map-sidebar, .sidebar-scrim, .sidebar-now, .minimap, .dock, .rp-bar, .crumbs, .lens-switch, .settings, .welcome";
+export const KEEPS_OPEN = ".map-panel, .map-sidebar, .sidebar-scrim, .sidebar-now, .readmap, .dock, .rp-bar, .crumbs, .lens-switch, .settings, .welcome";
 
 /** Close on a click outside `keep` (a CSS selector), not on a drag. */
 export function useClickAway(open: boolean, keep: string, close: () => void) {

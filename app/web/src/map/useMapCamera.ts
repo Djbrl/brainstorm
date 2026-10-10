@@ -24,7 +24,7 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
   smallRef: RefObject<boolean>;
 }) {
   const [followId, setFollowId] = useState<string | null>(null);
-  // Following the same agent again (its button on the minimap) frames it again, even after you moved the camera.
+  // Following the same agent again (its button on the Readmap) frames it again, even after you moved the camera.
   const [followAt, setFollowAt] = useState(0);
   const refollow = useCallback((id: string) => { setFollowId(id); setFollowAt((n) => n + 1); }, []);
   // A thread replay takes over the camera: stop following a live agent when one starts.

@@ -87,7 +87,7 @@ const darkHalo = (halo: string) => Number(/\d+/.exec(halo)?.[0] ?? 255) < 128;
 export const isWrite = (action?: string) => action === "edit" || action === "write";
 
 /** The files an agent read lately (map node ids), newest first: the last few distinct ones in its trail, but `except`
- *  (the file it stands on). The map draws them as dotted lines, the minimap too (often they're out of view). */
+ *  (the file it stands on). The map draws them as dotted lines, the Readmap too (often they're out of view). */
 export function recentReads(a: AgentPresence, resolveId: (file: string) => string | undefined, except?: string, max = READS_SHOWN): string[] {
   return readsWithTimes(a, resolveId, except, max).map((r) => r.id);
 }

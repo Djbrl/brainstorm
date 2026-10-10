@@ -44,7 +44,7 @@ export type ReplayLayerApi = {
   touches: (id: string) => boolean;
   /** Looking back through the thread (the tracer drawn, not live): the files read at the moment the cursor is on, or
    *  at the last read before it (up to a few moments back), newest first, or none; null when not looking back. The
-   *  minimap shows them (none: the whole project, not what the agents read now). */
+   *  readmap shows them (none: the whole project, not what the agents read now). */
   readsNow: () => string[] | null;
   /** The tracer's camera target (the marker, or between it and a file it reads), or null: what a locked camera centres. */
   subject: () => { x: number; y: number } | null;
@@ -59,7 +59,7 @@ type Box = { x0: number; y0: number; x1: number; y1: number };
 const GLIDE_MS = 650;       // same glide as the live agent markers (map/agents.tsx)
 const THINK_MS = 2400;      // the thinking ring's breath (as in agents.tsx)
 const FLASH_MS = 600;       // read flash
-const READS_BACK = 8;       // how many moments back the minimap still shows the last read (readsNow)
+const READS_BACK = 8;       // how many moments back the Readmap still shows the last read (readsNow)
 const PULSE_MS = 700;       // edit pulse on the marker
 const RED = "#d93025";      // a beat with a failed tool call
 const ERR_PULSE_MS = 1100;

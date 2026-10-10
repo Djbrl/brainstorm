@@ -28,7 +28,7 @@ export const SHORTCUTS: { title: string; keys: { keys: string[]; what: string }[
       { keys: ["Shift", "↑", "↓"], what: "Zoom in or out: hold to keep going" },
       { keys: ["C"], what: "Center the camera on the agent (without locking it)" },
       { keys: ["A"], what: "Follow the next agent (with Shift, the one before)" },
-      { keys: ["M"], what: "Show or hide the minimap" },
+      { keys: ["M"], what: "Show or hide the Readmap" },
       { keys: ["F"], what: "Fit the map to the window" },
       { keys: ["L"], what: "Lock or unlock the camera on the agent" },
       { keys: ["R"], what: "Show or hide reads" },

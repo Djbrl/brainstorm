@@ -1,7 +1,7 @@
 // Owner: camera. On a small map, an open thread followed live: the camera follows its agent up close by itself (the
-// minimap shows the rest). It follows the agent at work: the main one, or a subagent while the main one waits on it,
-// switching at most every few seconds. Pick an agent yourself (the minimap, A, the sidebar), stop following (Esc, the
-// arrow keys, a click on the minimap) or open another thread, and it lets you: until the next thread, it doesn't take
+// readmap shows the rest). It follows the agent at work: the main one, or a subagent while the main one waits on it,
+// switching at most every few seconds. Pick an agent yourself (the Readmap, A, the sidebar), stop following (Esc, the
+// arrow keys, a click on the Readmap) or open another thread, and it lets you: until the next thread, it doesn't take
 // the camera back.
 import { useEffect, useRef } from "react";
 import type { AgentPresence } from "@contract";

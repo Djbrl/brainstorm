@@ -37,9 +37,9 @@ import { GIT_COLOURS, gitFiles, useShowGit, worktreeOf } from "./gitFilter";
 import { drawFile, drawFocusLinks, drawFolderNames, FILE_LABELS_MAX, flushDots, labelFor, lookOf, moreMotion, newCaches, RIPPLE_MS, type Frame } from "./drawNode";
 import { useMapCamera } from "./useMapCamera";
 import { useLiveAgents } from "./useLiveAgents";
-import { Minimap, trackable } from "./Minimap";
+import { Readmap, trackable } from "./Readmap";
 import { useAutoTrack } from "./autoTrack";
-import { setMinimap, useMinimap } from "./prefs";
+import { setReadmap, useReadmap } from "./prefs";
 import { isTyping } from "../switch/shortcuts";
 import "./map.css";
 
@@ -185,15 +185,15 @@ export function MapView() {
     if (id && !replay.live) nav0.setReplayLive(true);
   }, [replay, agents, state.steps, setFollowId, refollow, nav0]);
 
-  // ---- the minimap (Minimap.tsx) and its keys: M shows or hides it, A follows the next agent (Shift A, the one before) ----
-  const minimap = useMinimap();
+  // ---- the Readmap (Readmap.tsx) and its keys: M shows or hides it, A follows the next agent (Shift A, the one before) ----
+  const readmap = useReadmap();
   const tracks = useMemo(() => trackable(drawnAgents), [drawnAgents]);
-  const keysRef = useRef({ minimap, tracks, followId, follow }); keysRef.current = { minimap, tracks, followId, follow };
+  const keysRef = useRef({ readmap, tracks, followId, follow }); keysRef.current = { readmap, tracks, followId, follow };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target) || document.querySelector('[aria-modal="true"], .lightbox')) return;
       const k = keysRef.current;
-      if (e.key === "m" || e.key === "M") { e.preventDefault(); setMinimap(!k.minimap); return; }
+      if (e.key === "m" || e.key === "M") { e.preventDefault(); setReadmap(!k.readmap); return; }
       if ((e.key === "a" || e.key === "A") && k.tracks.length) {
         e.preventDefault();
         const i = k.tracks.findIndex((a) => a.id === k.followId), n = k.tracks.length;
@@ -203,9 +203,9 @@ export function MapView() {
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
   }, []);
-  /** The minimap follows what agents read, with the map's own rules (agents.tsx): with a thread open, its agents; on
+  /** The Readmap follows what agents read, with the map's own rules (agents.tsx): with a thread open, its agents; on
    *  the project overview, only the one followed. */
-  const minimapReads = useCallback(() => {
+  const readmapReads = useCallback(() => {
     if (!mapPrefs.showReads) return null;
     const open = openRef.current, follow = followRef.current;
     return {
@@ -215,7 +215,7 @@ export function MapView() {
       past: replayRef.current.readsNow(),
     };
   }, [resolveId]);
-  /** A click or drag on the minimap: look there, by hand (no agent followed any more). */
+  /** A click or drag on the Readmap: look there, by hand (no agent followed any more). */
   const lookAt = useCallback((x: number, y: number, ms: number) => {
     setFollowId(null);
     const c = camRef.current;
@@ -575,13 +575,13 @@ export function MapView() {
       {map && <CapNote map={map} />}
       <TalkCard />
       <LensSwitch />
-      {hasNodes && (minimap
-        ? <Minimap graphRef={graphRef} anim={anim} drawnRef={agentsRef} cam={camRef} subject={() => replayRef.current.subject()} reads={minimapReads} agents={tracks} followId={followId} accent={tokens.accent}
-            onTrack={follow} onLook={lookAt} onHide={() => setMinimap(false)} />
+      {hasNodes && (readmap
+        ? <Readmap graphRef={graphRef} anim={anim} drawnRef={agentsRef} cam={camRef} subject={() => replayRef.current.subject()} reads={readmapReads} agents={tracks} followId={followId} accent={tokens.accent}
+            onTrack={follow} onLook={lookAt} onHide={() => setReadmap(false)} />
         : (
-          <button className="minimap-show" onClick={() => setMinimap(true)} title="Show the minimap (M)">
+          <button className="readmap-show" onClick={() => setReadmap(true)} title="Show the Readmap (M)">
             <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="3" /><circle cx="11.5" cy="9" r="2.6" /><path d="M13.4 10.9 15.5 13" /></svg>
-            Minimap
+            Readmap
           </button>
         ))}
 

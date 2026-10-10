@@ -2,7 +2,7 @@
 // how much of an open thread the map lights up (its last 15 moments, its last 50, or all of it: see replay/layer.ts's
 // focus), whether the camera locks onto what moves (the replay tracer, or an agent you follow), and whether the small
 // window with the file the agent is reading or writing shows while you follow or replay a thread (replay/Peek.tsx), and
-// whether the minimap shows (Minimap.tsx): on unless turned off, M flips it.
+// whether the Readmap shows (Readmap.tsx): on unless turned off, M flips it.
 import { useSyncExternalStore } from "react";
 
 /** How many moments up to the replay cursor the map lights up ("all": the whole thread). */
@@ -16,7 +16,7 @@ export const STEP_WINDOWS: { id: StepWindow; name: string }[] = [
 const WINDOW_KEY = "rundown-map-window";
 const LOCK_KEY = "rundown-camera-lock";
 const PEEK_KEY = "rundown-map-peek";
-const MINI_KEY = "rundown-minimap-shown";
+const MINI_KEY = "rundown-readmap-shown";
 
 function load<T>(key: string, parse: (v: string | null) => T): T {
   try { return parse(localStorage.getItem(key)); } catch { return parse(null); } // storage blocked: the default
@@ -48,7 +48,7 @@ export const getShowFile = () => prefs.peek;
 export function setShowFile(on: boolean) { if (on !== prefs.peek) { prefs.peek = on; save(PEEK_KEY, on ? "1" : "0"); } }
 export const useShowFile = () => useSyncExternalStore(subscribe, getShowFile, getShowFile);
 
-/** The minimap (Minimap.tsx): shown unless turned off (M, or its close button). */
-export const getMinimap = () => prefs.mini;
-export function setMinimap(on: boolean) { if (on !== prefs.mini) { prefs.mini = on; save(MINI_KEY, on ? "1" : "0"); } }
-export const useMinimap = () => useSyncExternalStore(subscribe, getMinimap, getMinimap);
+/** The Readmap (Readmap.tsx): shown unless turned off (M, or its close button). */
+export const getReadmap = () => prefs.mini;
+export function setReadmap(on: boolean) { if (on !== prefs.mini) { prefs.mini = on; save(MINI_KEY, on ? "1" : "0"); } }
+export const useReadmap = () => useSyncExternalStore(subscribe, getReadmap, getReadmap);

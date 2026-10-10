@@ -1,6 +1,6 @@
 // Owner: sidebar agent. The folded sidebar with a thread open: its Track, folded down to a few lines in the top-left
-// corner. The moment the thread is on (the newest while it follows live) as the Track's highlighted row, the two before
-// it fading out above, the next one below when you look back; the same words and dots as the Track (ReplaySteps'
+// corner. The moment the thread is on (the newest while it follows live) as the Track's highlighted row, the ones before
+// it fading out above, the next one below when you look back, always four rows of the same height; the same words and dots as the Track (ReplaySteps'
 // textOf). The current row's dot breathes while the thread works. Beside them a scroller, as plain as a scroll bar: where
 // you are in the thread (its start at the top, now at the bottom); click or drag it to go there. Clicking the rows, or
 // T, unfolds the sidebar. Scrolling on the card steps through the thread as the Track's list does: up goes back (into the
@@ -14,6 +14,7 @@ import { needsYou, yourTurn } from "../../lib/attention";
 import { textOf } from "../replay/ReplaySteps";
 
 const NOTCH = 40;   // px of wheel per moment (a mouse notch, or a stretch of a trackpad's glide)
+const ROWS = 4;     // moments on the card
 
 export function NowCard({ onOpen }: { onOpen: () => void }) {
   const { replay } = useNavState();
@@ -58,7 +59,10 @@ export function NowCard({ onOpen }: { onOpen: () => void }) {
 
   const beats = thread?.beats ?? [];
   const at = Math.min(index, beats.length - 1);
-  const rows = beats.length ? [at - 2, at - 1, at, at + 1].filter((i) => i >= 0 && i < beats.length) : [];
+  // Always the same four rows (fewer only in a thread that short), so the card keeps its height as you scroll: the
+  // moment you're on third, with one after it, or last at the newest (three before it).
+  const start = Math.max(0, Math.min(at - 2, beats.length - ROWS));
+  const rows = beats.length ? Array.from({ length: Math.min(ROWS, beats.length) }, (_, k) => start + k) : [];
   const working = running && !needsYou(attn) && !yourTurn(attn);
   const cur = beats[at];
 

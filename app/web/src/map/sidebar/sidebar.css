@@ -40,7 +40,7 @@
 .sn-rows { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 1px; padding: 0; border: 0; background: none;
   text-align: left; border-radius: 9px; cursor: pointer; }
 .sn-rows:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.sn-m { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 9px; font-size: 13.5px; line-height: 20px; color: var(--ink-2); }
+.sn-m { flex: none; display: flex; align-items: center; gap: 8px; height: 30px; padding: 5px 8px; border-radius: 9px; font-size: 13.5px; line-height: 20px; color: var(--ink-2); box-sizing: border-box; }
 .sn-m span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sn-m b { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--cool); }
 .sn-m.edit b { background: var(--warm); }
@@ -51,6 +51,7 @@
 .sn-m.current.working b { background: var(--accent); animation: sidebar-pulse 1.6s infinite; }
 .sn-m.done.d1 { opacity: .62; }
 .sn-m.done.d2 { opacity: .3; }
+.sn-m.done.d3 { opacity: .18; }
 .sn-m.todo { color: var(--ink-3); opacity: .7; }
 /* The scroller: a grey column, a darker grey thumb where you are (the thread's start at the top, now at the bottom). */
 .sn-scroll { position: relative; flex: none; width: 14px; margin: 4px 2px 4px 0; cursor: pointer; touch-action: none; --at: 1; }
@@ -68,8 +69,8 @@
   .map-wrap:has(.sidebar-now) .dock { display: none; }
   .sidebar-now { width: auto; min-width: 0; max-width: 520px; right: 258px; }
   :is(.map-wrap, .cw-wrap):not(:has(.readmap)) .sidebar-now { right: 150px; }
-  .sn-m.current { align-items: flex-start; }
-  .sn-m.current b { margin-top: 7px; }
+  /* Room for three lines whatever the step, so the card doesn't change height as you scroll. */
+  .sn-m.current { height: 70px; }
   .sn-m.current span { white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 }
 

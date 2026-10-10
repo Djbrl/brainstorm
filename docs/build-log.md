@@ -250,6 +250,7 @@ One line per milestone: `HH:MM [agent] what happened`. Newest at the bottom.
 - **10 Oct 2026** · [sidebar, replay] The folded thread card carries the player, folded: play and a vertical line down the thread (red where a chapter failed, click or drag to go there); on a small window it replaces the footer player, cramped there. Clicking the rows opens the sidebar (no separate button). The talk card over the map during a replay (TalkCard, from the 30 Sep first-run study, for stretches with no file to trace) is gone: the Track and the folded card already say those words.
 - **10 Oct 2026** · [sidebar, map] The folded card's player is a plain scroller (grey column, darker thumb where you are; click or drag). The Readmap drew at 15 to 30 frames a second and read the theme's colours every frame (a style flush): it now draws at the screen's rate while anything in it moves and not at all when it stands still, the colours read twice a second. Its footer shows only with agents to follow, and says nothing over the whole project.
 - **10 Oct 2026** · [sidebar] The folded card keeps one height while you scroll (fast scrolling jittered): always four rows of 30 px, the current one with room for three lines on a small window.
+- **10 Oct 2026** · [map] The Readmap over the whole project names the folder the agent is in and the one above it, in its colour, and the second-level folders where they fit (it named only the top ones).
 
 ## Requests
 

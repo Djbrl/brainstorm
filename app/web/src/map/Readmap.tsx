@@ -69,6 +69,7 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
     const ctx = el.getContext("2d");
     if (!ctx) return;
     let raf = 0, last = 0, settled = false, sig = "";
+    let idx = { g: -1 as number, m: new Map<string, GNode>() };   // the map's nodes by id, made again when it changes
     // The theme's colours and font, read again twice a second (a theme switch), not every frame (that's a style flush).
     let tok = { ink: "", quiet: "", font: "", at: -1e9 };
     const draw = (t: number) => {
@@ -216,9 +217,28 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
           label(folderName(n), X(n.x), Math.max(4, Y(n.y - n.r) + 3), 9, 600, ink, 0.45);
         }
       } else {
+        // The folders the agent is in (the one followed, else the one that moved last): its own, then the one above it,
+        // named in its colour inside their circles' tops, before anything else takes the room. Then the top folders,
+        // above their circles, and the next level's where they fit.
+        if (idx.g !== g.id) idx = { g: g.id, m: new Map(g.nodes.map((n) => [n.id, n])) };
+        const busy = drawn.filter((a) => A?.get(a.id)).sort((a, b) => Number(b.active) - Number(a.active) || (Date.parse(b.ts) || 0) - (Date.parse(a.ts) || 0));
+        const lead = busy.find((a) => a.id === followRef.current) ?? busy[0];
+        const here = lead ? idx.m.get(A!.get(lead.id)!.file) : undefined;
+        const mine = new Set<GNode>();
+        let named = 0;
+        for (let f = here?.dir ? here : here?.up; f && named < 2; f = f.up) {
+          if (f.x === undefined || f.y === undefined || f.r * k < 7) continue;
+          mine.add(f);
+          const top = !f.up;
+          if (label(folderName(f), X(f.x), top ? Math.max(3, Y(f.y - f.r) - 12) : Math.max(3, Y(f.y - f.r) + 2), 9.5, 700, agentColor(lead!, accentRef.current), 1)) named++;
+        }
         for (const n of g.folders) {
-          if (n.up || n.x === undefined || n.y === undefined || n.r * k < 18) continue;
+          if (n.up || mine.has(n) || n.x === undefined || n.y === undefined || n.r * k < 18) continue;
           label(folderName(n), X(n.x), Math.max(3, Y(n.y - n.r) - 12), 9, 600, ink, 0.55);
+        }
+        for (const n of g.folders) {
+          if (!n.up || n.up.up || mine.has(n) || n.x === undefined || n.y === undefined || n.r * k < 16) continue;
+          label(folderName(n), X(n.x), Math.max(3, Y(n.y - n.r) + 2), 8.5, 600, ink, 0.42);
         }
         // The big camera's frame, the rest veiled (not while it shows the whole map).
         const c = cam.current, bv = c?.view(), s = c?.safe.current;

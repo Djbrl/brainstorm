@@ -86,6 +86,19 @@ const WAIT_TEXT_DARK = "#ffc56b"; // on a dark one (Prism, Hologram)
 const darkHalo = (halo: string) => Number(/\d+/.exec(halo)?.[0] ?? 255) < 128;
 export const isWrite = (action?: string) => action === "edit" || action === "write";
 
+/** The files an agent read lately (map node ids), newest first: the last few distinct ones in its trail, but `except`
+ *  (the file it stands on). The map draws them as dotted lines, the minimap too (often they're out of view). */
+export function recentReads(a: AgentPresence, resolveId: (file: string) => string | undefined, except?: string, max = READS_SHOWN): string[] {
+  const reads: string[] = [];
+  for (let i = a.trail.length - 1; i >= 0 && reads.length < max; i--) {
+    const m = a.trail[i];
+    if (isWrite(m.action)) continue;
+    const id = resolveId(m.file);
+    if (id && id !== except && !reads.includes(id)) reads.push(id);
+  }
+  return reads;
+}
+
 /** Where the marker stands: the last file written, or before any write, the first file touched. */
 export function anchorFile(a: AgentPresence): string | undefined {
   for (let i = a.trail.length - 1; i >= 0; i--) if (isWrite(a.trail[i].action)) return a.trail[i].file;
@@ -213,13 +226,7 @@ export function drawAgents(opts: {
       // What it read lately: a dotted line from the marker to each of the last few files it read (not the one it stands
       // on), the newest strongest, until it reads others. Writes are the solid trail above.
       if (showReads && (!quiet || followId === a.id)) {
-        const reads: string[] = [];
-        for (let i = a.trail.length - 1; i >= 0 && reads.length < READS_SHOWN; i--) {
-          const m = a.trail[i];
-          if (isWrite(m.action)) continue;
-          const id = resolveId(m.file);
-          if (id && id !== key && !reads.includes(id)) reads.push(id);
-        }
+        const reads = recentReads(a, resolveId, key);
         ctx.setLineDash([2.2 / scale, 3.6 / scale]);
         ctx.lineCap = "round";
         ctx.strokeStyle = color;

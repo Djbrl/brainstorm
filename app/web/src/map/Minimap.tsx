@@ -1,10 +1,11 @@
 // Owner: camera. The minimap: the whole project in the top-right corner, like a picture in picture, while the camera
-// follows one agent up close. Its folders, every agent where it is now, and the part the camera shows. Click or drag on
-// it to look there; its buttons switch which agent the camera follows. Shown on a small map (the Claude app's browser
+// follows one agent up close. Its folders, every agent where it is now, the files each one is reading (they're often
+// out of the camera's view: a dotted line to each, a ring on it, a ring that swells on a read as it happens), and the
+// part the camera shows. Click or drag on it to look there; its buttons switch which agent the camera follows. Shown on a small map (the Claude app's browser
 // pane) unless turned off, on a big one only if turned on: M flips it (prefs.ts).
 import { useEffect, useRef, type RefObject } from "react";
 import type { AgentPresence } from "@contract";
-import { agentColor, initial, shortName, type AgentAnim } from "./agents";
+import { agentColor, initial, recentReads, shortName, type AgentAnim } from "./agents";
 import type { Camera } from "./camera";
 import type { Graph } from "./graph";
 import { mapStyle } from "./themes";
@@ -13,13 +14,17 @@ import "./minimap.css";
 const W = 208, H = 132;   // the picture, in CSS pixels
 const PAD = 8;
 const FPS_MS = 66;        // about 15 frames a second: agents glide, nothing needs more
+const READ_FLASH_MS = 1500; // a read as it happens (the map's line of sight lasts as long: agents.tsx)
 
-export function Minimap({ graphRef, anim, drawnRef, cam, subject, agents, followId, accent, onTrack, onLook, onHide }: {
+export function Minimap({ graphRef, anim, drawnRef, cam, subject, reads, agents, followId, accent, onTrack, onLook, onHide }: {
   graphRef: RefObject<Graph>;
   anim: RefObject<Map<string, AgentAnim>>;
   /** The agents the map draws this frame (where each one is comes from `anim`). */
   drawnRef: RefObject<AgentPresence[]>;
   cam: RefObject<Camera>;
+  /** Where to draw an agent's reads: the map's resolver and node positions, and whose reads show (the open thread's
+   *  agents, or on the project overview only the one followed), or null when reads are hidden. */
+  reads: () => { resolveId: (file: string) => string | undefined; at: (id: string) => { x: number; y: number; r: number } | undefined; whose: (a: AgentPresence) => boolean } | null;
   /** The replay's marker, while it shows (replay/layer.ts), or null. */
   subject: () => { x: number; y: number } | null;
   /** The agents you can follow from here, in order (the open thread's: main first). */
@@ -37,6 +42,7 @@ export function Minimap({ graphRef, anim, drawnRef, cam, subject, agents, follow
   const followRef = useRef(followId); followRef.current = followId;
   const accentRef = useRef(accent); accentRef.current = accent;
   const subjectRef = useRef(subject); subjectRef.current = subject;
+  const readsRef = useRef(reads); readsRef.current = reads;
 
   useEffect(() => {
     const el = canvas.current;
@@ -109,6 +115,32 @@ export function Minimap({ graphRef, anim, drawnRef, cam, subject, agents, follow
           ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.rect(rx, ry, rw, rh); ctx.fill("evenodd");
           ctx.globalAlpha = 0.9; ctx.strokeStyle = accentRef.current; ctx.lineWidth = 1.5;
           ctx.strokeRect(rx + 0.75, ry + 0.75, Math.max(2, rw - 1.5), Math.max(2, rh - 1.5));
+        }
+      }
+
+      // What each agent is reading: a dotted line from it to each file, a ring on the file, the newest strongest; a read
+      // as it happens swells a ring on its file. While one agent is followed, the others' reads are quieter.
+      const R = readsRef.current(), following = followRef.current, now = performance.now();
+      if (R) for (const a of drawnRef.current ?? []) {
+        const p = anim.current?.get(a.id);
+        if (!p || p.alpha < 0.05 || !R.whose(a)) continue;
+        const color = agentColor(a, accentRef.current), weight = Math.max(0.35, p.alpha) * (following && following !== a.id ? 0.45 : 1);
+        const ax = X(p.x), ay = Y(p.y);
+        recentReads(a, R.resolveId, p.file).forEach((id, j) => {
+          const n = R.at(id);
+          if (!n) return;
+          const fx = X(n.x), fy = Y(n.y), fade = weight * (1 - j * 0.18);
+          ctx.globalAlpha = fade * 0.8; ctx.strokeStyle = color; ctx.lineWidth = 1.2; ctx.setLineDash([2, 2.5]);
+          ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(fx, fy); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.globalAlpha = fade; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.arc(fx, fy, Math.max(2.6, n.r * k + 1.5), 0, Math.PI * 2); ctx.stroke();
+        });
+        for (const f of p.flashes) {
+          const id = R.resolveId(f.file), n = id ? R.at(id) : undefined, q = (now - f.t0) / READ_FLASH_MS;
+          if (!n || q < 0 || q >= 1) continue;
+          ctx.globalAlpha = weight * (1 - q); ctx.strokeStyle = color; ctx.lineWidth = 1.8;
+          ctx.beginPath(); ctx.arc(X(n.x), Y(n.y), 3 + q * 9, 0, Math.PI * 2); ctx.stroke();
         }
       }
 

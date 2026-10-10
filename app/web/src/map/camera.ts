@@ -16,7 +16,7 @@ const GAP = 12;                                         // breathing room off ea
 const LEFT = ".map-sidebar:not(.sidebar-overlay), .sidebar-collapsed"; // the narrow sheet opens over the map: no reframing
 const RIGHT = ".map-panel.open";
 const FLOAT_RIGHT = ".map-peek";                         // floats in from the right edge: covers from its left side on
-const TOP = ".lens-switch";
+const TOP = ".lens-switch, .sidebar-now"; // the folded sidebar's card with the thread's step, at the top left
 const BOTTOM = ".dock, .rp-bar, .map-sidebar.pip"; // the phone's thread sheet under the map (MapSidebar's pip)
 const WATCH = [LEFT, ".map-panel", FLOAT_RIGHT, TOP, BOTTOM].join(", ");
 
@@ -104,6 +104,8 @@ export type Camera = {
   sees: (x: number, y: number, m?: number) => boolean;
   /** Stop a glide in progress. */
   stop: () => void;
+  /** Count as a hand move now (a click on the minimap): what the camera framed by itself isn't framed again. */
+  touch: () => void;
 };
 
 /**
@@ -237,7 +239,8 @@ export function useCamera(fg: RefObject<Graph | undefined | null>, hostRef: RefO
       const sx = s.w / 2 + (x - v.x) * v.k, sy = s.h / 2 + (y - v.y) * v.k;
       return sx > s.left + m && sx < s.w - s.right - m && sy > s.top + m && sy < s.h - s.bottom - m;
     };
-    return { safe, version, measure, userAt: () => userAt.current, view, moveTo, lookAt, nudge, zoomBy, frame, reveal, easeToward, sees, stop };
+    const touch = () => { stop(); userAt.current = performance.now(); };
+    return { safe, version, measure, userAt: () => userAt.current, view, moveTo, lookAt, nudge, zoomBy, frame, reveal, easeToward, sees, stop, touch };
   }, [fg, hostRef, version]);
 }
 

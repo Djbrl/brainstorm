@@ -1,7 +1,8 @@
 // Owner: map-focus. Map choices remembered per browser, read on every frame by the canvas layers (like lib/theme):
 // how much of an open thread the map lights up (its last 15 moments, its last 50, or all of it: see replay/layer.ts's
 // focus), whether the camera locks onto what moves (the replay tracer, or an agent you follow), and whether the small
-// window with the file the agent is reading or writing shows while you follow or replay a thread (replay/Peek.tsx).
+// window with the file the agent is reading or writing shows while you follow or replay a thread (replay/Peek.tsx), and
+// whether the minimap shows (Minimap.tsx): on by default on a small map, off on a big one, M flips the one you're on.
 import { useSyncExternalStore } from "react";
 
 /** How many moments up to the replay cursor the map lights up ("all": the whole thread). */
@@ -15,6 +16,7 @@ export const STEP_WINDOWS: { id: StepWindow; name: string }[] = [
 const WINDOW_KEY = "rundown-map-window";
 const LOCK_KEY = "rundown-camera-lock";
 const PEEK_KEY = "rundown-map-peek";
+const MINI_KEY = "rundown-minimap";        // "small" and "big": the minimap's choice for each, as "1" or "0"
 
 function load<T>(key: string, parse: (v: string | null) => T): T {
   try { return parse(localStorage.getItem(key)); } catch { return parse(null); } // storage blocked: the default
@@ -23,6 +25,7 @@ const prefs = {
   window: load<StepWindow>(WINDOW_KEY, (v) => (v === "50" ? 50 : v === "all" ? "all" : 15)),
   lock: load<boolean>(LOCK_KEY, (v) => v === "1"),
   peek: load<boolean>(PEEK_KEY, (v) => v !== "0"), // on unless turned off
+  mini: load<{ small: boolean; big: boolean }>(MINI_KEY, (v) => ({ small: v?.[0] !== "0", big: v?.[1] === "1" })),
 };
 const listeners = new Set<() => void>();
 const subscribe = (f: () => void) => { listeners.add(f); return () => { listeners.delete(f); }; };
@@ -44,3 +47,16 @@ export const useCameraLock = () => useSyncExternalStore(subscribe, getCameraLock
 export const getShowFile = () => prefs.peek;
 export function setShowFile(on: boolean) { if (on !== prefs.peek) { prefs.peek = on; save(PEEK_KEY, on ? "1" : "0"); } }
 export const useShowFile = () => useSyncExternalStore(subscribe, getShowFile, getShowFile);
+
+/** The minimap (Minimap.tsx): shown on a small map unless turned off, on a big one only if turned on. */
+export const getMinimap = (small: boolean) => (small ? prefs.mini.small : prefs.mini.big);
+export function setMinimap(small: boolean, on: boolean) {
+  if (on === getMinimap(small)) return;
+  prefs.mini = { ...prefs.mini, [small ? "small" : "big"]: on };
+  save(MINI_KEY, `${prefs.mini.small ? 1 : 0}${prefs.mini.big ? 1 : 0}`);
+}
+const miniKey = () => `${prefs.mini.small ? 1 : 0}${prefs.mini.big ? 1 : 0}`;
+export function useMinimap(small: boolean): boolean {
+  useSyncExternalStore(subscribe, miniKey, miniKey);
+  return getMinimap(small);
+}

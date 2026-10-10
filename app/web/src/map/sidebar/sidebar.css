@@ -29,6 +29,30 @@
 .sidebar-collapsed i { font-style: normal; font-size: 14px; color: var(--ink-3); }
 .sidebar-collapsed:hover { color: var(--ink); }
 
+/* Folded with a thread open (NowCard): a card in the top-left corner with the thread, its state and the step it's on.
+   It stays left of the lens pill in the middle. */
+.sidebar-now { position: absolute; left: 24px; top: var(--sb-top, 24px); z-index: 3; width: min(300px, calc(50% - 134px)); min-width: 180px;
+  display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 8px; row-gap: 2px; padding: 9px 10px 10px 13px;
+  background: rgba(255,255,255,.9); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,.05); text-align: left; color: var(--ink); }
+.sidebar-now:hover { box-shadow: 0 10px 40px rgba(0,0,0,.09); }
+.sidebar-now:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sn-top, .sn-step { grid-column: 1; display: flex; align-items: center; gap: 7px; min-width: 0; }
+.sn-top b { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sn-top em { flex: none; font-style: normal; font-size: 11.5px; font-weight: 600; color: var(--ink-3); }
+.sn-top em.blocked { color: #b45309; }
+.sn-top em.turn { color: var(--accent); }
+.sn-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--cool); }
+.sn-dot.working { background: var(--accent); animation: sidebar-pulse 1.6s infinite; }
+.sn-dot.blocked { background: #f59e0b; }
+.sn-dot.turn { background: var(--accent); }
+.sn-step { padding-left: 15px; font-size: 12.5px; color: var(--ink-2); }
+.sn-step > span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sn-step small { flex: none; font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.sn-step .sn-failed { color: var(--risk); font-weight: 600; }
+.sn-open { grid-column: 2; grid-row: 1 / span 2; font-style: normal; font-size: 15px; color: var(--ink-3); }
+@media (prefers-reduced-motion: reduce) { .sn-dot.working { animation: none; } }
+
 .sidebar-empty { color: var(--ink-3); font-size: 14px; padding: 16px 4px; margin: 0; }
 
 /* ---------- Threads tab ---------- */

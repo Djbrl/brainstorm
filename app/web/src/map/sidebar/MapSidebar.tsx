@@ -7,7 +7,8 @@
 // Files, the file is still there until you let go of it.
 // Below 1100px wide it starts folded and opens over the content (tap outside or ‹ to fold it); on a phone, picking a
 // thread folds it too, and picking a file opens it. That narrow state isn't saved, so the desktop's folded-or-not
-// choice stays as it was.
+// choice stays as it was. T folds and unfolds it anywhere. Folded with a thread open, it's a card with the thread's
+// state and the step it's on (NowCard), except on a phone.
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { AgentPresence, FileNode, ProjectMap } from "@contract";
 import { useNav } from "../../lib/nav";
@@ -15,6 +16,8 @@ import { ThreadsPanel } from "./ThreadsPanel";
 import { TrackPanel } from "./TrackPanel";
 import { FilesPanel } from "./FilesPanel";
 import { FileView, FileViewBack } from "./FileView";
+import { NowCard } from "./NowCard";
+import { isTyping } from "../../switch/shortcuts";
 import "./sidebar.css";
 
 export type MapSidebarProps = {
@@ -95,6 +98,18 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
     addEventListener("keydown", esc, true);
     return () => removeEventListener("keydown", esc, true);
   }, [over]);
+  // T folds or unfolds it (not while typing, nor with a window open over the map).
+  const toggle = useRef(() => {}); toggle.current = () => setCollapsed(!collapsed);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.key !== "t" && e.key !== "T") || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return;
+      if (document.querySelector('[aria-modal="true"], .lightbox')) return;
+      e.preventDefault();
+      toggle.current();
+    };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, []);
   // On a phone, following an agent folds the sheet to show the map. A file opens here instead (see above).
   const fold = <T,>(f: (x: T) => void) => (x: T) => { if (phone) setOver(false); f(x); };
 
@@ -113,8 +128,8 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
   });
   const onScroll = () => { if (viewRef.current === "files" && body.current) treeTop.current = body.current.scrollTop; };
 
-  const tabButton = (
-    <button className="sidebar-collapsed" onClick={() => setCollapsed(false)} aria-label="Open sidebar" aria-expanded={!collapsed}>
+  const tabButton = thread && !phone ? <NowCard onOpen={() => setCollapsed(false)} /> : (
+    <button className="sidebar-collapsed" onClick={() => setCollapsed(false)} aria-label="Open sidebar" aria-expanded={!collapsed} title="Open sidebar (T)">
       <span>{shown === "threads" ? "Threads" : "Files"}</span>
       <i aria-hidden="true">›</i>
     </button>
@@ -132,7 +147,7 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
           <button role="tab" aria-selected={shown === "threads"} onClick={() => setTab("threads")}>Threads</button>
           <button role="tab" aria-selected={shown === "files"} onClick={() => setTab("files")}>Files</button>
         </nav>
-        <button className="sidebar-collapse" onClick={() => setCollapsed(true)} aria-label="Collapse sidebar" title="Collapse">‹</button>
+        <button className="sidebar-collapse" onClick={() => setCollapsed(true)} aria-label="Collapse sidebar" title="Collapse (T)">‹</button>
       </div>
       {viewing && <FileViewBack onBack={() => onCloseFile?.()} />}
       <div className="sidebar-body" ref={body} onScroll={onScroll}>

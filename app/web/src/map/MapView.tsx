@@ -37,7 +37,15 @@ import { GIT_COLOURS, gitFiles, useShowGit, worktreeOf } from "./gitFilter";
 import { drawFile, drawFocusLinks, drawFolderNames, FILE_LABELS_MAX, flushDots, labelFor, lookOf, moreMotion, newCaches, RIPPLE_MS, type Frame } from "./drawNode";
 import { useMapCamera } from "./useMapCamera";
 import { useLiveAgents } from "./useLiveAgents";
+import { Minimap, trackable } from "./Minimap";
+import { useAutoTrack } from "./autoTrack";
+import { setMinimap, useMinimap } from "./prefs";
+import { isTyping } from "../switch/shortcuts";
 import "./map.css";
+
+/** Below this width the map is small (the Claude app's browser pane, a half screen): the camera follows an open
+ *  thread's agent up close by itself, and the minimap shows the whole project. */
+export const SMALL_MAP = 1100;
 
 /** A recording (the hosted demo) or a shared replay: fixed for the page's life, read once (it parses the URL). */
 let replayed: boolean | undefined;
@@ -89,6 +97,8 @@ export function MapView() {
   const [watched, setWatched] = useState<{ key: string; files: string[] }>({ key: "", files: [] });
   const [wrapRef, size] = useSize<HTMLDivElement>();
   const sizeRef = useRef(size); sizeRef.current = size;
+  const small = size.w < SMALL_MAP;
+  const smallRef = useRef(small); smallRef.current = small;
   const fg = useRef<ForceGraphMethods<GNode, never> | undefined>(undefined);
   const tokens = useMemo(readTokens, [theme]);   // each theme sets its own colours (themes.css)
   const tokensRef = useRef(tokens); tokensRef.current = tokens;
@@ -147,10 +157,12 @@ export function MapView() {
 
   // ---- the camera (useMapCamera.ts) ----
   const hasNodes = graph.nodes.length > 0;
-  const { followId, setFollowId, followRef, fitNow, focusOnFile, applyIntent } = useMapCamera({
+  const { followId, setFollowId, refollow, followRef, fitNow, focusOnFile, applyIntent } = useMapCamera({
     cam, camRef, nodeIndex, nodeIndexRef, replayRef, replayActive: replayLayer.active, replay, step, selected, selectedRef, setSelected,
-    resolveId, anim, hasNodes, focusFile, setFocusFile,
+    resolveId, anim, hasNodes, focusFile, setFocusFile, smallRef,
   });
+  // A small map with a thread followed live: the camera follows its agent at work by itself (autoTrack.ts).
+  useAutoTrack({ on: small && !!replay?.live && replayLayer.active, sessionId: replay?.sessionId ?? null, agents: drawnAgents, followId, setFollowId });
 
   // Faint: with a thread open, its agents you aren't watching. Looking back through it (not live), all but the one you
   // follow (the replay's marker is the thread then); one agent on its own (agentFocus), the others.
@@ -165,13 +177,39 @@ export function MapView() {
   // Following one of the thread's agents shows it: the thread follows live again, and its steps show on their own.
   const nav0 = useNavActions();
   const follow = useCallback((id: string | null) => {
-    setFollowId(id);
+    if (id) refollow(id); else setFollowId(null);
     if (!replay) return;
     const a = id ? agents.find((x) => x.id === id) : undefined;
     if (id && a?.sessionId !== replay.sessionId) return;
     focusAgent(nav0, { ...replay, live: true }, state.steps[replay.sessionId], id && a?.isSubagent ? id : null);
     if (id && !replay.live) nav0.setReplayLive(true);
-  }, [replay, agents, state.steps, setFollowId, nav0]);
+  }, [replay, agents, state.steps, setFollowId, refollow, nav0]);
+
+  // ---- the minimap (Minimap.tsx) and its keys: M shows or hides it, A follows the next agent (Shift A, the one before) ----
+  const minimap = useMinimap(small);
+  const tracks = useMemo(() => trackable(drawnAgents), [drawnAgents]);
+  const keysRef = useRef({ small, minimap, tracks, followId, follow }); keysRef.current = { small, minimap, tracks, followId, follow };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target) || document.querySelector('[aria-modal="true"], .lightbox')) return;
+      const k = keysRef.current;
+      if (e.key === "m" || e.key === "M") { e.preventDefault(); setMinimap(k.small, !k.minimap); return; }
+      if ((e.key === "a" || e.key === "A") && k.tracks.length) {
+        e.preventDefault();
+        const i = k.tracks.findIndex((a) => a.id === k.followId), n = k.tracks.length;
+        k.follow(k.tracks[i < 0 ? (e.shiftKey ? n - 1 : 0) : (i + (e.shiftKey ? n - 1 : 1)) % n].id);
+      }
+    };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, []);
+  /** A click or drag on the minimap: look there, by hand (no agent followed any more). */
+  const lookAt = useCallback((x: number, y: number, ms: number) => {
+    setFollowId(null);
+    const c = camRef.current;
+    c.touch();
+    c.lookAt(x, y, undefined, ms);
+  }, [setFollowId]);
 
   // The thread's files in view (its recent window, or all of it) and a followed agent's file open their folders, and
   // keep them open until the thread closes or you stop following: folders don't fold and open again as the window moves.
@@ -525,6 +563,14 @@ export function MapView() {
       {map && <CapNote map={map} />}
       <TalkCard />
       <LensSwitch />
+      {hasNodes && (minimap
+        ? <Minimap graphRef={graphRef} anim={anim} drawnRef={agentsRef} cam={camRef} subject={() => replayRef.current.subject()} agents={tracks} followId={followId} accent={tokens.accent}
+            onTrack={follow} onLook={lookAt} onHide={() => setMinimap(small, false)} />
+        : small && (
+          <button className="minimap-show" onClick={() => setMinimap(small, true)} aria-label="Show the minimap (M)" title="Show the minimap (M)">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="4" width="15" height="12" rx="2.5" /><rect x="10" y="9" width="5" height="4.5" rx="1" /></svg>
+          </button>
+        ))}
 
       <Peek />
       <Dock />

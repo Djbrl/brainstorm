@@ -5,7 +5,7 @@ import type { ThreadReplay } from "../lib/nav";
 import { getCameraLock, setCameraLock } from "./prefs";
 import { replayCamera } from "./replay/store";
 import type { ReplayLayerApi } from "./replay/layer";
-import { boxOf, isFitKey, type Camera, type View } from "./camera";
+import { boxOf, fitView, isFitKey, type Camera, type View } from "./camera";
 import type { AgentAnim } from "./agents";
 import type { GNode } from "./graph";
 
@@ -14,14 +14,19 @@ import type { GNode } from "./graph";
 type Intent = { kind: "fit" } | { kind: "file"; id: string; zoom: boolean } | { kind: "free" };
 
 export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, replayActive, replay, step, selected, selectedRef, setSelected,
-  resolveId, anim, hasNodes, focusFile, setFocusFile }: {
+  resolveId, anim, hasNodes, focusFile, setFocusFile, smallRef }: {
   cam: Camera; camRef: RefObject<Camera>; nodeIndex: Map<string, GNode>; nodeIndexRef: RefObject<Map<string, GNode>>;
   replayRef: RefObject<ReplayLayerApi>; replayActive: boolean; replay: ThreadReplay | null; step: string | null;
   selected: string | null; selectedRef: RefObject<string | null>; setSelected: (id: string | null) => void;
   resolveId: (file: string) => string | undefined; anim: RefObject<Map<string, AgentAnim>>; hasNodes: boolean;
   focusFile: string | null; setFocusFile: (f: string | null) => void;
+  /** A small map (the Claude app's browser pane): a followed agent is framed again sooner, before it reaches the edge. */
+  smallRef: RefObject<boolean>;
 }) {
   const [followId, setFollowId] = useState<string | null>(null);
+  // Following the same agent again (its button on the minimap) frames it again, even after you moved the camera.
+  const [followAt, setFollowAt] = useState(0);
+  const refollow = useCallback((id: string) => { setFollowId(id); setFollowAt((n) => n + 1); }, []);
   // A thread replay takes over the camera: stop following a live agent when one starts.
   useEffect(() => { if (replay) setFollowId(null); }, [replay?.sessionId]);
   const followRef = useRef(followId); followRef.current = followId;
@@ -48,7 +53,8 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
   const applyIntent = useCallback((ms = 600) => {
     const i = intent.current, c = camRef.current;
     if (i.kind === "free" || c.userAt() > intentAt.current) return;
-    if (i.kind === "fit") { if (!lockedOn()) fitAll(ms); return; }
+    // Following an agent, the follow owns the camera (F lets go of it first): no fit takes it back.
+    if (i.kind === "fit") { if (!lockedOn() && !followRef.current) fitAll(ms); return; }
     const n = nodeIndexRef.current.get(i.id);
     if (!n || n.x === undefined || n.y === undefined) return;
     if (i.zoom) c.lookAt(n.x, n.y, 3, ms);
@@ -175,7 +181,8 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
 
   // Follow an agent (from the sidebar), like the tracer: the camera frames it once; locked, it keeps it centred (easing,
   // every frame, no stacked tweens) at whatever zoom you pick; unlocked, it stays where you put it, and frames the agent
-  // again when it leaves the view only if you haven't moved the camera since following began.
+  // again when it leaves the view only if you haven't moved the camera since following began. On a small map, "the view"
+  // is its middle: the agent is framed again once it gets within a fifth of the view of an edge, so it stays readable.
   useEffect(() => {
     if (!followId) return;
     setIntent({ kind: "free" });
@@ -184,15 +191,29 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
     const tick = () => {
       const st = anim.current.get(followId), c = camRef.current, now = performance.now();
       if (st) {
-        if (!framedAt) { framedAt = now; c.lookAt(st.x, st.y, Math.max(2.2, c.view()?.k ?? 0), 700); }
+        if (!framedAt) { framedAt = now; c.lookAt(st.x, st.y, zoomFor(st.file, c), 700); }
         else if (getCameraLock()) { if (now - framedAt > 700) c.easeToward(st.x, st.y, 0.09); }
-        else if (c.userAt() < t0 && now - framedAt > 1200 && !c.sees(st.x, st.y)) { framedAt = now; c.lookAt(st.x, st.y, undefined, 700); }
+        else if (c.userAt() < t0 && now - framedAt > 1200 && !c.sees(st.x, st.y, margin(c))) { framedAt = now; c.lookAt(st.x, st.y, smallRef.current ? zoomFor(st.file, c) : undefined, 700); }
       }
       raf = requestAnimationFrame(tick);
     };
+    // How close: on a big map, close enough to read its files; on a small one, the folder it works in fills the view
+    // (its neighbours named around it), the camera following it from folder to folder.
+    const zoomFor = (file: string, c: Camera) => {
+      const k = c.view()?.k ?? 0;
+      if (!smallRef.current) return Math.max(2.2, k);
+      const n = nodeIndexRef.current.get(file), f = n?.up ?? n;
+      if (f?.x === undefined || f.y === undefined) return Math.max(1.6, k);
+      return fitView(c.safe.current, { x0: f.x - f.r, x1: f.x + f.r, y0: f.y - f.r, y1: f.y + f.r }, { pad: 16, minZoom: 1.1, maxZoom: 2.2 }).k;
+    };
+    const margin = (c: Camera) => {
+      if (!smallRef.current) return 24;
+      const s = c.safe.current;
+      return Math.max(24, Math.min(s.w - s.left - s.right, s.h - s.top - s.bottom) * 0.2);
+    };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [followId, setIntent]);
+  }, [followId, followAt, setIntent]);
   /** A file to zoom to once it's selected (the selected file's effect below does the move). */
   const zoomTo = useRef<string | null>(null);
   const focusOnFile = useCallback((file: string) => {
@@ -269,5 +290,5 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
     else { setIntent({ kind: "fit" }); applyIntent(700); }
   }, [panelFile, setIntent, applyIntent]);
 
-  return { followId, setFollowId, followRef, fitNow, focusOnFile, applyIntent };
+  return { followId, setFollowId, refollow, followRef, fitNow, focusOnFile, applyIntent };
 }

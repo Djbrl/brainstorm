@@ -67,6 +67,7 @@ type Pt = { x: number; y: number; r: number };
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const GLIDE_MS = 650;
 const READ_MS = 1500;
+const READS_SHOWN = 4;      // the files it read lately that keep a dotted line
 const PULSE_MS = 700;
 export const ERROR_RED = "#d93025";
 const ERR_MS = 2600;        // how long the marker stays red
@@ -209,7 +210,32 @@ export function drawAgents(opts: {
         }
       }
 
-      // Reads: a thin line from the marker to the file read and a small ring on it, fading out.
+      // What it read lately: a dotted line from the marker to each of the last few files it read (not the one it stands
+      // on), the newest strongest, until it reads others. Writes are the solid trail above.
+      if (showReads && (!quiet || followId === a.id)) {
+        const reads: string[] = [];
+        for (let i = a.trail.length - 1; i >= 0 && reads.length < READS_SHOWN; i--) {
+          const m = a.trail[i];
+          if (isWrite(m.action)) continue;
+          const id = resolveId(m.file);
+          if (id && id !== key && !reads.includes(id)) reads.push(id);
+        }
+        ctx.setLineDash([2.2 / scale, 3.6 / scale]);
+        ctx.lineCap = "round";
+        ctx.strokeStyle = color;
+        reads.forEach((id, j) => {
+          const n = resolve(id);
+          if (!n) return;
+          const dx = n.x - st.x, dy = n.y - st.y, d = Math.hypot(dx, dy), stop = Math.max(0, d - n.r - 2 / scale);
+          if (stop < 6 / scale) return;
+          ctx.globalAlpha = st.alpha * (0.62 - j * 0.12);
+          ctx.lineWidth = 1.4 / scale;
+          ctx.beginPath(); ctx.moveTo(st.x, st.y); ctx.lineTo(st.x + (dx / d) * stop, st.y + (dy / d) * stop); ctx.stroke();
+        });
+        ctx.setLineDash([]);
+      }
+
+      // A read as it happens: a thin line from the marker to the file read and a small ring on it, fading out.
       st.flashes = st.flashes.filter((f) => t - f.t0 < READ_MS);
       if (showReads && (!quiet || followId === a.id)) for (const f of st.flashes) {
         const id = resolveId(f.file);

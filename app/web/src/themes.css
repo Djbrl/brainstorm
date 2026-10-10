@@ -112,3 +112,4 @@
 @media (prefers-reduced-motion: reduce) {
   :root[data-theme="hologram"] .force-graph-container::after { animation: none; }
 }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .sidebar-now:hover .sn-open { background: var(--hover-2); }

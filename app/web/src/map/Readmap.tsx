@@ -59,6 +59,7 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
   // The Readmap's own camera (graph point (x, y) in the middle, k pixels per graph unit), and what it shows now: the
   // file read (its id) or the whole map (null). A click goes there.
   const view = useRef<View | null>(null);
+  const lastReads = useRef(new Map<string, { n: GNode; at: number }[]>());   // per agent, what it read last
   const shows = useRef<{ id: string | null; x: number; y: number }>({ id: null, x: 0, y: 0 });
 
   useEffect(() => {
@@ -95,8 +96,11 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
         who = drawn.find((a) => a.id === followRef.current && R.whose(a))
           ?? drawn.filter((a) => R.whose(a) && lastReadAt(a) > 0).sort((a, b) => lastReadAt(b) - lastReadAt(a))[0];
         if (who) {
-          const list = readsWithTimes(who, R.resolveId, A?.get(who.id)?.file)
+          let list = readsWithTimes(who, R.resolveId, A?.get(who.id)?.file)
             .map((r) => ({ n: R.at(r.id), at: r.at })).filter((r): r is { n: GNode; at: number } => r.n?.x !== undefined && r.n.y !== undefined);
+          // Its trail keeps its last dozen moves: after a run of edits its reads have left it, and the Readmap stays on
+          // what it read last.
+          if (list.length) lastReads.current.set(who.id, list); else list = lastReads.current.get(who.id) ?? [];
           read = list[0]?.n; others = list.slice(1).map((r) => r.n);
           together = list.filter((r) => list[0].at - r.at <= TOGETHER_MS).map((r) => r.n);
         }
@@ -250,7 +254,7 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, reads, agents,
       // What it shows, in words beside the agents' buttons.
       const words = read && R?.past ? `Read ${together.length > 1 ? `${together.length} files` : baseName(read.file?.path ?? read.id)} at this step`
         : read && who ? `${who.isSubagent ? shortName(who, 16) : "Main agent"} read ${together.length > 1 ? `${together.length} files` : baseName(read.file?.path ?? read.id)}`
-        : who && who.id === followRef.current ? `${who.isSubagent ? shortName(who, 16) : "Main agent"}: nothing read yet` : "The whole project";
+        : who && who.id === followRef.current ? `${who.isSubagent ? shortName(who, 16) : "Main agent"}: no file read yet` : "The whole project";
       if (words !== said && caption.current) { said = words; caption.current.textContent = words; caption.current.title = words; }
     };
     raf = requestAnimationFrame(draw);

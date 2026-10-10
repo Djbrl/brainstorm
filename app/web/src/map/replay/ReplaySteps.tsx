@@ -34,9 +34,10 @@ function tone(b: Beat): string {
   if (b.kind === "summary" || b.step.kind === "text" || b.step.kind === "prompt") return "say";
   return "";
 }
-/** A moment's label and tone, worked out once per beat (a beat is rebuilt when its thread is). */
+/** A moment's label and tone, worked out once per beat (a beat is rebuilt when its thread is). The folded sidebar's
+ *  card (sidebar/NowCard.tsx) says its moments the same way. */
 const rowText = new WeakMap<Beat, { label: string; tone: string }>();
-function textOf(b: Beat) {
+export function textOf(b: Beat) {
   let t = rowText.get(b);
   if (!t) rowText.set(b, (t = { label: injectedLabel(b.step) ?? beatLabel(b), tone: tone(b) }));
   return t;

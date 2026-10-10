@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-force-graph-2d";
 import { hierarchy, pack } from "d3-hierarchy";
 import type { CoworkArea, CoworkEvent, CoworkPage, CoworkSite, CoworkSummary } from "@contract";
-import { AREA_NAME } from "./data";
+import { AREA_NAME, HOME, HOME_NAME } from "./data";
 import { useCamera, type Camera, type View } from "../map/camera";
 import { mapStyle, drawMarker, platform } from "../map/themes";
 import { css, readTokens, recencyRGB } from "../map/color";
@@ -22,7 +22,7 @@ import { useStepWindow } from "../map/prefs";
 
 /** One circle of the places map. */
 export type PNode = NodeObject & {
-  id: string; kind: "area" | "site" | "page"; area: CoworkArea; label: string; r: number; x: number; y: number;
+  id: string; kind: "area" | "site" | "page" | "home"; area: CoworkArea; label: string; r: number; x: number; y: number;
   events: number; changes: number; failed: number; lastTs?: string;
   up?: PNode;
   /** A circle that holds others (an area, a site with pages), drawn as the code map draws a folder. */
@@ -34,7 +34,8 @@ const HOT = "#ff6a3d", RISK = "#d93025";
 const GLIDE_MS = 650;
 const TRAIL = 6;          // the places before the marker's, its trail
 
-const leafR = (events: number) => Math.min(16, 3.2 + Math.sqrt(events) * 1.3);
+const leafR = (events: number) => Math.min(HOME_R, 3.2 + Math.sqrt(events) * 1.3);
+const HOME_R = 22, HOME_EVENTS = ((HOME_R - 3.2) / 1.3) ** 2;   // Your computer: as big as the biggest place
 const short = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 const pageName = (p: CoworkPage) => p.title || p.id.split("|")[1] || p.id;
 
@@ -52,8 +53,10 @@ function layout(data: CoworkSummary): PlacesGraph {
     if (pages.length >= 2) site.children = pages.slice(0, 80).map((p) => ({ id: p.id, kind: "page", area: p.area, label: pageName(p), events: p.events, changes: p.changes, failed: p.failed, lastTs: p.lastTs }));
     (byArea.get(s.area) ?? byArea.set(s.area, []).get(s.area)!).push(site);
   }
+  // Your computer first: where every thread starts and comes back to, a place of its own beside the areas.
   const root: Tree = { id: "places", kind: "area", area: "web", label: "", events: 0, changes: 0, failed: 0,
-    children: [...byArea].map(([area, sites]) => ({ id: `area|${area}`, kind: "area", area, label: AREA_NAME[area], events: 0, changes: 0, failed: 0, children: sites })) };
+    children: [{ id: HOME, kind: "home", area: "local", label: HOME_NAME, events: HOME_EVENTS, changes: 0, failed: 0 },
+      ...[...byArea].map(([area, sites]): Tree => ({ id: `area|${area}`, kind: "area", area, label: AREA_NAME[area], events: 0, changes: 0, failed: 0, children: sites }))] };
   const h = hierarchy(root).sum((d) => (d.children ? 0 : leafR(d.events) ** 2))
     .sort((a, b) => (b.value ?? 0) - (a.value ?? 0) || a.data.label.localeCompare(b.data.label));
   pack<Tree>().radius((d) => leafR(d.data.events)).padding((d) => (d.depth === 0 ? 46 : d.depth === 1 ? 14 : 5))(h);
@@ -74,14 +77,16 @@ function layout(data: CoworkSummary): PlacesGraph {
 /** Which place a cowork event stands on: its page when the page has its own dot, else its site. */
 const placeOf = (e: CoworkEvent, ids: ReadonlySet<string>) => (ids.has(`${e.area}|${e.page}`) ? `${e.area}|${e.page}` : `${e.area}|${e.site}`);
 
-export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0, small, beatOf, cursor, live, letter }: {
+export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0, small, beatOf, beats, cursor, live, letter }: {
   data: CoworkSummary; selected: string | null; highlight: string | null; onSelect: (id: string | null) => void;
   /** Set while the step panel is open on the right. */
   rightInset?: number;
   /** A small map (the Claude app's browser pane): the camera frames the site the thread is in. */
   small: boolean;
-  /** The thread's moment of a step (thread.stepBeat), to place the marker at the replay's cursor. */
+  /** The thread's moment of a step (thread.stepBeat), to place the marker at the replay's cursor; and how many moments
+   *  it has (after its last trip out, it's back on Your computer). */
   beatOf: (stepId: string) => number | undefined;
+  beats: number;
   /** The replay's cursor (a moment), and whether the thread follows live (the marker on its newest place). */
   cursor: number; live: boolean;
   /** The letter on the marker (the thread's). */
@@ -108,15 +113,25 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
   const redraw = useMemo(() => createRedraw(() => { const g = fg.current; if (g) g.zoom(g.zoom()); }), []);
   useEffect(() => () => redraw.stop(), [redraw]);
 
-  // ---- where the thread is: the events up to the cursor (all of them, live), their places in order ----
+  // ---- where the thread is: Your computer, then the places of its events up to the cursor (all of them, live), in
+  // order, back on Your computer for each stretch of work in the code between them (a moment with no event) ----
   const placeAt = useMemo(() => {
     const evs = data.events.map((e) => ({ e, beat: beatOf(e.stepId) ?? Infinity, place: placeOf(e, ids) }));
     return (upTo: number) => {
-      const out: { place: string; e: CoworkEvent }[] = [];
-      for (const x of evs) if (x.beat <= upTo) { if (out[out.length - 1]?.place !== x.place) out.push({ place: x.place, e: x.e }); else out[out.length - 1].e = x.e; }
+      const out: { place: string; e?: CoworkEvent }[] = [{ place: HOME }];
+      const push = (place: string, e?: CoworkEvent) => { const l = out[out.length - 1]; if (l.place !== place) out.push({ place, e }); else if (e) l.e = e; };
+      let prev = -1;
+      for (const x of evs) {
+        if (x.beat > upTo) break;
+        if (prev >= 0 && x.beat - prev > 1) push(HOME);   // moments between two trips out: back in the code
+        push(x.place, x.e);
+        prev = Math.max(prev, x.beat);
+      }
+      const end = Math.min(upTo, beats - 1);
+      if (prev >= 0 && end > prev) push(HOME);
       return out;
     };
-  }, [data, ids, beatOf]);
+  }, [data, ids, beatOf, beats]);
   const now = useMemo(() => placeAt(Infinity), [placeAt]);
   const past = useMemo(() => (live ? null : placeAt(cursor)), [placeAt, cursor, live]);
   const path = past ?? now;                            // the trail the camera and the marker follow
@@ -189,7 +204,7 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
   const active = (hover ? byId.get(hover) : undefined) ?? (highlight ? byId.get(highlight) : undefined) ?? sel ?? undefined;
   // Lit: the place pointed at or picked, what it holds and what holds it. The rest fades.
   const pointed = (n: PNode) => !active || n === active || n.up === active || active.up === n || (active.kind === "page" && n.up === active.up);
-  const lit = (n: PNode) => pointed(n) && (!focus || n.kind === "area" || focus.has(n.id));
+  const lit = (n: PNode) => pointed(n) && (!focus || n.kind === "area" || n.kind === "home" || focus.has(n.id));
   const st = mapStyle();
   const recorded = isReplay();
   useEffect(() => { redraw.kick(); }, [graph, hover, highlight, selected, theme, here, nowAt, focus, size.w, size.h, redraw]);
@@ -197,7 +212,18 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
   const drawNode = (n: PNode, ctx: CanvasRenderingContext2D, scale: number) => {
     const dim = lit(n) ? 1 : 0.35;
     ctx.save();
-    if (n.dir) {
+    if (n.kind === "home") {
+      ctx.globalAlpha = dim;
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+      ctx.fillStyle = st.halo; ctx.fill();
+      ctx.strokeStyle = st.fileInk; ctx.globalAlpha = 0.35 * dim; ctx.lineWidth = 1.4 / scale; ctx.stroke();
+      // A screen: the computer.
+      const w = n.r * 0.9, h = n.r * 0.58;
+      ctx.globalAlpha = 0.55 * dim; ctx.lineWidth = 1.6 / scale; ctx.lineJoin = "round";
+      ctx.beginPath(); ctx.roundRect?.(n.x - w / 2, n.y - h * 0.7, w, h, n.r * 0.08); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(n.x - w * 0.62, n.y + h * 0.45); ctx.lineTo(n.x + w * 0.62, n.y + h * 0.45); ctx.stroke();
+      if (n === sel || n === active) { ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(n.x, n.y, n.r + 4 / scale, 0, Math.PI * 2); ctx.strokeStyle = tokens.accent; ctx.lineWidth = 2 / scale; ctx.stroke(); }
+    } else if (n.dir) {
       ctx.globalAlpha = (n.kind === "area" ? 0.22 : 0.16) * dim;
       ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
       ctx.strokeStyle = st.fileInk; ctx.lineWidth = (n === sel ? 2 : 1) / scale; ctx.stroke();
@@ -229,9 +255,11 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
     const cur = here ? byId.get(here) : undefined;
     if (cur) label(short(cur.label, 40), cur.x, cur.y + cur.r + 4 / scale, 12.5, 700, tokens.accent, 1, true);
     for (const n of g.nodes) if (n.kind === "area") label(n.label, n.x, n.y - n.r - 26 / scale, 17, 750, st.fileInk, 0.42);
+    const home = byId.get(HOME);
+    if (home && home !== cur) label(HOME_NAME, home.x, home.y + home.r + 4 / scale, 12.5, 650, st.fileInk, lit(home) ? 0.85 : 0.4);
     for (const n of g.nodes) if (n.kind === "site" && n.r * scale > 26 && (!focus || focus.has(n.id))) label(short(n.label, 30), n.x, n.y - n.r + 6 / scale, 12.5, 650, st.fileInk, lit(n) ? 0.75 : 0.35);
     for (const n of g.nodes) {
-      if (n.dir || n === cur || (focus && !focus.has(n.id)) || n.r * scale < (n.kind === "page" && !n.up?.dir ? 3 : 5.5)) continue;
+      if (n.dir || n.kind === "home" || n === cur || (focus && !focus.has(n.id)) || n.r * scale < (n.kind === "page" && !n.up?.dir ? 3 : 5.5)) continue;
       label(short(n.label, 32), n.x, n.y + n.r + 3 / scale, n.up?.kind === "site" ? 10.5 : 12, n.up?.kind === "site" ? 500 : 650, n.up?.kind === "site" ? st.fileInkQuiet : st.fileInk, lit(n) ? 1 : 0.4);
     }
     ctx.restore();

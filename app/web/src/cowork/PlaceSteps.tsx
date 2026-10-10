@@ -2,13 +2,14 @@
 // stretch of work in a place, and the same way back through the thread as the Track: the row the thread is at is the
 // highlighted one (its newest while it follows live), scrolling the list moves the thread there (the moment at the
 // list's middle; the map's marker goes with it), and the list follows the replay. A row selects its place on the map,
-// takes the thread there and opens its newest step in the side panel.
+// takes the thread there and opens its newest step in the side panel. Between its trips out, a row for Your computer:
+// the thread back in the code (its first row too, where it starts).
 import { useEffect, useRef, type ReactNode } from "react";
 import { useNavActions, useNavState, useReplayCursor } from "../lib/nav";
 import { useThread } from "../lib/thread";
 import type { CoworkArea } from "@contract";
 import { timeIn } from "../follow/format";
-import { VERB_NAME, placeRuns, placeTitle, placesStore, selectPlace, usePlaces } from "./data";
+import { HOME_NAME, VERB_NAME, placeRuns, placeTitle, placesStore, selectPlace, usePlaces, type PlaceRun } from "./data";
 import "../map/replay/replay.css"; // the row styles (.rp-list, .rp-row) it shares with the replay
 
 const ICON: Record<CoworkArea, ReactNode> = {
@@ -18,6 +19,7 @@ const ICON: Record<CoworkArea, ReactNode> = {
   apps: <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="2.5" width="12" height="11" rx="1.5" /><path d="M2 5.5h12" /></svg>,
 };
 
+const HOME_ICON = <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"><rect x="3" y="3" width="10" height="7" rx="1.2" /><path d="M1.5 12.8h13" /></svg>;
 const USER_MS = 400;   // the list stops following the thread this long after you scroll it (as the Track's does)
 
 export function PlaceSteps() {
@@ -26,14 +28,28 @@ export function PlaceSteps() {
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
   const index = useReplayCursor((c) => c.index);
   const { setReplayIndex, setReplayPlaying, setThreadMode } = useNavActions();
+  // The rows: each stretch in a place, and Your computer before, between and after them (moments with no place: the
+  // code). Each with the moment it starts at and the one a click goes to.
   const runs = data ? placeRuns(data.events) : [];
-  // Each row's moment in the thread (its newest step's), and the row the thread is at.
-  const beatOf = (r: (typeof runs)[number]) => thread?.stepBeat.get(r.last.stepId) ?? thread?.stepBeat.get(r.first.stepId);
+  const beatAt = (id: string) => thread?.stepBeat.get(id);
+  type Row = { run?: PlaceRun; start: number; to: number; moments: number };
+  const rows: Row[] = [];
+  let prev = -1;
+  for (const r of runs) {
+    const first = beatAt(r.first.stepId), last = beatAt(r.last.stepId) ?? first;
+    if (first === undefined || last === undefined) continue;
+    if (first - prev > 1) rows.push({ start: prev + 1, to: prev + 1, moments: first - prev - 1 });
+    rows.push({ run: r, start: first, to: last, moments: 0 });
+    prev = Math.max(prev, last);
+  }
+  const beats = thread?.beats.length ?? 0;
+  if (rows.length && beats - 1 > prev) rows.push({ start: prev + 1, to: prev + 1, moments: beats - 1 - prev });
+  if (rows[0]?.run) rows.unshift({ start: 0, to: 0, moments: 0 });   // every thread starts on Your computer
   let at = -1;
-  if (replay?.live) at = runs.length - 1;
-  else for (let i = 0; i < runs.length; i++) { const b = beatOf(runs[i]); if (b !== undefined && b <= index) at = i; }
+  if (replay?.live) at = rows.length - 1;
+  else for (let i = 0; i < rows.length; i++) if (rows[i].start <= index) at = i;
   const go = (i: number) => {
-    const b = runs[i] ? beatOf(runs[i]) : undefined;
+    const b = rows[i]?.to;
     if (b === undefined) return;
     if (replay?.mode === "footprint") setThreadMode("steps");
     setReplayPlaying(false);
@@ -85,7 +101,21 @@ export function PlaceSteps() {
   const isSel = (r: (typeof runs)[number]) => (holder ? r === holder : atPlace(r.place));
   return (
     <div className="rp-list pl-list" ref={list}>
-      {runs.map((r, i) => {
+      {rows.map((row, i) => {
+        const r = row.run;
+        if (!r) {
+          return (
+            <div key={`home-${row.start}`} data-run={i} className={`rp-row pl-home ${i === at ? "current" : ""} ${i > at ? "todo" : ""}`}>
+              <button className="rp-row-main" onClick={() => go(i)}>
+                <span className="rp-glyph" aria-hidden="true">{HOME_ICON}</span>
+                <span className="rp-row-text">
+                  <span className="rp-row-label">{HOME_NAME}</span>
+                  <span className="rp-row-meta"><span>{i === 0 ? "Starts in the code" : "Back in the code"}{row.moments > 1 ? ` · ${row.moments} moments` : ""}</span></span>
+                </span>
+              </button>
+            </div>
+          );
+        }
         const e = r.last, cur = isSel(r) || i === at, changed = r.verbs.size > 0;
         const title = placeTitle(e) === e.site ? e.site : `${e.site} · ${placeTitle(e)}`;
         return (

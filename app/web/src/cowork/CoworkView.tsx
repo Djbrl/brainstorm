@@ -10,7 +10,7 @@ import { useThread } from "../lib/thread";
 import { initial } from "../map/agents";
 import { MapSidebar } from "../map/sidebar/MapSidebar";
 import { LensSwitch } from "../map/LensSwitch";
-import { eventsAt, placeOfStep, placeTitle, placesStore, selectPlace, useCowork, usePlaces } from "./data";
+import { HOME, eventsAt, placeOfStep, placeTitle, placesStore, selectPlace, useCowork, usePlaces } from "./data";
 import { StepDetail } from "../follow/StepDetail";
 import { pairResults } from "../follow/format";
 import { PlacesMap } from "./PlacesMap";
@@ -80,7 +80,8 @@ export function PlacesView() {
     <div className="map-wrap cw-wrap">
       {data && data.events.length > 0 && (
         <PlacesMap key={replay?.sessionId} data={data} selected={selected} highlight={highlight} rightInset={step ? 440 : 0}
-          onSelect={(id) => selectPlace(id)} small={small} beatOf={beatOf} cursor={cursor} live={!!replay?.live}
+          onSelect={(id) => (id === HOME ? setLens("map") : selectPlace(id))} small={small} beatOf={beatOf} beats={thread?.beats.length ?? 0}
+          cursor={cursor} live={!!replay?.live}
           letter={initial({ name: session?.title ?? "", isSubagent: false })} />
       )}
       <MapSidebar agents={Object.values(state.agents)} accent="#2563eb" followId={null} onFollow={() => setLens("map")} onFocusFile={() => setLens("map")} map={state.map} />

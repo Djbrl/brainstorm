@@ -77,3 +77,8 @@ export const placeTitle = (e: { title?: string; page: string; site: string }) =>
   e.title && e.title !== e.site ? e.title : e.page.replace(/^[^:]+:/, "").replace(e.site, "") || e.site;
 
 export const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+
+/** "Your computer": where a thread is while it works in the code, between its trips out (and where it starts). The places
+ *  map and its list (PlacesMap, PlaceSteps) put it beside the other places. */
+export const HOME = "home";
+export const HOME_NAME = "Your computer";

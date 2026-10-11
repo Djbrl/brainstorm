@@ -1,7 +1,7 @@
 /* Owner: sidebar agent. Floating left sidebar on the map: Threads | Files tabs, collapsible.
    Same frosted sheet as the old .map-agents tracker it replaces. */
 .map-sidebar {
-  position: absolute; left: 24px; top: 120px; bottom: 24px; width: 340px; max-width: calc(100% - 32px);
+  position: absolute; left: 24px; top: var(--sb-top); bottom: auto; height: var(--sb-h); width: 340px; max-width: calc(100% - 32px);
   display: flex; flex-direction: column;
   background: rgba(255,255,255,.86); backdrop-filter: saturate(180%) blur(20px);
   border: 1px solid var(--line); border-radius: 18px;
@@ -19,7 +19,7 @@
 .sidebar-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 14px 14px; }
 
 .sidebar-collapsed {
-  position: absolute; left: 24px; top: 120px; width: 38px; padding: 14px 0 16px;
+  position: absolute; left: 24px; top: var(--sb-top); width: 38px; padding: 14px 0 16px;
   background: rgba(255,255,255,.86); backdrop-filter: saturate(180%) blur(20px);
   border: 1px solid var(--line); border-radius: 14px;
   display: flex; flex-direction: column; align-items: center; gap: 10px;
@@ -84,18 +84,14 @@
 .sidebar-empty { color: var(--ink-3); font-size: 14px; padding: 16px 4px; margin: 0; }
 
 /* ---------- Threads tab ---------- */
-.sidebar-threads-toolbar { display: flex; justify-content: flex-end; padding: 10px 2px 2px; }
-.sidebar-threads-toolbar button { border: 0; background: none; color: var(--accent); font-size: 12.5px; font-weight: 600; padding: 4px 6px; border-radius: 6px; }
-.sidebar-threads-toolbar button:hover { background: var(--accent-soft); }
 
 .sidebar-thread-list { list-style: none; margin: 0; padding: 0; }
 .sidebar-thread { padding: 12px 2px; border-top: 1px solid var(--line); }
 .sidebar-thread:first-child { border-top: 0; }
 .sidebar-thread-head { display: flex; align-items: center; gap: 8px; }
 .sidebar-thread-status { width: 8px; height: 8px; border-radius: 50%; background: var(--cool); flex: none; }
-.sidebar-thread-status.running { background: var(--ok); box-shadow: 0 0 0 3px rgba(31,157,85,.15); }
-.sidebar-thread-title { flex: 1; min-width: 0; font-weight: 600; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sidebar-thread-title { flex: 1 1 auto; }
+.sidebar-thread-status.running { background: var(--accent); box-shadow: 0 0 0 3px rgba(31,157,85,.15); }
+.sidebar-thread-title { flex: 1 1 auto; min-width: 0; font-weight: 600; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Sections of the thread list under quiet labels (Claude Code, Codex, Other projects): small grey words, the caret at the
    right, folding the section; tight rows. */
 .sidebar-thread-group + .sidebar-thread-group { margin-top: 6px; }
@@ -112,9 +108,6 @@
 .sidebar-thread-group .sidebar-thread.selected .sidebar-thread-title { font-weight: 600; }
 .sidebar-thread-project { flex: none; max-width: 96px; font-size: 12px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-thread-head time { color: var(--ink-3); font-size: 12px; white-space: nowrap; }
-.sidebar-thread-actions { display: flex; gap: 8px; margin: 8px 0 0 16px; }
-.sidebar-thread-actions button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 12px; font-size: 12.5px; font-weight: 500; color: var(--ink-2); }
-.sidebar-thread-actions button:hover { color: var(--accent); border-color: var(--accent); }
 
 .sidebar-thread-agents { list-style: none; margin: 10px 0 0 16px; padding: 0; }
 .sidebar-thread-agents li { display: flex; align-items: center; gap: 2px; padding: 4px 0; }
@@ -163,14 +156,10 @@
 /* Threads: click to open (its Track). The open one is a pill; a running one pulses blue. */
 button.sidebar-thread-head { width: calc(100% + 16px); border: 0; background: transparent; padding: 7px 8px; margin: -7px -8px; border-radius: 10px; text-align: left; color: var(--ink); cursor: pointer; box-sizing: border-box; }
 button.sidebar-thread-head:hover { background: #f4f4f7; }
-.sidebar-thread.selected button.sidebar-thread-head { background: var(--accent-soft); }
-.sidebar-thread-status.running { background: var(--accent); }
 .sidebar-thread-head time { font-variant-numeric: tabular-nums; }
 
 /* The sidebar takes the map's height but a margin (Map, Places). */
 .map-wrap, .cw-wrap { --sb-h: calc(100% - 48px); --sb-top: 24px; }
-.map-sidebar { top: var(--sb-top); bottom: auto; height: var(--sb-h); }
-.sidebar-collapsed { top: var(--sb-top); }
 
 /* Title row: the thread (a pill when open) and the eye that shows or hides all its agents. */
 .sidebar-thread-headrow { display: flex; align-items: center; gap: 2px; margin: -7px -8px; border-radius: 10px; }
@@ -183,13 +172,6 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .sidebar-thread-headrow .sidebar-agent-eye { margin-right: 4px; }
 
 /* Folded agents (or folded steps): one compact row. */
-.sidebar-fold { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 10px; padding: 6px 8px; border: 0; border-radius: 10px; background: transparent; text-align: left; color: var(--ink-2); font-size: 12.5px; font-weight: 500; }
-.sidebar-fold:hover { background: #f4f4f7; color: var(--ink); }
-.sidebar-fold-avatars { display: flex; }
-.sidebar-fold-avatars i { width: 18px; height: 18px; border-radius: 50%; display: grid; place-content: center; color: #fff; font-size: 9px; font-weight: 700; font-style: normal; box-shadow: 0 0 0 2px #fff; }
-.sidebar-fold-avatars i + i { margin-left: -5px; }
-.sidebar-fold-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sidebar-fold[aria-expanded="true"] { color: var(--ink); }
 
 /* "Show all 12 threads" under the short list (ThreadsPanel). */
 .sidebar-more { display: block; width: 100%; margin-top: 6px; padding: 8px; border: 0; background: none; color: var(--accent); font-size: 13px; font-weight: 500; text-align: left; border-radius: 10px; }
@@ -206,9 +188,6 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .sidebar-thread-note { margin: 12px 0 0 16px; font-size: 13px; line-height: 1.4; color: #9a5800; font-weight: 600; }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .sidebar-thread-note.blocked { color: #f5b544; }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .sidebar-thread-attn.turn { background: var(--hover); color: var(--ink-2); }
-:root:is([data-theme="prism"], [data-theme="hologram"]) .sidebar-thread-attn.blocked { background: rgba(245,158,11,.18); color: #f5c06a; }
-/* The open thread's places on the Places lens (PlaceSteps): the one list that stays in the sidebar. */
-.sidebar-thread-steps { flex: 1; min-height: 0; margin: 10px -2px 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
 
 /* Dark themes: the amber badge glows on the dark sheet instead of a light chip. */
 :root:is([data-theme="prism"], [data-theme="hologram"]) .sidebar-thread-attn.blocked { background: rgba(245,158,11,.2); color: #ffc56b; }
@@ -267,7 +246,7 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 
 /* The Track tab: the step list scrolls by itself (its scroll moves the tracer), so the body doesn't. */
 .sidebar-body:has(> .sidebar-track) { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
-.sidebar-track { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.sidebar-track { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 /* The open thread's name reads as the page's title, Share and its live state on the same line. */
 .track-head { position: relative; flex: none; display: flex; align-items: flex-start; gap: 10px; margin: 6px 8px 14px; }
 .sidebar-track-title { flex: 1; min-width: 0; margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.25; color: var(--ink);
@@ -278,7 +257,6 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .track-back:hover { background: #f0f0f3; color: var(--ink); }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .track-back:hover { background: var(--hover); }
 /* Looking back through a running thread: a footer floats over the bottom of the steps, the way back to live. */
-.sidebar-track { position: relative; }
 .track-back-live { position: absolute; left: 8px; right: 8px; bottom: 12px; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(0,0,0,.10);
   font-size: 13px; color: var(--ink-2); animation: back-live-in .22s cubic-bezier(.2,.8,.2,1); }
@@ -292,7 +270,6 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .track-share:hover, .track-share[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 .track-head .rp-share-menu { left: 0; right: 0; top: calc(100% + 6px); bottom: auto; width: auto; }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .track-share { background: var(--hover); }
-.sidebar-tabs button:disabled { color: var(--ink-3); opacity: .55; cursor: default; }
 
 /* Files tab, big repos: the map shows a chosen part of the project (see the server's mapper/select.ts). */
 .sidebar-files-note { margin: 2px 2px 10px; font-size: 12.5px; line-height: 1.45; color: var(--ink-3); }

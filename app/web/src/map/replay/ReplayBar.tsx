@@ -37,7 +37,7 @@ const ChapterMarks = memo(function ChapterMarks({ thread }: { thread: Thread }) 
 });
 
 /** Local app: download this thread as a replay file anyone can open, or as a Markdown summary. */
-export function ShareMenu({ sessionId, className = "rp-text" }: { sessionId: string; className?: string }) {
+export function ShareMenu({ sessionId, className = "track-share" }: { sessionId: string; className?: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {

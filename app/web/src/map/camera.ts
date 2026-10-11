@@ -17,7 +17,7 @@ const LEFT = ".map-sidebar:not(.sidebar-overlay), .sidebar-collapsed:not(.at-bot
 const RIGHT = ".map-panel.open";
 const FLOAT_RIGHT = ".map-peek";                         // floats in from the right edge: covers from its left side on
 const TOP = ".lens-switch, .sidebar-now"; // the folded sidebar's card with the thread's step, at the top left
-const BOTTOM = ".dock, .rp-bar, .map-sidebar.pip, .sidebar-collapsed.at-bottom"; // the phone's thread sheet under the map (MapSidebar's pip), or its folded strip
+const BOTTOM = ".dock, .map-sidebar.pip, .sidebar-collapsed.at-bottom"; // the phone's thread sheet under the map (MapSidebar's pip), or its folded strip
 const WATCH = [LEFT, ".map-panel", FLOAT_RIGHT, TOP, BOTTOM].join(", ");
 
 /** Measure the safe area of the canvas living in `host` (the covering elements are looked up in its .map-wrap). */

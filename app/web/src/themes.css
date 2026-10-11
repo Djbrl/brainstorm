@@ -28,14 +28,14 @@
 :root[data-theme="prism"] :is(.sidebar-tabs, .rp-speed, .pl-panel-nav button, .pl-panel-back),
 :root[data-theme="hologram"] :is(.sidebar-tabs, .rp-speed, .pl-panel-nav button, .pl-panel-back) { background: var(--hover); }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .file-view-reveal:hover { background: var(--hover); }
-:root[data-theme="prism"] :is(.sidebar-collapse:hover, .sidebar-agent-eye:hover, .sidebar-agent-main:hover, .sidebar-tree-dir:hover, .sidebar-tree-file:hover, .rp-icon:hover:not(:disabled), .rp-text:hover),
-:root[data-theme="hologram"] :is(.sidebar-collapse:hover, .sidebar-agent-eye:hover, .sidebar-agent-main:hover, .sidebar-tree-dir:hover, .sidebar-tree-file:hover, .rp-icon:hover:not(:disabled), .rp-text:hover) { background: var(--hover-2); }
+:root[data-theme="prism"] :is(.sidebar-collapse:hover, .sidebar-agent-eye:hover, .sidebar-agent-main:hover, .sidebar-tree-dir:hover, .sidebar-tree-file:hover, .rp-icon:hover:not(:disabled)),
+:root[data-theme="hologram"] :is(.sidebar-collapse:hover, .sidebar-agent-eye:hover, .sidebar-agent-main:hover, .sidebar-tree-dir:hover, .sidebar-tree-file:hover, .rp-icon:hover:not(:disabled)) { background: var(--hover-2); }
 :root[data-theme="prism"] .rp-speed button.on, :root[data-theme="hologram"] .rp-speed button.on { background: var(--surface); }
 /* light hovers, pills and code blocks hard-coded elsewhere */
 :root:is([data-theme="prism"], [data-theme="hologram"]) .lens-switch { background: var(--sheet); }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .lens-switch.in-bar { background: var(--hover); }
 :root:is([data-theme="prism"], [data-theme="hologram"]) { --you: var(--hover-2); --you-hover: rgba(160,170,255,.28); }
-:root:is([data-theme="prism"], [data-theme="hologram"]) :is(button.sidebar-thread-head:hover, .sidebar-thread-headrow:hover, .sidebar-fold:hover, .sidebar-more:hover,
+:root:is([data-theme="prism"], [data-theme="hologram"]) :is(button.sidebar-thread-head:hover, .sidebar-thread-headrow:hover, .sidebar-more:hover,
   .rp-ch-head:hover, .rp-m:hover) { background: var(--hover-2); }
 :root:is([data-theme="prism"], [data-theme="hologram"]) :is(.md code, .md-pre, .sd-expand, .sd-glyph) { background: var(--hover); }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .rp-slider input::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--accent) var(--rp-pct), var(--hover-2) var(--rp-pct)); }

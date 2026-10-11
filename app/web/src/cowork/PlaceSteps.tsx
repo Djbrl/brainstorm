@@ -13,7 +13,7 @@ import { injectedLabel } from "../lib/chapters";
 import { useLiveSelector } from "../lib/live";
 import { LinkedLabel } from "../lib/links";
 import { HOME_NAME, placesStore, runWords, selectPlace, usePlaces, type PlaceRun } from "./data";
-import "../map/replay/replay.css"; // the row styles (.rp-list, .rp-row) it shares with the replay
+import "../map/replay/replay.css"; // the row styles (.rp-list, .rp-m) it shares with the replay
 
 
 const USER_MS = 400;   // the list stops following the thread this long after you scroll it (as the Track's does)

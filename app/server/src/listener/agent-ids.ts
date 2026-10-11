@@ -1,7 +1,8 @@
-import { closeSync, openSync, readSync, statSync } from "node:fs";
+import { closeSync, openSync, statSync } from "node:fs";
 import { basename, dirname, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { getSetting, setSetting } from "../core/settings.service";
+import { lineChunks } from "../core/lines";
 
 // Steps stored by older versions have no agent_id: it was live only. Without it, a reloaded thread can't tell parallel
 // subagents apart. This fills it in once, from the subagent logs the steps came from
@@ -13,7 +14,6 @@ export const AGENT_IDS_DONE = "agent_ids_backfilled";
 
 export type AgentIdsResult = { files: number; missing: number; filled: number };
 
-const NL = 0x0a;
 const yieldToLoop = () => new Promise<void>((r) => setImmediate(r));
 
 /** Fill agent_id on stored subagent steps from their logs, a chunk of a file per transaction, yielding in between.
@@ -54,31 +54,9 @@ export async function backfillAgentIds(
       let end: number;
       try { end = Math.min(f.offset, statSync(f.file).size); fd = openSync(f.file, "r"); } catch { result.missing++; continue; }
       result.files++;
-      const buf = Buffer.allocUnsafe(chunkBytes);
-      let pos = 0;
-      let pending: Buffer | null = null;
-      let skipping = false; // inside a line too long to have been stored
-      while (pos < end) {
-        const n = readSync(fd, buf, 0, Math.min(chunkBytes, end - pos), pos);
-        if (n <= 0) break;
-        pos += n;
-        let data = buf.subarray(0, n);
-        if (skipping) {
-          const nl = data.indexOf(NL);
-          if (nl === -1) continue;
-          skipping = false;
-          data = data.subarray(nl + 1);
-        }
-        const work: Buffer = pending ? Buffer.concat([pending, data]) : data;
-        pending = null;
+      for (const lines of lineChunks(fd, { to: end, chunkBytes, maxLineBytes })) {
         const pairs: [string, string][] = [];
-        let s = 0;
-        for (let e = work.indexOf(NL); e !== -1; s = e + 1, e = work.indexOf(NL, s)) {
-          if (e > s && e - s <= maxLineBytes) idsOfLine(work.toString("utf8", s, e), pairs);
-        }
-        const rest = work.subarray(s);
-        if (rest.length > maxLineBytes) skipping = true;
-        else if (rest.length) pending = Buffer.from(rest);
+        for (const l of lines) idsOfLine(l, pairs);
         if (stopped()) return undefined;
         apply(pairs);
         await yieldToLoop();

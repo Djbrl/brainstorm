@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import type { StepKind } from "../shared/contract";
 import { inside, relativeTo } from "../core/paths";
+import { forEachLine } from "../core/lines";
 import type { LogFile, LogSource, NewStep, Scope, Sink, WatchEvents } from "./source";
 import { setAgentName } from "./agent-names";
 import { sanitizeDeep, sanitizeText, TEXT_LIMIT, TOOL_RESULT_LIMIT } from "./text";
@@ -737,71 +738,42 @@ function fileHas(file: string, needle: string): boolean {
 
 /** Every call a file makes that a model record answers (by call id), for a file read from the middle: one pass, a
  * chunk at a time, keeping only the calls `keep` wants (their arguments as logged). */
-function earlierCalls(file: string, keep: (name: string) => boolean): Map<string, Call> {
+export function earlierCalls(file: string, keep: (name: string) => boolean): Map<string, Call> {
   const out = new Map<string, Call>();
-  let fd: number | undefined;
-  try {
-    fd = openSync(file, "r");
-    const buf = Buffer.allocUnsafe(4 * 1024 * 1024);
-    let pos = 0, rest = "";
-    for (;;) {
-      const got = readSync(fd, buf, 0, buf.length, pos);
-      if (got <= 0) break;
-      pos += got;
-      const text = rest + buf.toString("utf8", 0, got);
-      const lines = text.split("\n");
-      rest = lines.pop() ?? "";
-      if (rest.length > 64 * 1024 * 1024) rest = ""; // a giant line: not a call
-      for (const l of lines) {
-        if (!l.includes('"call_id"') || !/"type":"(function_call|custom_tool_call|local_shell_call)"/.test(l)) continue;
-        try {
-          const o = JSON.parse(l) as { timestamp?: string; payload?: any };
-          const p = o.payload ?? {};
-          const name = p.type === "local_shell_call" ? "local_shell" : String(p.name ?? "");
-          const callId = str(p.call_id) ?? str(p.id);
-          if (!callId || !keep(name)) continue;
-          let args: any = p.type === "custom_tool_call" ? p.input : p.type === "local_shell_call" ? p.action : p.arguments;
-          if (p.type === "function_call" && typeof args === "string") { try { args = JSON.parse(args); } catch { /* kept as text */ } }
-          out.set(callId, { name, args, ts: o.timestamp ?? "", turnId: str(p.internal_chat_message_metadata_passthrough?.turn_id) });
-        } catch { /* not a whole line */ }
-      }
-      if (got < buf.length) break;
-    }
-  } catch { /* unreadable: nothing found */ } finally { if (fd !== undefined) closeSync(fd); }
+  forEachLine(file, (l) => {
+    if (!l.includes('"call_id"') || !/"type":"(function_call|custom_tool_call|local_shell_call)"/.test(l)) return;
+    try {
+      const o = JSON.parse(l) as { timestamp?: string; payload?: any };
+      const p = o.payload ?? {};
+      const name = p.type === "local_shell_call" ? "local_shell" : String(p.name ?? "");
+      const callId = str(p.call_id) ?? str(p.id);
+      if (!callId || !keep(name)) return;
+      let args: any = p.type === "custom_tool_call" ? p.input : p.type === "local_shell_call" ? p.action : p.arguments;
+      if (p.type === "function_call" && typeof args === "string") { try { args = JSON.parse(args); } catch { /* kept as text */ } }
+      out.set(callId, { name, args, ts: o.timestamp ?? "", turnId: str(p.internal_chat_message_metadata_passthrough?.turn_id) });
+    } catch { /* not a whole line */ }
+  });
   return out;
 }
 
 /** The first command item in a file, and the start of its turn (for a file read from the middle after a restart). */
-function firstCommandItem(file: string): { ts: string; turnId?: string; turnStart?: string } | null {
-  let fd: number | undefined;
-  try {
-    fd = openSync(file, "r");
-    const buf = Buffer.allocUnsafe(4 * 1024 * 1024);
-    let pos = 0;
-    let rest = "";
-    let turnStart: { id?: string; ts?: string } = {};
-    for (;;) {
-      const got = readSync(fd, buf, 0, buf.length, pos);
-      if (got <= 0) return null;
-      pos += got;
-      const text = rest + buf.toString("utf8", 0, got); // a multibyte character cut at the end only affects that line's text
-      const lines = text.split("\n");
-      rest = lines.pop() ?? "";
-      for (const l of lines) {
-        if (l.includes('"type":"task_started"')) {
-          try { const o = JSON.parse(l); turnStart = { id: o.payload?.turn_id, ts: o.timestamp }; } catch { /* skip */ }
-        } else if (l.includes('"type":"CommandExecution"') && l.includes('"item_completed"')) {
-          try {
-            const o = JSON.parse(l);
-            if (o.payload?.item?.type !== "CommandExecution") continue;
-            const turnId = o.payload?.turn_id;
-            return { ts: o.timestamp, turnId, turnStart: turnId && turnId === turnStart.id ? turnStart.ts : undefined };
-          } catch { /* skip */ }
-        }
-      }
-      if (rest.length > 64 * 1024 * 1024) rest = ""; // a giant line: no item in it
+export function firstCommandItem(file: string): { ts: string; turnId?: string; turnStart?: string } | null {
+  let turnStart: { id?: string; ts?: string } = {};
+  let found: { ts: string; turnId?: string; turnStart?: string } | null = null;
+  forEachLine(file, (l) => {
+    if (l.includes('"type":"task_started"')) {
+      try { const o = JSON.parse(l); turnStart = { id: o.payload?.turn_id, ts: o.timestamp }; } catch { /* skip */ }
+    } else if (l.includes('"type":"CommandExecution"') && l.includes('"item_completed"')) {
+      try {
+        const o = JSON.parse(l);
+        if (o.payload?.item?.type !== "CommandExecution") return;
+        const turnId = o.payload?.turn_id;
+        found = { ts: o.timestamp, turnId, turnStart: turnId && turnId === turnStart.id ? turnStart.ts : undefined };
+        return false;
+      } catch { /* skip */ }
     }
-  } catch { return null; } finally { if (fd !== undefined) closeSync(fd); }
+  });
+  return found;
 }
 
 function collectJsonl(dir: string, out: LogFile[], depth: number) {

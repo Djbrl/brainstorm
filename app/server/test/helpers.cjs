@@ -27,11 +27,13 @@ async function makeListener({ root = "/work/demo-repo", watch = false } = {}) {
   const dbs = new DbService();
   const bus = new BusService();
   const cfg = new ConfigService();
-  const listener = new ListenerService(dbs, bus, gateway, cfg);
+  const { WorkspaceState } = require(dist("core/workspace-state.js"));
+  const state = new WorkspaceState();
+  const listener = new ListenerService(dbs, bus, gateway, cfg, state);
   listener.onModuleInit();
   if (!watch) await listener.watcher.close();
   const t = {
-    listener, dbs, bus, cfg, sent, tmp, projectDir, root,
+    listener, dbs, bus, cfg, state, sent, tmp, projectDir, root,
     /** Steps go out as live activity from now on. */
     live() { listener.ready = true; },
     /** Read what `file` gained; `history` reads it quietly. */

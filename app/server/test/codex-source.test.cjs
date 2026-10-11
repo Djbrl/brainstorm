@@ -382,7 +382,7 @@ test("watching: a new Codex thread is read live; no Codex folder at all is fine"
   const { ListenerService } = require(dist("listener/listener.service.js"));
   const sent = [];
   const dbs = new DbService();
-  const L = new ListenerService(dbs, new BusService(), { broadcast: (m) => sent.push(m) }, new ConfigService());
+  const L = new ListenerService(dbs, new BusService(), { broadcast: (m) => sent.push(m) }, new ConfigService(), new (require(dist("core/workspace-state.js")).WorkspaceState)());
   L.onModuleInit();
   const until = async (cond) => { const e = Date.now() + 10_000; while (!cond()) { if (Date.now() > e) throw new Error("timed out"); await new Promise((r) => setTimeout(r, 20)); } };
   try {

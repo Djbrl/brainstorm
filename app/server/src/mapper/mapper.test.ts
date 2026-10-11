@@ -219,7 +219,7 @@ test("past the cap (RUNDOWN_MAX_FILES): a spread of files, totalFiles counts the
   const svc = new MapperService(
     { on: (ev: string, fn: (p: unknown) => void) => { handlers[ev] = fn; }, emit() {} } as never,
     { broadcast: (m: WsMessage) => sent.push(m) } as never,
-    { defaultRoot: root, claudeProjectsDir: projects } as never,
+    { claudeProjectsDir: projects } as never, { root: root } as never,
   );
   try {
     svc.onModuleInit();
@@ -270,7 +270,7 @@ test("live: changes are batched, imports re-resolve once, new and deleted files 
   const svc = new MapperService(
     { on() {}, emit() {} } as never,
     { broadcast: (m: WsMessage) => sent.push(m) } as never,
-    { defaultRoot: root, claudeProjectsDir: projects } as never,
+    { claudeProjectsDir: projects } as never, { root: root } as never,
   );
   try {
     svc.onModuleInit();
@@ -330,7 +330,7 @@ test("live: changes are batched, imports re-resolve once, new and deleted files 
 test("the map cache keeps a bounded number of roots", async () => {
   const projects = mkdtempSync(join(tmpdir(), "bs-projects-"));
   const roots = Array.from({ length: 6 }, (_, i) => tempRepo({ [`f${i}.ts`]: "" }, false));
-  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { defaultRoot: roots[0], claudeProjectsDir: projects } as never);
+  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { claudeProjectsDir: projects } as never, { root: roots[0] } as never);
   try {
     for (const r of roots) await svc.getMapAsync(r);
     const kept = roots.filter((r) => svc.getCached(r));
@@ -356,7 +356,7 @@ test("imports: C/C++ includes (next to the file, then by path suffix, not system
     "Dockerfile": "FROM node:22\n",
   }, false);
   const projects = mkdtempSync(join(tmpdir(), "bs-projects-"));
-  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { defaultRoot: root, claudeProjectsDir: projects } as never);
+  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { claudeProjectsDir: projects } as never, { root: root } as never);
   try {
     const map = await svc.getMapAsync(root);
     const rel = (p: string) => p.slice(root.length + 1);
@@ -390,7 +390,7 @@ test("odd files a listing can name: a link to /dev/zero, a link out of the proje
   const g = (...a: string[]) => execFileSync("git", ["-C", root, ...a], { stdio: "ignore", env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
   g("init", "-q"); g("add", "src", "big.md"); g("commit", "-q", "-m", "init"); // the links committed, as a clone would bring them
   const projects = mkdtempSync(join(tmpdir(), "bs-projects-"));
-  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { defaultRoot: root, claudeProjectsDir: projects } as never);
+  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { claudeProjectsDir: projects } as never, { root: root } as never);
   try {
     const rss = process.memoryUsage().rss, t0 = Date.now();
     const map = await svc.getMapAsync(root);
@@ -460,7 +460,7 @@ test("live: a link to a folder outside the project, made while watching, maps no
   writeFileSync(join(outside, "secret.md"), "# not yours\n");
   const root = tempRepo({ "src/a.ts": "export const a = 1;\n" }, false);
   const projects = mkdtempSync(join(tmpdir(), "bs-projects-"));
-  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { defaultRoot: root, claudeProjectsDir: projects } as never);
+  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { claudeProjectsDir: projects } as never, { root: root } as never);
   try {
     svc.onModuleInit();
     await svc.getMapAsync(root);
@@ -488,7 +488,7 @@ test("presence: deleting a file or switching project cancels its 60 s 'working o
   const svc = new MapperService(
     { on: (ev: string, fn: (p: unknown) => void) => { handlers[ev] = fn; }, emit() {} } as never,
     { broadcast() {} } as never,
-    { defaultRoot: root, claudeProjectsDir: projects } as never,
+    { claudeProjectsDir: projects } as never, { root: root } as never,
   );
   const timers = () => (svc as unknown as { activeClearTimers: Map<string, unknown> }).activeClearTimers;
   try {
@@ -525,7 +525,7 @@ test("a git repo follows .gitignore alone (plus .git and caches): .github, build
   writeFileSync(join(root, "src/x.gen.ts"), "");
   mkdirSync(join(root, "node_modules/x"), { recursive: true });
   writeFileSync(join(root, "node_modules/x/index.js"), "");
-  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { defaultRoot: root, claudeProjectsDir: projects } as never);
+  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { claudeProjectsDir: projects } as never, { root: root } as never);
   const mapped = () => [...svc.getCached(root)!.byPath.keys()].map((p) => p.slice(root.length + 1)).sort();
   try {
     svc.onModuleInit();
@@ -564,7 +564,7 @@ test("imports: .js names for .ts files, tsconfig paths and baseUrl, Python absol
     "main.go": "package main\n// import \"x/y\"\n",
   }, false);
   const projects = mkdtempSync(join(tmpdir(), "bs-projects-"));
-  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { defaultRoot: root, claudeProjectsDir: projects } as never);
+  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { claudeProjectsDir: projects } as never, { root: root } as never);
   try {
     const map = await svc.getMapAsync(root);
     const from = (f: string) => map.edges.filter((e) => e.from === join(root, f)).map((e) => e.to.slice(root.length + 1)).sort();
@@ -586,7 +586,7 @@ test("imports: an alias without * means that name only, and no tsconfig above th
   writeFileSync(join(root, "src/a.ts"), "import b from '@x/b';\nimport c from 'src/b';\n");
   writeFileSync(join(root, "src/b.ts"), "export default 1;\n");
   const projects = mkdtempSync(join(tmpdir(), "bs-projects-"));
-  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { defaultRoot: root, claudeProjectsDir: projects } as never);
+  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { claudeProjectsDir: projects } as never, { root: root } as never);
   try {
     const map = await svc.getMapAsync(root);
     assert.deepEqual(map.edges.filter((e) => e.from === join(root, "src/a.ts")), []); // the outer tsconfig isn't the project's

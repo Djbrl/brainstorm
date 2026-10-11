@@ -31,7 +31,7 @@ test("boot: history quietly once listening, then live steps; other projects' fol
   const { ConfigService } = require("../dist/core/config.service.js");
   const { ListenerService } = require("../dist/listener/listener.service.js");
   const sent = [];
-  const L = new ListenerService(new DbService(), new BusService(), { broadcast: (m) => sent.push(m) }, new ConfigService());
+  const L = new ListenerService(new DbService(), new BusService(), { broadcast: (m) => sent.push(m) }, new ConfigService(), new (require("../dist/core/workspace-state.js").WorkspaceState)());
   L.onModuleInit();
   await until(() => L.listSessions().length === 2);
   assert.deepEqual(L.listSessions().map((s) => s.id).sort(), ["old", "wt"]);

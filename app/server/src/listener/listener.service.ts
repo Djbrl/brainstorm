@@ -7,6 +7,7 @@ import type { Harness, Session, Step } from "../shared/contract";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";
+import { WorkspaceState } from "../core/workspace-state";
 import { ConfigService } from "../core/config.service";
 import { safely } from "../core/safely";
 import { formerRoots, repoBase, within } from "./moved";
@@ -173,6 +174,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     private bus: BusService,
     private gateway: EventsGateway,
     private cfg: ConfigService,
+    private state: WorkspaceState,
     @Optional() private adapterHost?: HttpAdapterHost,
   ) {}
 
@@ -197,7 +199,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
 
     // Start out scoped to the configured default root (repo root, or MAP_ROOT) until a workspace
     // is explicitly chosen (WorkspaceService then emits "workspace" and we re-scope, see below).
-    this.setRoot(this.cfg.defaultRoot);
+    this.setRoot(this.state.root);
     this.bus.on("workspace", ({ root }) => this.onWorkspaceChanged(root));
     this.bus.on("file-content", (c) => this.commandEdits.fileChanged(c));
     this.bus.on("map-rules", ({ root, ignoredDirs }) => {

@@ -106,7 +106,7 @@ test("titles are stored masked, from a prompt and from a rename; older titles ar
   t.dbs.db.exec(`DELETE FROM settings WHERE key LIKE 'listener:%'; PRAGMA user_version = 0`);
   require(require("./helpers.cjs").dist("core/schema.js")).migrate(t.dbs.db);
   const { ListenerService } = require(require("./helpers.cjs").dist("listener/listener.service.js"));
-  const again = new ListenerService(t.dbs, t.bus, { broadcast() {} }, t.cfg);
+  const again = new ListenerService(t.dbs, t.bus, { broadcast() {} }, t.cfg, t.state);
   again.onModuleInit();
   await again.watcher.close();
   const s1 = titles().find((r) => r.id === "s1");

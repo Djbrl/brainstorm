@@ -80,7 +80,7 @@ test("the worked flag is filled in for a database from before it existed", async
   t.dbs.db.exec(`ALTER TABLE sessions DROP COLUMN worked; PRAGMA user_version = 0`);
   require(dist("core/schema.js")).migrate(t.dbs.db);
   const { ListenerService } = require(dist("listener/listener.service.js"));
-  const again = new ListenerService(t.dbs, t.bus, { broadcast() {} }, t.cfg);
+  const again = new ListenerService(t.dbs, t.bus, { broadcast() {} }, t.cfg, t.state);
   again.onModuleInit();
   await again.watcher.close();
   again.offsets = t.listener.offsets;

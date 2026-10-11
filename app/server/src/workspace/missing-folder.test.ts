@@ -16,11 +16,12 @@ function service(dir: string) {
   const sent: SetupStatus[] = [];
   const kept = new Map<string, string>();
   const settings = { get: (k: string) => kept.get(k) ?? null, set: (k: string, v: string) => kept.set(k, v), delete: (k: string) => kept.delete(k) };
-  const cfg = { defaultRoot: "", claudeProjectsDir: join(dir, "projects"), codexDir: join(dir, "codex"), claude: {} };
+  const cfg = { claudeProjectsDir: join(dir, "projects"), codexDir: join(dir, "codex"), claude: {} };
   const svc = new WorkspaceService(
     { emit() {}, on() {} } as never,
     { broadcast: (m: { type: string; status: SetupStatus }) => { if (m.type === "setup") sent.push(m.status); } } as never,
     cfg as never,
+    { root: "", set() {} } as never,
     { codexProjects: () => new Map(), bringGuest() {} } as never,
     { getCached: () => undefined, isBuilding: () => false } as never,
     settings as never,

@@ -10,6 +10,7 @@ import { inside, real } from "../core/paths";
 import { SettingsService } from "../core/settings.service";
 import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";
+import { WorkspaceState } from "../core/workspace-state";
 import { ConfigService } from "../core/config.service";
 import { ListenerService } from "../listener/listener.service";
 import { claudeProjectDir, folderOf, sanitizeName } from "../listener/moved";
@@ -78,6 +79,7 @@ export class WorkspaceService implements OnModuleInit, OnModuleDestroy {
     private bus: BusService,
     private gateway: EventsGateway,
     private cfg: ConfigService,
+    private state: WorkspaceState,
     private listener: ListenerService,
     private mapper: MapperService,
     private settings: SettingsService,
@@ -295,7 +297,7 @@ export class WorkspaceService implements OnModuleInit, OnModuleDestroy {
   private activate(abs: string) {
     this.root = abs;
     this.missing = null;
-    this.cfg.defaultRoot = abs;
+    this.state.set(abs);
     this.claudeStep = { id: "claude", label: "Connecting to your agents", state: "running" };
     this.anthropicStep = { id: "anthropic", label: "Claude for questions", state: "running" };
 

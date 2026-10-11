@@ -6,6 +6,7 @@ import { basename, dirname, extname, join, relative, resolve, sep } from "node:p
 import type { Edge, FileNode, ProjectMap } from "../shared/contract";
 import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";
+import { WorkspaceState } from "../core/workspace-state";
 import { ConfigService } from "../core/config.service";
 import { DbService } from "../core/db.service";
 import { formerRoots } from "../listener/moved";
@@ -174,15 +175,15 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
   /** An agent's edit to a file not on the map yet: the activity to show once the file joins. */
   private pendingTouches = new Map<string, { sessionId: string; ts: string }>();
 
-  constructor(private bus: BusService, private gateway: EventsGateway, private cfg: ConfigService, @Optional() private dbs?: DbService) {}
+  constructor(private bus: BusService, private gateway: EventsGateway, private cfg: ConfigService, private state: WorkspaceState, @Optional() private dbs?: DbService) {}
 
   onModuleInit() {
     // Build + watch the default root right away (in the background) so live updates and the reader have something to work with.
-    const root = resolve(this.cfg.defaultRoot);
+    const root = resolve(this.state.root);
     this.activeRoot = root;
     // No project chosen yet (the plugin's placeholder doesn't exist): nothing to build or watch until one is.
     if (existsSync(root)) this.ensure(root).then((c) => { if (this.activeRoot === root) this.startWatch(root, c); }).catch((e) => this.log.warn(`map build failed for ${root}: ${(e as Error).message}`));
-    this.bus.on("file-touched", ({ path, sessionId, ts }) => this.onFileTouched(this.cfg.defaultRoot, path, sessionId, ts));
+    this.bus.on("file-touched", ({ path, sessionId, ts }) => this.onFileTouched(this.state.root, path, sessionId, ts));
     this.bus.on("workspace", ({ root }) => { this.switchRoot(root).catch((e) => this.log.warn(`switching the map to ${root} failed: ${(e as Error).message}`)); });
   }
 

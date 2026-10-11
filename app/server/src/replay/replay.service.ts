@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { ListenerService } from "../listener/listener.service";
 import { MapperService } from "../mapper/mapper.service";
 import { AskService } from "../ask/ask.service";
+import { WorkspaceState } from "../core/workspace-state";
 import { ConfigService } from "../core/config.service";
 import { WorkspaceService } from "../workspace/workspace.service";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -25,7 +26,7 @@ function actionOf(step: Step): string | undefined {
 // Builds replays: the hosted demo's export (GET /api/replay) and shared replays (GET /api/share).
 @Injectable()
 export class ReplayService {
-  constructor(private listener: ListenerService, private mapper: MapperService, private askService: AskService, private cfg: ConfigService, private workspace: WorkspaceService) {}
+  constructor(private listener: ListenerService, private mapper: MapperService, private askService: AskService, private cfg: ConfigService, private state: WorkspaceState, private workspace: WorkspaceService) {}
 
   /** Which subagent wrote each log line: uuid → {agentId, name}, from Claude Code's subagents/agent-<id>.jsonl (+ .meta.json). */
   private subagentIndex(sessionId: string): Map<string, { id: string; name: string }> {
@@ -80,7 +81,7 @@ export class ReplayService {
       : all.filter((s) => wanted.includes(s.id));
     const steps = sessions.flatMap((s) => this.listener.listSteps(s.id)).filter((st) => !until || st.ts <= until);
     // The open project only (or the same folder written another way): never a walk of any folder a link names.
-    const map = await this.mapper.getMapAsync(share ? share.mapRoot : root && resolve(root) === resolve(this.cfg.defaultRoot) ? root : this.cfg.defaultRoot);
+    const map = await this.mapper.getMapAsync(share ? share.mapRoot : root && resolve(root) === resolve(this.state.root) ? root : this.state.root);
     const answers = this.askService.listAnswers();
     const cowork = Object.fromEntries(sessions.map((s) => [s.id, summarizePlaces([s.id], (id) => steps.filter((st) => st.sessionId === id))])); // Places, for the hosted demo
     const base: Replay = { exportedAt: until ?? new Date().toISOString(), sessions: sessions.map((s) => ({ ...s, status: "idle" })), steps, map: { ...map, files: map.files.map(({ activeSessionId: _a, ...f }) => f) }, answers, cowork };

@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import type { AskRequest, AskResponse, Step } from "../shared/contract";
 import { DbService } from "../core/db.service";
+import { WorkspaceState } from "../core/workspace-state";
 import { ConfigService } from "../core/config.service";
 import { ListenerService } from "../listener/listener.service";
 import { ClaudeService } from "../llm/claude.service";
@@ -44,6 +45,7 @@ export class AskService {
   constructor(
     private dbs: DbService,
     private cfg: ConfigService,
+    private state: WorkspaceState,
     private listener: ListenerService,
     private claude: ClaudeService,
     private usage: UsageService,
@@ -59,9 +61,9 @@ export class AskService {
     const stepId = text(req.stepId);
     const step: Step | undefined = stepId ? this.safe(() => this.listener.getStep(stepId)) : undefined;
     let filePath = text(req.filePath) ?? step?.filePath;
-    if (filePath && !isAbsolute(filePath)) filePath = resolve(this.cfg.defaultRoot, filePath);
+    if (filePath && !isAbsolute(filePath)) filePath = resolve(this.state.root, filePath);
     // Only a file of the project or of a thread's folder goes to the model, never any other file on the disk.
-    const roots = [this.cfg.defaultRoot, ...this.listener.listSessions().map((s) => s.cwd)].filter((r): r is string => !!r && !tooBroad(r));
+    const roots = [this.state.root, ...this.listener.listSessions().map((s) => s.cwd)].filter((r): r is string => !!r && !tooBroad(r));
     if (filePath && !insideAny(filePath, roots)) filePath = undefined;
     const content = filePath ? this.safe(() => readFileSync(filePath!, "utf8")) : undefined;
     const fileHash = content !== undefined ? createHash("sha1").update(content).digest("hex") : "";
@@ -74,7 +76,7 @@ export class AskService {
       .get(question, target, text(req.filePath) ?? "", fileHash) as { response: string } | undefined;
     if (cached) return JSON.parse(cached.response) as AskResponse;
 
-    const user = maskSecrets(this.buildContext(question, step, filePath, content, this.cfg.defaultRoot));
+    const user = maskSecrets(this.buildContext(question, step, filePath, content, this.state.root));
 
     let res: AskResponse;
     try {
@@ -106,7 +108,7 @@ export class AskService {
 
   private buildContext(question: string, step: Step | undefined, filePath: string | undefined, content: string | undefined, root?: string): string {
     const parts: string[] = [];
-    const base = root ?? this.cfg.defaultRoot;
+    const base = root ?? this.state.root;
     const rel = filePath ? relative(base, filePath) : undefined;
 
     if (step) {

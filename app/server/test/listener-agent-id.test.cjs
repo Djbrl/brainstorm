@@ -162,7 +162,7 @@ test("only the part of a log that was stored is read, and a listener runs the pa
 
   const { ListenerService } = require(dist("listener/listener.service.js"));
   const start = async () => {
-    const l = new ListenerService(t.dbs, t.bus, { broadcast() {} }, t.cfg);
+    const l = new ListenerService(t.dbs, t.bus, { broadcast() {} }, t.cfg, t.state);
     l.onModuleInit();
     await l.watcher.close();
     await l.agentIdsDone;

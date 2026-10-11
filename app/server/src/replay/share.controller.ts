@@ -10,7 +10,7 @@ import { forSharing, slug } from "./privacy";
 import { slimMap } from "./slim";
 import { UsageService } from "../usage/usage.service";
 import { config } from "../core/config";
-import { ConfigService } from "../core/config.service";
+import { WorkspaceState } from "../core/workspace-state";
 import { shareMapRoot, within } from "./share-root";
 
 const PLACEHOLDER = "<!--rundown:replay-->";
@@ -35,13 +35,13 @@ const escHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<":
 // Sharing a thread: GET /api/share (one .html file anyone can open) and GET /api/export.md (a report).
 @Controller()
 export class ShareController {
-  constructor(private listener: ListenerService, private replays: ReplayService, private usage: UsageService, private cfg: ConfigService) {}
+  constructor(private listener: ListenerService, private replays: ReplayService, private usage: UsageService, private state: WorkspaceState) {}
 
   /** The thread to share: the one asked for, or the newest one working in the open project (not one from another
    *  project that only visited it). */
   private pick(sessionId?: string): Session {
     const id = sessionId?.split(",")[0];
-    const s = id ? this.listener.getSession(id) : this.listener.listSessions().find((t) => [t.cwd, t.home].some((f) => f && within(f, this.cfg.defaultRoot)));
+    const s = id ? this.listener.getSession(id) : this.listener.listSessions().find((t) => [t.cwd, t.home].some((f) => f && within(f, this.state.root)));
     if (!s) throw new HttpException(id ? `No thread ${id}` : "No thread in this project to share yet", 404);
     return s;
   }
@@ -50,7 +50,7 @@ export class ShareController {
    *  secrets masked, no screenshots. */
   async sharedReplay(session: Session): Promise<Replay> {
     const steps = this.listener.listSteps(session.id);
-    const raw = await this.replays.build(session.id, undefined, undefined, undefined, undefined, undefined, { mapRoot: shareMapRoot(session, steps, this.cfg.defaultRoot) });
+    const raw = await this.replays.build(session.id, undefined, undefined, undefined, undefined, undefined, { mapRoot: shareMapRoot(session, steps, this.state.root) });
     const answers: Replay["answers"] = []; // a shared file carries no Ask answers: they were asked here, about this machine
     const shared = { title: session.title || "Untitled thread", createdAt: new Date().toISOString(), version: config.version ?? "dev" };
     const map = raw.map && slimMap(raw.map, raw.steps);

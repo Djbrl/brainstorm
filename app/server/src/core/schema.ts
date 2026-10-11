@@ -77,6 +77,11 @@ const MIGRATIONS: ((db: DatabaseSync) => void)[] = [
       db.prepare(`UPDATE sessions SET last_event_at = ? WHERE julianday(last_event_at) > julianday(?)`).run(now, now);
     }
   },
+  // 2. Step.isError, a column of its own: set at ingestion from now on; older rows had it only as input.isError.
+  (db) => {
+    if (!columns(db, "steps").includes("is_error")) db.exec(`ALTER TABLE steps ADD COLUMN is_error INTEGER NOT NULL DEFAULT 0`);
+    db.exec(`UPDATE steps SET is_error = 1 WHERE kind = 'tool_result' AND input IS NOT NULL AND json_valid(input) AND json_extract(input, '$.isError') = 1`);
+  },
 ];
 
 /** The number of migrations: a database at this user_version is up to date. */

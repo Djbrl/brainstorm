@@ -24,6 +24,8 @@ test("the steps JSON is byte for byte the serialized step objects, and afterSeq 
   await t.readNow(f, true);
   const L = t.listener;
   const steps = L.listSteps("s1");
+  assert.equal(steps.find((s) => s.id.startsWith("err-1")).isError, true); // Step.isError, set at ingestion
+  assert.equal(steps.filter((s) => s.isError).length, 1);
   L.updateStep(steps[1].id, { label: "Ran a command", risk: ["touches auth", odd] });
   L.updateStep(steps[0].id, { label: "" });
   // Rows written by older versions or other paths: odd stored values.

@@ -291,8 +291,8 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     db.function("step_reads", { deterministic: true }, (tool, input, cwd) => readsJson(tool as string | null, input as string | null, cwd as string | null));
     return {
       insertStep: db.prepare(
-        `INSERT OR IGNORE INTO steps (id, session_id, seq, ts, kind, text, tool, input, file_path, diff, label, risk, is_subagent, tool_use_id, agent_id)
-         VALUES (@id, @session_id, @seq, @ts, @kind, @text, @tool, @input, @file_path, @diff, @label, @risk, @is_subagent, @tool_use_id, @agent_id)`,
+        `INSERT OR IGNORE INTO steps (id, session_id, seq, ts, kind, text, tool, input, file_path, diff, label, risk, is_subagent, tool_use_id, agent_id, is_error)
+         VALUES (@id, @session_id, @seq, @ts, @kind, @text, @tool, @input, @file_path, @diff, @label, @risk, @is_subagent, @tool_use_id, @agent_id, @is_error)`,
       ),
       sessionRow: db.prepare(`SELECT * FROM sessions WHERE id = ?`),
       insertSession: db.prepare(`INSERT INTO sessions (id, cwd, title, started_at, last_event_at, custom_title, title_set, worked, harness) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`),
@@ -802,6 +802,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       is_subagent: step.isSubagent ? 1 : 0,
       tool_use_id: step.toolUseId ?? null,
       agent_id: step.agentId ?? null,
+      is_error: step.isError ? 1 : 0,
     });
     this.upsertSession(b, step.sessionId, harness, opts?.cwd ?? "", step.ts, opts?.promptTitle, step.kind === "tool_call" || step.kind === "edit");
     // A thread working elsewhere that touches this project's files: from now on it's a visitor here.
@@ -1010,6 +1011,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       isSubagent: !!row.is_subagent,
       ...(row.agent_id ? { agentId: row.agent_id } : {}),
       ...(row.tool_use_id ? { toolUseId: row.tool_use_id } : {}),
+      ...(row.is_error ? { isError: true } : {}),
       ...readsOf(row.tool, row.input, this.cwdOf(row.session_id)),
     };
   }
@@ -1076,6 +1078,7 @@ function inStoredOrder(s: NewStep, seq: number): Step {
   out.isSubagent = !!s.isSubagent;
   if (s.agentId) out.agentId = s.agentId;
   if (s.toolUseId) out.toolUseId = s.toolUseId;
+  if (s.isError) out.isError = true;
   return out as Step;
 }
 
@@ -1094,6 +1097,7 @@ const STEP_JSON = `'{"id":' || ${jq("id")} || ',"sessionId":' || ${jq("session_i
   || ',"isSubagent":' || CASE WHEN is_subagent THEN 'true' ELSE 'false' END
   || CASE WHEN agent_id IS NOT NULL AND agent_id != '' THEN ',"agentId":' || ${jq("agent_id")} ELSE '' END
   || CASE WHEN tool_use_id IS NOT NULL AND tool_use_id != '' THEN ',"toolUseId":' || ${jq("tool_use_id")} ELSE '' END
+  || CASE WHEN is_error THEN ',"isError":true' ELSE '' END
   || coalesce(',"reads":' || step_reads(tool, input, (SELECT cwd FROM sessions WHERE sessions.id = steps.session_id)), '') || '}'`;
 
 /**

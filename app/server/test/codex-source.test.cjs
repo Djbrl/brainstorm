@@ -100,6 +100,7 @@ test("a Codex thread end to end: prompt, reply, read, command, search, edits, MC
   assert.equal(bash.input.command, "npm test");
   const failed = resultOf(ss, bash);
   assert.deepEqual(failed.input, { isError: true, toolUseId: bash.toolUseId });
+  assert.equal(failed.isError, true);
   assert.match(failed.text, /^Exit code 1\n1 failing/);
 
   const grep = calls(ss).find((x) => x.tool === "Grep");

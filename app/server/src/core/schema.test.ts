@@ -15,6 +15,8 @@ test("a database from before the migrations (the oldest shape, no user_version) 
   db.exec(`CREATE TABLE listener_offsets (file TEXT PRIMARY KEY, offset INTEGER NOT NULL)`);
   db.exec(`INSERT INTO sessions (id, cwd, title, started_at, last_event_at) VALUES ('a', '/r', 't', '2026-01-01', '2026-01-01'), ('b', '/r', 't', '2026-01-01', '2026-01-01')`);
   db.exec(`INSERT INTO steps (id, session_id, seq, ts, kind) VALUES ('a1', 'a', 0, '2026-01-01', 'edit'), ('b1', 'b', 0, '2026-01-01', 'prompt')`);
+  db.exec(`INSERT INTO steps (id, session_id, seq, ts, kind, input) VALUES ('a2', 'a', 1, '2026-01-01', 'tool_result', '{"isError":true,"toolUseId":"t"}'),
+    ('a3', 'a', 2, '2026-01-01', 'tool_result', 'not json'), ('a4', 'a', 3, '2026-01-01', 'tool_result', NULL)`);
   migrate(db);
   assert.equal(version(db), SCHEMA_VERSION);
   assert.ok(["worked", "harness"].every((c) => cols(db, "sessions").includes(c)));
@@ -22,6 +24,8 @@ test("a database from before the migrations (the oldest shape, no user_version) 
   assert.ok(["ino", "head"].every((c) => cols(db, "listener_offsets").includes(c)));
   assert.deepEqual(db.prepare("SELECT id, worked, harness FROM sessions ORDER BY id").all().map((r) => ({ ...r })),
     [{ id: "a", worked: 1, harness: "claude" }, { id: "b", worked: 0, harness: "claude" }]);
+  // Step.isError from what older rows kept in input.isError.
+  assert.deepEqual(db.prepare("SELECT id FROM steps WHERE is_error = 1").all().map((r) => r.id), ["a2"]);
   for (const t of ["settings", "source_versions", "ask_answers", "attention_hooks", "task_shots", "task_shot_files"]) assert.ok(cols(db, t).length, t);
   db.exec(`UPDATE sessions SET harness = NULL WHERE id = 'b'`);
   migrate(db); // up to date: nothing runs again

@@ -28,6 +28,9 @@ function shareTemplate(): string | null {
   return null;
 }
 
+/** The shared file's name, from the shared title (secrets, home, names already masked): the name leaves with the file. */
+const fileName = (replay: Replay, session: Session) => `rundown-${slug(replay.shared?.title ?? "")}-${session.startedAt.slice(0, 10)}`;
+
 const escHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
 // Owned by the lead. Sharing a thread: GET /api/share (one .html file anyone can open) and GET /api/export.md (a report).
@@ -44,14 +47,12 @@ export class ShareController {
     return s;
   }
 
-  /** A replay of one thread for someone else: only this thread, its answers, the part of the map it touched (slim.ts),
+  /** A replay of one thread for someone else: only this thread (no Ask answers), the part of the map it touched (slim.ts),
    *  secrets masked, no screenshots. */
   sharedReplay(session: Session): Replay {
     const steps = this.listener.listSteps(session.id);
     const raw = this.replays.build(session.id, undefined, undefined, undefined, undefined, undefined, { mapRoot: shareMapRoot(session, steps, this.cfg.defaultRoot) });
-    const stepIds = new Set(raw.steps.map((s) => s.id));
-    const touched = new Set(raw.steps.map((s) => s.filePath).filter(Boolean) as string[]);
-    const answers = raw.answers.filter((a) => (a.request.stepId ? stepIds.has(a.request.stepId) : !!a.request.filePath && touched.has(a.request.filePath)));
+    const answers: Replay["answers"] = []; // a shared file carries no Ask answers: they were asked here, about this machine
     const shared = { title: session.title || "Untitled thread", createdAt: new Date().toISOString(), version: env("VERSION") ?? "dev" };
     const map = raw.map && slimMap(raw.map, raw.steps);
     return forSharing({ ...raw, map, answers, shared });
@@ -61,7 +62,7 @@ export class ShareController {
     const session = this.pick(sessionId);
     const replay = this.sharedReplay(session);
     this.usage.bump("sh");
-    const name = `rundown-${slug(session.title)}-${session.startedAt.slice(0, 10)}`;
+    const name = fileName(replay, session);
     if (format === "json") {
       res.setHeader("Content-Disposition", `attachment; filename="${name}.json"`);
       return res.json(replay);
@@ -87,7 +88,7 @@ export class ShareController {
     const steps: Step[] = replay.steps;
     const md = threadMarkdown(replay.sessions[0] ?? session, steps, replay.map, replay.failures ?? []);
     res.setHeader("Content-Type", "text/markdown; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="rundown-${slug(session.title)}-${session.startedAt.slice(0, 10)}.md"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName(replay, session)}.md"`);
     return res.send(md);
   }
 }

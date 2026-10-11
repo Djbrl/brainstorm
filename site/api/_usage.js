@@ -58,6 +58,10 @@ function pathnameFor(r, country, day) {
   return `usage/${day}/${r.id}_${r.kind}_${country}_${r.v}_${r.os}_${r.tm}_${counts}.json`;
 }
 
+/** The per-install index: one empty file per install per day, so deleting an install's reports lists usage-index/<id>/ (a few
+ * names) instead of every report ever sent. */
+const indexPathFor = (id, day) => `usage-index/${id}/${day}.json`;
+
 function parsePathname(p) {
   const m = /^usage\/(\d{4}-\d{2}-\d{2})\/([0-9a-f-]{36})_(new|day)_([A-Z]{2})_(\d{1,3}\.\d{1,3}\.\d{1,3})_([a-z0-9]+)_([a-z0-9]+)_([a-z0-9-]+)\.json$/.exec(p);
   if (!m) return null;
@@ -119,4 +123,4 @@ function aggregate(records, today, days = 30) {
   };
 }
 
-module.exports = { KEYS, sameOrigin, blobAuth, blobHeaders, validate, countryOf, pathnameFor, parsePathname, aggregate, dayOf };
+module.exports = { KEYS, sameOrigin, blobAuth, blobHeaders, validate, countryOf, pathnameFor, indexPathFor, parsePathname, aggregate, dayOf };

@@ -12,7 +12,7 @@ One static file, `index.html`. No build step. Preview with `python3 -m http.serv
 
 **Project variables (Vercel):** `UNSUBSCRIBE_SECRET` (any long random string: signs the unsubscribe and confirm links and fingerprints unsubscribed addresses; never change it once the list exists), `RESEND_API_KEY` and `RESEND_FROM` (the confirmation email's sender, as in `tools/release-email.mjs`), `CRON_SECRET` (the same for the daily retention job), `STATS_TOKEN` (the admin page). Set one with `vercel env add UNSUBSCRIBE_SECRET production`.
 
-**Usage stats retention:** `vercel.json` runs `api/usage-prune.js` every day; it deletes reports older than 13 months. `api/usage-forget.js` deletes one install's reports The same job forgets signups nobody confirmed within 30 days (Settings → Delete the stats already sent).
+**Usage stats retention:** `vercel.json` runs `api/usage-prune.js` every day; it deletes reports older than 13 months. `api/usage-forget.js` deletes one install's reports (found through the per-install index `usage-index/<id>/<day>.json` that `api/usage.js` writes with each report; run `tools/index-usage.mjs` once to index older reports) The same job forgets signups nobody confirmed within 30 days (Settings → Delete the stats already sent).
 
 **Sending the release email:** with Resend, from `tools/release-email.mjs` (setup and commands at the top of that file): a dry run by default, `--test you@example.com` for one copy, `--yes` to send to everyone. Each message gets its own unsubscribe link and the one-click unsubscribe headers; unsubscribing (`unsubscribe.html` → `api/unsubscribe.js`) deletes the address. It goes to confirmed addresses only. The message is `tools/release-email.html`. Never commit a recipients CSV.
 

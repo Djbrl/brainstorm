@@ -17,10 +17,12 @@ module.exports = async (req, res) => {
   try {
     // usage/<YYYY-MM-DD>/…: the day is in the name, compared as text.
     const old = (await listAll(auth, "usage/")).filter((b) => { const day = b.pathname.split("/")[1] || ""; return /^\d{4}-\d{2}-\d{2}$/.test(day) && day < cutoff; });
+    // usage-index/<id>/<YYYY-MM-DD>.json: the same cut-off.
+    const oldIndex = (await listAll(auth, "usage-index/")).filter((b) => { const day = (b.pathname.split("/")[2] || "").slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(day) && day < cutoff; });
     // Signups nobody confirmed within a month are forgotten (waitlist/pending/, see _waitlist.js).
     const stale = Date.now() - PENDING_DAYS * 86_400_000;
     const pending = (await listAll(auth, "waitlist/pending/")).filter((b) => Date.parse(b.uploadedAt) < stale);
-    await deleteAll(auth, [...old, ...pending].map((b) => b.url));
+    await deleteAll(auth, [...old, ...oldIndex, ...pending].map((b) => b.url));
     return res.status(200).json({ ok: true, cutoff, deleted: old.length, pendingDeleted: pending.length });
   } catch (e) {
     console.error("usage-prune:", e.message);

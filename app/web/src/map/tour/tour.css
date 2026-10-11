@@ -20,8 +20,8 @@
 .tour-actions button { font: inherit; font-size: 13.5px; font-weight: 600; border-radius: 999px; padding: 8px 14px; border: 0; cursor: pointer; }
 .tour-primary { background: var(--accent); color: #fff; }
 .tour-primary:hover { filter: brightness(1.08); }
-.tour-quiet { background: #f0f0f3; color: var(--ink); }
-.tour-quiet:hover { background: #e7e7ec; }
+.tour-quiet { background: var(--fill); color: var(--ink); }
+.tour-quiet:hover { background: var(--fill-active); }
 .tour-skip { background: none; color: var(--ink-3); padding-inline: 8px !important; }
 .tour-skip:hover { color: var(--ink); }
 .tour-link { font-size: 13px; color: var(--ink-3); margin-right: 4px; }
@@ -42,7 +42,6 @@
 @media (prefers-reduced-motion: reduce) { .tour-card, .tour-ring { animation: none; transition: none; } }
 
 /* Dark map themes. */
-:root:is([data-theme="prism"], [data-theme="hologram"]) .tour-quiet { background: var(--hover); color: var(--ink); }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .tour-card { box-shadow: 0 18px 50px rgba(0,0,0,.5); }
 /* Their accent is a light blue: dark text on it reads, white didn't. */
 :root:is([data-theme="prism"], [data-theme="hologram"]) .tour-primary { color: #0b1020; }

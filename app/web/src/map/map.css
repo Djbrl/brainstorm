@@ -16,7 +16,7 @@
 
 
 .map-panel:focus { outline: none; } /* focused as a whole when a step opens from the list (StepPanel): its contents show it */
-.map-panel { position: absolute; top: 0; right: 0; bottom: 0; width: 440px; max-width: 100%; z-index: 4;
+.map-panel { position: absolute; top: 0; right: 0; bottom: 0; width: var(--panel-w); max-width: 100%; z-index: 4;
   background: rgba(255,255,255,.94); backdrop-filter: saturate(180%) blur(24px);
   border-left: 1px solid var(--line); box-shadow: -20px 0 60px rgba(0,0,0,.05); overflow-y: auto;
   /* Closing: it slides out with what it showed and fades as it goes, then leaves the page (no empty sheet left behind). */
@@ -26,23 +26,20 @@
   transition: transform .38s cubic-bezier(.2,.8,.2,1), opacity .16s ease-out, visibility 0s; }
 @media (prefers-reduced-motion: reduce) { .map-panel, .map-panel.open { transition: opacity .15s, visibility 0s linear .15s; transform: none; } .map-panel.open { transition-delay: 0s; } }
 
-/* The step panel on the right (StepPanel, and Places' place panel): its header with ‹ › and the step view. */
+/* The step panel on the right (StepPanel, on the Map and in Places): Back, Places' header with ‹ ›, and the step view. */
 .pl-panel { overflow: hidden; display: flex; flex-direction: column; z-index: 4; }
 .pl-panel .sd { flex: 1; min-height: 0; border-left: 0; background: transparent; animation: none; }
 .pl-panel-nav { display: flex; align-items: center; gap: 8px; padding: 14px 20px 0 36px; font-size: 12.5px; color: var(--ink-3); flex: none; }
 .pl-panel-nav span:first-child { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--ink-2); }
 .pl-panel-count { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.pl-panel-nav button { width: 26px; height: 26px; border-radius: 50%; border: 0; background: #f0f0f3; color: var(--ink-2); font-size: 16px; line-height: 1; }
-.pl-panel-nav button:hover:not(:disabled) { background: #e7e7ec; color: var(--ink); }
+.pl-panel-nav button { width: 26px; height: 26px; border-radius: 50%; border: 0; background: var(--fill); color: var(--ink-2); font-size: 16px; line-height: 1; }
+.pl-panel-nav button:hover:not(:disabled) { background: var(--fill-active); color: var(--ink); }
 .pl-panel-nav button:disabled { opacity: .35; }
 /* Back to the thread's steps: a phone's only way out of a step (elsewhere a click away or Esc closes it). */
 .pl-panel-back { display: none; flex: none; align-items: center; gap: 6px; align-self: flex-start; margin: 14px 0 0 12px; padding: 6px 12px 6px 8px;
-  border: 0; border-radius: 999px; background: #f0f0f3; color: var(--ink-2); font: inherit; font-size: 13.5px; font-weight: 600; }
-.pl-panel-back:hover { background: #e7e7ec; color: var(--ink); }
+  border: 0; border-radius: 999px; background: var(--fill); color: var(--ink-2); font: inherit; font-size: 13.5px; font-weight: 600; }
+.pl-panel-back:hover { background: var(--fill-active); color: var(--ink); }
 .pl-panel-back i { font-style: normal; font-size: 16px; line-height: 1; }
-
-/* With a side panel open beside the sidebar, the footer lines up against the panel: it never slides under it. */
-.map-wrap:has(.map-sidebar:not(.sidebar-overlay)):has(.map-panel.open) .dock { left: auto; right: 464px; transform: none; align-items: flex-end; }
 
 /* Narrow (tablet and phone). */
 @media (max-width: 1100px) {
@@ -54,10 +51,8 @@
   .map-panel { top: var(--pip-top, 50%); width: 100%; border-left: 0; border-top: 1px solid var(--line); border-radius: 18px 18px 0 0;
     box-shadow: 0 -10px 30px rgba(0,0,0,.08); z-index: 12; transform: translateY(104%); }
   .map-panel.open { transform: none; }
-  .map-wrap:has(.map-panel.open) .dock { bottom: calc(100% - var(--pip-top, 50%) + 10px); z-index: 13; }
   .map-wrap:has(.map-panel.open) { --fade-bottom: 0px; }
   .pl-panel-back { display: flex; }
-  .map-wrap .dock { z-index: 8; } /* the footer stays over a panel, so a replay can still be driven */
   .pl-panel-nav { padding: 12px 14px 0 20px; }
   .pl-panel .sd-scroll { padding: 18px 18px 120px; }
 }

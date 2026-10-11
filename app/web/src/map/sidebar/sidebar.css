@@ -1,7 +1,7 @@
 /* Floating left sidebar on the map: Threads | Files tabs, collapsible.
    Same frosted sheet as the old .map-agents tracker it replaces. */
 .map-sidebar {
-  position: absolute; left: 24px; top: var(--sb-top); bottom: auto; height: var(--sb-h); width: 340px; max-width: calc(100% - 32px);
+  position: absolute; left: 24px; top: var(--sb-top); bottom: auto; height: var(--sb-h); width: var(--sidebar-w); max-width: calc(100% - 32px);
   display: flex; flex-direction: column;
   background: rgba(255,255,255,.86); backdrop-filter: saturate(180%) blur(20px);
   border: 1px solid var(--line); border-radius: 18px;
@@ -11,11 +11,11 @@
 .map-sidebar button:focus-visible, .sidebar-collapsed:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .sidebar-head { display: flex; align-items: center; gap: 6px; padding: 14px 10px 10px 14px; flex: none; }
-.sidebar-tabs { display: flex; gap: 4px; background: #f0f0f3; border-radius: 999px; padding: 4px; flex: 1; min-width: 0; }
+.sidebar-tabs { display: flex; gap: 4px; background: var(--fill); border-radius: 999px; padding: 4px; flex: 1; min-width: 0; }
 .sidebar-tabs button { flex: 1; border: 0; background: transparent; padding: 6px 0; border-radius: 999px; font-weight: 500; font-size: 13.5px; color: var(--ink-2); }
 .sidebar-tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .sidebar-collapse { flex: none; border: 0; background: none; width: 28px; height: 28px; border-radius: 50%; color: var(--ink-3); font-size: 16px; line-height: 1; }
-.sidebar-collapse:hover { background: #f0f0f3; color: var(--ink); }
+.sidebar-collapse:hover { background: var(--fill-hover); color: var(--ink); }
 .sidebar-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 14px 14px; }
 
 .sidebar-collapsed {
@@ -32,7 +32,7 @@
 /* Folded with a thread open (NowCard): the Track folded down to a few lines, in the top-left corner, left of the lens
    pill. Its rows are the Track's (.rp-m): the same type, dots and highlighted current row; the ones before it fade out
    above, the next one shows below when you look back. Beside them, a scroller. */
-.sidebar-now { position: absolute; left: 24px; top: var(--sb-top, 24px); z-index: 3; width: min(340px, calc(50% - 134px)); min-width: 220px;
+.sidebar-now { position: absolute; left: 24px; top: var(--sb-top, 24px); z-index: 3; width: min(var(--sidebar-w), calc(50% - 134px)); min-width: 220px;
   display: flex; align-items: stretch; gap: 4px; padding: 6px;
   background: rgba(255,255,255,.9); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
   border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,.05); text-align: left; color: var(--ink-2); }
@@ -57,10 +57,10 @@
 .sn-m.todo { color: var(--ink-3); opacity: .7; }
 /* The scroller: a grey column, a darker grey thumb where you are (the thread's start at the top, now at the bottom). */
 .sn-scroll { position: relative; flex: none; width: 14px; margin: 4px 2px 4px 0; cursor: pointer; touch-action: none; --at: 1; }
-.sn-scroll::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 4px; margin-left: -2px; border-radius: 4px; background: #ececef; }
+.sn-scroll::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 4px; margin-left: -2px; border-radius: 4px; background: var(--track); }
 .sn-scroll i { position: absolute; left: 50%; top: calc(var(--at) * (100% - 18px)); width: 4px; height: 18px; margin-left: -2px; border-radius: 4px;
-  background: #b9b9c0; transition: top .12s ease-out; }
-.sn-scroll:hover i { background: #9a9aa3; }
+  background: var(--thumb); transition: top .12s ease-out; }
+.sn-scroll:hover i { background: var(--thumb-hover); }
 .sn-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 @media (prefers-reduced-motion: reduce) { .sn-scroll i { transition: none; } }
 @media (prefers-reduced-motion: reduce) { .sn-m.working b { animation: none; } }
@@ -74,7 +74,7 @@
   .sn-m.current { height: 70px; }
   .sn-m.current span { white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
   /* A step's panel open on the right: the card keeps to its left. */
-  .map-wrap:has(.map-panel.open) .sidebar-now { right: 464px; }
+  .map-wrap:has(.map-panel.open) .sidebar-now { right: calc(var(--panel-w) + 24px); }
   /* The open sheet is as tall as what it holds (up to the full height): no white block under a short list hiding the map. */
   .map-sidebar.sidebar-overlay { height: auto; max-height: var(--sb-h); }
   .map-sidebar.sidebar-overlay :is(.sidebar-body, .sidebar-track, .rp-steps, .rp-list) { flex: 0 1 auto; height: auto; }
@@ -97,8 +97,7 @@
 .sidebar-thread-group h3 { margin: 2px -6px 0; }
 .sidebar-thread-group h3 button { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; background: none; padding: 6px; border-radius: 8px;
   font-size: 12.5px; font-weight: 500; color: var(--ink-3); text-align: left; }
-.sidebar-thread-group h3 button:hover { color: var(--ink-2); background: #f4f4f7; }
-:root:is([data-theme="prism"], [data-theme="hologram"]) .sidebar-thread-group h3 button:hover { background: var(--hover); }
+.sidebar-thread-group h3 button:hover { color: var(--ink-2); background: var(--wash); }
 .sidebar-thread-group h3 .sidebar-tree-caret { margin-left: auto; width: 14px; font-size: 13px; text-align: center; color: var(--ink-3); transform: rotate(90deg); transition: transform .15s; }
 .sidebar-thread-group.shut h3 .sidebar-tree-caret { transform: none; }
 .sidebar-thread-group .sidebar-thread { padding: 9px 2px; }
@@ -111,7 +110,7 @@
 .sidebar-thread-agents { list-style: none; margin: 10px 0 0 16px; padding: 0; }
 .sidebar-thread-agents li { display: flex; align-items: center; gap: 2px; padding: 4px 0; }
 .sidebar-agent-main { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 3px 4px; border-radius: 8px; text-align: left; cursor: pointer; }
-.sidebar-agent-main:hover { background: #f5f5f7; }
+.sidebar-agent-main:hover { background: var(--row-hover); }
 /* The agent's name is the row's button: it stretches over the whole row (the file button sits above it). */
 .sidebar-agent-follow { display: block; width: 100%; border: 0; background: none; padding: 0; text-align: left; }
 .sidebar-agent-follow::after { content: ""; position: absolute; inset: 0; border-radius: 8px; }
@@ -127,7 +126,7 @@
 .sidebar-agent-file:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .sidebar-thread-agents li.hidden-agent .sidebar-agent-main { opacity: .4; }
 .sidebar-agent-eye { flex: none; border: 0; background: none; width: 26px; height: 26px; border-radius: 50%; color: var(--ink-3); display: grid; place-content: center; }
-.sidebar-agent-eye:hover { background: #f0f0f3; color: var(--ink); }
+.sidebar-agent-eye:hover { background: var(--fill-hover); color: var(--ink); }
 
 
 /* ---------- Files tab ---------- */
@@ -140,7 +139,7 @@
 .sidebar-tree-scroll { padding-bottom: 10px; }
 .sidebar-tree { list-style: none; margin: 0; padding: 0; }
 .sidebar-tree-dir, .sidebar-tree-file { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; background: none; padding: 5px 6px; border-radius: 8px; text-align: left; font-size: 13px; color: var(--ink-2); }
-.sidebar-tree-dir:hover, .sidebar-tree-file:hover { background: #f5f5f7; color: var(--ink); }
+.sidebar-tree-dir:hover, .sidebar-tree-file:hover { background: var(--row-hover); color: var(--ink); }
 .sidebar-tree-caret { display: inline-block; width: 12px; flex: none; color: var(--ink-3); transition: transform .15s; transform: rotate(0deg); font-style: normal; }
 .sidebar-tree-caret.open { transform: rotate(90deg); }
 .sidebar-tree-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -154,7 +153,7 @@
 
 /* Threads: click to open (its Track). The open one is a pill; a running one pulses blue. */
 button.sidebar-thread-head { width: calc(100% + 16px); border: 0; background: transparent; padding: 7px 8px; margin: -7px -8px; border-radius: 10px; text-align: left; color: var(--ink); cursor: pointer; box-sizing: border-box; }
-button.sidebar-thread-head:hover { background: #f4f4f7; }
+button.sidebar-thread-head:hover { background: var(--row-hover); }
 .sidebar-thread-head time { font-variant-numeric: tabular-nums; }
 
 /* The sidebar takes the map's height but a margin (Map, Places). */
@@ -162,7 +161,7 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 
 /* Title row: the thread (a pill when open) and the eye that shows or hides all its agents. */
 .sidebar-thread-headrow { display: flex; align-items: center; gap: 2px; margin: -7px -8px; border-radius: 10px; }
-.sidebar-thread-headrow:hover { background: #f4f4f7; }
+.sidebar-thread-headrow:hover { background: var(--row-hover); }
 .sidebar-thread.selected .sidebar-thread-headrow { background: var(--accent-soft); }
 /* The open thread is a link too (back to its steps): the same hand and a hover, a shade deeper. */
 .sidebar-thread.selected .sidebar-thread-headrow:hover { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
@@ -174,7 +173,7 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 
 /* "Show all 12 threads" under the short list (ThreadsPanel). */
 .sidebar-more { display: block; width: 100%; margin-top: 6px; padding: 8px; border: 0; background: none; color: var(--accent); font-size: 13px; font-weight: 500; text-align: left; border-radius: 10px; }
-.sidebar-more:hover { background: #f4f4f7; }
+.sidebar-more:hover { background: var(--row-hover); }
 
 /* Waiting on you (attention): an amber dot that breathes, and a badge in place of the worktree name. */
 .sidebar-thread-status.waiting { background: #f59e0b; }
@@ -211,19 +210,16 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
     justify-content: flex-start; border-radius: 18px 18px 0 0; border-bottom: 0; z-index: 6; box-shadow: 0 -10px 30px rgba(0,0,0,.08); touch-action: none;
     animation: sidebar-strip-in .22s cubic-bezier(.2,.8,.2,1); }
   .sidebar-collapsed.at-bottom span { writing-mode: horizontal-tb; font-size: 13.5px; font-weight: 600; letter-spacing: 0; }
-  .sidebar-collapsed .pip-bar { width: 38px; height: 4px; border-radius: 4px; background: #d2d2d8; }
-  .map-wrap:has(.sidebar-collapsed.at-bottom) .dock { bottom: 62px; }
+  .sidebar-collapsed .pip-bar { width: 38px; height: 4px; border-radius: 4px; background: var(--grip); }
   .map-wrap:has(.sidebar-collapsed.at-bottom) { --fade-bottom: 56px; }
   .map-sidebar.sidebar-overlay { left: 10px; right: 10px; top: 10px; bottom: 10px; width: auto; max-width: none; height: auto; }
   /* An open thread: the map keeps the top 42% like a video (no scrim: it stays live and touchable), its steps below. */
   .map-sidebar.sidebar-overlay.pip { top: var(--pip-top, 50%); left: 0; right: 0; bottom: 0; border-radius: 18px 18px 0 0; border-bottom: 0;
     box-shadow: 0 -10px 30px rgba(0,0,0,.08); animation: sidebar-pip-in .26s cubic-bezier(.2,.8,.2,1); }
-  /* The player rides on the sheet's edge, over the map's bottom. */
-  .map-wrap:has(.map-sidebar.pip) .dock { bottom: calc(100% - var(--pip-top, 50%) + 10px); z-index: 11; }
   /* Its grab bar: drag to set the sheet's height (MapSidebar), down past the lowest to fold it. */
   .pip-grab { position: absolute; top: 0; left: 0; right: 0; height: 18px; z-index: 2; display: grid; place-items: center; cursor: ns-resize; touch-action: none; }
-  .pip-grab i { width: 38px; height: 4px; border-radius: 4px; background: #d2d2d8; }
-  .pip-grab:hover i, .pip-grab:active i { background: #a9a9b2; }
+  .pip-grab i { width: 38px; height: 4px; border-radius: 4px; background: var(--grip); }
+  .pip-grab:hover i, .pip-grab:active i { background: var(--grip-hover); }
   .pip-grab:focus-visible { outline: none; }
   .pip-grab:focus-visible i { outline: 2px solid var(--accent); outline-offset: 3px; }
   .map-sidebar.pip .sidebar-head { padding-top: 18px; }
@@ -253,8 +249,7 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .track-head .rp-share { flex: none; position: static; }
 .track-back { flex: none; width: 30px; height: 30px; margin: -1px -4px 0 -8px; border: 0; border-radius: 50%; background: none; color: var(--ink-2);
   display: grid; place-items: center; }
-.track-back:hover { background: #f0f0f3; color: var(--ink); }
-:root:is([data-theme="prism"], [data-theme="hologram"]) .track-back:hover { background: var(--hover); }
+.track-back:hover { background: var(--fill); color: var(--ink); }
 /* Looking back through a running thread: a footer floats over the bottom of the steps, the way back to live. */
 .track-back-live { position: absolute; left: 8px; right: 8px; bottom: 12px; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(0,0,0,.10);
@@ -290,7 +285,7 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .file-view-path.outside { white-space: normal; direction: ltr; overflow-wrap: anywhere; overflow: visible; line-height: 1.5; }
 .file-view-reveal { margin: 14px 0 4px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-size: 13.5px;
   font-weight: 600; padding: 7px 14px; border-radius: 999px; cursor: pointer; }
-.file-view-reveal:hover { background: #f4f4f7; }
+.file-view-reveal:hover { background: var(--wash); }
 .file-view-reveal:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .file-view-meta { color: var(--ink-2); margin: 10px 0 0; font-size: 13.5px; line-height: 1.45; }
 .file-view-live { display: flex; align-items: center; gap: 10px; margin: 14px 0 0; color: var(--accent); font-weight: 500; font-size: 14px; }

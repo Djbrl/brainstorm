@@ -32,7 +32,7 @@
 .md ul, .md ol { margin: 0 0 10px; padding-left: 20px; }
 .md li { margin: 3px 0; }
 .md code { font-family: var(--font-mono); font-size: .88em; background: #f2f2f6; padding: 1px 5px; border-radius: 5px; }
-.md-pre { margin: 0 0 10px; background: #f6f6f9; border-radius: 10px; padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+.md-pre { margin: 0 0 10px; background: var(--code-block); border-radius: 10px; padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
 .md-pre code { background: none; padding: 0; font-size: inherit; }
 
 @keyframes ask-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

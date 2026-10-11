@@ -1,0 +1,30 @@
+/* The floating footer over the map (Dock in replay/ReplayBar.tsx: the player, the step count): where it sits, on every
+   screen and beside whatever is open. Every .dock rule is here. In the order they apply: the later rules win over the
+   earlier ones of the same weight. */
+.dock { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: calc(100% - 48px); }
+.map-wrap:has(.map-panel.open) .dock { left: calc(50% - var(--panel-w) / 2); }
+
+/* Narrow (tablet and phone): the footer fits the width it has. */
+@media (max-width: 1100px) {
+  .dock { width: max-content; }
+  /* A side panel open: the footer keeps to the space left of it. */
+  .map-wrap:has(.map-panel.open) .dock { left: 16px; right: calc(var(--panel-w) + 16px); width: auto; transform: none; max-width: none; }
+}
+/* Phone: the footer wraps, centred. */
+@media (max-width: 440px) {
+  .dock { bottom: 12px; max-width: calc(100% - 24px); }
+  .map-wrap:has(.map-panel.open) .dock { left: 50%; right: auto; transform: translateX(-50%); max-width: calc(100% - 24px); }
+  /* Over the sidebar's folded strip along the bottom. */
+  .map-wrap:has(.sidebar-collapsed.at-bottom) .dock { bottom: 62px; }
+  /* The player rides on the thread sheet's edge, over the map's bottom (MapSidebar's pip). */
+  .map-wrap:has(.map-sidebar.pip) .dock { bottom: calc(100% - var(--pip-top, 50%) + 10px); z-index: 11; }
+}
+
+/* With a side panel open beside the sidebar, the footer lines up against the panel: it never slides under it. */
+.map-wrap:has(.map-sidebar:not(.sidebar-overlay)):has(.map-panel.open) .dock { left: auto; right: calc(var(--panel-w) + 24px); transform: none; align-items: flex-end; }
+
+@media (max-width: 440px) {
+  /* A step opens where the thread's sheet is: the footer rides on its edge too, over it. */
+  .map-wrap:has(.map-panel.open) .dock { bottom: calc(100% - var(--pip-top, 50%) + 10px); z-index: 13; }
+  .map-wrap .dock { z-index: 8; } /* the footer stays over a panel, so a replay can still be driven */
+}

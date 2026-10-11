@@ -1,10 +1,10 @@
 /* The Map | Places switch (LensSwitch), floating at the top of a thread's view. */
-.lens-switch { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; background: rgba(240,240,243,.92); backdrop-filter: blur(10px); border-radius: 999px; padding: 3px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+.lens-switch { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; background: var(--pill); backdrop-filter: blur(10px); border-radius: 999px; padding: 3px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
 .lens-switch button { border: 0; background: transparent; padding: 6px 18px; border-radius: 999px; font-size: 13.5px; font-weight: 600; color: var(--ink-2); }
 .lens-switch button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 /* Tablet: a side panel open on the right would cut the pill; it centres in the space left of the panel instead. */
 @media (min-width: 441px) and (max-width: 1100px) {
-  .map-wrap:has(.map-panel.open) .lens-switch { left: calc((100% - 440px) / 2); }
+  .map-wrap:has(.map-panel.open) .lens-switch { left: calc((100% - var(--panel-w)) / 2); }
 }
 /* Phone: the pill at the right of the top row (the folded sidebar is a strip along the bottom). */
 @media (max-width: 440px) {
@@ -15,6 +15,6 @@
 .lens-switch.in-bar { display: none; }
 @media (max-width: 1100px) {
   .lens-switch:not(.in-bar) { display: none; }
-  .lens-switch.in-bar { display: flex; position: static; transform: none; flex: none; padding: 2px; box-shadow: none; background: #f0f0f3; backdrop-filter: none; }
+  .lens-switch.in-bar { display: flex; position: static; transform: none; flex: none; padding: 2px; box-shadow: none; background: var(--fill); backdrop-filter: none; }
   .lens-switch.in-bar button { padding: 4px 12px; font-size: 13px; }
 }

@@ -8,6 +8,7 @@ import { useThread, type Thread } from "../../lib/thread";
 import { chaptersOf } from "../../lib/chapters";
 import { togglePlay } from "./layer";
 import "./replay.css";
+import "../dock.css";
 
 const SPEEDS: ReplaySpeed[] = [1, 2, 4];
 const P = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };

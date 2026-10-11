@@ -18,7 +18,7 @@ Decisions the maintainer made along the way, which explain several entries:
 - Windows is out of scope.
 - Merge only after all phases are done.
 
-Review passes: Phase 1's review fixed four findings. Phase 2's review fixed three plausible ones (the database handle closed before the move-aside, the moved copy and notices.json set to owner-only, renumbered steps refetched) plus the Ask-key marker. Phase 3's review fixed four (tsconfig lookup bounded to the project and 1 MB, exact aliases, a 10 s limit on git's ignored-folder listing, a returning folder's spelling saved).
+Review passes: Phase 1's review fixed four findings. Phase 2's review fixed three plausible ones (the database handle closed before the move-aside, the moved copy and notices.json set to owner-only, renumbered steps refetched) plus the Ask-key marker. Phase 3's review fixed four (tsconfig lookup bounded to the project and 1 MB, exact aliases, a 10 s limit on git's ignored-folder listing, a returning folder's spelling saved). Phase 4's review found nothing blocking: it ran the database upgrade on a database made by the previous code (nothing lost, failed results flagged, each step rolled back on error), and checked that every write route is still guarded. One fix: a server answer with no body (opening a file, showing it in Finder, a usage event) no longer counts as a failure (`16e54db`). Its other two notes needed no change: after a downgrade to 0.8.x and back, failed results still show as failed because every reader also checks the older flag stored with the step; and Esc's order is unchanged in practice.
 
 ## Phase 1: stop the bleeding
 

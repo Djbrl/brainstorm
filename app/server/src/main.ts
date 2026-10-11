@@ -49,6 +49,9 @@ async function bootstrap() {
   const web = env("WEB_DIR");
   if (web && existsSync(join(web, "index.html"))) {
     app.useStaticAssets(web);
+    // A chunk this build doesn't have (a page loaded before an update asking for its old one): a plain 404, so the page
+    // sees the failure and reloads, instead of index.html served as JavaScript.
+    app.use("/assets", (_req: Request, res: Response) => res.status(404).type("text/plain").send("Not found"));
     app.use((req: Request, res: Response, next: NextFunction) =>
       // Any other page (/thread/<id>/…) is the app: index.html. `root` matters: the plugin lives under ~/.claude, and
       // sendFile refuses a full path through a dot folder.
@@ -56,15 +59,36 @@ async function bootstrap() {
   }
 
   const version = env("VERSION") ?? "dev";
-  const port = Number(env("PORT") ?? process.env.PORT ?? 4000);
-  await app.listen(port, "127.0.0.1");
+  const first = Number(env("PORT") ?? process.env.PORT ?? 4000);
+  // The plugin's server picks its own port: the one asked for if it's free, else the next ones (the launcher can't
+  // reserve one for us: anything could take it before we bind). Dev keeps its fixed port.
+  const tries = env("DATA_DIR") ? 50 : 1;
+  let port = first;
+  for (let i = 0; ; i++) {
+    try { await app.listen(port, "127.0.0.1"); break; } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "EADDRINUSE" || i + 1 >= tries) throw e;
+      port = first + i + 1;
+    }
+  }
+  const state = join(dataDir(), "server.json");
+  // On a stop (the launcher's SIGTERM, Ctrl-C, logout): close the app (and with it the database), and remove
+  // server.json if it's still ours, so nobody finds a dead server there.
+  const shutdown = (signal: string) => {
+    console.log(`Rundown ${version} (pid ${process.pid}) stopping on ${signal}`);
+    setTimeout(() => process.exit(0), 3000).unref();
+    try { if (env("DATA_DIR") && JSON.parse(readFileSync(state, "utf8")).pid === process.pid) rmSync(state, { force: true }); } catch { /* not there */ }
+    void app.close().catch(() => {}).finally(() => process.exit(0));
+  };
+  process.once("SIGTERM", () => shutdown("SIGTERM"));
+  process.once("SIGINT", () => shutdown("SIGINT"));
   if (env("DATA_DIR")) {
     // 0600: the secret lets the launcher and the hooks check they talk to this server, not something else on the port.
-    const state = join(dataDir(), "server.json");
     const mine = { pid: process.pid, port, version, startedAt: new Date().toISOString(), secret: SECRET };
     writeFileSync(state, JSON.stringify(mine), { mode: 0o600 });
     chmodSync(state, 0o600); // the mode above only applies to a new file
-    rmSync(join(dataDir(), "launch.lock"), { force: true }); // up: the launcher that started us is done
+    // Up: the launcher that started us is done. Only its own lock (a token it gave us), never another launcher's.
+    const lock = join(dataDir(), "launch.lock"), token = env("LOCK_TOKEN");
+    try { if (token && readFileSync(lock, "utf8") === token) rmSync(lock, { force: true }); } catch { /* gone */ }
     // One server per data folder. If server.json names another one that's alive, a launcher started it beside us
     // (we were too busy to answer it): it's the one everyone finds now, so we go, instead of running on untracked
     // on the same database. If it names a dead one, we're the server again.
@@ -82,6 +106,6 @@ async function bootstrap() {
       try { writeFileSync(state, JSON.stringify(mine), { mode: 0o600 }); } catch { /* next minute */ }
     }, 60_000).unref();
   }
-  console.log(`Rundown ${version} on http://localhost:${port}  (api /api, ws /ws)`);
+  console.log(`Rundown ${version} on http://127.0.0.1:${port}  (api /api, ws /ws)`);
 }
 bootstrap();

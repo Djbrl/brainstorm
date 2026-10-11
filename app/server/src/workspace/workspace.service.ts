@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { closeSync, existsSync, openSync, readdirSync, readSync, realpathSync, statSync } from "node:fs";
@@ -19,6 +19,10 @@ import { safely } from "../core/safely";
 
 const execFileP = promisify(execFile);
 const real = (p: string) => { try { return realpathSync(p); } catch { return p; } };
+/** On a case-insensitive disk (macOS) "~/Proj" still opens after a rename to "~/proj": the name as the disk spells it now, when only the case differs. */
+export const caseOnDisk = (p: string): string | null => {
+  try { const n = realpathSync.native(p); return n !== p && n.toLowerCase() === p.toLowerCase() ? n : null; } catch { return null; }
+};
 
 /** Turn a Claude Code project folder name back into a real path by walking the filesystem ("-Users-me-my-app" → /Users/me/my-app). */
 export function decodeProjectDir(name: string): string | null {
@@ -51,13 +55,18 @@ function claudeCandidates(): string[] {
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const CWD_READ_BYTES = 64 * 1024;
 const POLL_MS = 300;
+/** How often the open project's folder is checked for still being there (a rename, a move, a delete, a case-only rename). */
+const FOLDER_CHECK_MS = 5_000;
 const POLL_TIMEOUT_MS = 5 * 60_000;
 
 // Owner: S (workspace setup, server).
 @Injectable()
-export class WorkspaceService implements OnModuleInit {
+export class WorkspaceService implements OnModuleInit, OnModuleDestroy {
   private log = new Logger("Workspace");
   private root: string | null = null;
+  /** The project that was open (or saved) and whose folder is gone; it opens again by itself if the folder comes back. */
+  private missing: string | null = null;
+  private folderTimer?: NodeJS.Timeout;
   private claudeStep: SetupStep = { id: "claude", label: "Connecting to your agents", state: "pending" };
   private anthropicStep: SetupStep = { id: "anthropic", label: "Claude for questions", state: "pending" };
   private lastBroadcast = "";
@@ -75,6 +84,8 @@ export class WorkspaceService implements OnModuleInit {
 
   onModuleInit() {
     this.dbs.db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
+    this.folderTimer = setInterval(() => safely(this.log, "project folder check", () => this.checkFolder()), FOLDER_CHECK_MS);
+    this.folderTimer.unref?.();
     // The saved project wins: a restart (an update, a crash) keeps the project the pages show. The project of the session
     // that started the server counts only when none was ever chosen.
     const given = env("ROOT");
@@ -93,16 +104,24 @@ export class WorkspaceService implements OnModuleInit {
       if (useGiven()) return;
     } else if (saved && this.isValidDir(saved)) {
       this.log.log(`boot: applying saved workspace ${saved}`);
-      this.activate(saved); // fire and forget: don't block startup
+      this.activate(caseOnDisk(saved) ?? saved); // fire and forget: don't block startup
       return;
-    } else if (useGiven()) return;
+    } else {
+      if (saved) { this.log.warn(`boot: the saved workspace ${saved} is gone (renamed, moved or deleted)`); this.missing = saved; }
+      if (useGiven()) return;
+    }
     this.log.log(`boot: no saved workspace, the web will show the setup screen`);
   }
 
   // ---- reads ----
 
+  onModuleDestroy() {
+    if (this.folderTimer) clearInterval(this.folderTimer);
+    if (this.pollTimer) clearInterval(this.pollTimer);
+  }
+
   status(): SetupStatus {
-    if (!this.root) return { root: null, name: null, ready: false, steps: [] };
+    if (!this.root) return { root: null, name: null, ready: false, steps: [], ...(this.missing ? { missing: { root: this.missing, name: basename(this.missing) } } : {}) };
     const scan = this.scanStep(this.root);
     const imports = this.importsStep(this.root);
     const steps: SetupStep[] = [scan, imports, this.claudeStep, this.anthropicStep];
@@ -203,6 +222,34 @@ export class WorkspaceService implements OnModuleInit {
     return this.status();
   }
 
+  /**
+   * The open project's folder is gone: the pages go back to the picker with a plain message (the saved choice stays,
+   * so it opens again if the folder comes back). Renamed only in case (macOS): open it under its new spelling, or every
+   * path from Claude Code (which uses the new one) would miss the map.
+   */
+  private checkFolder() {
+    if (this.root) {
+      if (!this.isValidDir(this.root)) {
+        this.log.warn(`the project folder ${this.root} is gone (renamed, moved or deleted): showing the picker`);
+        this.missing = this.root;
+        this.root = null;
+        this.gen++; // checks still running for it are dropped
+        if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = undefined; }
+        this.broadcastIfChanged();
+        return;
+      }
+      const renamed = caseOnDisk(this.root);
+      if (renamed && !tooBroad(renamed)) {
+        this.log.log(`the project folder is now spelled ${renamed}: opening it under that name`);
+        this.setSetting("workspace", renamed);
+        this.activate(renamed);
+      }
+    } else if (this.missing && this.isValidDir(this.missing) && !tooBroad(this.missing)) {
+      this.log.log(`the project folder ${this.missing} is back: opening it`);
+      this.activate(caseOnDisk(this.missing) ?? this.missing);
+    }
+  }
+
   // ---- validation ----
   // (tooBroad, below the class: a folder that holds folders of projects, never one to map)
 
@@ -226,7 +273,7 @@ export class WorkspaceService implements OnModuleInit {
     if (!existsSync(root)) throw new BadRequestException(`"${root}" does not exist`);
     if (!statSync(root).isDirectory()) throw new BadRequestException(`"${root}" is not a directory`);
     if (tooBroad(root)) throw new BadRequestException(`${resolve(root)} holds your folders, not one project. Pick the project's own folder inside it.`);
-    return resolve(root);
+    return caseOnDisk(resolve(root)) ?? resolve(root);
   }
 
   private isValidDir(p: string): boolean {
@@ -253,6 +300,7 @@ export class WorkspaceService implements OnModuleInit {
    * inline since they're fast local fs work; the network/subprocess checks are not awaited. */
   private activate(abs: string) {
     this.root = abs;
+    this.missing = null;
     this.cfg.defaultRoot = abs;
     this.claudeStep = { id: "claude", label: "Connecting to your agents", state: "running" };
     this.anthropicStep = { id: "anthropic", label: "Claude for questions", state: "running" };

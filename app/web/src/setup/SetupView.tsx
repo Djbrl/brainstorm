@@ -55,6 +55,7 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const now = clock();
+  const missing = useLive().state.setup?.missing; // the open project's folder went away
 
   useEffect(() => { getSuggestions().then(setList).catch(() => setList([])); }, []);
   useEffect(() => { inputRef.current?.focus(); }, []);
@@ -118,7 +119,9 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
     <div className="su-col su-pick">
       {onCancel && <button className="su-back" onClick={onCancel}><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 3.5L5.5 8l4.5 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>Back</button>}
       <h1 className="su-title">Pick a workspace</h1>
-      <p className="su-lede">Rundown maps the code in a folder and follows the agents (Claude Code or Codex) working in it, live.</p>
+      {missing
+        ? <p className="su-lede">The folder <b>{missing.name}</b> isn't at {missing.root} anymore: it was renamed, moved or deleted. Pick it again where it is now.</p>
+        : <p className="su-lede">Rundown maps the code in a folder and follows the agents (Claude Code or Codex) working in it, live.</p>}
 
       <button className="su-choose" onClick={choose} disabled={choosing || !!busy}>
         {choosing ? <><span className="su-spin" />Waiting for a folder…</> : <>

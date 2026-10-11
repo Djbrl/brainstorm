@@ -55,6 +55,8 @@ export type SetupStatus = {
   name: string | null;        // folder name
   ready: boolean;             // map built + Claude Code log folder resolved (summaries may still be running)
   steps: SetupStep[];
+  /** The project that was open is gone (renamed, moved or deleted): root is null, and the page says so above the picker. */
+  missing?: { root: string; name: string };
 };
 export type WorkspaceSuggestion = { root: string; name: string; lastActiveAt?: string; sessions: number; exists: boolean };
 

@@ -11,7 +11,8 @@ import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-for
 import { hierarchy, pack } from "d3-hierarchy";
 import type { CoworkArea, CoworkEvent, CoworkPage, CoworkSite, CoworkSummary } from "@contract";
 import { AREA_NAME, HOME, HOME_NAME } from "./data";
-import { useCamera, type Camera, type View } from "../map/camera";
+import { boxOf, useCamera, type Camera, type View } from "../map/camera";
+import { drawName, LabelSpace, textWidth } from "../map/labels";
 import { mapStyle } from "../map/themes";
 import { drawMarker } from "../map/marks";
 import { platform } from "../map/routes";
@@ -161,11 +162,10 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
   // ---- the camera: everything at first; then the thread's place, from site to site ----
   const userAt0 = useRef(0), framed = useRef(false), lastSite = useRef<string | null>(null);
   const fitAll = useCallback((ms = 700) => {
-    const ns = graphRef.current.nodes.filter((n) => !n.up);
-    if (!ns.length) return;
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (const n of ns) { x0 = Math.min(x0, n.x - n.r); x1 = Math.max(x1, n.x + n.r); y0 = Math.min(y0, n.y - n.r - 30); y1 = Math.max(y1, n.y + n.r); }
-    camRef.current.frame({ x0, y0, x1, y1 }, { pad: 36, maxZoom: 3 }, ms);
+    const box = boxOf(graphRef.current.nodes.filter((n) => !n.up));
+    if (!box) return;
+    box.y0 -= 30;   // room for the areas' names over their circles
+    camRef.current.frame(box, { pad: 36, maxZoom: 3 }, ms);
   }, []);
   const siteOf = (n: PNode) => (n.kind === "page" && n.up?.kind === "site" ? n.up : n);
   const frameSite = useCallback((n: PNode, ms = 650) => {
@@ -237,19 +237,19 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
     ctx.restore();
   };
 
+  const space = useRef(new LabelSpace());
   const endFrame = (ctx: CanvasRenderingContext2D, scale: number) => {
     const g = graphRef.current, t = performance.now(), font = tokens.body;
     // Names: areas over their circles, sites inside their tops, pages under them once they're big enough; no two cross.
-    const taken: { x0: number; y0: number; x1: number; y1: number }[] = [];
+    // Placed in the map's label space (a grid: map/labels.ts) and stamped as the map stamps its names (drawName).
+    const sp = space.current;
+    sp.reset(48 / scale);
     const label = (text: string, x: number, y: number, px: number, weight: number, fill: string, alpha: number, force = false) => {
-      ctx.font = `${weight} ${px / scale}px ${font}`;
-      const w = ctx.measureText(text).width, p = 2 / scale, b = { x0: x - w / 2 - p, x1: x + w / 2 + p, y0: y - p, y1: y + px / scale + p };
-      if (!force && taken.some((o) => o.x0 < b.x1 && b.x0 < o.x1 && o.y0 < b.y1 && b.y0 < o.y1)) return;
-      taken.push(b);
-      ctx.globalAlpha = alpha; ctx.lineWidth = 3.2 / scale; ctx.strokeStyle = st.halo; ctx.strokeText(text, x, y);
-      ctx.fillStyle = fill; ctx.fillText(text, x, y);
+      const w = textWidth(ctx, text, weight, font, px, px) / scale, p = 2 / scale;
+      if (!sp.claim({ x0: x - w / 2 - p, x1: x + w / 2 + p, y0: y - p, y1: y + px / scale + p }, force)) return;
+      drawName(ctx, text, x, y, px, weight, font, fill, st.halo, alpha);
     };
-    ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.lineJoin = "round";
+    ctx.save();
     const cur = here ? byId.get(here) : undefined;
     if (cur) label(short(cur.label, 40), cur.x, cur.y + cur.r + 4 / scale, 12.5, 700, tokens.accent, 1, true);
     for (const n of g.nodes) if (n.kind === "area") label(n.label, n.x, n.y - n.r - 26 / scale, 17, 750, st.fileInk, 0.42);

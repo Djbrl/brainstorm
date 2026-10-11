@@ -1,0 +1,265 @@
+# Cleanup change record
+
+This file lists every fix of the code cleanup, so you can question each decision later. Later phases append here, below the last one.
+
+How to use it: find the behaviour you are curious about, read why it changed, then look up the commit (`git show <hash>`). Each entry says what changed, why (the audit finding number from the "Fix before announcing" table, or the maintainer's decision), what a person using the app might notice, and the commit hashes. "Nothing" means no visible change.
+
+Decisions the maintainer made along the way, which explain several entries:
+
+- Update notifications are their own setting, separate from usage stats, on by default, and not tied to DO_NOT_TRACK.
+- Sharing never falls back to another thread.
+- The old Brainstorm data folder is deleted once everything has been copied.
+- Skills may only run the launcher. This is not tested live yet: verify before release.
+- A server started by a skill is marked, and restarted with the Ask key at the next session.
+- The phone layout starts at 440 px instead of 600 px; from there to 1100 px the sidebar folds into a strip on the left.
+- One project per server stays (not one per page).
+- Nemotron, Failures and the git view are removed.
+- The hosted-demo code is kept for now.
+- Windows is out of scope.
+- Merge only after all phases are done.
+
+Review passes: Phase 1's review fixed four findings. Phase 2's review fixed three plausible ones (the database handle closed before the move-aside, the moved copy and notices.json set to owner-only, renumbered steps refetched) plus the Ask-key marker. Phase 3's review fixed four (tsconfig lookup bounded to the project and 1 MB, exact aliases, a 10 s limit on git's ignored-folder listing, a returning folder's spelling saved).
+
+## Phase 1: stop the bleeding
+
+Branch `cleanup/phase-1`, 17 commits on top of `main`. These make the server hard to freeze or crash and fix what a visitor reads first.
+
+### What you might notice
+
+- A long or odd file, e-mail address or line of text no longer freezes the server.
+- A busy or full database no longer takes the server down.
+- An over-long e-mail address in a shared replay is hidden whole.
+- The map settles and stops redrawing after an agent stops.
+- A project folder that links to a folder outside itself shows nothing from that link.
+- The README, plugin README, landing page and docs say the current things (version, Node 22.13, data folder).
+
+### Safety against copied repos and odd files
+
+- **A copied repo can't make the server run a program through git.** Git settings inside a repo someone else made could name helper programs; the server's git calls now ignore them. If the repo's settings can't be read, git is not used at all. Git-lfs and git-crypt keep working when set up the normal way. A branch switch is still noticed. Finding 1. Nothing visible. Commits `be33935`, `653dda3`, `b383a16`.
+- **A link to a folder outside the project maps nothing from it.** A shortcut inside the project pointing elsewhere used to pull outside files onto the map. Finding 3. A file may disappear from the map if it was only reachable that way. Commit `d022c45`.
+- **A listed file is checked before reading and never read whole.** The mapper looks at the file kind and size first, skips anything that isn't a normal file or is too large, and reads in pieces. Finding 3. Huge files no longer slow the map. Commit `79e98b7`.
+
+### Things that froze the server
+
+- **Import lines are read in a straight pass.** A file full of export lines could freeze the server for a long time. Finding 4. Commit `621833a`.
+- **Secret and long-text masking is linear.** The rules for `sk-` keys, long texts without a break, e-mail names, brace lists and patch headers no longer slow down on long input. Timing tests added. Finding 4. Commit `28da1f4`.
+- **A very long e-mail address is masked whole in shares**, and a stale link to the archived numbers is fixed. Finding 4. Commit `2122942`.
+
+### The database
+
+- **A busy or full database no longer stops the server or drops steps.** It waits a few seconds when busy, timers that write to it log a problem instead of crashing, a crash is written to the log, and a failed chunk is retried soon rather than when the log next grows. Finding 2. Nothing visible, except fewer lost steps. Commit `e86fc44`.
+
+### The map
+
+- **The map rests again after an agent stops.** Marker colour eases in fractions (so it truly ends), and thinking frames are requested only when the ring is drawn. Finding 6. Less fan noise and battery use. Commit `3d25428`.
+
+### Docs, licence and site
+
+- **The first things a visitor reads were wrong.** The README lost the Nemotron fallback, "Codex is next" and post-deadline claims and the old screenshot; Node 22.13 or later; `.env.example` has only optional commented settings. Findings 44-46. Commits `1db4d5f`, `5a739a9`.
+- **Hackathon papers archived** in `docs/archive/hackathon` with a short README; the organiser's form link and the sponsor-prize pitches dropped; links fixed. Finding 45. Commit `047e6fc`.
+- **Plugin README and the contributor guide for `app/`** say the current version, the honest "local server" wording (other programs on your computer could still reach it), the `~/.rundown` folder and the `rundown@brainstorm` commands. Findings 40, 44, 46. Commit `5a739a9`.
+- **Licence holder's full name, "source-available" wording, and ignore rules for local and secret files.** Finding 48. Commit `73c624d`.
+- **Landing page: current version strings, no Vercel team name in its README, the unused deck and five unused images removed.** Findings 44, 45. Commit `6247264`.
+- **The landing page's usage and waitlist endpoints refuse posts from other sites** and non-JSON bodies. Finding 42. Commit `2c30799`.
+- Build log for the phase: `81e4d6f`.
+
+### Left open (Phase 1)
+
+- Deleting the old remote branches, setting the GitHub description and homepage: the maintainer's pushes. Finding 49.
+- The `.mailmap` line was dropped: the file itself would have to contain the address.
+- Vercel Firewall rate limits: set in Vercel by the maintainer.
+
+## Phase 2: privacy and the must-fix bugs
+
+Branch `cleanup/phase-2`. Privacy first, then the project model, data flow, launcher, "meaning from text", Codex and the web.
+
+### What you might notice
+
+- Shared files hide more (permission prompts, other projects' titles, the git user name, keys) and show less (no Ask answers).
+- The data folder is private to your account.
+- Opening a file from the app opens the real file; `.env`-style names and README-like names open.
+- Screenshots: only png, jpeg, gif and webp are kept.
+- Switching projects reloads the page cleanly; a restart keeps your saved project; a renamed or deleted project folder shows the picker with a sentence saying which folder went missing.
+- "Needs you" survives a restart.
+- Threads from sibling folders no longer appear; resumed or forked threads keep their own steps.
+- Play and Pause exist at every width; the failure words and grey text are readable in all four themes; the Track has a "Skip past the steps" link.
+- The map follows `.gitignore` in git repos, so committed `.github`, `vendor`, `build` and `.idea` folders now show.
+- More import lines (TypeScript aliases, Python packages) show on the map.
+- A new setting, Updates, controls the new-version message.
+- Old hooks (0.4-era) are refused and pages use `127.0.0.1` rather than `localhost`.
+- A damaged database is moved aside with a date and a fresh one starts with a notice.
+
+### Secrets and sharing
+
+- **Masking rewritten against realistic cases.** The secret word must end the key name, quoted values are checked as well as plain ones, and the missing secret shapes were added. Finding 33. Fewer false hits, fewer leaks. Commit `32be92c`.
+- **Thread titles, permission prompts and other projects' titles are masked before they reach the page.** Finding 32. Commit `2261c8a` (prompts and elsewhere), titles in `508e050`.
+- **Shares mask names only by exact case and only when distinctive, mask the git user name and keys.** Finding 32/33. A common word is no longer blotted out. Commit `d497171`.
+- **The shared file's name is built from the masked shared title.** Finding 32. Commit `5129554`.
+- **Shared files carry no Ask answers**; a recording answers the exact question only. Finding 38. Maintainer: ask answers are not shared. Commit `bded656`.
+- **The share page's title is inserted safely**, so a thread title with `$&` can't splice the template. Finding 27. Commit `c645f92`.
+- **`/rundown:share` never falls back to another thread.** With no or unfilled session id it says so and points to Share in the app; a thread not read yet is waited for up to 8 s, then reported. Finding 38. Maintainer decision. Commit `0a9944e`.
+- **Share, export and the hosted-demo replay build the map without blocking**; the synchronous twin (getMap, buildSync and six listing/reading functions) is deleted. Commit `b5ff5b7`.
+- **Licence notices inside share.html** and a LICENSE in the plugin. Finding 48. Commit `fc3e919`.
+
+### Files, screenshots, opening
+
+- **The data folder is 0700 and the database files 0600.** Finding 35. Commit `480ae1e`. Review follow-up: the moved-aside copy and notices.json are owner-only too (`1b098a1`).
+- **Open checks and opens the real file, not the link**; dotfiles and README-like names open. Finding 36. Commit `26de4b5`.
+- **Screenshots**: only png, jpeg, gif and webp are kept and served as inert images. Finding 39. Commit `e73c4cb`.
+- **Editor links encode each path segment**, so `#` or `?` in a file name opens the right file. Commit `d9d05ec`.
+
+### Project model and data flow
+
+- **Nothing is mapped or watched before a project is chosen** (the plugin starts on a placeholder that doesn't exist). Finding 34. Commit `dc07bf2`.
+- **A restart keeps the saved project**; the starting session's project counts only when none was ever chosen. Finding 9. Commit `8c74fa4`.
+- **The page reloads when the server's project differs**, stale `loadAll` answers are dropped, the picker stays mounted through its checklist, and a reconnect to another server version reloads. Findings 7, 25. Maintainer: one project per server. Commits `52a6046`, `6364b36` (lockfile).
+- **Hook knowledge survives a project switch**, and the last hook per thread is stored so "Needs you" survives a restart unless the log moved on. Finding 8. Commit `f2130aa`.
+- **A renamed, moved or deleted project folder is noticed** (checked every 5 s and at boot); the picker says which folder went missing, and the project reopens if it returns. A case-only rename on macOS opens under the disk's spelling. Commit `3078e21`.
+- **A loaded thread catches up**: history stored after its fetch, steps during it, and after a reconnect. Finding 10. Commit `6cd9c77`.
+- **History in time order, replaced logs read again**, and pages told when history lands. Finding 14. Commit `5f2d024`.
+- **Titles masked, Claude rows marked `claude`, times ahead of the clock handled, NUL kept, command edits kept on stop.** Findings 14, 32. Commit `508e050`.
+- **Claude Code's folder naming mirrored** (long paths found, siblings left out, either Unicode form). Findings 11, 13. Commit `04ab1a3`.
+- **Step ids are per thread**, so a resumed or forked thread no longer takes copied steps. Finding 12. Commit `95906c5`.
+- **The replay cursor stays on its step** when a growing thread renumbers its moments. Finding 15. Commit `3d8825b`.
+- **A thread whose steps the server renumbered (fresh database) is fetched again** instead of freezing. Review fix. Commit `952267e`.
+- **The map's "working on it" mark (60 s) is cancelled** on delete or project switch, and only reported for a file still on the map. Finding 16. Commit `7de5782`.
+- **The map follows `.gitignore` in a git repo**: only `.git` and true caches are skipped by name; ignored folders come from git. A folder that is not a git repo keeps the name list. Finding 17. Maintainer: rely on `.gitignore` in git repos. Commit `a826ede`.
+- **More import lines**: `./x.js` finds `x.ts`; aliases from the nearest tsconfig/jsconfig; Python absolute and package imports; imports inside comments no longer count. Finding 22. Commit `e160d6c`.
+- **Islands** on the project overview come only from agents still on the map. Commit `564b74c`.
+- **Dead contract removed**: `GET /api/history`, the Snapshot type, unused cache fields, `AskRequest.root`. Commit `9ca52b9`.
+
+### Launcher, server start and database
+
+- **Only a newer launcher restarts the server**; a downgrade is never announced as updated; the lock is taken before stopping and held through start; an unverified pid is never killed; the server picks its port starting from the previous one; failures go to server.log and, once a day, notices.json; loops are time-bounded; the environment is an allowlist (a shell `ANTHROPIC_API_KEY` never reaches the server); `RUNDOWN_PORT` is read. Findings 9, 23, 24, 37. Maintainer: a shell key does not power Ask; older launcher never restarts a newer server. Commit `66dc02a`.
+- **The server serves 404 for missing `/assets/*`**, picks its port and writes it to server.json, and on SIGTERM/SIGINT closes cleanly. Findings 24, 25. Commit `3f2d0a1`.
+- **A damaged database is moved aside with a date (never deleted)** and a fresh one starts with a notice; read-only gets one log line; the database closes on shutdown. Finding 26. Maintainer: never delete a corrupt database. Commit `650e389`; handle closed before the move: `1b098a1`.
+- **Taking over the old Brainstorm data**: once every file is copied, the old copies are removed; if a copy fails, the partial new ones go and the old folder stays. Maintainer: delete the old folder after a full copy. Commit `e303753`.
+- **Update notifications are their own setting** (Settings > Updates, "Tell me when there's a new version"), kept in settings.json in the data folder; off or `RUNDOWN_UPDATE_CHECK=0` means no request at all. One sentence on the privacy page. Maintainer decision: separate from stats, on by default, not tied to DO_NOT_TRACK. Commit `b3e59a9`.
+- **Skills may run only the launcher** (`open`, `share`, `stop`). Finding 41. Not tested live: if a skill stops loading, revert this commit. Commit `d8e70b6`.
+- **A server a skill started is marked** and restarted with the key by the next hook, keeping its port and project; Ask says it needs a restart meanwhile. Commit `02a981d`.
+- **Build into a temp folder and swap only on success**, stop on web type errors, third-party notices from the bundles' real inputs. Findings 31, 48. Commit `fc3e919`.
+
+### Meaning from text
+
+- **One rule for a failed tool call** (flag first, text only for shell, edits and navigation); the Failures feature removed. Finding 18. Commit `d943184`.
+- **Places splits shell commands quote-aware**; a push rehearsal or delete is not a push; `curl -X DELETE`, `gh api` writes and connector verbs match whole words; "not found" in a push no longer fails it. Finding 19. Commit `2eb745c`.
+- **Command edits** match by whole words, never credit another thread's edit, drop no-change writes live, ignore ignored folders and folder deletes; shell option fixes. Finding 20. Commit `14f91fd`.
+- **Codex**: commands keep their folder; interrupted turns end; `spawn_agent` shows as an Agent call linked to its subagent; subagents named from `agent_nickname`. Finding 21. Commit `cb40ba9`.
+
+### Web
+
+- **Play and Pause at every width**, in the thread bar and in shared replays; the shared replay's first crumb is "The whole map". Finding 29. Maintainer: no Space-only playback. Commit `f4e5cc5`.
+- **Contrast**: failure words, agent initials and secondary grey text meet AA in all four themes. Finding 30. Commit `32d7d8a`.
+- **Keyboard**: a "Skip past the steps" link; opening a step moves focus into its panel. Commit `839c115`.
+- **Places** says when places couldn't load and stops polling while the tab is hidden. Finding 28. Commit `0042f20`.
+- **A link with a stray `%` no longer crashes the page.** Commit `dde0376`.
+
+### Landing site
+
+- **Waitlist takes JSON only**; **double opt-in** with a confirm link by e-mail, release e-mail to confirmed addresses only, unsubscribed addresses stay unsubscribed, unconfirmed signups forgotten after 30 days. Finding 42. Commits `1bfcf64`, `53b101c`.
+- **Deleting an install's usage reports is fast** through a per-install index. Finding 42. Commit `0ec99fd`.
+- **Security headers**, admin token in sessionStorage, Resend's 30-day retention on the privacy page. Finding 42. Commit `f9a2ff3`.
+
+### Left open (Phase 2)
+
+- Hook proof: the server doesn't yet check an HMAC from the hook (the hook checks the server). Finding 40 partly done.
+- Release tags (finding 31): the maintainer's release step.
+- Reader rework (risk computed in the listener's sink).
+- `ListenerService.updateStep` and the `step-update` message are never sent.
+- Audit items not done: peek and diff line-number colours, the nav trailing-slash case.
+- Windows: out of scope.
+- Moving `site/` and `video/` out of the repo is not done.
+
+## Phase 3: delete what the decisions retire
+
+Mostly deletions. Same branch, then reviewed.
+
+### What you might notice
+
+- No Failures page or section, no git rings or git filter, no Nemotron setup steps or labels.
+- Fewer setup steps in the checklist.
+- 0.4-era hooks are refused, the old storage migration is gone.
+- The project's docs are rewritten to match the code.
+
+### Removed features
+
+- **Nemotron removed**: model client, reader labels, summaries, retries, metrics (risk flags stay), Ask's fallback, setup steps, the `openai` dependency, the web's label guess. Maintainer decision. Commits `3761aab`, `6364b36`.
+- **The hidden git view removed**: the server's git module (`/api/git`, periodic refresh, socket message), the web's filter, rings and file git line. `core/git-safety.ts` stays for the mapper. Maintainer decision. Commit `a1c6891`.
+- **Failures feature removed** (see Phase 2 `d943184`), its Markdown section grouped from the thread itself.
+- **The "footprint" thread mode deleted.** Nothing opened it. Commit `9d48395`.
+
+### Dead code
+
+- **Map**: `redraw.ticked()`, four theme keys, settle timers (the layout is final from the first frame), the one-off perf script. Commit `a774592`.
+- **CSS**: dead rules deleted, overridden declarations folded. Commit `db96d94`.
+- **Pre-rename shims**: no `BRAINSTORM_*` env, no `x-brainstorm-hook`, no browser storage migration, old placeholders. The `brainstorm.db` rename, adoptOldData and the brainstorm marketplace name stay for old installs. A 0.4-era hook is now refused. Commit `0d534be`.
+- **Dependencies**: `@nestjs/cli` dropped, `@types/d3-hierarchy` to dev, no `legacy-peer-deps`. Commit `911b6f2`.
+- **Strict TypeScript** (`noUnusedLocals`, `noUnusedParameters`, `noImplicitOverride`) and what it flagged removed; command edits use the map's own `.gitignore`-aware rules; `.mts` and `.cts` files are on the map. Commit `6ae26f2`.
+
+### Docs and comments
+
+- **technical.md rewritten** against the code, with attention, tasks and cowork folded in; run-locally and performance docs updated. Commit `d43a9e0`.
+- **"Owner:" lines removed** and dated comments made timeless. Comments only. Commit `4a426a7`.
+- Build log and handoff: `9cf0535`, `bdf312b`, `1b20485`.
+
+### Review fixes
+
+- **tsconfig alias lookup** stops at the project, reads only a regular file under 1 MB, and an alias without `*` matches that name only; tests. Commit `dd75b3b`.
+- **The ignored-folders listing** gives up after 10 s with what it found. Commit `39d68de`.
+- **A returning project folder under another spelling** is saved under it. Commit `fdf2fb6`.
+
+### Left open (Phase 3)
+
+- Hosted-demo code kept for now (maintainer decision), so recording code and `lib/preview.ts` remain.
+- Moving `site/` and `video/` to their own repos: not done.
+- `app/README.md` still mentions Nemotron and `brainstorm.db`.
+- Thread titles: attached context next to typed words is no longer in the title; typed HTML stays.
+- `test/regex-timing.test.cjs` is timing-based and flaked once.
+
+## Phase 4: one copy of each rule
+
+Behaviour should be the same. This puts rules that existed in several copies in one place. Phase 4 was not separately reviewed.
+
+### What you might notice
+
+- Phone layout starts at 440 px, not 600 px; between 440 and 1100 px the sidebar folds into a strip on the left.
+- Picker's Back works.
+- Failed steps are now stored with the step itself; old threads are filled in on first start.
+- A character split at a read boundary is no longer garbled in some Codex lookups.
+- Markdown export names a file relative to the project only if truly inside it.
+
+### Shared between server and web
+
+- **Contract moved into the shared folder**, plus new fields (`Step.isError`, command-edit input, 409 body, token, usage and updates status, hook signal), one store action name for the setup payload. Commits `af13e5e`, `7e327bb`.
+- **One call pairer, one prompt parser, one failure text rule, one set of tool-name lists, one worktree/path module, small text helpers.** Several differently written copies became one each. Commits `005ea9d`, `d2c0f23`, `7d7c2ec`, `375a120`, `9f135fc`, `b441ffd`. Nothing visible; thread titles come from the one prompt parser.
+
+### Server
+
+- **One "inside the root" check** (`core/paths.ts`). Kept on purpose: the either-Unicode-form version in `moved.ts` and the relative-path one in `ignore.ts`. Commit `f67acf1`.
+- **One config reader** (`core/config.ts`), the only reader of the environment; `.env.example` is generated. Commit `40b6da0`.
+- **All tables in `core/schema.ts`** with ordered migrations under `PRAGMA user_version`; one settings service. Existing databases migrate as before. Commit `2a4276e`.
+- **The open project's folder in one provider** instead of a mutable setting. Commit `3e7c833`.
+- **The setup checklist asks the mapper for stats** instead of reaching into its cache. Commit `5c65ae9`.
+- **One line reader**; fixes a character cut by a 4 MB read boundary. Commit `fdc935b`.
+- **One local-write guard** (a refused write was already a 403). Commit `06e2c48`.
+- **Prepared statements kept per database.** Commit `30965d5`.
+- **`Step.isError` stored** (migration 2, backfilled), kept in old input for older builds. Commit `4a180c9`.
+- **Markdown export** says a file is inside the project only when it is (`/a/bc` is not inside `/a/b`). Commit `9a06971`.
+
+### Web
+
+- **One way to call the server** (`lib/api.ts`) with one error type the setup view, Ask and crash screen show. Commit `861862d`.
+- **`usePoll`**, **`createAtom`** for small stores, **breakpoints module** (1100 and 440 px) with one clock and one size hook. Commits `e94799b`, `63fe90f`, `ace7618`.
+- **Store migration finished**: views read only the slices they draw. Commit `01eb17f`.
+- **One shortcuts registry**; the thread bar's Play and Center call the action directly. Commit `cec706f`.
+- **The step at the replay cursor and the Places step live in the nav store.** Commit `087e636`.
+- **Map helpers once** (ease, id hash, colour parsing). Commit `b7ff45c`.
+- **Phone layout at 440 px; folded strip up to 1100 px.** Maintainer decision. Commit `e157044`.
+- **Picker's Back fixed**: the boot screen waits while the checklist runs, and Back stops picking. Commit `f8a3ba6`.
+- Build log and handoff: `5cb5c81`.
+
+### Left open (Phase 4)
+
+- Copies whose behaviour differs were kept on purpose (named in the commits above).
+- Phase 5 (split the large files, renames) and Phase 6 (tests, release process) are not started.
+- Merge to `main` happens only after all phases; pushes and release are the maintainer's.

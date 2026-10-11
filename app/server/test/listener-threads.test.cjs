@@ -160,3 +160,64 @@ test("a command's file edits waiting for the mapper are stored, without a diff, 
   assert.equal(edits[0].diff, undefined);
   await t.close();
 });
+
+/** Wait for the backfill (history read) to end. */
+async function backfilled(L) {
+  await new Promise((r) => setImmediate(r));
+  while (L.historyEnd.size || L.reading.size) await new Promise((r) => setTimeout(r, 10));
+}
+
+test("history reads a thread's own log and its subagents' together, in time order, whichever file is newer", async () => {
+  const { mkdirSync, utimesSync } = require("node:fs");
+  for (const newer of ["main", "subagent"]) {
+    const t = await makeListener();
+    const L = t.listener;
+    const main = join(t.projectDir, "S.jsonl");
+    const sub = join(t.projectDir, "S", "subagents", "agent-a1.jsonl");
+    mkdirSync(join(t.projectDir, "S", "subagents"), { recursive: true });
+    const side = (l) => ({ ...l, isSidechain: true, agentId: "a1" });
+    writeFileSync(main, jsonl([line("prompt", { sessionId: "S", i: 0, text: "main ask" }), line("tool", { sessionId: "S", i: 2, tool: "Task" }), line("text", { sessionId: "S", i: 5, text: "final answer" })]));
+    writeFileSync(sub, jsonl([side(line("prompt", { sessionId: "S", i: 1, text: "SUBAGENT-BRIEF look at the API" })), side(line("text", { sessionId: "S", i: 3, text: "sub 3" })), side(line("text", { sessionId: "S", i: 4, text: "sub 4" }))]));
+    const old = new Date(Date.now() - 3600_000);
+    utimesSync(newer === "main" ? sub : main, old, old);
+    L.backfillForNewFilter();
+    await backfilled(L);
+    const steps = L.listSteps("S");
+    assert.deepEqual(steps.map((s) => s.text ?? s.tool), ["main ask", "SUBAGENT-BRIEF look at the API", "Task", "sub 3", "sub 4", "final answer"], newer);
+    assert.deepEqual(steps.map((s) => s.seq), [0, 1, 2, 3, 4, 5]);
+    const s = L.getSession("S");
+    assert.equal(s.title, "main ask");
+    assert.equal(s.startedAt, steps[0].ts);
+    const notices = t.sent.filter((m) => m.type === "steps-stored");
+    assert.deepEqual(notices.at(-1), { type: "steps-stored", sessionId: "S", lastSeq: 5 }, "the pages are told the thread's last seq");
+    await t.close();
+  }
+});
+
+test("a log cut short or replaced: its steps go, it's read from the start; steps that come back keep their seq", async () => {
+  const { renameSync } = require("node:fs");
+  const t = await makeListener();
+  const f = join(t.projectDir, "s1.jsonl");
+  const lines = own("s1", "x", 5);
+  writeFileSync(f, jsonl(lines));
+  await t.readNow(f, true);
+  // Cut short to two lines, and one more written: the cut ones go, the two kept keep 0 and 1, the new one comes after.
+  writeFileSync(f, jsonl([...lines.slice(0, 2), ...own("s1", "y", 1, 5)]));
+  await t.readNow(f);
+  assert.deepEqual(stepsOf(t, "s1").map((s) => [s.text, s.seq]), [["x 0", 0], ["x 1", 1], ["y 0", 5]]);
+  assert.equal(offsetOf(t, f), require("node:fs").statSync(f).size);
+  // Replaced by another file, longer, with another first line: read from its start, nothing of the old one left.
+  const tmp = f + ".new";
+  writeFileSync(tmp, jsonl(own("s1", "z", 8, 10)));
+  renameSync(tmp, f);
+  await t.readNow(f);
+  assert.deepEqual(stepsOf(t, "s1").map((s) => s.text), ["z 0", "z 1", "z 2", "z 3", "z 4", "z 5", "z 6", "z 7"]);
+  // Same inode, same size, another first line (rewritten in place).
+  const before = stepsOf(t, "s1");
+  const again = own("s1", "w", 8, 20).map((l) => ({ ...l, timestamp: l.timestamp }));
+  writeFileSync(f, jsonl(again));
+  await t.readNow(f);
+  assert.ok(stepsOf(t, "s1").every((s) => s.text.startsWith("w")), "the rewritten log's steps only");
+  assert.ok(Math.min(...stepsOf(t, "s1").map((s) => s.seq)) > Math.max(...before.map((s) => s.seq)), "new steps, new seqs");
+  await t.close();
+});

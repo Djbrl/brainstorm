@@ -151,6 +151,13 @@ export class ClaudeSource implements LogSource {
     return !!rel && !rel.startsWith("..") && !rel.startsWith(sep);
   }
 
+  threadOf(file: string) {
+    const parts = relative(this.dir, file).split(sep);
+    if (parts.length === 2) return basename(parts[1], ".jsonl"); // <project>/<thread>.jsonl
+    if (parts.length === 4 && parts[2] === "subagents") return parts[1]; // <project>/<thread>/subagents/agent-*.jsonl
+    return undefined;
+  }
+
   inScope(file: string, scope: Scope) {
     this.setScope(scope);
     return (this.matches(relative(this.dir, file).split(sep)[0] ?? "") && this.isOurs(file)) || this.isGuest(file);

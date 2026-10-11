@@ -57,6 +57,8 @@ export interface LogSource {
    * error rolls the chunk back. Lines arrive in order, but reading can resume anywhere after a restart: what a source
    * needs from a file's first line (Codex's session id) it must be able to get from the file again. */
   parse(file: string, line: unknown, sink: Sink): void;
+  /** The thread a log file belongs to (a subagent's log: its parent's), if known: a thread's logs are read together. */
+  threadOf?(file: string): string | undefined;
   /** The folders it watches, as chokidar's getWatched gives them (tests). */
   getWatched?(): Record<string, string[]>;
   /** Threads to leave out of the list although stored (Claude: deleted in its desktop app). `files`: every log read. */

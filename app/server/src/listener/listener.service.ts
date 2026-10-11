@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from "@nestjs/common";
 import { HttpAdapterHost } from "@nestjs/core";
-import { closeSync, existsSync, openSync, readdirSync, readSync, realpathSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { closeSync, existsSync, fstatSync, openSync, readdirSync, readSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { Harness, Session, Step } from "../types";
 import { DbService } from "../core/db.service";
@@ -30,11 +31,9 @@ const IDLE_AFTER_MS = 2 * 60 * 1000;
 type SessionRow = { id: string; cwd: string; title: string; started_at: string; last_event_at: string; custom_title: number; title_set: number; worked: number; harness: string };
 type BatchSession = SessionRow & { isNew: boolean; dirty: boolean };
 
-/** One chunk of a file being stored: passed down the parse, so reads of several files can interleave. */
+/** One chunk of lines being stored: passed down the parse, so reads of several files can interleave. */
 type Batch = {
-  /** Lines ending at or before this byte offset are history: stored, not broadcast as live activity. */
-  quietUntil: number;
-  /** The line being parsed is history. */
+  /** The line being parsed is history: stored, not broadcast as live activity. */
   quiet: boolean;
   /** Session rows this chunk touched, written once at its end. */
   sessions: Map<string, BatchSession>;
@@ -43,7 +42,53 @@ type Batch = {
   announced: Set<string>;
   /** Each touched session's next seq before the chunk, put back if it rolls back. */
   seqBefore: Map<string, number | undefined>;
+  /** Seqs taken back from `kept` (thread, step id, seq), put back if it rolls back. */
+  keptUsed: [string, string, number][];
+  /** Threads that got history stored (told to the pages, see noticeStored). */
+  quietSessions: Set<string>;
 };
+
+/** A log being read: where it's at, and its complete lines read and not stored yet. */
+type Cursor = {
+  file: string;
+  source: LogSource;
+  fd: number;
+  /** Its size when opened: what this pass reads. */
+  size: number;
+  /** Next byte to read, and the offset after the last line stored. */
+  pos: number;
+  committed: number;
+  /** Lines ending at or before this byte offset are history. */
+  quietUntil: number;
+  /** Which file this is (another at the same path is another log), and a hash of its first line. */
+  ino: number;
+  head?: string;
+  /** Its thread's reset count when opened (see resetThread). */
+  reset: number;
+  /** The start of a line not complete yet; inside a line longer than maxLineBytes (dropped up to its end). */
+  pending: Buffer | null;
+  skipping: boolean;
+  /** Lines read and not handed out yet: lines[next…]. */
+  lines: Line[];
+  next: number;
+  reads: number;
+  /** The time of its last line that had one. */
+  lastTs: number;
+};
+/** A complete line: buf[start, end), the offset after it, and (logs merged) its time and its parse. start === end: no
+ * line to store, only an offset to move past (an empty or over-long line). */
+type Line = { c: Cursor; buf: Buffer; start: number; end: number; at: number; ts: number; obj?: unknown; err?: string };
+type ReadEntry = { again?: number; done?: Promise<void> };
+
+/** A hash of a log's first line (of its first 4 KB, if longer), or undefined while it isn't written: the same path
+ * with another first line is another log. */
+function headOf(fd: number, size: number): string | undefined {
+  const buf = Buffer.alloc(Math.min(4096, size));
+  const n = readSync(fd, buf, 0, buf.length, 0);
+  const nl = buf.subarray(0, n).indexOf(0x0a);
+  if (nl === -1 && n < 4096) return undefined;
+  return createHash("sha1").update(buf.subarray(0, nl === -1 ? n : nl + 1)).digest("hex");
+}
 
 /** How long a live command's file edits wait for the mapper to see the files change (it batches changes for 100 ms). */
 const COMMAND_EDIT_WAIT_MS = 1_500;
@@ -58,6 +103,8 @@ const NL = 0x0a;
  * times in a row; after that, on the log's next change. */
 const RETRY_MS = 1_000;
 const RETRY_MAX = 30;
+/** While a long history read goes on, the pages are told which threads got steps every this many batches. */
+const NOTICE_EVERY = 4;
 const yieldToLoop = () => new Promise<void>((r) => setImmediate(r));
 const isSqliteError = (e: unknown) => String((e as { code?: unknown })?.code ?? "").startsWith("ERR_SQLITE");
 
@@ -74,6 +121,14 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   private guestFiles: string[] = [];
   private pendingGuest?: string;
   private offsets = new Map<string, number>();
+  /** Which file each offset is in (inode, first line's hash; see headOf), to notice a log replaced or cut short. */
+  private idents = new Map<string, { ino?: number | null; head?: string | null }>();
+  /** Per file, how many times its thread was read again from the start (a pass that began before stops). */
+  private resets = new Map<string, number>();
+  /** Steps of a thread being read again from the start, by id: each comes back with the seq it had. */
+  private kept = new Map<string, Map<string, number>>();
+  /** Threads that got history stored since the pages were last told (noticeStored). */
+  private storedQuietly = new Set<string>();
   private nextSeq = new Map<string, number>();
   private ready = false;
   /** Where the agents' logs come from: Claude Code's, then Codex's. Built in onModuleInit (it needs the config). */
@@ -100,7 +155,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   private listening!: Promise<void>;
   private isListening = false;
   /** Files being read now, and the next pass to make once the current one ends (the file changed meanwhile). */
-  private reading = new Map<string, { again?: number; done?: Promise<void> }>();
+  private reading = new Map<string, ReadEntry>();
   /** Each file's size when the backfill listed it: lines up to there are history, anything after is live. */
   private historyEnd = new Map<string, number>();
   private backfillGen = 0;
@@ -150,6 +205,10 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     // Added 5 Oct 2026: which subagent a step comes from, so parallel subagents stay apart after a reload. Steps stored
     // before then get theirs from their logs, once (see agent-ids.ts).
     if (!stepCols.includes("agent_id")) db.exec(`ALTER TABLE steps ADD COLUMN agent_id TEXT`);
+    // Added 11 Oct 2026: which file an offset is in, to notice a log replaced or cut short (see openLog).
+    const offsetCols = (db.prepare(`PRAGMA table_info(listener_offsets)`).all() as { name: string }[]).map((c) => c.name);
+    if (!offsetCols.includes("ino")) db.exec(`ALTER TABLE listener_offsets ADD COLUMN ino INTEGER`);
+    if (!offsetCols.includes("head")) db.exec(`ALTER TABLE listener_offsets ADD COLUMN head TEXT`);
     db.exec(`CREATE INDEX IF NOT EXISTS steps_session_seq ON steps(session_id, seq)`);
     db.exec(`CREATE INDEX IF NOT EXISTS steps_label ON steps(kind, label)`);
     // Added 6 Oct 2026: "was this file touched by a step?" for the picture endpoint (image/).
@@ -177,8 +236,9 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     this.sources = [new ClaudeSource(this.cfg.claudeProjectsDir, warn), this.codex];
     this.rereadChangedSources();
 
-    for (const row of db.prepare(`SELECT file, offset FROM listener_offsets`).all() as { file: string; offset: number }[]) {
+    for (const row of db.prepare(`SELECT file, offset, ino, head FROM listener_offsets`).all() as { file: string; offset: number; ino: number | null; head: string | null }[]) {
       this.offsets.set(row.file, row.offset);
+      this.idents.set(row.file, { ino: row.ino, head: row.head });
     }
     for (const row of db.prepare(`SELECT session_id, MAX(seq) as m FROM steps GROUP BY session_id`).all() as { session_id: string; m: number }[]) {
       this.nextSeq.set(row.session_id, row.m + 1);
@@ -294,9 +354,9 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       ),
       sessionRow: db.prepare(`SELECT * FROM sessions WHERE id = ?`),
       insertSession: db.prepare(`INSERT INTO sessions (id, cwd, title, started_at, last_event_at, custom_title, title_set, worked, harness) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`),
-      updateSession: db.prepare(`UPDATE sessions SET cwd = ?, title = ?, last_event_at = ?, title_set = ?, custom_title = ?, worked = ? WHERE id = ?`),
+      updateSession: db.prepare(`UPDATE sessions SET cwd = ?, title = ?, started_at = ?, last_event_at = ?, title_set = ?, custom_title = ?, worked = ? WHERE id = ?`),
       allSessions: db.prepare(`SELECT * FROM sessions ORDER BY last_event_at DESC`),
-      saveOffset: db.prepare(`INSERT INTO listener_offsets (file, offset) VALUES (?, ?) ON CONFLICT(file) DO UPDATE SET offset = excluded.offset`),
+      saveOffset: db.prepare(`INSERT INTO listener_offsets (file, offset, ino, head) VALUES (?, ?, ?, ?) ON CONFLICT(file) DO UPDATE SET offset = excluded.offset, ino = excluded.ino, head = excluded.head`),
       stepById: db.prepare(`SELECT * FROM steps WHERE id = ?`),
       stepThread: db.prepare(`SELECT session_id FROM steps WHERE id = ?`),
       stepsOf: db.prepare(`SELECT * FROM steps WHERE session_id = ? ORDER BY seq ASC`),
@@ -389,12 +449,23 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     const started = Date.now();
     const todo = files.filter((f) => this.historyEnd.has(f.path));
     const recent = todo.filter((f) => started - f.mtimeMs <= RECENT_MS).length;
-    this.log.log(`backfill: reading ${todo.length} of ${files.length} jsonl file(s), newest first (${recent} from the last two weeks)`);
+    // A thread's logs (its own and its subagents') are read together, their lines in time order: its steps are
+    // numbered in the order things happened, not in the order the files were read.
+    const threads = new Map<string, string[]>();
     for (const f of todo) {
+      const source = this.sourceOf(f.path);
+      const key = `${source?.harness}\n${source?.threadOf?.(f.path) ?? f.path}`;
+      const list = threads.get(key);
+      if (list) list.push(f.path); else threads.set(key, [f.path]);
+    }
+    this.log.log(`backfill: reading ${todo.length} of ${files.length} jsonl file(s) (${threads.size} thread(s)), newest first (${recent} from the last two weeks)`);
+    for (const paths of threads.values()) {
       if (gen !== this.backfillGen) return; // the workspace changed again: that backfill takes over
-      const end = this.historyEnd.get(f.path);
-      if (end === undefined) continue;     // read meanwhile (it changed, and was read up to its end)
-      await this.runFile(f.path, end);
+      const left = paths.filter((p) => this.historyEnd.has(p)); // not read meanwhile (it changed, and was read up to its end)
+      if (!left.length) continue;
+      // The thread's own log first, where lines have the same time (it's the shorter path, for both sources).
+      left.sort((a, b) => a.length - b.length || (a < b ? -1 : 1));
+      await this.runFiles(left);
       await yieldToLoop();
     }
     this.log.log(`backfill: finished ${todo.length} file(s) in ${Date.now() - started} ms`);
@@ -416,141 +487,254 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       cur.again = Math.min(cur.again ?? Infinity, quietUntil);
       return cur.done!;
     }
-    const entry: { again?: number; done?: Promise<void> } = { again: quietUntil };
+    const entry: ReadEntry = { again: quietUntil };
     this.reading.set(file, entry);
     entry.done = (async () => {
       try {
         while (entry.again !== undefined) {
           const q = entry.again;
           entry.again = undefined;
-          await this.readFile(file, q);
+          await this.readLogs([{ file, quietUntil: q }]);
         }
       } catch (e) {
         this.log.warn(`handleFile(${file}) failed: ${(e as Error).message}`);
       } finally {
         this.reading.delete(file);
-        const end = this.historyEnd.get(file);
-        if (end !== undefined && (this.offsets.get(file) ?? 0) >= end) this.historyEnd.delete(file);
+        this.historyRead(file);
       }
     })();
     return entry.done;
   }
 
-  /** Read the appended bytes chunkBytes at a time, split on newline bytes before decoding (a multibyte character
-   * never spans one), and store the complete lines about batchBytes per transaction, each with the byte offset after
-   * its last line, yielding in between. A partial last line waits for the next change. */
-  private async readFile(file: string, quietUntil: number): Promise<void> {
-    const source = this.sourceOf(file);
-    if (!source || !source.inScope(file, this.scope())) return;
-    let fd: number | undefined;
-    try {
-      const size = statSync(file).size;
-      const prev = this.offsets.get(file) ?? 0;
-      if (size < prev) { this.saveOffset(file, 0); return; } // file rotated/truncated
-      if (size === prev) return;
-      fd = openSync(file, "r");
-      let pos = prev;                     // next byte to read
-      let pending: Buffer | null = null;  // the start of a line not complete yet
-      let skipping = false;               // inside a line longer than maxLineBytes: dropped up to its end
-      let first = true;
-      while (pos < size) {
-        if (!first) await yieldToLoop();
-        first = false;
-        const want = Math.min(this.chunkBytes, size - pos);
-        const chunk = Buffer.allocUnsafe(want);
-        const n = readSync(fd, chunk, 0, want, pos);
-        if (n <= 0) break;
-        const chunkStart = pos;
-        pos += n;
-        let data = chunk.subarray(0, n);
-        let dataStart = chunkStart;
-        if (skipping) {
-          const nl = data.indexOf(NL);
-          if (nl === -1) continue;
-          skipping = false;
-          data = data.subarray(nl + 1);
-          dataStart = chunkStart + nl + 1;
-          this.saveOffset(file, dataStart); // past the long line
-        }
-        const work: Buffer = pending ? Buffer.concat([pending, data]) : data;
-        const workStart = dataStart - (pending ? pending.length : 0);
-        pending = null;
-        const lastNl = work.lastIndexOf(NL);
-        let rest: Buffer = work;
-        if (lastNl !== -1) {
-          // Stored a batch of about batchBytes at a time, yielding in between, so a request waits one batch at most.
-          const end = lastNl + 1;
-          for (let s = 0; s < end;) {
-            let e = end;
-            if (end - s > this.batchBytes) {
-              e = work.lastIndexOf(NL, s + this.batchBytes - 1) + 1;
-              if (e <= s) e = work.indexOf(NL, s + this.batchBytes) + 1; // one line longer than a batch
-            }
-            if (!this.commitChunk(file, work, workStart, s, e, quietUntil)) return;
-            s = e;
-            if (s < end) await yieldToLoop();
-          }
-          rest = work.subarray(end);
-        }
-        if (rest.length > this.maxLineBytes) {
-          this.log.warn(`skipping a line over ${Math.round(this.maxLineBytes / 1048576)} MB in ${file} (byte ${workStart + work.length - rest.length})`);
-          skipping = true;
-        } else if (rest.length) pending = Buffer.from(rest); // a copy: don't keep the whole chunk alive
+  /** Read one thread's logs as one pass, their lines merged by time (history: lines up to each file's historyEnd are
+   * quiet). Waits for a pass on any of them to end first; a change during the pass is read after it. Never rejects. */
+  private async runFiles(files: string[]): Promise<void> {
+    if (files.length === 1) return this.runFile(files[0], this.historyEnd.get(files[0]) ?? 0);
+    while (files.some((f) => this.reading.has(f))) await Promise.all(files.map((f) => this.reading.get(f)?.done));
+    const entries = files.map((f) => { const e: ReadEntry = {}; this.reading.set(f, e); return e; });
+    const done = (async () => {
+      try {
+        await this.readLogs(files.map((f) => ({ file: f, quietUntil: this.historyEnd.get(f) ?? 0 })));
+      } catch (e) {
+        this.log.warn(`reading ${files[0]} and its subagents' logs failed: ${(e as Error).message}`);
+      } finally {
+        for (const f of files) this.reading.delete(f);
       }
+      await Promise.all(files.map((f, k) => (entries[k].again !== undefined ? this.runFile(f, entries[k].again) : undefined)));
+      for (const f of files) this.historyRead(f);
+    })();
+    for (const e of entries) e.done = done;
+    return done;
+  }
+
+  /** A file the backfill listed is history no more once it's read up to where it was listed. */
+  private historyRead(file: string) {
+    const end = this.historyEnd.get(file);
+    if (end !== undefined && (this.offsets.get(file) ?? 0) >= end) this.historyEnd.delete(file);
+  }
+
+  /** Read what `logs` gained since their offsets, chunkBytes at a time, split on newline bytes before decoding (a
+   * multibyte character never spans one), and store the complete lines about batchBytes per transaction, each log's
+   * offset after its last line stored with them, yielding in between. A partial last line waits for the next change.
+   * Several logs (a thread's own and its subagents') are merged by their lines' times. When it's done, and every few
+   * batches, the threads that got history are told to the pages (noticeStored). */
+  private async readLogs(logs: { file: string; quietUntil: number }[]): Promise<void> {
+    const cursors: Cursor[] = [];
+    try {
+      for (const { file, quietUntil } of logs) {
+        const c = this.openLog(file, quietUntil);
+        if (c) cursors.push(c);
+      }
+      const merge = cursors.length > 1;
+      // A thread read again from the start meanwhile (resetThread): this pass stops, and each log is read again after it.
+      const stale = () => {
+        if (!cursors.some((c) => (this.resets.get(c.file) ?? 0) !== c.reset)) return false;
+        for (const c of cursors) void this.runFile(c.file, c.quietUntil);
+        return true;
+      };
+      let batch: Line[] = [];
+      let bytes = 0;
+      let commits = 0;
+      for (;;) {
+        let next: Cursor | undefined;
+        for (const c of cursors) {
+          while (c.next === c.lines.length && c.pos < c.size) await this.fill(c, merge);
+          if (c.next < c.lines.length && (!next || c.lines[c.next].ts < next.lines[next.next].ts)) next = c;
+        }
+        if (!next) break;
+        const l = next.lines[next.next++];
+        batch.push(l);
+        bytes += l.end - l.start + 1;
+        if (bytes < this.batchBytes) continue;
+        if (stale() || !this.commitLines(batch)) return;
+        batch = [];
+        bytes = 0;
+        if (++commits % NOTICE_EVERY === 0) this.noticeStored();
+        await yieldToLoop();
+      }
+      if (batch.length && !stale()) this.commitLines(batch);
     } finally {
-      if (fd !== undefined) closeSync(fd);
+      for (const c of cursors) closeSync(c.fd);
+      this.noticeStored();
     }
   }
 
-  /** Store the complete lines buf[start, end) (buf[0] is byte `bufStart` of the file) and the offset after them in
-   * one transaction, then announce what was live. On a database error nothing of it is kept (seqs put back, offset
-   * unchanged) and it's read again in a second (retrySoon); returns false then. */
-  private commitChunk(file: string, buf: Buffer, bufStart: number, start: number, end: number, quietUntil: number): boolean {
-    const db = this.dbs.db;
+  /** A log to read from its offset, or undefined if it's not the project's, gone, or has nothing new. A log replaced
+   * or cut short since (another file at its path, another first line, or shorter than its offset) has its thread
+   * read again from the start (resetThread). */
+  private openLog(file: string, quietUntil: number): Cursor | undefined {
     const source = this.sourceOf(file);
-    if (!source) return true;
-    const batch: Batch = { quietUntil, quiet: true, sessions: new Map(), events: [], announced: new Set(), seqBefore: new Map() };
-    const sink = this.sinkFor(batch, source.harness);
+    if (!source || !source.inScope(file, this.scope())) return undefined;
+    let fd: number;
+    let st: { size: number; ino: number };
+    try { fd = openSync(file, "r"); st = fstatSync(fd); } catch { return undefined; } // gone
+    let prev = this.offsets.get(file) ?? 0;
+    const head = headOf(fd, st.size);
+    const known = this.idents.get(file);
+    if (prev > 0 && (st.size < prev || (known?.ino != null && known.ino !== st.ino) || (known?.head != null && head !== undefined && head !== known.head))) {
+      try { this.resetThread(file, source); } catch (e) { closeSync(fd); throw e; }
+      prev = 0;
+      quietUntil = Math.max(quietUntil, st.size); // what it has now is history; the pages catch up (noticeStored)
+    }
+    if (st.size <= prev) { closeSync(fd); return undefined; }
+    return {
+      file, source, fd, size: st.size, pos: prev, committed: prev, quietUntil, ino: st.ino, head, reset: this.resets.get(file) ?? 0,
+      pending: null, skipping: false, lines: [], next: 0, reads: 0, lastTs: -Infinity,
+    };
+  }
+
+  /** Read a log's next chunk into its cursor's lines (with each line's time when logs are merged). */
+  private async fill(c: Cursor, merge: boolean) {
+    if (c.reads++) await yieldToLoop();
+    if (c.next === c.lines.length) { c.lines = []; c.next = 0; }
+    const want = Math.min(this.chunkBytes, c.size - c.pos);
+    const chunk = Buffer.allocUnsafe(want);
+    const n = readSync(c.fd, chunk, 0, want, c.pos);
+    if (n <= 0) { c.size = c.pos; return; }
+    const chunkStart = c.pos;
+    c.pos += n;
+    let data = chunk.subarray(0, n);
+    let dataStart = chunkStart;
+    if (c.skipping) {
+      const nl = data.indexOf(NL);
+      if (nl === -1) return;
+      c.skipping = false;
+      data = data.subarray(nl + 1);
+      dataStart = chunkStart + nl + 1;
+      c.lines.push({ c, buf: data, start: 0, end: 0, at: dataStart, ts: c.lastTs }); // past the long line
+    }
+    const work: Buffer = c.pending ? Buffer.concat([c.pending, data]) : data;
+    const workStart = dataStart - (c.pending ? c.pending.length : 0);
+    c.pending = null;
+    let s = 0;
+    for (let e = work.indexOf(NL); e !== -1; s = e + 1, e = work.indexOf(NL, s)) {
+      const l: Line = { c, buf: work, start: s, end: e, at: workStart + e + 1, ts: c.lastTs };
+      if (e - s > this.maxLineBytes) {
+        this.log.warn(`skipping a line over ${Math.round(this.maxLineBytes / 1048576)} MB in ${c.file} (byte ${workStart + s})`);
+        l.end = l.start; // only its offset is kept
+      } else if (merge && e > s) {
+        try { l.obj = JSON.parse(work.toString("utf8", s, e)); } catch (err) { l.err = (err as Error).message; }
+        const t = Date.parse((l.obj as { timestamp?: unknown } | undefined)?.timestamp as string);
+        if (!Number.isNaN(t)) l.ts = c.lastTs = t; // a line without a time stays where it is in its log
+      }
+      c.lines.push(l);
+    }
+    const rest = work.subarray(s);
+    if (rest.length > this.maxLineBytes) {
+      this.log.warn(`skipping a line over ${Math.round(this.maxLineBytes / 1048576)} MB in ${c.file} (byte ${workStart + s})`);
+      c.skipping = true;
+    } else if (rest.length) c.pending = Buffer.from(rest); // a copy: don't keep the whole chunk alive
+  }
+
+  /** Store `lines` (of one or more logs) and each log's offset after its last one in one transaction, then announce
+   * what was live. On a database error nothing of it is kept (seqs put back, offsets unchanged) and each log is read
+   * again in a second (retrySoon); returns false then. */
+  private commitLines(lines: Line[]): boolean {
+    const db = this.dbs.db;
+    const batch: Batch = { quiet: true, sessions: new Map(), events: [], announced: new Set(), seqBefore: new Map(), keptUsed: [], quietSessions: new Set() };
+    const sinks = new Map<LogSource, Sink>();
+    const ends = new Map<Cursor, number>();
     try {
       // IMMEDIATE: the write lock from the start. A transaction that reads first (is this step stored?) and writes after
       // can't wait for a lock another program holds (busy_timeout): it fails at once.
       db.exec("BEGIN IMMEDIATE");
-      for (let s = start; s < end;) {
-        let e = buf.indexOf(NL, s);
-        if (e === -1 || e >= end) e = end;
-        if (e - s > this.maxLineBytes) {
-          this.log.warn(`skipping a line over ${Math.round(this.maxLineBytes / 1048576)} MB in ${file} (byte ${bufStart + s})`);
-        } else if (e > s) {
-          batch.quiet = bufStart + e + 1 <= quietUntil;
-          let obj: unknown;
-          try {
-            obj = JSON.parse(buf.toString("utf8", s, e));
-          } catch (err) {
-            this.log.warn(`bad jsonl line in ${file}: ${(err as Error).message}`);
-          }
-          if (obj) {
-            try { source.parse(file, obj, sink); } catch (err) {
-              if (isSqliteError(err)) throw err; // the database, not the line: roll the batch back
-              this.log.warn(`bad jsonl line in ${file}: ${(err as Error).message}`);
-            }
-          }
+      for (const l of lines) {
+        const c = l.c;
+        ends.set(c, l.at);
+        if (l.end <= l.start) continue; // an empty or over-long line
+        batch.quiet = l.at <= c.quietUntil;
+        let obj = l.obj;
+        if (obj === undefined && l.err === undefined) {
+          try { obj = JSON.parse(l.buf.toString("utf8", l.start, l.end)); } catch (err) { l.err = (err as Error).message; }
         }
-        s = e + 1;
+        if (l.err !== undefined) this.log.warn(`bad jsonl line in ${c.file}: ${l.err}`);
+        if (!obj) continue;
+        let sink = sinks.get(c.source);
+        if (!sink) sinks.set(c.source, (sink = this.sinkFor(batch, c.source.harness)));
+        try { c.source.parse(c.file, obj, sink); } catch (err) {
+          if (isSqliteError(err)) throw err; // the database, not the line: roll the batch back
+          this.log.warn(`bad jsonl line in ${c.file}: ${(err as Error).message}`);
+        }
       }
       this.flushSessions(batch);
-      this.st.saveOffset.run(file, bufStart + end);
+      for (const [c, at] of ends) this.st.saveOffset.run(c.file, at, c.ino, c.head ?? null);
       db.exec("COMMIT");
     } catch (e) {
       try { db.exec("ROLLBACK"); } catch { /* already rolled back */ }
       for (const [id, n] of batch.seqBefore) if (n === undefined) this.nextSeq.delete(id); else this.nextSeq.set(id, n);
-      this.log.warn(`storing ${file} from byte ${bufStart + start} failed, tried again in a moment: ${(e as Error).message}`);
-      this.retrySoon(file, quietUntil);
+      for (const [sid, id, seq] of batch.keptUsed) { const m = this.kept.get(sid) ?? new Map<string, number>(); m.set(id, seq); this.kept.set(sid, m); }
+      for (const c of new Set(lines.map((l) => l.c))) {
+        this.log.warn(`storing ${c.file} from byte ${c.committed} failed, tried again in a moment: ${(e as Error).message}`);
+        this.retrySoon(c.file, c.quietUntil);
+      }
       return false;
     }
-    this.retryCount.delete(file);
-    this.setOffset(file, bufStart + end);
+    for (const [c, at] of ends) {
+      c.committed = at;
+      this.retryCount.delete(c.file);
+      this.setOffset(c.file, at);
+      this.idents.set(c.file, { ino: c.ino, head: c.head });
+    }
+    for (const sid of batch.quietSessions) this.storedQuietly.add(sid);
     this.announce(batch);
     return true;
+  }
+
+  /** A log was replaced or cut short: its thread's steps are dropped and all its logs read again from the start. The
+   * steps that come back keep their seq (`kept`): a re-read never renumbers a step a page already has. */
+  private resetThread(file: string, source: LogSource) {
+    const thread = source.threadOf?.(file);
+    const files = thread === undefined ? [file] : [...this.offsets.keys()].filter((f) => f === file || (source.owns(f) && source.threadOf!(f) === thread));
+    this.log.warn(`${file} was replaced or cut short: ${thread === undefined ? "it is" : `its thread's logs are`} read again from the start`);
+    const db = this.dbs.db;
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      if (thread !== undefined) {
+        const keep = this.kept.get(thread) ?? new Map<string, number>();
+        for (const r of db.prepare(`SELECT id, seq FROM steps WHERE session_id = ?`).all(thread) as { id: string; seq: number }[]) keep.set(r.id, r.seq);
+        this.kept.set(thread, keep);
+        db.prepare(`DELETE FROM steps WHERE session_id = ?`).run(thread);
+      }
+      for (const f of files) this.st.saveOffset.run(f, 0, null, null);
+      db.exec("COMMIT");
+    } catch (e) { try { db.exec("ROLLBACK"); } catch { /* already rolled back */ } throw e; }
+    for (const f of files) {
+      this.setOffset(f, 0);
+      this.idents.delete(f);
+      this.resets.set(f, (this.resets.get(f) ?? 0) + 1);
+      if (f !== file) void this.runFile(f, Infinity);
+    }
+  }
+
+  /** Tell the pages which threads got history stored since the last notice, and their last seq: a page that loaded
+   * one of them before has a part of it, and fetches the rest. */
+  private noticeStored() {
+    if (!this.storedQuietly.size) return;
+    for (const sessionId of this.storedQuietly) {
+      const next = this.nextSeq.get(sessionId);
+      if (next !== undefined) this.gateway.broadcast({ type: "steps-stored", sessionId, lastSeq: next - 1 });
+    }
+    this.storedQuietly.clear();
   }
 
   /** Read `file` again in RETRY_MS, instead of waiting for it to grow: a finished thread's last steps would otherwise
@@ -566,8 +750,9 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private saveOffset(file: string, offset: number) {
-    this.st.saveOffset.run(file, offset);
+    this.st.saveOffset.run(file, offset, null, null);
     this.setOffset(file, offset);
+    this.idents.delete(file);
   }
   private setOffset(file: string, offset: number) {
     this.offsets.set(file, offset);
@@ -582,7 +767,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
         const id = this.ownId(parsed);
         if (id === undefined) return;
         const s = id === parsed.id ? parsed : { ...parsed, id };
-        const step = inStoredOrder(s, this.allocSeq(b, s.sessionId));
+        const step = inStoredOrder(s, this.keptSeq(b, s) ?? this.allocSeq(b, s.sessionId));
         this.storeStep(b, step, harness, opts);
         // A shell command that finished: the files it changed become edits too (command-edits.ts). In history at once,
         // without a diff; live a moment later, once the mapper has seen the files change.
@@ -606,7 +791,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     const edits = this.commandEdits.editsFor(done, ts, live);
     if (!edits.length) return;
     const db = this.dbs.db;
-    const b: Batch = { quietUntil: 0, quiet: !live, sessions: new Map(), events: [], announced: new Set(), seqBefore: new Map() };
+    const b: Batch = { quiet: !live, sessions: new Map(), events: [], announced: new Set(), seqBefore: new Map(), keptUsed: [], quietSessions: new Set() };
     try {
       db.exec("BEGIN IMMEDIATE");
       for (const e of edits) {
@@ -634,6 +819,17 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     if (at.session_id === s.sessionId) return undefined;
     const own = `${s.id}@${s.sessionId}`;
     return this.st.stepThread.get(own) ? undefined : own;
+  }
+
+  /** The seq a step had before its thread was read again from the start (resetThread), if it had one. */
+  private keptSeq(b: Batch, s: NewStep): number | undefined {
+    const kept = this.kept.get(s.sessionId);
+    const seq = kept?.get(s.id);
+    if (seq === undefined) return undefined;
+    kept!.delete(s.id);
+    if (!kept!.size) this.kept.delete(s.sessionId);
+    b.keptUsed.push([s.sessionId, s.id, seq]);
+    return seq;
   }
 
   private allocSeq(b: Batch, sessionId: string): number {
@@ -670,7 +866,8 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       const cwd = opts?.cwd || this.batchSession(b, step.sessionId)?.cwd || "";
       if (cwd && !this.isWithinRoot(cwd)) { this.visitors.add(step.sessionId); this.sessionsCache = null; }
     }
-    if (!b.quiet) {
+    if (b.quiet) b.quietSessions.add(step.sessionId);
+    else {
       if (step.kind === "tool_call" && step.tool === "Bash" && !step.reads) {
         const r = readsOf(step.tool, step.input, opts?.cwd || this.batchSession(b, step.sessionId)?.cwd || this.cwdOf(step.sessionId));
         if (r.reads) step.reads = r.reads;
@@ -720,6 +917,8 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       titleSet = 1;
     }
     const lastEventAt = !(Date.parse(row.last_event_at) >= Date.parse(ts)) ? ts : row.last_event_at; // as times, not strings
+    // A thread starts with its earliest step (its logs aren't always read in time order).
+    if (Date.parse(ts) < Date.parse(row.started_at)) Object.assign(row, { started_at: ts, dirty: true });
     const newCwd = cwd || row.cwd;
     const titleOrCwdChanged = title !== row.title || newCwd !== row.cwd;
     if (titleOrCwdChanged || lastEventAt !== row.last_event_at || titleSet !== row.title_set) {
@@ -749,7 +948,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     for (const r of b.sessions.values()) {
       if (!r.dirty) continue;
       if (r.isNew) this.st.insertSession.run(r.id, r.cwd, r.title, r.started_at, r.last_event_at, r.custom_title, r.title_set, r.worked, r.harness);
-      else this.st.updateSession.run(r.cwd, r.title, r.last_event_at, r.title_set, r.custom_title, r.worked, r.id);
+      else this.st.updateSession.run(r.cwd, r.title, r.started_at, r.last_event_at, r.title_set, r.custom_title, r.worked, r.id);
       this.sessionsCache = null;
     }
   }

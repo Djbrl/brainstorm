@@ -58,9 +58,10 @@ test("updateStep can store a label without broadcasting it", async () => {
   await t.readNow(f, true);
   const [step] = t.listener.listSteps("s1");
   t.listener.updateStep(step.id, { label: "quiet" }, { broadcast: false });
-  assert.equal(t.sent.length, 0);
+  const updates = () => t.sent.filter((m) => m.type === "step-update");
+  assert.equal(updates().length, 0);
   assert.equal(t.listener.getStep(step.id).label, "quiet");
   t.listener.updateStep(step.id, { label: "loud", risk: ["x"] });
-  assert.deepEqual(t.sent, [{ type: "step-update", id: step.id, label: "loud", risk: ["x"] }]);
+  assert.deepEqual(updates(), [{ type: "step-update", id: step.id, label: "loud", risk: ["x"] }]);
   await t.close();
 });

@@ -215,6 +215,12 @@ export class CodexSource implements LogSource {
     return folders.some((f) => this.inRoots(this.rewrite(meta, f)));
   }
 
+  /** A subagent's log is its parent's thread. */
+  threadOf(file: string) {
+    const meta = this.metaOf(file);
+    return meta ? meta.parent ?? meta.id : undefined;
+  }
+
   private inRoots(p: string) { return this.scope.roots.some((r) => within(p, r)); }
 
   /** The file's first line, read once (up to its first newline). */

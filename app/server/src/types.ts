@@ -33,6 +33,9 @@ export type WsMessage =
   | { type: "session"; session: Session }
   | { type: "step"; step: Step }
   | { type: "step-update"; id: string; label?: string; risk?: string[] }
+  /** History was stored for a thread (read quietly, not sent step by step): a page that has fewer of its steps fetches
+   *  the rest (`GET /api/sessions/:id/steps?afterSeq=`). */
+  | { type: "steps-stored"; sessionId: string; lastSeq: number }
   | { type: "file"; file: FileNode; edges?: Edge[] } // edges: the file's outgoing imports, when they were recomputed
   | { type: "file-removed"; path: string }
   | { type: "map"; map: ProjectMap }

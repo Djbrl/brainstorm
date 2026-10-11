@@ -57,7 +57,8 @@ Claude Code writes one JSON object per line to `~/.claude/projects/<project path
 | `user` `tool_result` block | `tool_result`, text cut to 2,000 characters; `is_error` kept |
 
 - **Step ids:** `<line uuid>:<block index>`. Claude Code copies earlier lines, uuids and all, into a resumed or forked thread's log: a line a thread already has is skipped (it keeps its first place), and a copy of another thread's line is stored as `<line uuid>:<block index>@<thread id>`. A step line without a uuid is skipped.
-- **Order:** `seq` increases per session.
+- **Order:** `seq` increases per session. History reads a thread's own log and its subagents' together, their lines merged by time, so the order is what happened, not which file was read first; a thread starts with its earliest step, and a subagent's brief never titles it.
+- **Replaced logs:** each offset is kept with the file's inode and a hash of its first line. A log cut short or replaced drops its thread's steps and is read again from the start; steps that come back keep their seq, so a re-read never renumbers what a page has.
 - **Status:** a session is `running` while its last event is under 2 minutes old.
 
 ## Files changed through commands
@@ -102,7 +103,7 @@ FailureGroup { key, tool, error, title, advice, count, firstSeen, lastSeen, sess
 Replay   { exportedAt, sessions, steps, map, answers, failures? }
 ```
 
-WebSocket messages: `session`, `step`, `step-update` (a label or risk flags arrived), `file`, `map`.
+WebSocket messages: `session`, `step`, `step-update` (a label or risk flags arrived), `steps-stored` (history was stored for a thread, with its last seq: a page that has fewer of its steps fetches the rest with `afterSeq`, as it does for every loaded thread when it reconnects), `file`, `map`.
 
 ## HTTP API (port 4000, prefix `/api`)
 
@@ -123,7 +124,7 @@ One SQLite file, `app/server/data/brainstorm.db`, ignored by git. Each module cr
 
 | Table | Owner | Content |
 | --- | --- | --- |
-| `sessions`, `steps`, `listener_offsets` | Listener | Parsed logs and the byte offset reached in each file |
+| `sessions`, `steps`, `listener_offsets` | Listener | Parsed logs and the byte offset reached in each file (with its inode and first line's hash) |
 | `summaries` | Reader | File and module summaries keyed by content hash |
 | `ask_answers` | Ask | Questions and Claude answers, reused while the file is unchanged |
 | `failure_names` | Failures | Nemotron's title and advice per failure group |

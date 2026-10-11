@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isErrorResult } from "./failed";
+import { errorLine, errorText, isErrorResult } from "./failed";
 import type { Step } from "./contract";
 
 const res = (text: string, isError = false): Step => ({ id: "r", sessionId: "s", seq: 1, ts: "2026-01-01T00:00:00Z", kind: "tool_result", text, ...(isError ? { input: { isError: true } } : {}) });
@@ -41,4 +41,10 @@ test("one rule for a failed result", () => {
 
 test("a call that is not a result never fails", () => {
   assert.equal(isErrorResult({ ...res("Error: x"), kind: "tool_call" }, "Bash"), false);
+});
+
+test("errorText and errorLine drop Claude Code's wrapper", () => {
+  assert.equal(errorText("<tool_use_error>File has not been read yet</tool_use_error>"), "File has not been read yet");
+  assert.equal(errorLine("<tool_use_error>\n  Exit code 1\nboom\n</tool_use_error>"), "Exit code 1");
+  assert.equal(errorLine(""), "");
 });

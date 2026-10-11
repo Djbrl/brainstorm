@@ -1,5 +1,5 @@
 import { agentName } from "../listener/agent-names";
-import { isErrorResult } from "../shared/failed";
+import { errorLine, isErrorResult } from "../shared/failed";
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
@@ -155,7 +155,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     if (away) next.away = away; else delete next.away;
     if (step.kind === "tool_result" && isErrorResult(step, step.toolUseId ? this.callTools.get(step.toolUseId) : undefined)) {
       next.errorAt = now;
-      next.error = (step.text ?? "").replace(/<\/?tool_use_error>/g, "").trim().split("\n")[0].slice(0, 160);
+      next.error = errorLine(step.text ?? "").slice(0, 160);
     }
     if (file && action) {
       const last = next.trail[next.trail.length - 1];

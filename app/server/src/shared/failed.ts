@@ -11,6 +11,12 @@ const SHELL_ERROR = /^\s*(<tool_use_error>|error:|exit code [1-9]\d*|permission 
 const EDIT_ERROR = /^\s*(<tool_use_error>|error:)|file has not been read yet|string to replace not found|permission to use/i;
 const NAVIGATION_ERROR = /^\s*(navigation to \S+ was denied|navigation to this domain is not allowed|<tool_use_error>)/i;
 
+/** A failed result's text without the <tool_use_error> wrapper Claude Code puts around it. */
+export const errorText = (text = "") => text.replace(/<\/?tool_use_error>/g, "");
+
+/** The first line of a failed result's text (unwrapped and trimmed). */
+export const errorLine = (text = "") => errorText(text).trim().split("\n")[0];
+
 /** `tool`: the tool the result answers (a result step doesn't carry it); without it only the stored flag counts. */
 export function isErrorResult(step: Step, tool?: string): boolean {
   if (step.kind !== "tool_result") return false;

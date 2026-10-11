@@ -1,8 +1,9 @@
 import type { Step } from "../shared/contract";
+import { errorLine, errorText } from "../shared/failed";
 
 /** A failed result's error, reduced to what repeats: tags, paths, ids, numbers and quoted strings stripped. */
 export function normalizeError(text: string): string {
-  const lines = text.replace(/<\/?tool_use_error>/g, "").split("\n").map((l) => l.trim()).filter(Boolean);
+  const lines = errorText(text).split("\n").map((l) => l.trim()).filter(Boolean);
   // For shell failures the first line is just "Exit code N": use the most error-like line of the output instead.
   let s = lines[0] ?? "";
   if (/^exit code/i.test(s)) {
@@ -28,7 +29,7 @@ export function groupFailed(failed: { call?: Step; result: Step }[]): { title: s
     const key = `${tool} · ${error}`;
     const g = groups.get(key);
     if (g) g.count++;
-    else groups.set(key, { title: `${tool}: ${error}`, count: 1, sample: (result.text ?? "").replace(/<\/?tool_use_error>/g, "").trim().split("\n")[0] ?? error });
+    else groups.set(key, { title: `${tool}: ${error}`, count: 1, sample: errorLine(result.text ?? "") });
   }
   return [...groups.values()].sort((a, b) => b.count - a.count);
 }

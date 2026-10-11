@@ -6,7 +6,7 @@ import { DbService } from "../core/db.service";
 import { EventsGateway } from "../core/events.gateway";
 import { safely } from "../core/safely";
 import { ListenerService } from "../listener/listener.service";
-import { isErrorResult } from "../shared/failed";
+import { errorText, isErrorResult } from "../shared/failed";
 import { CallPairer } from "../shared/pairing";
 import { maskSecrets } from "../privacy/mask";
 
@@ -69,7 +69,7 @@ const tailStep = (r: TailRow): Step => ({
 
 /** One line of at most `max` characters, secrets masked (a hook's command is raw text; the cut is past any key shown). */
 const one = (s: string | undefined, max = 140) => {
-  const t = maskSecrets(String(s ?? "").slice(0, 4 * max)).replace(/<\/?tool_use_error>/g, "").replace(/\s+/g, " ").trim();
+  const t = errorText(maskSecrets(String(s ?? "").slice(0, 4 * max))).replace(/\s+/g, " ").trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t || undefined;
 };
 

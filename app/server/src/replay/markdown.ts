@@ -1,6 +1,6 @@
 import { relative } from "node:path";
 import type { ProjectMap, Session, Step } from "../shared/contract";
-import { isErrorResult } from "../shared/failed";
+import { errorText, isErrorResult } from "../shared/failed";
 import { groupFailed } from "./failure-text";
 import { CallPairer } from "../shared/pairing";
 import { promptTitle } from "../listener/listener.service";
@@ -143,7 +143,7 @@ export function threadMarkdown(session: Session, steps: Step[], map: ProjectMap 
       if (t.reads) out.push(`- Read or searched ${t.reads} time${t.reads === 1 ? "" : "s"}`);
       for (const f of t.failed) {
         const what = f.call?.tool === "Bash" ? oneLine((f.call.input as { command?: string } | undefined)?.command ?? "", 80) : f.call?.filePath ? rel(f.call.filePath) : f.call?.tool ?? "a tool call";
-        out.push(`- **Failed:** ${f.call?.tool ?? "tool"} ${code(what)}: ${oneLine((f.result.text ?? "").replace(/<\/?tool_use_error>/g, ""), 160)}`);
+        out.push(`- **Failed:** ${f.call?.tool ?? "tool"} ${code(what)}: ${oneLine(errorText(f.result.text ?? ""), 160)}`);
       }
       if (t.lastText) out.push("", `> ${oneLine(t.lastText, 600)}`);
       out.push("");

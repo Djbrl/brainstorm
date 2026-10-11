@@ -11,6 +11,10 @@ import { ListenerService } from "../listener/listener.service";
 
 const SHOT_MISS_MS = 30 * 1000;
 
+/** The image types a shot may have. Anything else a log claims (text/html, image/svg+xml...) is dropped: it would be
+ *  served from the app's own origin. */
+export const SHOT_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+
 @Injectable()
 export class ShotsService implements OnModuleInit {
   /** Shots asked for and not found, by `stepId:idx` → when to look again, so a missing one doesn't rescan the logs on every request. */
@@ -65,7 +69,10 @@ export class ShotsService implements OnModuleInit {
           if (b?.type !== "tool_result" || !Array.isArray(b.content)) return;
           // Same id the listener gives the result step: `${uuid}:${block index}`.
           b.content.filter((c: any) => c?.type === "image" && c.source?.type === "base64" && typeof c.source.data === "string")
-            .forEach((c: any, k: number) => insert.run(`${o.uuid}:${i}`, k, o.sessionId ?? sessionId, String(c.source.media_type ?? "image/png"), Buffer.from(c.source.data, "base64")));
+            .forEach((c: any, k: number) => {
+              const media = String(c.source.media_type ?? "image/png").toLowerCase();
+              if (SHOT_TYPES.has(media)) insert.run(`${o.uuid}:${i}`, k, o.sessionId ?? sessionId, media, Buffer.from(c.source.data, "base64"));
+            });
         });
       }
       db.prepare(`INSERT INTO task_shot_files (file, offset) VALUES (?, ?) ON CONFLICT(file) DO UPDATE SET offset = excluded.offset`).run(file, offset + end);

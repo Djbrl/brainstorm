@@ -206,3 +206,11 @@ export function maskSecrets(text: string): string {
     return text;
   }
 }
+
+/** Every string inside a value masked (object keys too), the shape kept: a hook's body, a tool's input. */
+export function maskDeep<T>(v: T): T {
+  if (typeof v === "string") return maskSecrets(v) as T;
+  if (Array.isArray(v)) return v.map(maskDeep) as T;
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [maskSecrets(k), maskDeep(x)])) as T;
+  return v;
+}

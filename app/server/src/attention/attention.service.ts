@@ -7,6 +7,7 @@ import { EventsGateway } from "../core/events.gateway";
 import { safely } from "../core/safely";
 import { ListenerService } from "../listener/listener.service";
 import { isErrorResult } from "../failures/failures.service";
+import { maskSecrets } from "../privacy/mask";
 
 // Owner: attention. Does a thread need you? Worked out from the log (calls with no result, failures in a row, a finished
 // turn) and made certain by the plugin's hooks (PermissionRequest, Notification, Stop) when they're installed.
@@ -65,8 +66,9 @@ const tailStep = (r: TailRow): Step => ({
   isSubagent: !!r.is_subagent, ...(r.agent_id ? { agentId: r.agent_id } : {}), ...(r.tool_use_id ? { toolUseId: r.tool_use_id } : {}),
 });
 
+/** One line of at most `max` characters, secrets masked (a hook's command is raw text; the cut is past any key shown). */
 const one = (s: string | undefined, max = 140) => {
-  const t = (s ?? "").replace(/<\/?tool_use_error>/g, "").replace(/\s+/g, " ").trim();
+  const t = maskSecrets(String(s ?? "").slice(0, 4 * max)).replace(/<\/?tool_use_error>/g, "").replace(/\s+/g, " ").trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t || undefined;
 };
 

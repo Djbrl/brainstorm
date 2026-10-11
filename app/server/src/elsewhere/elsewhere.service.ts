@@ -6,6 +6,7 @@ import { ConfigService } from "../core/config.service";
 import { ListenerService } from "../listener/listener.service";
 import { AttentionService } from "../attention/attention.service";
 import { promptTitle } from "../listener/text";
+import { maskSecrets } from "../privacy/mask";
 import { isIdleTranscript } from "../workspace/threads";
 import { decodeProjectDir } from "../workspace/workspace.service";
 
@@ -85,6 +86,9 @@ export class ElsewhereService {
       out.push({ sessionId: t.id, harness: "codex", title: t.title ?? this.listener.getSession(t.id)?.title, root, project: basename(root), lastEventAt: new Date(t.mtimeMs).toISOString(), state });
     }
 
+    // Titles come from other projects' raw logs (a custom title, the latest prompt) or from rows stored before titles
+    // were masked: masked here, on the way to the page.
+    for (const t of out) if (t.title) t.title = maskSecrets(t.title);
     const rank = { "needs-you": 0, "working": 1, "your-turn": 2 } as const;
     return out.sort((a, b) => rank[a.state] - rank[b.state] || b.lastEventAt.localeCompare(a.lastEventAt));
   }
@@ -136,6 +140,6 @@ export class ElsewhereService {
       if (line.startsWith('{"type":"custom-title"')) { try { custom = JSON.parse(line).customTitle || custom; } catch { /* cut */ } }
       else if (line.startsWith('{"type":"last-prompt"')) { try { prompt = JSON.parse(line).lastPrompt || prompt; } catch { /* cut */ } }
     }
-    return custom ?? this.listener.getSession(sid)?.title ?? (prompt ? promptTitle(prompt) : undefined);
+    return custom ?? this.listener.getSession(sid)?.title ?? (prompt ? promptTitle(maskSecrets(prompt)) : undefined);
   }
 }

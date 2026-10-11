@@ -61,3 +61,13 @@ test("a visitor (listed here because it once touched this project) still counts 
   thread(there, "other", 1000);
   assert.deepEqual(svc.list().map((t) => t.sessionId).sort(), ["guest", "other"]);
 });
+
+test("a title read from another project's raw log has its secrets masked", () => {
+  const { svc, thread, there } = setup();
+  const key = "sk-ant-api03-FAKEFAKEFAKEFAKE0123456789";
+  thread(there, "prompted", 1000, `${JSON.stringify({ type: "last-prompt", lastPrompt: `use ${key} for the tests`, sessionId: "prompted" })}\n`);
+  thread(there, "named", 1000, `${JSON.stringify({ type: "custom-title", customTitle: `key ${key}` })}\n`);
+  const list = svc.list();
+  assert.equal(list.length, 2);
+  for (const t of list) assert.ok(t.title?.includes("[redacted]") && !t.title.includes("FAKEFAKE"), t.title);
+});

@@ -150,3 +150,13 @@ test("mid-turn and quiet is thinking (past the 2 minutes that made it idle, up t
   att.signal({ event: "Stop", session_id: "a" });
   assert.equal(by().a, "done");
 });
+
+test("a permission prompt's command is shown and broadcast with its secrets masked", () => {
+  const { att, sent, session } = setup();
+  session("a", iso(1_000));
+  const key = "sk-ant-api03-FAKEFAKEFAKEFAKE0123456789";
+  att.signal({ event: "PermissionRequest", session_id: "a", tool_name: "Bash", tool_input: { command: `curl -H "x-api-key: ${key}" https://api.example.com/v1/models` }, tool_use_id: "tu1" });
+  assert.ok(sent.length > 0);
+  assert.ok(!JSON.stringify(sent).includes("FAKEFAKE") && !JSON.stringify(att.list()).includes("FAKEFAKE"), JSON.stringify(att.list()));
+  assert.match(att.list()[0]?.detail ?? "", /curl -H "x-api-key: \[redacted\]" https:\/\/api\.example\.com/);
+});

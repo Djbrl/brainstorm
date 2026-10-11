@@ -5,7 +5,7 @@ const { blobAuth, blobHeaders } = require("./_usage");
 
 const API = process.env.BLOB_API_URL || "https://vercel.com/api/blob"; // overridable for local tests
 
-/** Every blob under `prefix`: [{ url, pathname }]. Stops after `maxPages` pages of 1000. */
+/** Every blob under `prefix`: [{ url, pathname, uploadedAt }]. Stops after `maxPages` pages of 1000. */
 async function listAll(auth, prefix, maxPages = 500) {
   const out = [];
   let cursor;
@@ -15,7 +15,7 @@ async function listAll(auth, prefix, maxPages = 500) {
     const r = await fetch(`${API}/?${q}`, { headers: blobHeaders(auth) });
     if (!r.ok) throw new Error(`blob list failed with status ${r.status}`);
     const data = await r.json();
-    for (const b of data.blobs || []) out.push({ url: b.url, pathname: b.pathname });
+    for (const b of data.blobs || []) out.push({ url: b.url, pathname: b.pathname, uploadedAt: b.uploadedAt });
     if (!data.hasMore || !data.cursor) break;
     cursor = data.cursor;
   }
@@ -35,4 +35,19 @@ async function deleteAll(auth, urls) {
   return urls.length;
 }
 
-module.exports = { API, blobAuth, listAll, deleteAll };
+/** Save `obj` as JSON at `pathname` (private, no random suffix, overwriting). */
+async function putJson(auth, pathname, obj) {
+  const r = await fetch(`${API}/?${new URLSearchParams({ pathname })}`, {
+    method: "PUT",
+    body: JSON.stringify(obj),
+    headers: { ...blobHeaders(auth), "x-vercel-blob-access": "private", "x-content-type": "application/json", "x-add-random-suffix": "0", "x-allow-overwrite": "1" },
+  });
+  if (!r.ok) throw new Error(`blob put failed with status ${r.status}`); // status only: the response can echo the name
+}
+
+/** The blob at exactly `pathname`, or null. */
+async function findOne(auth, pathname) {
+  return (await listAll(auth, pathname, 1)).find((b) => b.pathname === pathname) || null;
+}
+
+module.exports = { API, blobAuth, listAll, deleteAll, putJson, findOne };

@@ -1,7 +1,8 @@
 // GET /api/usage-prune: the daily retention job (vercel.json "crons"). Deletes usage reports older than 13 months, as
-// the privacy page says. Vercel sends Authorization: Bearer <CRON_SECRET>; without that project variable it stays shut.
+// the privacy page says, and unconfirmed waitlist signups older than 30 days. Vercel sends Authorization: Bearer <CRON_SECRET>; without that project variable it stays shut.
 const { timingSafeEqual } = require("node:crypto");
 const { blobAuth, listAll, deleteAll } = require("./_blob");
+const { PENDING_DAYS } = require("./_waitlist");
 
 const KEEP_DAYS = 396; // 13 months
 const same = (a, b) => { const x = Buffer.from(a), y = Buffer.from(b); return x.length === y.length && timingSafeEqual(x, y); };
@@ -16,8 +17,11 @@ module.exports = async (req, res) => {
   try {
     // usage/<YYYY-MM-DD>/…: the day is in the name, compared as text.
     const old = (await listAll(auth, "usage/")).filter((b) => { const day = b.pathname.split("/")[1] || ""; return /^\d{4}-\d{2}-\d{2}$/.test(day) && day < cutoff; });
-    await deleteAll(auth, old.map((b) => b.url));
-    return res.status(200).json({ ok: true, cutoff, deleted: old.length });
+    // Signups nobody confirmed within a month are forgotten (waitlist/pending/, see _waitlist.js).
+    const stale = Date.now() - PENDING_DAYS * 86_400_000;
+    const pending = (await listAll(auth, "waitlist/pending/")).filter((b) => Date.parse(b.uploadedAt) < stale);
+    await deleteAll(auth, [...old, ...pending].map((b) => b.url));
+    return res.status(200).json({ ok: true, cutoff, deleted: old.length, pendingDeleted: pending.length });
   } catch (e) {
     console.error("usage-prune:", e.message);
     return res.status(502).json({ error: "Couldn't prune right now." });

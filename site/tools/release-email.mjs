@@ -7,7 +7,7 @@
 //     RESEND_FROM=Djibril from Rundown <hello@your-verified-domain>
 //
 //   node --env-file=tools/.env.local tools/release-email.mjs > recipients.csv
-//       the list as CSV (email, unsubscribe_url, list_unsubscribe, list_unsubscribe_post). Never commit it.
+//       the confirmed addresses only (waitlist/confirmed/; people who haven't clicked the confirm link aren't on it), as CSV (email, unsubscribe_url, list_unsubscribe, list_unsubscribe_post). Never commit it.
 //   node --env-file=tools/.env.local tools/release-email.mjs --send --subject "Rundown is out" --test you@example.com
 //       one copy of tools/release-email.html to you, to check it
 //   node --env-file=tools/.env.local tools/release-email.mjs --send --subject "Rundown is out"
@@ -39,7 +39,7 @@ const links = (email) => {
 async function recipients() {
   const auth = blobAuth({ headers: {} });
   if (!auth) fail("No Blob store credentials: vercel env pull tools/.env.local first.");
-  return (await listAll(auth, "waitlist/")).map((b) => b.pathname.replace(/^waitlist\//, "").replace(/\.json$/, "")).sort();
+  return (await listAll(auth, "waitlist/confirmed/")).map((b) => b.pathname.replace(/^waitlist\/confirmed\//, "").replace(/\.json$/, "")).sort();
 }
 
 if (!flag("--send")) {

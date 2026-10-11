@@ -14,7 +14,6 @@ import { ConfigService } from "../core/config.service";
 import { shareMapRoot, within } from "./share-root";
 
 const PLACEHOLDER = "<!--rundown:replay-->";
-const OLD_PLACEHOLDER = "<!--brainstorm:replay-->"; // a share.html built before the rename
 
 /** The one-file web app a shared replay is poured into (built by app/web/scripts/build-share.mjs). */
 function shareTemplate(): string | null {
@@ -70,12 +69,10 @@ export class ShareController {
     const template = shareTemplate();
     if (!template) throw new HttpException("The share page isn't built. Run `npm run build:share` in app/web.", 503);
     // JSON inside <script> can't contain "</script>": escaping every "<" keeps it valid JSON and inert HTML.
-    // A template built before the rename has the old marker, and its app reads the old id.
-    const old = !template.includes(PLACEHOLDER) && template.includes(OLD_PLACEHOLDER);
-    const data = `<script id="${old ? "brainstorm" : "rundown"}-replay" type="application/json">${JSON.stringify(replay).replace(/</g, "\\u003c")}</script>`;
+    const data = `<script id="rundown-replay" type="application/json">${JSON.stringify(replay).replace(/</g, "\\u003c")}</script>`;
     const html = template
       .replace(/<title>[^<]*<\/title>/, () => `<title>${escHtml(replay.shared!.title)} · Rundown replay</title>`)
-      .replace(old ? OLD_PLACEHOLDER : PLACEHOLDER, () => data);
+      .replace(PLACEHOLDER, () => data);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${name}.html"`);
     return res.send(html);

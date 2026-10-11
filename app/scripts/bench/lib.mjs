@@ -65,11 +65,11 @@ export const real = (p) => { try { return realpathSync(p); } catch { return reso
 
 /** The scratch dir, refusing anything inside this repo, ~/rundown (or its old name ~/brainstorm) or ~/.claude (the real logs). */
 export function scratchDir(given) {
-  const dir = resolve(given || resolve(tmpdir(), "brainstorm-bench"));
+  const dir = resolve(given || resolve(tmpdir(), "rundown-bench"));
   mkdirSync(dir, { recursive: true });
   const abs = real(dir) + sep;
   const forbidden = [REPO_DIR, resolve(homedir(), "rundown"), resolve(homedir(), "brainstorm"), resolve(homedir(), ".claude")].map((p) => real(p) + sep);
-  for (const f of forbidden) if (abs.startsWith(f)) throw new Error(`scratch dir ${dir} is inside ${f}: pick one outside (default: $TMPDIR/brainstorm-bench)`);
+  for (const f of forbidden) if (abs.startsWith(f)) throw new Error(`scratch dir ${dir} is inside ${f}: pick one outside (default: $TMPDIR/rundown-bench)`);
   return real(dir);
 }
 

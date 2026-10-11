@@ -43,14 +43,9 @@ export type MapSidebarProps = {
 
 type Tab = "threads" | "files";
 const TAB_KEY = "rundown-sidebar-tab";
-const COLLAPSED_KEY = "rundown-sidebar-collapsed";
 
 function loadTab(): Tab {
   try { return localStorage.getItem(TAB_KEY) === "files" ? "files" : "threads"; } catch { return "threads"; }
-}
-/** The fold that used to be saved: forgotten, so a wide window opens with the sidebar open. */
-function forgetCollapsed() {
-  try { localStorage.removeItem(COLLAPSED_KEY); } catch { /* storage blocked: nothing saved anyway */ }
 }
 
 /** Whether a media query matches, kept up to date as the window resizes. */
@@ -92,7 +87,6 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
   const setCollapsed = (c: boolean) => (narrow ? setOver(!c) : setFolded(c));
 
   useEffect(() => { try { localStorage.setItem(TAB_KEY, tab); } catch { /* storage blocked: tab resets on reload */ } }, [tab]);
-  useEffect(forgetCollapsed, []);
   // Back to a wide window: the sidebar opens again.
   useEffect(() => { if (!narrow) setFolded(false); }, [narrow]);
   // Opening a thread shows it under Threads; closing it, the list. On a phone the thread opens below the map, which

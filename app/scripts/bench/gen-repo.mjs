@@ -1,7 +1,7 @@
 // A fake TypeScript monorepo of N files: nested folders, 10–800 lines per file, each TS file importing 1–8 others
 // (mostly nearby), a git history, file times in the past. Deterministic for a given --files and --seed.
 //
-//   node gen-repo.mjs --files 5000 --out /tmp/brainstorm-bench/repo-5000 [--seed 1] [--force]
+//   node gen-repo.mjs --files 5000 --out /tmp/rundown-bench/repo-5000 [--seed 1] [--force]
 //
 // Writes <out>.manifest.json next to the repo (not inside it: the mapper would read it as a file).
 import { execFileSync } from "node:child_process";

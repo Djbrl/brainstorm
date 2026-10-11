@@ -65,9 +65,9 @@ export function sampler(pid, everyMs = 1000) {
 export async function startServer({ port, dataDir, claudeDir, root, timeoutMs = 120_000 }) {
   const env = {
     PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR, LANG: process.env.LANG ?? "en_US.UTF-8",
-    PORT: String(port), BRAINSTORM_PORT: String(port), BRAINSTORM_DATA_DIR: dataDir, CLAUDE_PROJECTS_DIR: claudeDir,
-    BRAINSTORM_ROOT: root, MAP_ROOT: root, BRAINSTORM_WEB_DIR: join(APP_DIR, "web/dist"), BRAINSTORM_VERSION: "bench",
-    ...(process.env.BRAINSTORM_MAX_FILES ? { BRAINSTORM_MAX_FILES: process.env.BRAINSTORM_MAX_FILES } : {}), // the map's file cap
+    PORT: String(port), RUNDOWN_PORT: String(port), RUNDOWN_DATA_DIR: dataDir, CLAUDE_PROJECTS_DIR: claudeDir,
+    RUNDOWN_ROOT: root, MAP_ROOT: root, RUNDOWN_WEB_DIR: join(APP_DIR, "web/dist"), RUNDOWN_VERSION: "bench",
+    ...(process.env.RUNDOWN_MAX_FILES ? { RUNDOWN_MAX_FILES: process.env.RUNDOWN_MAX_FILES } : {}), // the map's file cap
   };
   const t0 = Date.now();
   const child = spawn(process.execPath, [join(APP_DIR, "server/dist/main.js")], { env, stdio: ["ignore", "pipe", "pipe"] });
@@ -203,4 +203,4 @@ export async function untilQuiet(pid, sinceMs, { pct = 5, quiet = 4, everyMs = 5
   return { quietAtMs: null, peakRssMb: peak, timeout: true };
 }
 
-export const dbSizeMb = (dataDir) => { try { return mb(statSync(join(dataDir, "brainstorm.db")).size + (existsSync(join(dataDir, "brainstorm.db-wal")) ? statSync(join(dataDir, "brainstorm.db-wal")).size : 0)); } catch { return null; } };
+export const dbSizeMb = (dataDir) => { try { return mb(statSync(join(dataDir, "rundown.db")).size + (existsSync(join(dataDir, "rundown.db-wal")) ? statSync(join(dataDir, "rundown.db-wal")).size : 0)); } catch { return null; } };

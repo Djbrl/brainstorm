@@ -5,7 +5,7 @@
 //   node app/scripts/bench/run.mjs --files 1000,5000,20000 --cpu 1,4 --steps 10000 --scratch /tmp/bb --out results/
 //
 // Options: --files (comma list, default 1000), --cpu (comma list, default 1,4), --steps (long thread, default 10000),
-// --scratch (default $TMPDIR/brainstorm-bench), --out (JSON folder, default <scratch>/results), --no-build, --no-front,
+// --scratch (default $TMPDIR/rundown-bench), --out (JSON folder, default <scratch>/results), --no-build, --no-front,
 // --dpr (device pixel ratio, default 1), --window (seconds per front-end window, default 10), --live-seconds (default 20),
 // --rate (live writer steps a second, default 3), --label (a name stored in the JSON, e.g. a branch).
 import { execFileSync } from "node:child_process";

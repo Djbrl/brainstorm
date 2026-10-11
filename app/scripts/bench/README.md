@@ -25,7 +25,7 @@ measure your branch. A full run of the three sizes at two CPU rates takes about 
 3. **Live writer** (same file): a new running thread, about 3 steps a second with bursts of 5–12 calls, written with
    real timestamps; its edits also append a line to the file in the repo, as Claude Code would.
 4. **Server** (`server.mjs`): started the way the plugin starts it (`node app/server/dist/main.js` serving
-   `app/web/dist`), on a free port from 4900, with `CLAUDE_PROJECTS_DIR`, `BRAINSTORM_DATA_DIR` and `BRAINSTORM_ROOT`
+   `app/web/dist`), on a free port from 4900, with `CLAUDE_PROJECTS_DIR`, `RUNDOWN_DATA_DIR` and `RUNDOWN_ROOT`
    pointing into the scratch dir and no model keys. Booted three times: no logs (the map alone), cold (the long thread
    never read before) and warm (same database, the everyday restart).
 5. **Front-end** (`front.mjs`, `cdp.mjs`): our own headless Chrome on a free port from 9620 with a throwaway profile,
@@ -33,7 +33,7 @@ measure your branch. A full run of the three sizes at two CPU rates takes about 
    layout settling, at rest, panning and zooming, with the live writer running, replaying the long thread at 4×.
 
 The real `~/.claude/projects` is never read: the server only sees the scratch dir (`CLAUDE_PROJECTS_DIR` already
-existed in `app/server/src/core/config.service.ts`). The scratch dir defaults to `$TMPDIR/brainstorm-bench` and the
+existed in `app/server/src/core/config.service.ts`). The scratch dir defaults to `$TMPDIR/rundown-bench` and the
 script refuses one inside the repo, `~/rundown` (or `~/brainstorm`) or `~/.claude`.
 
 ## Options
@@ -43,7 +43,7 @@ script refuses one inside the repo, `~/rundown` (or `~/brainstorm`) or `~/.claud
 | `--files` | `1000` | Repo sizes, comma separated |
 | `--cpu` | `1,4` | Chrome CPU throttling rates |
 | `--steps` | `10000` | Steps in the long thread |
-| `--scratch` | `$TMPDIR/brainstorm-bench` | Repos, logs, databases, Chrome profile |
+| `--scratch` | `$TMPDIR/rundown-bench` | Repos, logs, databases, Chrome profile |
 | `--out` | `<scratch>/results` | Where the JSON goes |
 | `--window` | `10` | Seconds per front-end window |
 | `--live-seconds` | `20` | Live writer against the server alone |

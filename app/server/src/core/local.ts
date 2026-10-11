@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 
-/** A setting from the environment: RUNDOWN_<name>, or its name before the rename, BRAINSTORM_<name> (read until 0.6). */
-export const env = (name: string): string | undefined => process.env[`RUNDOWN_${name}`] ?? process.env[`BRAINSTORM_${name}`];
+/** A setting from the environment: RUNDOWN_<name>. */
+export const env = (name: string): string | undefined => process.env[`RUNDOWN_${name}`];
 
 /** Where Rundown keeps its database and private files. The plugin sets RUNDOWN_DATA_DIR; dev uses app/server/data. */
 export const dataDir = () => resolve(env("DATA_DIR") ?? resolve(__dirname, "../../data"));

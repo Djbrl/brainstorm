@@ -18,7 +18,7 @@
 // RUNDOWN_PORT: the first port to try (default 4747). RUNDOWN_UPDATE_CHECK=0: no daily update check, whatever the
 // setting (Settings in the app, kept in settings.json in the data folder) says.
 import { execFileSync, spawn } from "node:child_process";
-import { createHash, createHmac, randomBytes } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import { appendFileSync, chmodSync, closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -55,10 +55,8 @@ const DAY = 24 * 60 * 60 * 1000;
 const DESKTOP = process.env.CLAUDE_CODE_ENTRYPOINT === "claude-desktop";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-// Which key the server runs with: an HMAC with the server's secret (from server.json), or a plain hash for a server
-// from before 0.6 that has no secret.
-const keyHash = (k, secret) => (!k ? null : secret ? createHmac("sha256", secret).update(`key:${k}`).digest("hex").slice(0, 12)
-  : createHash("sha256").update(k).digest("hex").slice(0, 12));
+// Which key the server runs with: an HMAC with the server's secret (from server.json).
+const keyHash = (k, secret) => (!k || !secret ? null : createHmac("sha256", secret).update(`key:${k}`).digest("hex").slice(0, 12));
 
 function nodeOk() {
   const [maj, min] = process.versions.node.split(".").map(Number);

@@ -51,3 +51,12 @@ test("still masked once (no double markers)", () => {
   assert.equal(maskSecrets("Authorization: Bearer FAKEtokenFAKEtoken1234"), "Authorization: Bearer [redacted]");
   assert.equal(maskSecrets(maskSecrets("password: hunter2hunter2")), "password: [redacted]");
 });
+
+test("a long run of sk- is masked in linear time", () => {
+  maskSecrets("sk-".repeat(1000)); // warm up
+  const run = "sk-".repeat(11_000); // 33 KB: a lookahead per "sk-" took seconds
+  const t0 = performance.now();
+  assert.equal(maskSecrets(run), run);
+  assert.ok(performance.now() - t0 < 50, "sk- run took " + (performance.now() - t0) + " ms");
+  assert.equal(maskSecrets(run + "9"), "[redacted]"); // a digit anywhere in the run makes it a key
+});

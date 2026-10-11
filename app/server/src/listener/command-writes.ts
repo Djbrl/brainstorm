@@ -170,7 +170,7 @@ function readWord(s: string, start: number): { w: Word; end: number } {
       text += c; bare += c; i++;
     }
   }
-  if (/\{[^}]*,[^}]*\}/.test(bare)) dynamic = true; // a{,.bak}: brace expansion
+  if (hasBraceList(bare)) dynamic = true; // a{,.bak}: brace expansion
   return { w: word(text, dynamic, quoted), end: i };
 }
 
@@ -450,17 +450,30 @@ function gitWrites(args: Word[], dir: string | undefined, out: Out) {
   } else if (sub === "mv") moveOrCopy(args.slice(k + 1), dir, out, true);
 }
 
+/** A `{` then a `,` then a `}` with no `}` in between (a{,.bak}): one pass; the regex for it, /\{[^}]*,[^}]*\}/, is quadratic on `{{{{`. */
+function hasBraceList(s: string): boolean {
+  let open = false, comma = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === "{") open = true;
+    else if (c === "," && open) comma = true;
+    else if (c === "}") { if (open && comma) return true; open = comma = false; }
+  }
+  return false;
+}
+
 /** Codex's patch format: Update/Add File write, Delete File deletes, Move to renames. */
 function patchWrites(text: string, dir: string | undefined, out: Out) {
   let last: string | undefined;
-  for (const line of text.split("\n")) {
-    const f = /^\*\*\* (Update|Add|Delete) File: (.+?)\s*$/.exec(line);
+  for (const raw of text.split("\n")) {
+    const line = raw.trimEnd(); // not `(.+?)\s*$` in the patterns: a long run of spaces inside the path is re-scanned from every character
+    const f = /^\*\*\* (Update|Add|Delete) File: (.+)$/.exec(line);
     if (f) {
       last = absPath(f[2], dir);
       add(out, last, f[1] === "Delete" ? "delete" : "write");
       continue;
     }
-    const mv = /^\*\*\* Move to: (.+?)\s*$/.exec(line);
+    const mv = /^\*\*\* Move to: (.+)$/.exec(line);
     if (mv && last) {
       add(out, absPath(mv[1], dir), "write", last);
       add(out, last, "delete");
@@ -784,7 +797,7 @@ const JS_RE = new RegExp(
   "(?<![\\w$.])((?:(?:fs|fsp|fse|fsPromises|promises|fs\\.promises)|require\\(\\s*['\"](?:node:)?fs(?:\\/promises|-extra)?['\"]\\s*\\))\\.)?(" +
   Object.keys(JS_CALLS).map(escapeRe).join("|") + ")\\b", "g");
 const PY_METHOD_RE = /\.[ \t]*(write_text|write_bytes|unlink|touch|open)\b/g;
-const PL_OPEN_RE = /(?<![\w$>.:])open\s*\(?\s*(?:(?:my|our|local)\s+)?(?:\$\w+|[A-Z_]\w*|\*\w+)\s*,/g;
+const PL_OPEN_RE = /(?<![\w$>.:])open\s*(?:\(\s*)?(?:(?:my|our|local)\s+)?(?:\$\w+|[A-Z_]\w*|\*\w+)\s*,/g;
 const PL_CALL_RE = /(?<![\w$>.:])(unlink|rename)\b/g;
 const ASSIGN_RE = /(?:^|[;\n{])[ \t]*(?:(?:const|let|var|my|our|local)\s+)?([A-Za-z_$][\w$]*)[ \t]*=(?![=~>])[ \t]*/g;
 

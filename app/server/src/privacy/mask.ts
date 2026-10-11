@@ -8,7 +8,9 @@ const PATTERNS: [RegExp, Replacer][] = [
   // Provider keys
   [/\bsk-ant-[A-Za-z0-9_\-]{10,}/g, R],
   [/\bsk-(?:proj|live|test|svcacct|admin)-[A-Za-z0-9_\-]{16,}/g, R],
-  [/\bsk-(?=[A-Za-z0-9_\-]*\d)[A-Za-z0-9_\-]{16,}/g, R], // a bare sk- key has digits: not "sk-service-account-name"
+  // A bare sk- key has digits: not "sk-service-account-name". The digit is checked on the match, not by a lookahead:
+  // a lookahead re-scans the rest of the run from every "sk-" in it (sk-sk-sk-..., quadratic).
+  [/\bsk-[A-Za-z0-9_\-]{16,}/g, (m: string) => (/\d/.test(m) ? R : m)],
   [/\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}/g, R],        // Stripe secret and restricted keys
   [/\bwhsec_[A-Za-z0-9+\/=]{20,}/g, R],                      // webhook signing secrets
   [/\bglpat-[A-Za-z0-9_\-]{20,}/g, R],                        // GitLab

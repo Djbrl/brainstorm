@@ -26,12 +26,12 @@ export function sanitizeDeep(v: unknown, limit = TEXT_LIMIT): unknown {
 export function sanitizeText(s: string, limit = TEXT_LIMIT): string {
   let masked: string | undefined;
   if (s.length > limit + MASK_MARGIN) {
+    // With no break or space within reach (minified code, base64), cut at the margin itself: it is longer than any
+    // key, so a key cut through it is still masked whole. Masking all of such a text costs ~1.7 us a char.
     const cut = safeCut(s, limit + MASK_MARGIN);
-    if (cut > 0) {
-      const head = s.slice(0, cut);
-      const m = maskSecrets(head);
-      if (head.length - m.length <= MASK_MARGIN / 4) masked = m;
-    }
+    const head = s.slice(0, cut > 0 ? cut : limit + MASK_MARGIN);
+    const m = maskSecrets(head);
+    if (head.length - m.length <= MASK_MARGIN / 4) masked = m;
   }
   masked ??= maskSecrets(s);
   return masked.length > limit ? masked.slice(0, limit) + "\n…(truncated)" : masked;

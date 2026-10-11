@@ -4,7 +4,8 @@ import { maskSecrets } from "../privacy/mask";
 import { redactReplayJson } from "./redact";
 
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g;
+// The local part is capped at 64 (the most an address can have): an unbounded one is re-scanned from every character of a long run.
+export const EMAIL =/[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g;
 
 /** This computer's names, longest first: the host name, and on macOS the names shell prompts use (it can be an IP). */
 export function computerNames(): string[] {
@@ -57,7 +58,7 @@ export function forSharing<T>(value: T): T {
       if (encodedRe) m = m.replace(encodedRe, "-~");
       if (hostRe) m = m.replace(hostRe, "computer");
       if (userRe) m = m.replace(userRe, "user");
-      m = m.replace(EMAIL, (e) => (e.startsWith("git@") ? e : "[email]"));
+      if (m.includes("@")) m = m.replace(EMAIL, (e) => (e.startsWith("git@") ? e : "[email]"));
       if (mailboxRe) m = m.replace(mailboxRe, "[email]");
       return m;
     }

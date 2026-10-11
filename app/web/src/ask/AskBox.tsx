@@ -25,7 +25,7 @@ export function AskBox({ context, placeholder }: { context: Omit<AskRequest, "qu
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
-  const key = `${context.stepId ?? ""}|${context.filePath ?? ""}|${context.root ?? ""}`;
+  const key = `${context.stepId ?? ""}|${context.filePath ?? ""}`;
 
   const keyRef = useRef(key);
   keyRef.current = key;

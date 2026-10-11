@@ -25,9 +25,8 @@ export type Edge = { from: string; to: string };
 /** `scanStopped`: a folder that isn't a git repo whose walk hit its budget, so the map shows what was found in time.
  *  `unread`: files left out because reading them took too long (a file kept only in the cloud, downloading on open). */
 export type ProjectMap = { root: string; files: FileNode[]; edges: Edge[]; modules: { id: string; summary?: string }[]; formerRoots?: string[]; totalFiles?: number; scanStopped?: boolean; unread?: number };
-export type Snapshot = { ts: string; map: ProjectMap };
 /** What a question is about: a step or a file. */
-export type AskRequest = { question: string; stepId?: string; filePath?: string; root?: string };
+export type AskRequest = { question: string; stepId?: string; filePath?: string };
 export type AskResponse = { answer: string; model: string; tokensIn: number; tokensOut: number; costUsd: number; fallback: boolean };
 export type WsMessage =
   | { type: "session"; session: Session }

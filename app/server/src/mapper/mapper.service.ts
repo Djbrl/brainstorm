@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { deflateRawSync, inflateRawSync } from "node:zlib";
 import { lstat, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
-import type { Edge, FileNode, ProjectMap, Snapshot } from "../types";
+import type { Edge, FileNode, ProjectMap } from "../types";
 import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";
 import { ConfigService } from "../core/config.service";
@@ -46,7 +46,6 @@ type Cached = {
   specs: Map<string, string[]>;
   /** Resolved imports by importing file: map.edges is this, flattened. */
   out: Map<string, Set<string>>;
-  mtimes: Map<string, number>;
   /** Mapped files git tracks (relative, "/" separators); undefined when not a git repo. */
   tracked?: Set<string>;
   /** A git repo: what to leave out comes from .gitignore. These are the folders it excludes (relative, "/" separators), grown as new ones appear. */
@@ -209,8 +208,6 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     return (await this.ensure(resolve(root))).map;
   }
 
-  getHistory(_root: string): Snapshot[] { return []; } // history/snapshots cut for the demo
-
   /** Internal: cached ProjectMap for a root, if it has been built. Used by the reader to attach summaries. */
   getCached(root: string): Cached | undefined { return this.cache.get(resolve(root)); }
 
@@ -319,7 +316,6 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     const nodes: FileNode[] = [];
     const byPath = new Map<string, FileNode>();
     const specs = new Map<string, string[]>();
-    const mtimes = new Map<string, number>();
     const moduleIds = new Map<string, { id: string }>();
     const gitTimes = new Map<string, number>();
     const chosen = new Set<string>();
@@ -334,7 +330,6 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
       const node: FileNode = { path: r.abs, module: moduleId, lines: r.lines, lastChangedAt: new Date(ms || Date.now()).toISOString() };
       nodes.push(node);
       byPath.set(r.abs, node);
-      mtimes.set(r.abs, r.mtimeMs);
       specs.set(r.abs, this.parseImports(r.abs, r.content));
     }
     const out = new Map<string, Set<string>>();
@@ -342,7 +337,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     const unselected = new Set(listing.rels.filter((rel) => !chosen.has(rel)).map((rel) => join(root, rel)));
     const map: ProjectMap = { root, files: nodes, edges: [], modules: [...moduleIds.values()], formerRoots: formerRoots(this.cfg.claudeProjectsDir, root), ...(listing.stopped ? { scanStopped: true } : {}) };
     const c: Cached = {
-      map, gitTimes, byPath, fileSet, specs, out, mtimes,
+      map, gitTimes, byPath, fileSet, specs, out,
       tracked: listing.tracked && new Set([...chosen].filter((rel) => listing.tracked!.has(rel))),
       ignoredDirs: listing.source === "git" ? listing.ignoredDirs ?? new Set() : undefined,
       listing: { source: listing.source, total: listing.total, ms: listMs },
@@ -787,7 +782,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     for (const abs of removed) {
       this.bus.emit("file-content", { path: abs, before: this.snapshotOf(c, abs, true), after: null, at });
       c.snapshots.delete(abs);
-      c.byPath.delete(abs); c.fileSet.delete(abs); c.specs.delete(abs); c.out.delete(abs); c.mtimes.delete(abs);
+      c.byPath.delete(abs); c.fileSet.delete(abs); c.specs.delete(abs); c.out.delete(abs);
     }
     if (removed.size) c.map.files = c.map.files.filter((f) => !removed.has(f.path));
     const changed = new Set<string>();
@@ -811,7 +806,6 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
         node.lines = r.lines;
         node.lastChangedAt = lastChangedAt;
       }
-      c.mtimes.set(r.abs, r.mtimeMs);
       c.specs.set(r.abs, this.parseImports(r.abs, r.content));
       changed.add(r.abs);
     }

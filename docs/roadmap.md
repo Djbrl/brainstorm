@@ -25,7 +25,7 @@ Shareable replays and replays on pull requests could be the main value of Brains
 
 Problems that affect every feature:
 
-- **Summaries and labels depend on Nemotron on a GPU we deleted.** We need a model setting: Claude Haiku with the user's own key, a local model through Ollama, or Nemotron through NVIDIA's hosted API. The last one keeps the NVIDIA story. Our measurement puts Haiku at about $0.75 to read a 300-file repo once (see `numbers.md`); later changes cost cents.
+- **Summaries and labels depend on Nemotron on a GPU we deleted.** We need a model setting: Claude Haiku with the user's own key, a local model through Ollama, or Nemotron through NVIDIA's hosted API. The last one keeps the NVIDIA story. Our measurement puts Haiku at about $0.75 to read a 300-file repo once (see `archive/hackathon/numbers.md`); later changes cost cents.
 - **Claude Code and Codex are supported** (Codex since 6 Oct 2026). Each agent is a log source (`app/server/src/listener/source.ts`), so Gemini CLI and Cursor can each be another one.
 - **There are no tests.** Claude Code's log format isn't documented and can change, so the parser needs tests first.
 
@@ -51,7 +51,7 @@ The user keeps typing to their agent, and Brainstorm shows up next to it. Four l
 
 Watching agents is hard to charge a single developer for. Brainstorm becomes worth more with more agents, more people and more money at stake. Tiers (the prices are guesses we'd need to test):
 
-- **Free, open source, local.** One developer on one machine, and the code never leaves it. That builds trust and spreads it.
+- **Free, source-available, local.** One developer on one machine, and the code never leaves it. That builds trust and spreads it.
 - **Pro, about $10–15 a month.**
   - Models included, no API keys needed.
   - History and search across every session ("when did login break?").
@@ -96,7 +96,7 @@ It records locally and automatically, with no setup per session. Three kinds of 
 - **Your agents**, as context: through the MCP server they learn who is editing what, what depends on a file, and why it was last changed.
 - **Other people**, to understand: a share link, or a replay attached to a pull request.
 
-The Map, Follow, Ask and Failures are ways of reading a replay. Local use is free and open source. The paid product is replays that leave your machine: hosted links, pull request replays, teams.
+The Map, Follow, Ask and Failures are ways of reading a replay. Local use is free, and the source is available. The paid product is replays that leave your machine: hosted links, pull request replays, teams.
 
 ## Packaging: the Claude Code plugin
 

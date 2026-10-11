@@ -9,3 +9,13 @@ video/raw/
 
 # TypeScript incremental build state (CLAUDE.md: never commit)
 *.tsbuildinfo
+
+# Local and secret files
+.claude/worktrees/
+.claude/launch.json
+.claude/settings.local.json
+.env.local
+.env.*.local
+.env.production
+*.pem
+.vercel/

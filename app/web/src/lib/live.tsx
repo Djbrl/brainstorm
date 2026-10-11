@@ -289,7 +289,10 @@ export function createLiveStore(start: LiveState = initial): LiveStore {
       return;
     }
     if (a.type === "steps-stored") {
-      if ((ix.through.get(a.sessionId) ?? Infinity) < a.lastSeq) catchUp(a.sessionId);
+      const through = ix.through.get(a.sessionId) ?? Infinity;
+      if (through < a.lastSeq) catchUp(a.sessionId);
+      // Behind what the page has: the server's steps were renumbered (a fresh database). Fetch the thread again.
+      else if (through !== Infinity && a.lastSeq < through) loadSteps(a.sessionId);
       return;
     }
     queue.push(a);

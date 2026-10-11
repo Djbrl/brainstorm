@@ -11,13 +11,13 @@ import { tourHidesExtras } from "../lib/tour";
 import { drawAgents, type AgentRing } from "./agents";
 import type { ReplayLayerApi } from "./replay/layer";
 import { drawQueuedLabels, LabelSpace, type QueuedLabel } from "./labels";
-import { mapStyle, settleLandings } from "./themes";
+import { mapStyle } from "./themes";
 import { spriteFrame } from "./sprites";
 import { Motion, type Redraw } from "./redraw";
 import { css, type Tokens } from "./color";
 import { nodeReach, shownLinks, stepTween, type GLink, type Graph, type GNode } from "./graph";
 import { foldFrame, openAround } from "./fold";
-import { drawFile, drawFocusLinks, drawFolderNames, FILE_LABELS_MAX, flushDots, labelFor, moreMotion, type Caches, type Frame } from "./drawNode";
+import { settleLandings, drawFile, drawFocusLinks, drawFolderNames, FILE_LABELS_MAX, flushDots, labelFor, moreMotion, type Caches, type Frame } from "./drawNode";
 import type { useLiveAgents } from "./useLiveAgents";
 import type { Size } from "../lib/hooks";
 
@@ -81,7 +81,7 @@ export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIn
     F.anyLook = false; F.lookSum = 0; F.motion = Motion.None;
     F.labN.length = 0; F.labP.length = 0;
     for (const d of caches.current.dots.values()) d.xyr.length = 0;
-    settleLandings(F.t);
+    settleLandings(caches.current.landings, F.t);
     // Files came or went: the circles that moved glide to their new places.
     if (stepTween(tween, F.t)) { moreMotion(F, Motion.Smooth); vis.current.ver++; }
     // What's open at this zoom; an agent at work shows its folders open too.
@@ -155,6 +155,7 @@ export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIn
       ctx, scale, agents: live.agentsRef.current, anim: live.anim.current, accent: tokens.accent, font: tokens.body,
       hoverFile: I.hover, followId: followRef.current, resolveId, showReads: mapPrefs.showReads && !tourHidesExtras(), quiet: !I.open, waiting: live.waitingRef.current,
       thinking: live.thinkingRef.current, keep: I.open, dimmed: live.dimmedRef.current, rings: ringsOut.current = [],
+      land: (id, t) => caches.current.landings.set(id, t),
       resolve: (id) => { const n = nodeIndexRef.current.get(id); return n && n.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y, r: n.r } : undefined; },
     });
     syncRings(ringLayer.current, ringsOut.current);

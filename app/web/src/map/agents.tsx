@@ -1,7 +1,9 @@
 // Live agents on the Map: markers that glide between files, fading trails, lines of sight to the files they read.
 import type { AgentPresence } from "@contract";
 import { clock } from "../lib/live";
-import { drawMarker, drawTrip, landings, mapStyle, platform, type RGB } from "./themes";
+import { mapStyle, type RGB } from "./themes";
+import { drawMarker } from "./marks";
+import { drawTrip, platform } from "./routes";
 import { css, hex, mixRGB, rgbOf, same } from "./color";
 import { hashString } from "./util";
 import { drawPulse, drawThinkRing, ERR_PULSE_MS, ERROR_RED, glide, PULSE_MS, setOff, trailPath } from "./tracer";
@@ -148,8 +150,10 @@ export function drawAgents(opts: {
   /** Filled with the rings that breathe (thinking, waiting on you), in CSS pixels on the canvas: the page draws them
    *  over the map (MapView's AgentRings, CSS animations), so a breath doesn't repaint the whole map. */
   rings?: AgentRing[];
+  /** A marker landed on a file (Prism's hop: its cube spins up and flashes). */
+  land?: (id: string, t: number) => void;
 }) {
-  const { ctx, scale, agents, anim, resolve, accent, hoverFile, followId, resolveId, showReads, quiet, waiting, thinking, keep, dimmed, rings } = opts;
+  const { ctx, scale, agents, anim, resolve, accent, hoverFile, followId, resolveId, showReads, quiet, waiting, thinking, keep, dimmed, rings, land } = opts;
   // Graph point → CSS pixel on the canvas (its transform is in device pixels).
   const m = ctx.getTransform(), dpr = ctx.canvas.width / Math.max(1, ctx.canvas.clientWidth);
   const onScreen = (x: number, y: number) => ({ x: (m.a * x + m.c * y + m.e) / dpr, y: (m.b * x + m.d * y + m.f) / dpr });
@@ -181,7 +185,7 @@ export function drawAgents(opts: {
         anim.set(a.id, st);
       }
       if (st.file !== key) { setOff(st, t); st.file = key; }
-      const { p, e, trip } = glide(st, tx, ty, t, style.route, 1, () => landings.set(key, t));
+      const { p, e, trip } = glide(st, tx, ty, t, style.route, 1, () => land?.(key, t));
       const thinks = !!thinking?.has(a.id) && !waiting?.has(a.id);
       const target = agentAlpha(a, now, !!waiting?.has(a.id) || thinks, !!keep) * (dimmed?.has(a.id) ? DIM : 1);
       st.alpha += (target - st.alpha) * 0.08;

@@ -117,7 +117,10 @@ export function MapView() {
   liveShown.current = !!replay && drawnAgents.some((a) => a.sessionId === replay.sessionId);
   // The replay's camera follow and the map's camera talk through this (useMapCamera fills it in, the layer reads it).
   const replayCam = useRef<ReplayCamera>({ onLost: null, margin: () => 24, pinned: false });
-  const replayLayer = useReplayLayer({ nodeIndexRef, accent: tokens.accent, font: tokens.body, camera: camRef, follow: replayCam, liveShown });
+  // What drawing keeps between frames (drawNode.ts): ripples, colour batches, a marker's landings.
+  const caches = useRef(newCaches());
+  const land = useCallback((id: string, t: number) => { caches.current.landings.set(id, t); }, []);
+  const replayLayer = useReplayLayer({ nodeIndexRef, accent: tokens.accent, font: tokens.body, camera: camRef, follow: replayCam, land, liveShown });
   const replayRef = useRef<ReplayLayerApi>(replayLayer); replayRef.current = replayLayer;
   const openRef = useRef(!!replay); openRef.current = !!replay;
 
@@ -216,7 +219,6 @@ export function MapView() {
 
   // ---- the frame (useMapFrame.ts), and what makes one come (useRedrawTriggers.ts) ----
   // Import lines show only around the file under the pointer, or else the selected one, in every theme.
-  const caches = useRef(newCaches());
   const fp = replayLayer.footprint();
   const footprintKey = fp ? `${fp.length}|${fp[0] ?? ""}|${fp[fp.length - 1] ?? ""}` : "";
   const epoch = useRedrawTriggers({

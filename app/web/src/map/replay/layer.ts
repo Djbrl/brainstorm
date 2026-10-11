@@ -7,7 +7,9 @@ import { useThread, type Thread } from "../../lib/thread";
 import { useLiveSelector } from "../../lib/live";
 import type { Camera, ReplayCamera } from "../camera";
 import { getStepWindow } from "../prefs";
-import { drawMarker, drawTrip, landings, mapStyle, platform } from "../themes";
+import { mapStyle } from "../themes";
+import { drawMarker } from "../marks";
+import { drawTrip, platform } from "../routes";
 import { PARK } from "../agents";
 import { drawPulse, drawThinkRing, ERR_PULSE_MS, ERROR_RED as RED, glide, PULSE_MS, setOff, trailPath } from "../tracer";
 import { useFocus, WINDOW, type Look } from "./focus";
@@ -92,7 +94,7 @@ type Anim = { x: number; y: number; fromX: number; fromY: number; t0: number; fi
   cam: { x: number; y: number } | null; landedT0?: number };
 
 
-export function useReplayLayer({ nodeIndexRef, accent, font, camera, follow, liveShown }: {
+export function useReplayLayer({ nodeIndexRef, accent, font, camera, follow, land, liveShown }: {
   nodeIndexRef: RefObject<Map<string, NodePos>>;
   accent: string;
   font: string;
@@ -100,6 +102,8 @@ export function useReplayLayer({ nodeIndexRef, accent, font, camera, follow, liv
   camera: RefObject<Camera>;
   /** What the follow asks of the map's camera: where it gave up on the tracer, how far in counts as in view, a pinned file. */
   follow: RefObject<ReplayCamera>;
+  /** The marker landed on a file (Prism's hop: its cube spins up and flashes). */
+  land: (id: string, t: number) => void;
   /** Whether the live layer draws the thread's agent where it is now. Following live, the replay's marker stands in for
    *  it only if it's gone (the server forgets an agent after half an hour); looking back, the marker is drawn faint
    *  beside it (the past, under the agent now), at full strength only without it. */
@@ -199,7 +203,7 @@ export function useReplayLayer({ nodeIndexRef, accent, font, camera, follow, liv
     if (target) {
       if (a.file === null) { a.x = a.fromX = target.x; a.y = a.fromY = target.y; a.t0 = -1e9; a.file = curFile; }
       else if (a.file !== curFile) { setOff(a, t); a.file = curFile; }
-      const g = glide(a, target.x, target.y, t, style.route, s.speed, () => { if (curFile) landings.set(curFile, t); });
+      const g = glide(a, target.x, target.y, t, style.route, s.speed, () => { if (curFile) land(curFile, t); });
       if (g.trip) { trip = g.trip; tp = g.p; te = g.e; }
     } else if (!curFile) {
       a.file = null;

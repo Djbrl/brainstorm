@@ -4,10 +4,9 @@
 import type { Look } from "./replay/layer";
 import { drawName, textWidth, type LabelSpace, type QueuedLabel } from "./labels";
 import { Motion } from "./redraw";
-import {
-  CUBE_STILL_PX, drawCube, drawGlobe, drawStation, LAND_MS, landings, metroPoints, octagonPath, polyPath, reachOf, upTo, type Pt2,
-  stampCube, stampGlobe, stampStation, type MapStyle, type RGB,
-} from "./themes";
+import { reachOf, type MapStyle, type RGB } from "./themes";
+import { CUBE_STILL_PX, drawCube, drawGlobe, drawStation, stampCube, stampGlobe, stampStation } from "./marks";
+import { metroPoints, octagonPath, polyPath, upTo, type Pt2 } from "./routes";
 import { css, mixRGB, recencyRGB, same, steps, type Tokens } from "./color";
 import type { GLink, GNode } from "./graph";
 import { reducedMotion } from "../lib/breakpoints";
@@ -86,9 +85,18 @@ export type Caches = {
   /** The focused file's lines (drawFocusLinks): which file and since when, and the one before, fading out. */
   /** How far each file's lines are drawn (drawFocusLinks): the focused one's, and any still drawing back. */
   lines: Map<string, LineLevel>;
+  /** Files a marker just landed on, and when (Prism: the cube spins up and flashes). The agent and replay layers set
+   *  them (their `land` callback), drawFile reads and clears them. */
+  landings: Map<string, number>;
 };
 export const newCaches = (): Caches => ({ ripples: new Map(), dots: new Map(), focusColours: new Map(),
-  lines: new Map() });
+  lines: new Map(), landings: new Map() });
+
+const LAND_MS = 520;
+/** Forget landings that are over (drawFile only clears the ones it draws, and it doesn't draw files off screen). */
+export function settleLandings(landings: Map<string, number>, now = performance.now()) {
+  for (const [id, t] of landings) if (now - t >= LAND_MS) landings.delete(id);
+}
 
 export const moreMotion = (F: Frame, m: Motion) => { if (m === Motion.Smooth || F.motion === Motion.None) F.motion = m; };
 
@@ -270,8 +278,8 @@ export function drawFile(ctx: CanvasRenderingContext2D, n: GNode, scale: number,
   const lit = active || !same(rgb, tokens.cool);
   if (st.node === "cube") {
     // An agent lands: the cube spins up and flashes gold for a moment.
-    const landed = landings.get(n.id), k = landed === undefined ? 1 : (t - landed) / LAND_MS;
-    if (k >= 1 && landed !== undefined) landings.delete(n.id);
+    const landed = c.landings.get(n.id), k = landed === undefined ? 1 : (t - landed) / LAND_MS;
+    if (k >= 1 && landed !== undefined) c.landings.delete(n.id);
     const kick = k < 1 ? 1 - (1 - k) ** 3 : 0, flash = k < 1 ? 1 - k : 0; // a half turn: the cube looks the same after it, so it never snaps back
     const s = r * 0.78 * (active ? 1.3 : 1) * (1 + flash * 0.25);
     // A cube a few pixels wide stands still: its turn wouldn't show, and the map can rest.

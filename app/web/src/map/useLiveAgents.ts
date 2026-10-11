@@ -5,7 +5,8 @@ import type { AgentPresence, Attention } from "@contract";
 import { clock } from "../lib/live";
 import { attentionText, needsYou } from "../lib/attention";
 import { agentAlpha, DIM, visibleAgents, type AgentAnim } from "./agents";
-import { mapStyle, tripMs } from "./themes";
+import { mapStyle } from "./themes";
+import { tripMs } from "./routes";
 import { Motion } from "./redraw";
 
 

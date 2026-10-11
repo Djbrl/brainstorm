@@ -2,7 +2,8 @@
 // (replay/layer.ts) and the places map's marker (cowork/PlacesMap.tsx). A marker glides from stop to stop along the
 // theme's route, leaves a trail of segments behind it, and rings: a pulse on activity, a red ring on a failure, a slow
 // breath while it thinks. One copy of the timings and the strokes, so a theme's look reaches every layer.
-import { along, casing, polyPath, routePoints, tripMs, type MapStyle, type Pt2 } from "./themes";
+import type { MapStyle } from "./themes";
+import { along, casing, polyPath, routePoints, tripMs, type Pt2 } from "./routes";
 import { ease } from "./util";
 
 export const GLIDE_MS = 650;       // a marker's glide from one stop to the next (at 1×)

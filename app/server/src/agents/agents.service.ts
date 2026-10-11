@@ -1,3 +1,4 @@
+import { agentName } from "../listener/agent-names";
 import { isErrorResult } from "../shared/failed";
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -96,6 +97,8 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
 
   /** Subagent description from Claude Code's agent-<id>.meta.json (cached; cheap: one readdir per new agent). */
   private metaLabel(sessionId: string, agentId: string): string | undefined {
+    const named = agentName(agentId); // Codex says the name in its log
+    if (named) return named;
     try {
       for (const proj of readdirSync(this.cfg.claudeProjectsDir)) {
         const f = join(this.cfg.claudeProjectsDir, proj, sessionId, "subagents", `agent-${agentId}.meta.json`);

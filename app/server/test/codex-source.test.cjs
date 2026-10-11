@@ -491,3 +491,56 @@ test("when the Codex reader's version changes, its threads are read again from t
   assert.equal(t.listener.listSessions().length, 2);
   await t.close();
 });
+
+test("a command keeps the folder it ran in, in the Bash input", async () => {
+  const t = await makeListener();
+  const id = uuid();
+  const c = codex(id);
+  const f = file(t, id, [c.meta(), ...c.turn(),
+    c.item({ type: "CommandExecution", id: "exec-0000-sub", command: ["/bin/zsh", "-lc", "sed -i s/a/b/ src/main.ts"], cwd: "file:///work/demo-repo/app/server", parsed_cmd: [{ type: "unknown", cmd: "x" }], status: "completed", stdout: "", stderr: "", aggregated_output: "", exit_code: 0 }),
+    c.ri({ type: "function_call", call_id: "call_w1", name: "exec_command", arguments: JSON.stringify({ cmd: "npm run build", workdir: "/work/demo-repo/web" }) }),
+    c.ri({ type: "function_call_output", call_id: "call_w1", output: "Chunk ID: 1\nWall time: 1 seconds\nProcess exited with code 0\nOutput:\nbuilt\n" })]);
+  await t.readNow(f, true);
+  const bash = steps(t, id).filter((s) => s.kind === "tool_call" && s.tool === "Bash");
+  assert.deepEqual(bash.map((s) => s.input.workdir), ["/work/demo-repo/app/server", "/work/demo-repo/web"]);
+  await t.close();
+});
+
+test("an interrupted turn tells attention it's your turn, like a finished one", async () => {
+  const t = await makeListener();
+  const id = uuid();
+  const c = codex(id);
+  const f = file(t, id, [c.meta(), ...c.turn(), c.item({ type: "UserMessage", id: uuid(), content: [{ type: "text", text: "go" }] })]);
+  const ended = [];
+  t.bus.on("turn-ended", (e) => ended.push(e.sessionId));
+  await t.readNow(f, true);
+  t.live();
+  appendFileSync(f, jsonl([c.raw("event_msg", { type: "turn_aborted", turn_id: "turn-1", reason: "interrupted" })]));
+  await t.readNow(f);
+  assert.deepEqual(ended, [id]);
+  await t.close();
+});
+
+test("spawn_agent is an Agent call in the parent, its message is the subagent's first prompt, and the subagent is named from its nickname", async () => {
+  const t = await makeListener();
+  const parent = uuid(), child = uuid();
+  const p = codex(parent);
+  const pf = file(t, parent, [p.meta(), ...p.turn(), p.item({ type: "UserMessage", id: uuid(), content: [{ type: "text", text: "audit the repo" }] }),
+    p.ri({ type: "function_call", call_id: "call_spawn1", name: "spawn_agent", arguments: JSON.stringify({ task_name: "check-auth", message: "check the auth module", model: "x" }) }),
+    p.ri({ type: "function_call_output", call_id: "call_spawn1", output: JSON.stringify({ agent_thread_id: child }) })]);
+  const c = codex(child, { extra: { parent_thread_id: parent, thread_source: "subagent", session_id: parent, agent_nickname: "Euclid" } });
+  const cf = file(t, child, [c.meta(), ...c.turn(), c.item({ type: "AgentMessage", id: uuid(), content: [{ type: "Text", text: "Auth looks fine." }] })]);
+  await t.readNow(pf, true);
+  await t.readNow(cf, true);
+  const ss = steps(t, parent);
+  const agent = ss.find((s) => s.kind === "tool_call" && s.tool === "Agent");
+  assert.ok(agent, "the parent shows it started a subagent");
+  assert.equal(agent.input.description, "check-auth");
+  assert.equal(agent.input.prompt, "check the auth module");
+  assert.equal(agent.input.agent_thread_id, child);
+  assert.ok(resultOf(ss, agent));
+  const first = ss.find((s) => s.kind === "prompt" && s.agentId === child);
+  assert.equal(first?.text, "check the auth module");
+  assert.equal(require(dist("listener/agent-names.js")).agentName(child), "Euclid");
+  await t.close();
+});

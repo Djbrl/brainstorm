@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import type { StepKind } from "../types";
 import type { LogFile, LogSource, NewStep, Scope, Sink, WatchEvents } from "./source";
+import { setAgentName } from "./agent-names";
 import { sanitizeDeep, sanitizeText, TEXT_LIMIT, TOOL_RESULT_LIMIT } from "./text";
 import { codexPrompt, commandString, diffToBeforeAfter, execCalls, isInjected, outputText, parsePatch, questionReply, readsOf, shellResult, todoStatus, type ShellResult } from "./codex.map";
 
@@ -36,6 +37,8 @@ type Meta = {
   reviewer: boolean;
   /** A subagent's thread: the thread that started it. Its steps go in that thread, as a subagent's (like Claude Code's). */
   parent?: string;
+  /** A subagent's name ("Euclid"). */
+  nickname?: string;
 };
 
 type Call = { name: string; args: any; ts: string; turnId?: string };
@@ -252,6 +255,7 @@ export class CodexSource implements LogSource {
           repoUrl: str(p.git?.repository_url),
           version: versionOf(p.cli_version),
           reviewer: p.source?.subagent?.other === "guardian",
+          ...(str(p.agent_nickname) ? { nickname: str(p.agent_nickname) } : {}),
         };
       }
     } catch { /* not JSON */ }
@@ -316,6 +320,7 @@ export class CodexSource implements LogSource {
     const meta = this.metaOf(file);
     if (!meta) return null;
     const fileId = UUID.exec(file)?.[1] ?? meta.id;
+    if (meta.parent && meta.nickname) setAgentName(meta.id, meta.nickname);
     st = { file, meta, sessionId: meta.parent ?? meta.id, fileId, fromStart: line.type === "session_meta", cwd: meta.cwd, calls: new Map(), patched: new Set() };
     this.states.set(file, st);
     return st;
@@ -335,7 +340,7 @@ export class CodexSource implements LogSource {
         return;
       case "event_msg":
         if (p.type === "task_started") { st.turnId = str(p.turn_id); st.turnStart = ts; }
-        else if (p.type === "task_complete" && !st.meta.parent) sink.turnEnded(st.sessionId); // "Your turn" (attention), live only; a subagent finishing isn't
+        else if ((p.type === "task_complete" || p.type === "turn_aborted") && !st.meta.parent) sink.turnEnded(st.sessionId); // "Your turn" (attention), live only; a subagent finishing isn't. An interrupted turn is over too.
         else if (p.type === "item_completed" && p.item && typeof p.item === "object") { st.items = true; this.item(at, p.item, str(p.turn_id)); }
         return;
       case "response_item":
@@ -451,7 +456,7 @@ export class CodexSource implements LogSource {
     const parsed: any[] = Array.isArray(it.parsed_cmd) ? it.parsed_cmd : [];
     // Codex already says what a command did: read a file, search, list files. Each lands on the map as Claude's would.
     const known = parsed.length > 0 && parsed.every((c) => (c?.type === "read" && typeof c.path === "string") || c?.type === "search" || c?.type === "list_files");
-    if (!known) return this.callAndResult(at, id, "Bash", { command }, undefined, res);
+    if (!known) return this.callAndResult(at, id, "Bash", { command, ...(cwd ? { workdir: this.abs(st, cwd) } : {}) }, undefined, res);
     parsed.forEach((c, k) => {
       const sid = parsed.length > 1 ? `${id}#${k}` : id;
       const path = typeof c.path === "string" && c.path ? this.abs(st, c.path, cwd) : undefined;
@@ -572,6 +577,7 @@ export class CodexSource implements LogSource {
         return;
       }
       case "update_plan": return this.plan(at, id, args, raw);
+      case "spawn_agent": return this.spawnAgent(at, id, args, raw);
       case "view_image": {
         const path = str(args.path);
         if (path) this.callAndResult(at, id, "Read", { file_path: this.abs(st, path) }, this.abs(st, path), { text: "", failed: false });
@@ -590,11 +596,25 @@ export class CodexSource implements LogSource {
   /** A command Codex logged without saying what it did: a plain read of files lands on the map as Read, else Bash. */
   private command(at: At, id: string, command: string, workdir: string | undefined, res: { text: string; failed: boolean }) {
     const reads = readsOf(command);
-    if (!reads) return this.callAndResult(at, id, "Bash", { command }, undefined, res);
+    const dir = workdir ?? at.st.cwd;
+    if (!reads) return this.callAndResult(at, id, "Bash", { command, ...(dir ? { workdir: this.abs(at.st, dir) } : {}) }, undefined, res);
     reads.forEach((f, k) => {
       const path = this.abs(at.st, f, workdir);
       this.callAndResult(at, reads.length > 1 ? `${id}#r${k}` : id, "Read", { file_path: path, command }, path, res);
     });
+  }
+
+  /** Codex started a subagent: an Agent call like Claude Code's (its task name and message), and the message as the
+   * subagent's first prompt, which is how the web ties the call to the thread it started (its log has no prompt of its own). */
+  private spawnAgent(at: At, id: string, args: any, raw: string) {
+    let child: string | undefined;
+    try { child = str(JSON.parse(raw)?.agent_thread_id); } catch { /* no id */ }
+    const task = str(args?.task_name) ?? str(args?.agent_type);
+    const message = str(args?.message) ?? str(args?.prompt) ?? "";
+    this.callAndResult(at, id, "Agent", { description: task ?? "Subagent", prompt: message, ...(child ? { agent_thread_id: child } : {}) }, undefined, { text: `Started ${task ?? "a subagent"}.`, failed: false });
+    if (child && message.trim()) {
+      at.sink.step({ id: `${id}:task`, sessionId: at.st.sessionId, ts: at.ts, kind: "prompt", text: sanitizeText(message, TEXT_LIMIT), isSubagent: true, agentId: child } as NewStep, { cwd: this.threadCwd(at.st) });
+    }
   }
 
   private plan(at: At, id: string, args: any, result = "Plan updated") {
@@ -672,7 +692,7 @@ export class CodexSource implements LogSource {
 type At = { st: FileState; sink: Sink; ts: string; key: string };
 
 /** Calls taken from the model's records even when the file has items (no item covers them). */
-const OWN_CALLS = new Set(["exec_command", "shell_command", "shell", "local_shell", "container.exec", "exec", "apply_patch", "update_plan", "view_image"]);
+const OWN_CALLS = new Set(["spawn_agent", "exec_command", "shell_command", "shell", "local_shell", "container.exec", "exec", "apply_patch", "update_plan", "view_image"]);
 
 const fileUrl = (p: string | undefined) => { if (!p) return undefined; if (!p.startsWith("file:")) return p; try { return fileURLToPath(p); } catch { return undefined; } };
 

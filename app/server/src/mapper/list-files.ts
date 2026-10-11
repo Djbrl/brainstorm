@@ -100,8 +100,10 @@ export function gitIgnoredDirs(root: string): Promise<Set<string>> {
       for (const e of entries) if (e.endsWith("/") && out.size < IGNORED_DIRS_LIMIT) out.add(e.slice(0, -1));
       if (out.size >= IGNORED_DIRS_LIMIT) child.kill();
     });
-    child.on("error", () => resolveP(out));
-    child.on("close", () => resolveP(out));
+    // A huge untracked tree can keep git walking for long: after 10 s, the folders found so far.
+    const timer = setTimeout(() => { child.kill(); resolveP(out); }, 10_000);
+    child.on("error", () => { clearTimeout(timer); resolveP(out); });
+    child.on("close", () => { clearTimeout(timer); resolveP(out); });
   });
 }
 

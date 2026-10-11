@@ -94,7 +94,7 @@ The landing site that receives it adds the country from the request (two letters
 | [Technical documentation](docs/technical.md) | Architecture, modules, contract, API, storage, how each model is used, privacy |
 | [Run it on your machine](docs/run-locally.md) | Running from source, configuring, troubleshooting |
 | [Roadmap](docs/roadmap.md) | Product vision, packaging as a plugin, pricing ideas, decisions |
-| [Tasks and the Track](docs/tasks.md) | Following agents beyond code: how the Track is built, privacy |
+| [Tasks and the Track](docs/technical.md#screenshots-and-the-track) | Following agents beyond code: how the Track is built, privacy |
 | [Plugin](plugin/README.md) | Install, updates, settings, what it stores, uninstall |
 | [Build log](docs/build-log.md) · [Hackathon archive](docs/archive/hackathon/README.md) | The raw record, and the notes from the hackathon day |
 

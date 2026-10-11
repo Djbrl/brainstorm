@@ -10,7 +10,7 @@ Sizes are estimates for one developer who knows the codebase.
 
 Today the plugin has one hook, SessionStart (`plugin/hooks/hooks.json`), and the server reads Claude Code's log files (`app/server/src/listener/`). Every hook receives the session id, so more hooks give exact signals.
 
-- [x] Add an endpoint on the local server that receives hook events (session id, event name, project folder). Done 5 Oct: `POST /api/hooks`, see [attention.md](attention.md).
+- [x] Add an endpoint on the local server that receives hook events (session id, event name, project folder). Done 5 Oct: `POST /api/hooks`, see [technical.md](technical.md), "Waiting for you".
 - [ ] `UserPromptSubmit` hook: marks this thread as the one the user is on. The hook exists since 5 Oct (it clears a thread's waiting state); marking the thread you're on isn't built.
 - [ ] `PostToolUse` hook: a step happened, in real time (the log reader stays as the fallback and for history).
 - [x] `Notification` hook: this thread is waiting on the user (permission, idle). Done 5 Oct, with `PermissionRequest` for the tool and its input.
@@ -36,7 +36,7 @@ Size: ½ day.
 - [ ] **Rewind to a step.** Scrub the replay to where it still worked, restore the files to that step and continue from there. Needs a file snapshot per step, which is the expensive part. Overlaps "History slider" in `archive/hackathon/next-steps.md`.
 - [ ] **Runtime errors on the map.** Catch dev server and browser console errors, then light up the file and the agent step that last wrote the failing line.
 - [ ] **Learn tab.** A chat in the sidebar: ask how something works (a feature, a bug, a PR), and the map walks you through it, stopping on the key steps with the code at each. A headless, read-only Claude Code session Brainstorm follows, plus one tool for paced stops. Plan and risks in [learn-tab.md](learn-tab.md).
-- [ ] **Git on the map (built, hidden).** "Show git" in the bottom bar rings the files not committed and not pushed, or an open thread's worktree branch. Hidden on 6 Oct as a step too far for now: `GIT_SHOWN` in `app/web/src/map/gitFilter.ts` turns it back on; the server still serves `/api/git`. Next if it comes back: a menu on the switch listing the agents' worktrees.
+- [ ] **Git on the map (removed).** "Show git" rang the files not committed and not pushed, or an open thread's worktree branch. Hidden on 6 Oct, then removed with the server's `/api/git` in the October cleanup; it's in git history before then. Next if it comes back: a menu on the switch listing the agents' worktrees.
 - [ ] **Agents talking through Rundown (CLI).** With Codex support, two harnesses in one codebase: `rundown` warns before an edit another agent is making, lets agents claim a folder for a while, and carries messages between threads, all shown in the app. Collision warnings first; no task assignment. In [agent-bridge.md](agent-bridge.md).
 - [ ] **Brainstorm as context for agents (MCP).** "Is another thread editing this?", "what failed last time?". Already in `roadmap.md`, part 2. The import graph makes it sharper: blast radius before an edit, likely files for a prompt, parallel agents whose work overlaps. Ideas, uses and how to measure them first in [graph-for-agents.md](graph-for-agents.md).
 

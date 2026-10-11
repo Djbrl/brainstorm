@@ -119,7 +119,7 @@ The Map, Follow, Ask and Failures are ways of reading a replay. Local use is fre
 
 ## Tasks: following agents beyond code (28 Sep 2026)
 
-Agents don't only write code. They edit videos with FFmpeg, write documents, research the web for a paper or a reference board, and automate things on the computer. Tasks lets anyone follow and replay that work, and learn how it was done. It starts from the prototype on `feature/cowork` (see `docs/cowork.md`), which sorts every non-code tool call into a place (site, page, service, app) and separates reads from changes. "Cowork" is Anthropic's product name, so the feature is called **Tasks**.
+Agents don't only write code. They edit videos with FFmpeg, write documents, research the web for a paper or a reference board, and automate things on the computer. Tasks lets anyone follow and replay that work, and learn how it was done. It starts from the prototype on `feature/cowork` (see "Places" in `docs/technical.md`), which sorts every non-code tool call into a place (site, page, service, app) and separates reads from changes. "Cowork" is Anthropic's product name, so the feature is called **Tasks**.
 
 **A task replay has four parts:**
 
@@ -144,7 +144,7 @@ Agents don't only write code. They edit videos with FFmpeg, write documents, res
 
 **Order:**
 
-1. Task view (goal, how, made, sources) and the filmstrip replay, on `feature/tasks`. **v0 built (28 Sep), see [tasks.md](tasks.md).**
+1. Task view (goal, how, made, sources) and the filmstrip replay, on `feature/tasks`. **v0 built (28 Sep), see [technical.md](technical.md#screenshots-and-the-track).**
 2. Live file previews.
 3. The places map merged into the main map.
 4. Research access to Cowork and other agents.

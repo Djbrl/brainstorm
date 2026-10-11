@@ -6,7 +6,7 @@ How Rundown works, what's planned, and how it was built. Keep every file short a
 
 | File | What |
 | --- | --- |
-| [technical.md](technical.md) | Architecture, modules, the contract, API, storage, privacy |
+| [technical.md](technical.md) | Architecture, modules, reading the logs, the contract, API, storage, Ask, "Waiting for you", Places, the Track, privacy |
 | [run-locally.md](run-locally.md) | Running the server and web app from a clone |
 | [todo.md](todo.md) | The to-do list: what to build next, in order |
 | [graph-for-agents.md](graph-for-agents.md) | Saved for later: the import graph as a tool for agents (blast radius, likely files, collisions) |
@@ -15,9 +15,6 @@ How Rundown works, what's planned, and how it was built. Keep every file short a
 | [roadmap.md](roadmap.md) | Product direction, packaging, pricing, decisions |
 | [share-and-experiments.md](share-and-experiments.md) | The next big directions: sharing and live replays, and the experiments lab |
 | [build-log.md](build-log.md) | Milestones with times, and "Requests" between agents |
-| [tasks.md](tasks.md) | The Track: following agents' work beyond code |
-| [cowork.md](cowork.md) | Places: web, local apps and services agents use (and the hard parts) |
-| [attention.md](attention.md) | "Waiting for you": when a thread needs you, and the plugin hooks |
 | [performance.md](performance.md) | The benchmark (`app/scripts/bench/`), baseline numbers, and what slows down on big projects |
 
 ## The hackathon (27 Sep 2026)

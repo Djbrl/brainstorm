@@ -108,7 +108,7 @@ export type Replay = {
 /**
  * Cowork prototype (GET /api/cowork). Agent work outside the code: websites, apps running locally,
  * connected services and command-line tools that reach the outside world. Sorted into places
- * (area → site → page) and actions (reads vs changes). See docs/cowork.md.
+ * (area → site → page) and actions (reads vs changes). See docs/technical.md, "Places".
  */
 export type CoworkArea = "web" | "local" | "services" | "apps";
 export type CoworkAction = "visit" | "read" | "search" | "input" | "click" | "write";

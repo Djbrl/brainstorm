@@ -1,5 +1,5 @@
 // Owner: cowork. Turns non-code tool calls (browser, web, connectors, outward CLIs) into places and actions.
-// Pure: no Nest, no db. One tracker per session, fed call/result pairs in order. See docs/cowork.md.
+// Pure: no Nest, no db. One tracker per session, fed call/result pairs in order. See docs/technical.md, "Places".
 import { isErrorResult } from "../shared/failed";
 import { shellArgv } from "../listener/command-writes";
 import type { CoworkArea, CoworkConfidence, CoworkEvent, CoworkVerb, Step } from "../types";
@@ -186,7 +186,7 @@ export class CoworkTracker {
     }
   }
 
-  /** Local dev apps never count as changes to the world (see docs/cowork.md, open questions). */
+  /** Local dev apps never count as changes to the world (see docs/technical.md, "Places"). */
   private webChange(place: Place | null, verb: CoworkVerb, confidence: CoworkConfidence): Draft["change"] {
     return place && place.area === "web" ? { verb, confidence } : undefined;
   }
@@ -243,7 +243,7 @@ export class CoworkTracker {
     const raw = serviceItem(input);
     const known = raw ? this.itemTitles.get(raw) ?? (input.container?.id ? this.itemTitles.get(input.container.id) : undefined) : undefined;
     if (raw && known && input.container?.id) this.itemTitles.set(input.container.id, known);
-    // Opaque ids ("dc2c64ba-2bb6…") make poor names: show "Doc dc2c64ba" until we learn titles (docs/cowork.md).
+    // Opaque ids ("dc2c64ba-2bb6…") make poor names: show "Doc dc2c64ba" until we learn titles.
     const opaque = (v: string) => /^[0-9a-f]{6,}(-[0-9a-f]+)*$/i.test(v);
     let item = known ?? (raw && opaque(raw) ? `${ITEM_NOUN[svc] ?? "Item"} ${raw.slice(0, 8)}` : raw ?? svc);
     if (input.object === "utterance") item = `Comment on ${known ?? item}`;

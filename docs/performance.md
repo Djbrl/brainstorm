@@ -34,9 +34,7 @@ Wall times below carry that noise. CPU seconds and main-thread CPU are steadier.
 | Boot, same database (warm): thread listed | 1.8 s | 1.5 s | 2.4 s |
 | `/api/map` | 17 ms, 1.2 MB | 9 ms, 1.1 MB | 14 ms, 1.1 MB |
 | `/api/sessions` | 16 ms | 10 ms | 11 ms |
-| `/api/failures` first / cached | 86 / 10 ms | 82 / 3 ms | 144 / 5 ms |
 | `/api/sessions/:id/steps` (the 10k thread) | 195 ms, **12 MB** | 182 ms, 12 MB | 361 ms, 12 MB |
-| `/api/tasks/:id` | 222 ms, 1.1 MB | 250 ms, 1.1 MB | 255 ms, 1.1 MB |
 | Memory (RSS): no threads / warm / after serving the thread / peak | 127 / 146 / 347 / 347 MB | 194 / 213 / 401 / 401 MB | 323 / 301 / 477 / **488 MB** |
 | CPU while the live writer runs (avg / max) | 1.0 / 3% | 1.3 / 13% | 1.1 / 5% |
 | Websocket while it runs | 14.5 msg/s, 1.2 KB avg | 10.9 msg/s, 1.1 KB | 14 msg/s, 1.2 KB |
@@ -97,8 +95,6 @@ Nothing timed out and every page rendered. These are the worst numbers, most imp
      An `agent` message carries its whole trail, 2.4–2.7 KB each time.
    - Steps usually reach a websocket client in under 70 ms, but one or two per 20 s take about 2 s (seen at 5k and 20k files,
      in both passes).
-   - `/api/failures` rebuilds from every step of every thread (82–144 ms) when its 10 s cache runs out, and each open
-     page asks for it every 15 s.
    - The Fontshare stylesheet blocks the first paint: 260–1,250 ms on an empty cache here, and it's the one request
      that leaves the machine.
 
@@ -164,7 +160,7 @@ of it is on `main` until the human says so.
   that couldn't be seen.
 - **Every websocket message re-rendered the whole app,** and about eight components each rebuilt the same thread model
   and file lookup.
-- **The server recomputed on timers:** failures read every step of every thread every 15 s; the attention sweep scanned
+- **The server recomputed on timers:** the attention sweep scanned
   the steps table every 2 s.
 - **The first import blocked startup** and read whole logs into memory; a log over about 512 MB never imported.
 - **On big repos, the file scanner** watched every folder, ran the whole `git log` synchronously, and rebuilt everything
@@ -214,19 +210,19 @@ Numbers are each branch's own measurements, mostly on a machine loaded by the ot
 | --- | --- | --- |
 | `perf/canvas` | The map pauses when nothing moves; off-screen files skipped; colours, text widths and folder labels cached; theme shapes from cached pictures; idle import lines batched and hidden when zoomed out on big maps; no full layout restart on live updates; positions saved per project and theme (IndexedDB). `MapView.tsx` split from 1,237 to 413 lines (`graph.ts`, `color.ts`, `drawNode.ts`, `useMapCamera.ts`, `useLiveAgents.ts`) | 20k files at rest: 3–11 → 58–60 fps, main thread 86–89% → 3–4% busy (Prism 45%). 20k files at 4× CPU: the page used to stop answering for 4 minutes; now 58–59 fps at rest, 14–22 fps panning |
 | `perf/replay-lists` | Replay trail cached in layers, per-cursor caches, binary search, the camera loop stops when settled; windowed Track list and file tree | 10k-step thread at 4× CPU: "Show every step" 1.8 → 0.7 s; scrolling Track 5–7 → 23–28 fps; full-detail replay 10–12 → 29–34 fps; Files search on 19k files 1.9 s → 37 ms |
-| `perf/web-store` | Websocket messages applied once per frame; selector hooks; O(1) reducer updates; `structureVersion`; nav split into actions, state and cursor; the unused failures poll removed; one steps download per thread; the map chunk prefetched | 1,000 messages at 250/s: renders 556 → 229 (project) and 674 → 225 (thread open); 4 s of messages handled in 6.5 s and 4.9 s (was 13.9 s and 13.6 s); header renders ~600 → 0–1 |
-| `perf/web-thread` | One shared thread build and file resolver for all components, incremental for live threads; cached chapters and timestamps | A "file" message across 8 views 115–294 → 0.4–2 ms; one new step 197–268 → 2.6–6.7 ms; identical output in 16,524 checks (`node app/web/scripts/perf-thread.mjs`) |
+| `perf/web-store` | Websocket messages applied once per frame; selector hooks; O(1) reducer updates; `structureVersion`; nav split into actions, state and cursor; one steps download per thread; the map chunk prefetched | 1,000 messages at 250/s: renders 556 → 229 (project) and 674 → 225 (thread open); 4 s of messages handled in 6.5 s and 4.9 s (was 13.9 s and 13.6 s); header renders ~600 → 0–1 |
+| `perf/web-thread` | One shared thread build and file resolver for all components, incremental for live threads; cached chapters and timestamps | A "file" message across 8 views 115–294 → 0.4–2 ms; one new step 197–268 → 2.6–6.7 ms; identical output in 16,524 checks |
 | `perf/server-ingest` | Import after the server starts; 4 MB chunked reads split on bytes; transactions and prepared statements; cached session list; masking before truncation; `/steps` built by SQLite and `?afterSeq=`; watching only the workspace's log folders | 561 MB of real logs: answering 12.4–13.7 → 0.9–1.2 s; full import 12.6–14.0 → 5.7–8.2 s while answering; peak memory 625–646 → 297–384 MB; a 600 MB log (never imported before) imports in 26 s at 220 MB; identical steps and `/steps` bytes |
 | `perf/server-live` | Attention sweep on recent threads; labels set on the step before it's sent (fixes live steps arriving without labels); agent messages only on change, time updates at most once a second | Messages per live step 3.34 → 1.28; sweep 20 → 0.02 ms (316k steps: 92 → 0.08 ms); live labels on the first message 0/36 → 36/36 |
-| `perf/mapper` | One ignore rule; files from `git ls-files` (respects `.gitignore`); one recursive watch instead of chokidar; changes batched every 100 ms; `git log` streamed and bounded; the 800 files chosen across every folder; `totalFiles`; `BRAINSTORM_MAX_FILES` | 20k repo: 21,028 watch handles (crashed) → 1; 60k commits: event loop blocked 4.9–14.4 s → 0.4–0.8 s; 2k changes: ~1,500–1,900 messages → 22; a 5k repo shows 25 of 25 folders (was 4). One change now reaches the page in 110–180 ms (was 3–55 ms) |
-| `perf/server-pollers` | Failures and Places keep each thread's result until its steps change, reading only calls, edits and results | Same answers on a frozen copy of the real database (16/16); 147–152 → 21–24 ms |
+| `perf/mapper` | One ignore rule; files from `git ls-files` (respects `.gitignore`); one recursive watch instead of chokidar; changes batched every 100 ms; `git log` streamed and bounded; the 800 files chosen across every folder; `totalFiles`; `RUNDOWN_MAX_FILES` | 20k repo: 21,028 watch handles (crashed) → 1; 60k commits: event loop blocked 4.9–14.4 s → 0.4–0.8 s; 2k changes: ~1,500–1,900 messages → 22; a 5k repo shows 25 of 25 folders (was 4). One change now reaches the page in 110–180 ms (was 3–55 ms) |
+| `perf/server-pollers` | Places keeps each thread's result until its steps change, reading only calls, edits and results | Same answers on a frozen copy of the real database (16/16); 147–152 → 21–24 ms |
 | `fix/server-bugs` | Bus listeners isolated; screenshots load again in the step panel (only the unmounted full-screen Track used to trigger the scan) | A failing listener no longer drops the event for the others; a new thread's screenshot returns in 0.21 s |
 | `fix/web-panels` | Places deep-link crash; risk labels styled; dark-theme contrast for code, output and JSON | `/thread/<id>/places/step/<id>` opens instead of crashing; dark-theme content at 7:1 or better |
 | `refactor/web-dead-code` | Dead exports and CSS from removed views; the FilePanel ↔ MapView circular import | −328 lines, built CSS −15 KB (−16%), screens pixel-identical |
 | `perf/bench` | This benchmark | Baseline above |
 
-Tests: `cd app/server && npm test` (49 tests: listener reading and masking, sessions, steps, attention, agents, reader,
-mapper, bus), `node app/web/scripts/perf-thread.mjs` (thread model equivalence).
+Tests at the time: `cd app/server && npm test` (49 tests: listener reading and masking, sessions, steps, attention,
+agents, reader, mapper, bus).
 
 ### Left for later
 
@@ -252,7 +248,7 @@ mapper, bus), `node app/web/scripts/perf-thread.mjs` (thread model equivalence).
    way after a reload as they do live.
 4. **The file cap: decided 5 Oct, raised from 800 to 3,000.** On a 20k-file repo at 4× CPU, a 5,000-file map held
    51–60 fps at rest, panning, live and in replay (server quiet 3 s after boot, map payload 4.9 MB); 3,000 keeps the
-   map readable. `BRAINSTORM_MAX_FILES` overrides it. Bigger repos say "showing 3,000 of 20,312 files" in the stats
+   map readable. `RUNDOWN_MAX_FILES` overrides it. Bigger repos say "showing 3,000 of 20,312 files" in the stats
    line, and the Files tab explains which files were chosen.
 5. **Fonts: decided 5 Oct, system fonts.** The Fontshare stylesheet was the one request that left the computer and
    blocked the first paint for 0.3–1.3 s on a cold cache. Self-hosting was ruled out: the ITF Free Font License

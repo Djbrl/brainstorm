@@ -15,6 +15,7 @@ import { ReaderService } from "../reader/reader.service";
 import { isIdleTranscript } from "./threads";
 import { walkCandidates } from "../mapper/list-files";
 import { env } from "../core/local";
+import { safely } from "../core/safely";
 
 const execFileP = promisify(execFile);
 const encodeRoot = (root: string) => root.replace(/[^A-Za-z0-9-]/g, "-");
@@ -416,7 +417,7 @@ export class WorkspaceService implements OnModuleInit {
   private startPolling() {
     if (this.pollTimer) clearInterval(this.pollTimer);
     const startedAt = Date.now();
-    this.pollTimer = setInterval(() => {
+    this.pollTimer = setInterval(() => safely(this.log, "setup status", () => {
       const s = this.status();
       this.broadcastIfChanged(s);
       const settled = s.ready && s.steps.every((st) => st.state !== "running");
@@ -424,7 +425,7 @@ export class WorkspaceService implements OnModuleInit {
         if (this.pollTimer) clearInterval(this.pollTimer);
         this.pollTimer = undefined;
       }
-    }, POLL_MS);
+    }), POLL_MS);
   }
 
   private broadcastIfChanged(s?: SetupStatus) {

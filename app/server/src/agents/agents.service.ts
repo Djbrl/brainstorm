@@ -1,10 +1,11 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import type { AgentMove, AgentPresence, Step } from "../types";
 import { BusService } from "../core/bus.service";
 import { ConfigService } from "../core/config.service";
 import { EventsGateway } from "../core/events.gateway";
+import { safely } from "../core/safely";
 import { ListenerService } from "../listener/listener.service";
 
 // Owner: D. Live presence of agents (main session threads and subagents): which file each one is on, and its recent route.
@@ -64,13 +65,14 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
   private sentAt = new Map<string, number>(); // agent id -> when it was last broadcast
   private timer?: NodeJS.Timeout;
 
+  private log = new Logger("Agents");
   constructor(private bus: BusService, private cfg: ConfigService, private gateway: EventsGateway, private listener: ListenerService) {}
 
   onModuleInit() {
     this.bus.on("step", (s) => { try { this.onStep(s); } catch { /* never break the listener */ } });
     this.bus.on("session", (s) => { this.sessionNames.delete(s.id); });
     this.bus.on("workspace", () => { this.agents.clear(); this.sentAt.clear(); this.sessionNames.clear(); });
-    this.timer = setInterval(() => this.sweep(), 15_000);
+    this.timer = setInterval(() => safely(this.log, "agents sweep", () => this.sweep()), 15_000);
     this.timer.unref?.();
   }
   onModuleDestroy() { if (this.timer) clearInterval(this.timer); }

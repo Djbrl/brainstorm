@@ -1,9 +1,10 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import type { StatementSync } from "node:sqlite";
 import type { Attention, AttentionState, Step } from "../types";
 import { BusService } from "../core/bus.service";
 import { DbService } from "../core/db.service";
 import { EventsGateway } from "../core/events.gateway";
+import { safely } from "../core/safely";
 import { ListenerService } from "../listener/listener.service";
 import { isErrorResult } from "../failures/failures.service";
 
@@ -87,6 +88,7 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
   private rechecked = new Set<string>(); // hidden threads that already forced a re-check by starting to work
   private stmts?: { recent: StatementSync; tail: StatementSync };
 
+  private log = new Logger("Attention");
   constructor(private bus: BusService, private gateway: EventsGateway, private listener: ListenerService, private dbs: DbService) {}
 
   /** Prepared on first use: the listener creates the tables in its own init. */
@@ -102,7 +104,7 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
     // A turn an agent's log says is over (Codex's task_complete): what the plugin's Stop hook says for Claude Code.
     this.bus.on("turn-ended", ({ sessionId }) => { try { this.signal({ event: "Stop", session_id: sessionId }, false); } catch { /* never break the listener */ } });
     this.bus.on("workspace", () => { this.trackers.clear(); this.last.clear(); this.scope = undefined; this.rechecked.clear(); });
-    this.timer = setInterval(() => this.sweep(), 2_000);
+    this.timer = setInterval(() => safely(this.log, "attention sweep", () => this.sweep()), 2_000);
     this.timer.unref?.();
   }
   onModuleDestroy() { if (this.timer) clearInterval(this.timer); }

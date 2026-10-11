@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { protectGit } from "./core/git-safety";
 protectGit(); // before anything runs git
 import { join, resolve } from "node:path";
-import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync, writeSync } from "node:fs";
 import { NestFactory } from "@nestjs/core";
 import { WsAdapter } from "@nestjs/platform-ws";
 import type { NestExpressApplication } from "@nestjs/platform-express";
@@ -10,6 +10,15 @@ import type { NextFunction, Request, Response } from "express";
 import { AppModule } from "./app.module";
 import { dataDir, isLocalHost, isLocalWrite, pageCsp, env } from "./core/local";
 import { SECRET } from "./core/secrets";
+
+// An error nothing caught: written to the log (stderr, server.log under the plugin) before the server stops, so a crash
+// says why. Timers and listeners catch their own; this is the last resort, not a way to keep running half broken.
+const fatal = (what: string) => (e: unknown) => {
+  try { writeSync(2, `${new Date().toISOString()} Rundown stopped on an ${what}: ${e instanceof Error ? e.stack ?? e.message : String(e)}\n`); } catch { /* no stderr */ }
+  process.exit(1);
+};
+process.on("uncaughtException", fatal("uncaught exception"));
+process.on("unhandledRejection", fatal("unhandled rejection"));
 
 const envFile = resolve(__dirname, "../../.env");
 // Dev only: the plugin passes its settings in the environment, and must not pick up some .env above its install folder.

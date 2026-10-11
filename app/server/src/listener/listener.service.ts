@@ -7,6 +7,7 @@ import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";
 import { ConfigService } from "../core/config.service";
+import { safely } from "../core/safely";
 import { formerRoots, repoBase } from "./moved";
 import { ClaudeSource } from "./claude.source";
 import { CodexSource } from "./codex.source";
@@ -52,6 +53,10 @@ const BATCH_BYTES = 1024 * 1024;
 /** A longer line is skipped (with a warning) instead of buffered. The longest seen in real logs is 13 MB (a pasted image). */
 const MAX_LINE_BYTES = 16 * 1024 * 1024;
 const NL = 0x0a;
+/** A chunk the database wouldn't take (busy past its timeout, disk full) is read again this soon, at most RETRY_MAX
+ * times in a row; after that, on the log's next change. */
+const RETRY_MS = 1_000;
+const RETRY_MAX = 30;
 const yieldToLoop = () => new Promise<void>((r) => setImmediate(r));
 const isSqliteError = (e: unknown) => String((e as { code?: unknown })?.code ?? "").startsWith("ERR_SQLITE");
 
@@ -79,6 +84,8 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   private commandEdits = new CommandEdits((p) => this.isWithinRoot(p));
   /** Live command edits waiting for the mapper to see their files change. */
   private commandTimers = new Set<NodeJS.Timeout>();
+  private retryTimers = new Map<string, NodeJS.Timeout>();
+  private retryCount = new Map<string, number>();
   /** Closes every source's watcher (tests read files themselves). */
   readonly watcher = {
     close: async () => { await Promise.all(this.sources.map((s) => s.close())); },
@@ -219,6 +226,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     this.backfillGen++; // stops a backfill between files
     this.destroyed = true;
     for (const t of this.commandTimers) clearTimeout(t);
+    for (const t of this.retryTimers.values()) clearTimeout(t);
     await this.agentIdsDone;
     await this.watcher.close();
   }
@@ -477,7 +485,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
 
   /** Store the complete lines buf[start, end) (buf[0] is byte `bufStart` of the file) and the offset after them in
    * one transaction, then announce what was live. On a database error nothing of it is kept (seqs put back, offset
-   * unchanged), so the file's next change retries it; returns false then. */
+   * unchanged) and it's read again in a second (retrySoon); returns false then. */
   private commitChunk(file: string, buf: Buffer, bufStart: number, start: number, end: number, quietUntil: number): boolean {
     const db = this.dbs.db;
     const source = this.sourceOf(file);
@@ -514,12 +522,26 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     } catch (e) {
       try { db.exec("ROLLBACK"); } catch { /* already rolled back */ }
       for (const [id, n] of batch.seqBefore) if (n === undefined) this.nextSeq.delete(id); else this.nextSeq.set(id, n);
-      this.log.warn(`storing ${file} from byte ${bufStart + start} failed, retried on its next change: ${(e as Error).message}`);
+      this.log.warn(`storing ${file} from byte ${bufStart + start} failed, tried again in a moment: ${(e as Error).message}`);
+      this.retrySoon(file, quietUntil);
       return false;
     }
+    this.retryCount.delete(file);
     this.setOffset(file, bufStart + end);
     this.announce(batch);
     return true;
+  }
+
+  /** Read `file` again in RETRY_MS, instead of waiting for it to grow: a finished thread's last steps would otherwise
+   * stay missing until its next line, maybe hours later. */
+  private retrySoon(file: string, quietUntil: number) {
+    if (this.destroyed || this.retryTimers.has(file)) return;
+    const n = (this.retryCount.get(file) ?? 0) + 1;
+    if (n > RETRY_MAX) { this.retryCount.delete(file); return; }
+    this.retryCount.set(file, n);
+    const t = setTimeout(() => { this.retryTimers.delete(file); void this.runFile(file, quietUntil); }, RETRY_MS);
+    t.unref?.();
+    this.retryTimers.set(file, t);
   }
 
   private saveOffset(file: string, offset: number) {
@@ -543,7 +565,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
         const done = this.commandEdits.step(step, opts?.cwd || this.batchSession(b, step.sessionId)?.cwd || "");
         if (!done) return;
         if (b.quiet) { for (const e of this.commandEdits.editsFor(done, step.ts, false)) sink.step(e, { cwd: "" }); return; }
-        const timer = setTimeout(() => { this.commandTimers.delete(timer); this.storeCommandEdits(done, step.ts, harness); }, COMMAND_EDIT_WAIT_MS);
+        const timer = setTimeout(() => { this.commandTimers.delete(timer); safely(this.log, "storing a command's file edits", () => this.storeCommandEdits(done, step.ts, harness)); }, COMMAND_EDIT_WAIT_MS);
         this.commandTimers.add(timer);
       },
       customTitle: (sessionId, title) => this.setCustomTitle(b, sessionId, title, harness),

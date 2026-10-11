@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { safely } from "../core/safely";
 import { createHash } from "node:crypto";
 import { maskSecrets } from "../privacy/mask";
 import { readFileSync } from "node:fs";
@@ -127,16 +128,16 @@ export class ReaderService implements OnModuleInit {
     this.bus.on("step", (step) => this.onStep(step));
 
     // Backfill labels for steps stored before the reader was up (e.g. server restart).
-    setTimeout(() => this.backfillLabels(), 5000);
+    setTimeout(() => safely(this.log, "label backfill", () => this.backfillLabels()), 5000);
 
     // Re-check labels already stored from a previous (buggy) run and fix any that echoed the prompt.
-    setTimeout(() => this.relabelBadSteps(), 6000);
+    setTimeout(() => safely(this.log, "relabel sweep", () => this.relabelBadSteps()), 6000);
 
     // Kick off file + module summarization once the map exists.
-    setTimeout(() => this.summarizeAll(), 500);
+    setTimeout(() => safely(this.log, "summaries", () => this.summarizeAll()), 500);
 
     // Nemotron (Brev tunnel) can be flaky; periodically retry any file that never got a summary.
-    setInterval(() => this.retryMissingSummaries(), 45_000);
+    setInterval(() => safely(this.log, "summary retry", () => this.retryMissingSummaries()), 45_000);
 
     // Owner: S. When the workspace changes, re-summarize the new root's files from scratch.
     this.bus.on("workspace", () => {

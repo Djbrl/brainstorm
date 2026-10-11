@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
 import { env } from "../core/local";
+import { safely } from "../core/safely";
 
 // Owned by the lead. Anonymous usage stats: once a day, counts of what was used, sent to the landing site so we know how
 // many people use Rundown, roughly where, and which parts matter. Off until the person says yes (the app asks once;
@@ -69,9 +70,9 @@ export class UsageService implements OnModuleInit, OnModuleDestroy {
       if (!this.sessions.has(s.sessionId)) { this.sessions.add(s.sessionId); this.dirty = true; }
     });
     this.bus.on("workspace", () => this.bump("pj"));
-    const first = setTimeout(() => void this.report(), FIRST_TRY_MS);
-    const hourly = setInterval(() => void this.report(), EVERY_MS);
-    const save = setInterval(() => this.save(), SAVE_MS);
+    const first = setTimeout(() => safely(this.log, "usage report", () => this.report()), FIRST_TRY_MS);
+    const hourly = setInterval(() => safely(this.log, "usage report", () => this.report()), EVERY_MS);
+    const save = setInterval(() => safely(this.log, "saving usage counts", () => this.save()), SAVE_MS);
     for (const t of [first, hourly, save]) t.unref?.();
     this.timers.push(first, hourly, save);
   }

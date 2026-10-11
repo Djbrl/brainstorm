@@ -11,12 +11,6 @@ Rubric re-read from the live site at 15:30. Two changes since planning: **solo e
 | Experience + demo | 15 | 90-second film structure done in the landing page's style | **Product scenes in the film and on the landing page are still illustrative** | Capture real app footage and 3 screenshots at 15:40 (human + video agent); replace placeholders; export by 16:10 |
 | Responsible AI + data | 10 | Local-first, secret masking before storing or sending, small context packages, human in control | Consent, bias and copyright not mentioned | Add one paragraph to the card: code stays local, only your own sessions are read, summaries can be wrong (labeled AI-generated, with a link to the source step), open-source model license (docs agent, 16:00) |
 
-## Awards to select
-
-- **Primary:** Thunders Engineering Excellence.
-- **Tick:** Guepard (AI automation), EY Studio+ (human-centred), CompTIA (technical foundations), Brightest (skills).
-- **New fit, SupplyzPro "Find the Hidden Failures":** identify recurring failures in AI-agent conversations and tool calls, group related issues, and prioritize them with evidence. Brainstorm already reads every tool call and result. A small "Failures" panel would qualify: failed tool calls grouped by tool and error, sorted by count, each linking to its steps, with a one-line Nemotron title per group. About 30 minutes for one agent. **Human decides.**
-
 ## Shipping timeline
 
 | Time | What |

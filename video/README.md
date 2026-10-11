@@ -16,7 +16,7 @@ A 90-second video in English. The human records the voice. Screen footage must b
 | 1:12–1:25 | Brainstorm's own map time-lapse. Text: "Built today, watched by itself. Nemotron on NVIDIA Brev: [N] files read in [N] min for $[X]. [X]¢ per question." | "We built Brainstorm with agents, and Brainstorm watched them. The reading runs on NVIDIA Nemotron on Brev, on our own GPU." |
 | 1:25–1:30 | Logo plus closing line | "Let the agents type. Keep your brain in the loop." |
 
-Numbers in brackets come from `../docs/numbers.md`. If a number is missing, remove the claim; never guess.
+Numbers in brackets come from `../docs/archive/hackathon/numbers.md`. If a number is missing, remove the claim; never guess.
 
 ## Video agent tasks
 

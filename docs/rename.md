@@ -39,6 +39,6 @@ share marker and id, `brainstorm.db` renaming, `adoptOldData()` in the launcher,
 
 ## Stays "Brainstorm" (history)
 
-The hackathon docs (`docs/submission-*`, `docs/how-we-built-it.md`, `docs/judging-audit.md`, `docs/project-card.md`),
+The hackathon docs (`docs/archive/hackathon/`),
 `docs/build-log.md`, `video/`, the judged demo (`brainstorm-demo`, never redeployed without approval) and the
 `hackathon-submission` tag.

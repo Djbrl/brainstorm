@@ -1,6 +1,6 @@
 # Docs
 
-How Brainstorm works, what's planned, and how it was built. Keep every file short and factual; a number we haven't measured stays `TODO`.
+How Rundown works, what's planned, and how it was built. Keep every file short and factual; a number we haven't measured stays `TODO`.
 
 ## Today
 
@@ -14,14 +14,12 @@ How Brainstorm works, what's planned, and how it was built. Keep every file shor
 | [agent-bridge.md](agent-bridge.md) | Saved for later: agents (Claude Code, Codex) coordinating through Rundown with a CLI: collision warnings, claims, messages |
 | [roadmap.md](roadmap.md) | Product direction, packaging, pricing, decisions |
 | [share-and-experiments.md](share-and-experiments.md) | The next big directions: sharing and live replays, and the experiments lab |
-| [next-steps.md](next-steps.md) | Features cut at the hackathon and smaller known improvements |
 | [build-log.md](build-log.md) | Milestones with times, and "Requests" between agents |
 | [tasks.md](tasks.md) | The Track: following agents' work beyond code |
 | [cowork.md](cowork.md) | Places: web, local apps and services agents use (and the hard parts) |
 | [attention.md](attention.md) | "Waiting for you": when a thread needs you, and the plugin hooks |
-| [thread-replay.md](thread-replay.md) | Thread replay on the map |
 | [performance.md](performance.md) | The benchmark (`app/scripts/bench/`), baseline numbers, and what slows down on big projects |
 
 ## The hackathon (27 Sep 2026)
 
-Kept as they were, for history: [plan.md](plan.md), [how-we-built-it.md](how-we-built-it.md), [numbers.md](numbers.md) (measured results), [brev-setup.md](brev-setup.md) and [nemotron.md](nemotron.md) (the GPU and model), [project-card.md](project-card.md), [submission-answers.md](submission-answers.md), [submission-checklist.md](submission-checklist.md), [judging-audit.md](judging-audit.md), [disclosures.md](disclosures.md), [status.md](status.md).
+The plans, notes and numbers from the hackathon day, kept as they were and not maintained: [archive/hackathon/](archive/hackathon/README.md). That includes the features cut that day ([next-steps.md](archive/hackathon/next-steps.md)) and the first thread replay notes ([thread-replay.md](archive/hackathon/thread-replay.md)).

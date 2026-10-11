@@ -15,7 +15,7 @@ It replays real sessions from Brainstorm's own build: the lead agent and four su
 
 | | Required? | Notes |
 | --- | --- | --- |
-| Node.js 24 | Yes | The server uses Node's built-in `node:sqlite` and `process.loadEnvFile` |
+| Node.js 22.13 or later | Yes | The server uses Node's built-in `node:sqlite` and `process.loadEnvFile` |
 | Claude Code | Yes | Brainstorm reads its session logs in `~/.claude/projects` |
 | git | Yes | Used for "last changed" times on the map |
 | Anthropic API key | For Ask | A key scoped to a workspace. Otherwise also set `ANTHROPIC_WORKSPACE_ID` |
@@ -54,7 +54,7 @@ To follow your own project, set `MAP_ROOT` to its absolute path and `SESSION_FIL
 
 ### 3. (Optional) Run Nemotron on NVIDIA Brev
 
-The full command log we used is in [brev-setup.md](brev-setup.md). The short version:
+The full command log we used is in [brev-setup.md](archive/hackathon/brev-setup.md). The short version:
 
 ```bash
 brew install brevdev/homebrew-brev/brev && brev login

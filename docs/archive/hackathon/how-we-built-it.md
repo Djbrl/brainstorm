@@ -1,6 +1,6 @@
 # How we built it
 
-Brainstorm was built in one afternoon: workspace set up at 13:25, code freeze at 15:40, submission at 16:30. One human directed several AI coding agents working in parallel. This matches the product's thesis: agents did the typing, and the human stayed in the loop by reading a map of what they did. The git history and [build-log.md](build-log.md) are the primary record. This page summarizes them.
+Brainstorm was built in one afternoon: workspace set up at 13:25, code freeze at 15:40, submission at 16:30. One human directed several AI coding agents working in parallel. This matches the product's thesis: agents did the typing, and the human stayed in the loop by reading a map of what they did. The git history and [build-log.md](../../build-log.md) are the primary record. This page summarizes them.
 
 ## Who did what
 
@@ -64,4 +64,4 @@ Models were matched to the work. Sonnet handled the two server pieces with preci
 
 ## What was AI and what was human
 
-All code was written by AI agents: Claude Code sessions and subagents for the app, landing page and docs, and Codex for the video. The human chose the idea and the stack, approved the plan and scope, created accounts and keys, made the decisions agents asked for (which sessions to publish, deploys, the public repo), and reviewed the results. Every model call inside the product is disclosed in [disclosures.md](disclosures.md) and [technical.md](technical.md).
+All code was written by AI agents: Claude Code sessions and subagents for the app, landing page and docs, and Codex for the video. The human chose the idea and the stack, approved the plan and scope, created accounts and keys, made the decisions agents asked for (which sessions to publish, deploys, the public repo), and reviewed the results. Every model call inside the product is disclosed in [disclosures.md](disclosures.md) and [technical.md](../../technical.md).

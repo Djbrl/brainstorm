@@ -10,7 +10,7 @@ Rundown is a live map of your code and of the AI agents writing it. It runs loca
 - **Map**: the project's modules and files as a graph. Lines are imports. Nodes glow by how recently they changed and pulse where an agent is editing right now. Click a node to see its summary, its recent steps and to ask about it.
 - **History**: map snapshots over time, with a slider.
 
-Full pitch and features: `../docs/plan.md`. Judges score on working features, purposeful AI use (NVIDIA Brev), reliability, demo clarity and privacy.
+Full pitch and features: `../docs/archive/hackathon/plan.md`. Judges score on working features, purposeful AI use (NVIDIA Brev), reliability, demo clarity and privacy.
 
 ## Hard rules
 
@@ -50,7 +50,7 @@ Full pitch and features: `../docs/plan.md`. Judges score on working features, pu
 | C: Web Follow + Ask UI | `web/src/follow/`, `web/src/ask/` |
 | D: Web Map + Ask server | `web/src/map/`, `server/src/ask/`, `server/src/llm/claude.service.ts`, `server/src/privacy/` |
 
-**Nemotron is live** (14:20). Read `../docs/nemotron.md` before calling it: connection, rules, code snippet and prompts.
+**Nemotron is live** (14:20). Read `../docs/archive/hackathon/nemotron.md` before calling it: connection, rules, code snippet and prompts.
 
 ## Architecture
 
@@ -119,7 +119,7 @@ Each agent exports an express `Router` from its folder. A mounts them all in `se
 | **A: Live** | `server/` scaffold, `server/src/{index,types,db,ws}.ts`, `server/src/listener/` | 1. Scaffold server, types, stub routers for B and D. 2. Tail all jsonl files (chokidar, remember byte offsets), parse lines into Steps, store them, broadcast over ws. 3. Sessions and steps REST. 4. `/api/replay` export. 5. Map snapshot after each finished turn (`history` table). | A live Claude Code session streams steps to `ws://localhost:4000/ws` |
 | **B: Map + Reader** | `server/src/mapper/`, `server/src/reader/`, `server/src/llm/nemotron.ts` | 1. Mapper: walk the project (skip node_modules, .git, dist), count lines, parse imports (TS/JS `import`/`require`, Python `import`/`from`) into edges. Module = top two folder levels. `lastChangedAt` from git log plus file mtime. Watch for changes and push `file` messages. 2. Nemotron client (`enable_thinking: false`, 20s timeout, 2 retries). 3. Step labels: at most 8 words per edit or tool_call; send `step-update`. 4. File summaries (2 sentences), cached by content hash in the db, then module summaries. 5. Risk flags on edits: deleted tests, auth/payment/env files, more than 50 lines deleted, secrets. | The map shows real summaries, and new steps get labels within seconds |
 | **C: Web** | `web/` | 1. Vite scaffold, ws client, mock data in the contract's shape. 2. Sessions list plus Follow timeline (label, kind icon, time, diff viewer on click). 3. Map with react-force-graph-2d: color by recency, pulse when `activeSessionId` is set, size by lines, side panel on click. 4. Ask box (on a step or a node) showing answer, model and cost. 5. History slider. 6. Replay mode: `?replay=/replay.json` loads a static file, so the same UI works on Vercel. | All three views run on real data from localhost:4000 |
-| **D: Ask + Brev** | `server/src/ask/`, `server/src/llm/claude.ts`, `server/src/privacy/`, `../docs/brev-setup.md` | 1. Get Nemotron running on Brev with the human (see `../docs/brev-setup.md`) and log every command. 2. `/api/ask`: build a small context (question, the step and its diff, 3 steps before it, the file summary and module summary, at most 150 lines of the file) and call Claude. Fall back to Nemotron if Claude fails. Save Q&A in the db and reuse the saved answer when the file hash is unchanged. 3. Cost meter (tokens times price). 4. Secret masking: redact API keys, tokens and passwords before anything is stored or sent. 5. Measure numbers for `../docs/numbers.md`. | Asking about a real step returns a grounded answer with its cost |
+| **D: Ask + Brev** | `server/src/ask/`, `server/src/llm/claude.ts`, `server/src/privacy/`, `../docs/archive/hackathon/brev-setup.md` | 1. Get Nemotron running on Brev with the human (see `../docs/archive/hackathon/brev-setup.md`) and log every command. 2. `/api/ask`: build a small context (question, the step and its diff, 3 steps before it, the file summary and module summary, at most 150 lines of the file) and call Claude. Fall back to Nemotron if Claude fails. Save Q&A in the db and reuse the saved answer when the file hash is unchanged. 3. Cost meter (tokens times price). 4. Secret masking: redact API keys, tokens and passwords before anything is stored or sent. 5. Measure numbers for `../docs/numbers.md`. | Asking about a real step returns a grounded answer with its cost |
 
 **Claude model:** `claude-opus-5` by default (Opus 5: $5 input / $25 output per million tokens). Use `claude-sonnet-5` ($2 / $10) if cost matters. Record the choice in the build log.
 

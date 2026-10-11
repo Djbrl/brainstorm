@@ -1,6 +1,5 @@
-# Submission form answers (backup: paste from here if the form loses them)
+# Submission form answers (backup copy of what was sent)
 
-Form: https://docs.google.com/forms/d/e/1FAIpQLSebmyKeBPv2mrmy4T_wI2_z9SBjjSTZ-O-_ewiWs6PBEikRjw/viewform
 Deadline: 17:30 Tunis = **16:30 Dakar**. `[FILL]` = needs the human.
 
 **Country:** Senegal
@@ -43,28 +42,6 @@ TypeScript; NestJS 11 server (node:sqlite, chokidar, WebSocket); React 19 + Vite
 ## Project next step
 
 Support Codex and other agents next to Claude Code; ship pause and steer through Claude Code hooks; package it as a desktop app with a global shortcut; add a private mode where answers also run on your own GPU; pilot it with GOMYCODE students to measure whether asking-while-building improves their comprehension.
-
-## Partner awards to tick
-
-Thunders, Guepard, SupplyzPro, EY Studio+, CompTIA, Brightest, Artefact.
-
-**Primary prize application:** Thunders — Engineering Excellence Award
-
-## Award application (fit and eligibility)
-
-**Thunders (Engineering Excellence):** Brainstorm is a working, tested prototype, not a mockup. It streams real Claude Code sessions, maps a real repo, and answers questions with measured cost and latency. Evidence: 311 files (81k lines) summarized in 73 s with 0 errors; labels in 0.14 s median; retries and Nemotron fallback when Claude or the GPU tunnel fails; content-hash caching (`docs/numbers.md`, `docs/brev-setup.md`). Senegal, open to all countries.
-
-**Guepard (AI Automation):** Brainstorm automates the review work that follows every agent run: labeling each step, summarizing every file, flagging risky edits and grouping failures. The productivity gain is understanding what several agents did in minutes instead of reading dozens of diffs. See the Follow and Map views in the video and `app/server/src/reader/`. Open to all countries.
-
-**SupplyzPro (Find the Hidden Failures):** Brainstorm reads every AI-agent conversation and tool call as it happens. Its Failures view detects failed tool calls, groups them by tool and normalized error, and ranks the groups by frequency, recency and retries, each with its evidence steps and a Nemotron one-line title. Demonstrated on Brainstorm's own multi-agent build logs: 22 failing tool calls in 13 groups across 5 sessions, top group "Environment access failures retried" (live at https://brainstorm-demo-black.vercel.app/?view=failures; code in `app/server/src/failures/`). Senegal; no country restriction stated.
-
-**EY Studio+ (Human-Centred Innovation):** A clear problem backed by research (comprehension debt), a user who feels it daily (anyone coding with AI agents), and an experience built around seeing rather than reading. Route to adoption: it sits beside the tools developers already use, needs no workflow change, and is local-first. See `docs/plan.md` and the video. Open to all countries.
-
-**CompTIA (Skills & Technical Readiness):** Solid technical foundations: typed contract shared by server and web, a self-hosted open model on a GPU, secret masking and fallbacks. The project itself is a skills tool: it helps developers keep learning while AI writes code, based on Anthropic's 2026 finding that asking questions protects comprehension. Open to all countries.
-
-**Brightest (Skills & Employability):** Developers and students who rely on AI agents risk losing job-relevant skills such as reading and debugging code. Brainstorm keeps them engaged by making agent work visible and questionable, the pattern linked to higher comprehension in Anthropic's study. Open to all countries.
-
-**Artefact (Data & AI):** Brainstorm turns raw agent log data (thousands of steps) into insights you can act on: what changed where, which failures recur, what to review first, with measured cost (about $0.02 to read 81k lines, about $0.03 per question). Open to all participating countries.
 
 ## AI/tool disclosure
 

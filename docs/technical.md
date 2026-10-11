@@ -2,7 +2,7 @@
 
 Brainstorm is a local web app that runs next to Claude Code. It reads Claude Code's session logs as they are written, maps the project the agents are editing, and uses two models: Nemotron for bulk reading and Claude for questions.
 
-- Server: `app/server/`, NestJS 11, TypeScript, Node 24
+- Server: `app/server/`, NestJS 11, TypeScript, Node 22.13 or later
 - Web: `app/web/`, Vite 7, React 19, TypeScript
 - Shared contract: `app/server/src/types.ts`, imported by the web as `@contract`
 
@@ -134,7 +134,7 @@ A `steps` row is one `Step` (`app/server/src/types.ts`): `id` (`<line uuid>:<blo
 ## How the models are used
 
 **Nemotron 3 Nano (30B, FP8) on NVIDIA Brev.**
-- Setup: served by vLLM on one L40S, reached at `http://localhost:8000/v1` through `brev port-forward`. See [brev-setup.md](brev-setup.md) and [nemotron.md](nemotron.md).
+- Setup: served by vLLM on one L40S, reached at `http://localhost:8000/v1` through `brev port-forward`. See [brev-setup.md](archive/hackathon/brev-setup.md) and [nemotron.md](archive/hackathon/nemotron.md).
 - Every request sends `chat_template_kwargs: {enable_thinking: false}`.
 - Prompt design: instructions go in the system message only. Content is wrapped as data (`<file>`, `<step>`, `<module>`, `<failure_group>`).
 - Output checks: outputs that repeat instruction phrases, labels with several lines, and labels over 10 words are rejected and retried once.

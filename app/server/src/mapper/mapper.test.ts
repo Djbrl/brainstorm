@@ -11,9 +11,9 @@ import { isIgnoredDirName, isInIgnoredDir, isMappableRel, moduleOf } from "./ign
 import { rankScale, scoreFrom, selectFiles } from "./select";
 import { Batcher, foldersToWatch } from "./watch";
 import { GitLogParser } from "./git-times";
-import { listProjectFiles, listProjectFilesSync, parseLsFiles } from "./list-files";
+import { listProjectFiles, parseLsFiles } from "./list-files";
 import { MapperService, jsImports } from "./mapper.service";
-import { MAX_COUNT_BYTES, readMapped, readMappedSync } from "./read-file";
+import { MAX_COUNT_BYTES, readMapped } from "./read-file";
 import type { WsMessage } from "../types";
 
 Logger.overrideLogger(false);
@@ -174,7 +174,6 @@ test("listing a git repo follows .gitignore and the shared rule; a plain folder 
     assert.deepEqual(l.rels, [".eslintrc.json", "src/a.ts", "src/b.ts", "src/untracked.ts"]);
     assert.deepEqual([...(l.tracked ?? [])].sort(), [".eslintrc.json", "src/a.ts", "src/b.ts"]);
     assert.equal(l.changedAt, undefined); // under the cap: no ranking needed
-    assert.deepEqual(listProjectFilesSync(root, 800).rels, l.rels);
   } finally { rmSync(root, { recursive: true, force: true }); }
 
   const plain = tempRepo(files, false);
@@ -329,7 +328,7 @@ test("the map cache keeps a bounded number of roots", async () => {
   const roots = Array.from({ length: 6 }, (_, i) => tempRepo({ [`f${i}.ts`]: "" }, false));
   const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { defaultRoot: roots[0], claudeProjectsDir: projects } as never);
   try {
-    for (const r of roots) svc.getMap(r);
+    for (const r of roots) await svc.getMapAsync(r);
     const kept = roots.filter((r) => svc.getCached(r));
     assert.ok(kept.length <= 4, `${kept.length} roots kept`);
     assert.ok(svc.getCached(roots[5]));
@@ -397,16 +396,12 @@ test("odd files a listing can name: a link to /dev/zero, a link out of the proje
     assert.ok(map.edges.some((e) => e.from.endsWith("src/a.ts") && e.to.endsWith("src/b.ts")));
     assert.ok(Date.now() - t0 < 10_000, "the build finishes");
     assert.ok(process.memoryUsage().rss - rss < 200 * 1024 * 1024, "memory stays bounded");
-    // The same through the synchronous build and the live path's reader.
-    svc.onModuleDestroy();
-    const sync = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { defaultRoot: root, claudeProjectsDir: projects } as never);
-    try { assert.deepEqual(sync.getMap(root).files.map((f) => f.path.slice(root.length + 1)).sort(), names); } finally { sync.onModuleDestroy(); }
+    // The same through the live path's reader.
     for (const f of ["src/zero.json", "src/rand.md", "src/secret.md", "src/pipe.md", "dump.sql", "src/missing.ts"]) {
       assert.equal(await readMapped(join(root, f), root), null, f);
-      assert.equal(readMappedSync(join(root, f), root), null, f);
     }
     assert.ok(MAX_COUNT_BYTES < 1536 * 1024 * 1024);
-    assert.deepEqual(await readMapped(join(root, "src/b-link.ts"), root), readMappedSync(join(root, "src/b-link.ts"), root));
+    assert.equal((await readMapped(join(root, "src/b-link.ts"), root))!.content, "export const b = 1;\n");
     assert.equal((await readMapped(join(root, "src/b.ts"), root))!.content, "export const b = 1;\n");
   } finally {
     svc.onModuleDestroy();
@@ -474,7 +469,6 @@ test("live: a link to a folder outside the project, made while watching, maps no
     await new Promise((r) => setTimeout(r, 500));
     assert.deepEqual(mapped(), ["src/a.ts", "src/b.ts"]);
     assert.equal(await readMapped(join(root, "docs/secret.md"), root), null);  // through a linked folder: its real path is outside
-    assert.equal(readMappedSync(join(root, "docs/secret.md"), root), null);
     assert.ok(await readMapped(join(root, "src/inner/up/a.ts"), root));          // a linked folder that stays inside is fine to read
   } finally {
     svc.onModuleDestroy();

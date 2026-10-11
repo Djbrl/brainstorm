@@ -7,8 +7,8 @@ import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gitEnv } from "./git-safety";
-import { gitLastCommitTimes, recentCommitTimes, recentCommitTimesSync } from "../mapper/git-times";
-import { gitIgnored, listProjectFiles, listProjectFilesSync } from "../mapper/list-files";
+import { gitLastCommitTimes, recentCommitTimes } from "../mapper/git-times";
+import { gitIgnored, listProjectFiles } from "../mapper/list-files";
 
 const ID = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
 const git = (cwd: string, ...a: string[]) => execFileSync("git", a, { cwd, stdio: "pipe", env: { ...process.env, ...ID } }).toString();
@@ -68,8 +68,8 @@ test("a copied repo's filters, diff drivers, includes, submodules and gpg progra
     const reads = async () => { await gitLastCommitTimes(repo, new Set(["a.ts"])); await listProjectFiles(repo, 1); await gitIgnored(repo, ["a.ts"]); };
     await reads();
     await gitLastCommitTimes(repo, new Set(["a.ts", "nothing.ts"]));
-    await recentCommitTimes(repo); recentCommitTimesSync(repo);
-    await listProjectFiles(repo, 1); listProjectFilesSync(repo, 1);
+    await recentCommitTimes(repo);
+    await listProjectFiles(repo, 1);
     await gitIgnored(repo, ["a.ts"]);
     // A driver added after the first run (an agent's `git config`) is pinned too.
     git(repo, "config", "filter.later.clean", mark("later"));
@@ -120,7 +120,6 @@ test("a config too big to read: no git runs there at all (fails closed)", async 
     const t = new Date(Date.now() + 5000); utimesSync(join(repo, "src/a.ts"), t, t);
     assert.equal(gitEnv(repo), null);
     assert.equal((await listProjectFiles(repo, 100)).source, "walk");
-    assert.equal(listProjectFilesSync(repo, 100).source, "walk");
     assert.equal((await gitLastCommitTimes(repo, new Set(["src/a.ts"]))).times.size, 0);
     assert.equal(existsSync(marker), false);
   } finally { rmSync(tmp, { recursive: true, force: true }); }

@@ -44,15 +44,6 @@ export function recentCommitTimes(root: string, n = 1000, timeoutMs = 5000): Pro
   });
 }
 
-export function recentCommitTimesSync(root: string, n = 1000, timeoutMs = 5000): Map<string, number> {
-  const parser = new GitLogParser();
-  try {
-    const out = execFileSync("git", RECENT_ARGS(root, n), { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"], timeout: timeoutMs, windowsHide: true, env: gitEnvOrThrow(root) });
-    for (const l of out.split("\n")) parser.line(l);
-  } catch { /* not a repo, no commits yet, or no git */ }
-  return parser.times;
-}
-
 /** Newest commit time (seconds) of each wanted path ("/" separators, relative to the root). Never rejects: an empty map when git can't answer. */
 export function gitLastCommitTimes(root: string, wanted: Set<string>, opts: GitTimesOptions = {}): Promise<{ times: Map<string, number>; commits: number; complete: boolean; error?: string }> {
   const maxCommits = opts.maxCommits ?? 20_000;

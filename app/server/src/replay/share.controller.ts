@@ -49,18 +49,18 @@ export class ShareController {
 
   /** A replay of one thread for someone else: only this thread (no Ask answers), the part of the map it touched (slim.ts),
    *  secrets masked, no screenshots. */
-  sharedReplay(session: Session): Replay {
+  async sharedReplay(session: Session): Promise<Replay> {
     const steps = this.listener.listSteps(session.id);
-    const raw = this.replays.build(session.id, undefined, undefined, undefined, undefined, undefined, { mapRoot: shareMapRoot(session, steps, this.cfg.defaultRoot) });
+    const raw = await this.replays.build(session.id, undefined, undefined, undefined, undefined, undefined, { mapRoot: shareMapRoot(session, steps, this.cfg.defaultRoot) });
     const answers: Replay["answers"] = []; // a shared file carries no Ask answers: they were asked here, about this machine
     const shared = { title: session.title || "Untitled thread", createdAt: new Date().toISOString(), version: env("VERSION") ?? "dev" };
     const map = raw.map && slimMap(raw.map, raw.steps);
     return forSharing({ ...raw, map, answers, shared });
   }
 
-  @Get("share") share(@Query("sessionId") sessionId: string | undefined, @Query("format") format: string | undefined, @Res() res: Response) {
+  @Get("share") async share(@Query("sessionId") sessionId: string | undefined, @Query("format") format: string | undefined, @Res() res: Response) {
     const session = this.pick(sessionId);
-    const replay = this.sharedReplay(session);
+    const replay = await this.sharedReplay(session);
     this.usage.bump("sh");
     const name = fileName(replay, session);
     if (format === "json") {
@@ -81,9 +81,9 @@ export class ShareController {
     return res.send(html);
   }
 
-  @Get("export.md") exportMarkdown(@Query("sessionId") sessionId: string | undefined, @Res() res: Response) {
+  @Get("export.md") async exportMarkdown(@Query("sessionId") sessionId: string | undefined, @Res() res: Response) {
     const session = this.pick(sessionId);
-    const replay = this.sharedReplay(session);
+    const replay = await this.sharedReplay(session);
     this.usage.bump("sh");
     const steps: Step[] = replay.steps;
     const md = threadMarkdown(replay.sessions[0] ?? session, steps, replay.map);

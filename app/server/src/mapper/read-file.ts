@@ -2,7 +2,7 @@
 // committed symlink to /dev/zero or to a FIFO, a link out of the project, a multi-gigabyte database dump. Each is
 // checked before anything is read; a file is read into memory only up to MAX_PARSE_BYTES, and counted a chunk at a time
 // up to MAX_COUNT_BYTES. Anything else is left off the map.
-import { closeSync, constants, fstatSync, openSync, readSync, realpathSync, statSync, type Stats } from "node:fs";
+import { constants, type Stats } from "node:fs";
 import { open, realpath, stat } from "node:fs/promises";
 import { sep } from "node:path";
 
@@ -52,33 +52,6 @@ export async function readMapped(abs: string, root: string): Promise<FileRead | 
       if (small) { const b = buf.subarray(0, pos); return { lines: countLines(b), content: b.toString("utf8"), mtimeMs: st.mtimeMs }; }
       return { lines: pos ? lines + 1 : 0, content: "", mtimeMs: st.mtimeMs };
     } finally { await fh.close(); }
-  } catch { return null; }
-}
-
-/** readMapped, synchronously (the first map of a project, built while a request waits). */
-export function readMappedSync(abs: string, root: string): FileRead | null {
-  try {
-    const real = realpathSync(abs);
-    if (!inside(real, realpathSync(root))) return null;
-    let st = statSync(real);
-    if (!mappable(st)) return null;
-    const fd = openSync(real, FLAGS);
-    try {
-      st = fstatSync(fd);
-      if (!mappable(st)) return null;
-      const small = st.size <= MAX_PARSE_BYTES;
-      const buf = Buffer.allocUnsafe(small ? st.size : CHUNK);
-      let pos = 0, lines = 0;
-      while (pos < st.size) {
-        const want = Math.min(small ? buf.length - pos : buf.length, st.size - pos);
-        const n = readSync(fd, buf, small ? pos : 0, want, pos);
-        if (!n) break;
-        if (!small) lines += newlines(buf, n);
-        pos += n;
-      }
-      if (small) { const b = buf.subarray(0, pos); return { lines: countLines(b), content: b.toString("utf8"), mtimeMs: st.mtimeMs }; }
-      return { lines: pos ? lines + 1 : 0, content: "", mtimeMs: st.mtimeMs };
-    } finally { closeSync(fd); }
   } catch { return null; }
 }
 

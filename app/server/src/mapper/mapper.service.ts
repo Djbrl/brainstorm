@@ -10,10 +10,10 @@ import { ConfigService } from "../core/config.service";
 import { DbService } from "../core/db.service";
 import { formerRoots } from "../listener/moved";
 import { isInIgnoredDir, liveHeadroom, maxFiles, isMappableRel, moduleOf } from "./ignore";
-import { type Listing, gitIgnored, listFolder, listProjectFiles, listProjectFilesSync } from "./list-files";
+import { type Listing, gitIgnored, listFolder, listProjectFiles } from "./list-files";
 import { type Signals, scoreFrom, selectFiles } from "./select";
 import { gitLastCommitTimes } from "./git-times";
-import { readMapped, readMappedSync } from "./read-file";
+import { readMapped } from "./read-file";
 import { Batcher, ProjectWatcher, foldersToWatch } from "./watch";
 
 const JS_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
@@ -153,22 +153,6 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /** The map for a root, built now (blocking) if nothing has built it yet. Prefer getMapAsync where a promise is fine. */
-  getMap(root: string): ProjectMap {
-    const abs = resolve(root);
-    const hit = this.cache.get(abs);
-    if (hit) { this.remember(abs, hit); return hit.map; }
-    this.building.add(abs);
-    try {
-      const t0 = Date.now();
-      const built = this.buildSync(abs);
-      this.store(abs, built, t0);
-      return built.map;
-    } finally {
-      this.building.delete(abs);
-    }
-  }
-
   /** The map for a root, built in the background if needed (the event loop stays free while files are listed and read). */
   async getMapAsync(root: string): Promise<ProjectMap> {
     return (await this.ensure(resolve(root))).map;
@@ -207,12 +191,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
       const t0 = Date.now();
       this.building.add(abs);
       p = this.buildAsync(abs)
-        .then((built) => {
-          const raced = this.cache.get(abs); // a blocking getMap() got there first
-          if (raced) return raced;
-          this.store(abs, built, t0);
-          return built;
-        })
+        .then((built) => { this.store(abs, built, t0); return built; })
         .finally(() => { this.inflight.delete(abs); this.building.delete(abs); });
       this.inflight.set(abs, p);
     }
@@ -240,25 +219,6 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     const sig = this.firstSignals(root, listing);
     const pool = await readAll(selectFiles(listing.rels, Math.min(listing.rels.length, 2 * maxFiles()), scoreFrom(sig)));
     return done(this.assemble(root, listing, this.chooseFromPool(root, sig, pool), listMs));
-  }
-
-  private buildSync(root: string): Cached {
-    const t0 = Date.now();
-    const listing = listProjectFilesSync(root, maxFiles());
-    const listMs = Date.now() - t0;
-    const readAll = (rels: string[]) => {
-      const reads: Read[] = [];
-      for (const rel of rels) {
-        const abs = join(root, rel);
-        const r = readMappedSync(abs, root); // null: gone, unreadable, too big, or not a file in the project
-        if (r) reads.push({ abs, ...r });
-      }
-      return reads;
-    };
-    if (listing.rels.length <= maxFiles()) return this.assemble(root, listing, readAll(listing.rels), listMs);
-    const sig = this.firstSignals(root, listing);
-    const pool = readAll(selectFiles(listing.rels, Math.min(listing.rels.length, 2 * maxFiles()), scoreFrom(sig)));
-    return this.assemble(root, listing, this.chooseFromPool(root, sig, pool), listMs);
   }
 
   /** Before reading anything: when files changed (git, mtime, an agent's last step on it) and which ones agents touched. */

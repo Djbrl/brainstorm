@@ -70,7 +70,7 @@ export class ReplayService {
    * `share`: a thread being shared (share.controller.ts), found by id even from another project, with the map of the
    * project the server worked out for it (share-root.ts), never one a link names.
    */
-  build(sessionId?: string, root?: string, movesFrom?: string, movesTo?: string, preview?: string, until?: string, share?: { mapRoot: string }): Replay {
+  async build(sessionId?: string, root?: string, movesFrom?: string, movesTo?: string, preview?: string, until?: string, share?: { mapRoot: string }): Promise<Replay> {
     const all = this.listener.listSessions();
     const wanted = sessionId ? sessionId.split(",") : [];
     const sessions = !wanted.length ? all.slice(0, 1)
@@ -78,7 +78,7 @@ export class ReplayService {
       : all.filter((s) => wanted.includes(s.id));
     const steps = sessions.flatMap((s) => this.listener.listSteps(s.id)).filter((st) => !until || st.ts <= until);
     // The open project only (or the same folder written another way): never a walk of any folder a link names.
-    const map = this.mapper.getMap(share ? share.mapRoot : root && resolve(root) === resolve(this.cfg.defaultRoot) ? root : this.cfg.defaultRoot);
+    const map = await this.mapper.getMapAsync(share ? share.mapRoot : root && resolve(root) === resolve(this.cfg.defaultRoot) ? root : this.cfg.defaultRoot);
     const answers = this.askService.listAnswers();
     const cowork = Object.fromEntries(sessions.map((s) => [s.id, summarizePlaces([s.id], (id) => steps.filter((st) => st.sessionId === id))])); // Places, for the hosted demo
     const base: Replay = { exportedAt: until ?? new Date().toISOString(), sessions: sessions.map((s) => ({ ...s, status: "idle" })), steps, map: { ...map, files: map.files.map(({ activeSessionId: _a, ...f }) => f) }, answers, cowork };

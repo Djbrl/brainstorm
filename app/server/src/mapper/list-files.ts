@@ -1,13 +1,13 @@
 // Which files a project has, for the map. A git repo asks git (`ls-files -co --exclude-standard`: tracked files plus
 // new ones, minus .gitignore'd), anything else walks the folder. Both go through the same ignore rule. When there are
 // more than the cap, it also says when each file last changed, so select.ts can choose deliberately.
-import { execFileSync, spawn } from "node:child_process";
-import { readdirSync, statSync, type Dirent } from "node:fs";
+import { spawn } from "node:child_process";
+import { type Dirent } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { gitEnvOrThrow } from "../core/git-safety";
 import { isIgnoredDirName, isMappableRel, isSourceName } from "./ignore";
-import { recentCommitTimes, recentCommitTimesSync } from "./git-times";
+import { recentCommitTimes } from "./git-times";
 
 export type Listing = {
   /** Every mappable file found, relative with "/" separators, sorted, at most CANDIDATE_LIMIT. */
@@ -81,15 +81,6 @@ function gitCandidates(root: string): Promise<Candidates | null> {
   });
 }
 
-function gitCandidatesSync(root: string): Candidates | null {
-  try {
-    const out = execFileSync("git", LS_ARGS(root), { encoding: "utf8", maxBuffer: 512 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"], timeout: 30_000, windowsHide: true, env: gitEnvOrThrow(root) });
-    const acc = { rels: [] as string[], tracked: new Set<string>(), total: 0 };
-    parseLsFiles(out.split("\0"), acc);
-    return acc.total ? acc : null;
-  } catch { return null; }
-}
-
 // ---- walk ----
 
 const byName = (a: Dirent, b: Dirent) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
@@ -117,28 +108,6 @@ export async function walkCandidates(root: string, budget = { dirs: WALK_DIRS, m
   return acc;
 }
 
-function walkCandidatesSync(root: string): Candidates {
-  const acc: Candidates = { rels: [], total: 0 };
-  const until = Date.now() + WALK_MS;
-  let dirs = 0;
-  const visit = (dir: string, relDir: string): void => {
-    if (acc.stopped || ++dirs > WALK_DIRS || Date.now() > until) { acc.stopped = true; return; }
-    let entries: Dirent[];
-    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
-    entries.sort(byName);
-    for (const e of entries) {
-      if (acc.rels.length >= CANDIDATE_LIMIT) return;
-      const rel = relDir ? `${relDir}/${e.name}` : e.name;
-      let isFile = e.isFile();
-      if (e.isSymbolicLink()) { try { isFile = statSync(join(dir, e.name)).isFile(); } catch { continue; } }
-      if (e.isDirectory()) { if (!isIgnoredDirName(e.name)) visit(join(dir, e.name), rel); }
-      else if (isFile && isSourceName(e.name)) { acc.rels.push(rel); acc.total++; }
-    }
-  };
-  visit(root, "");
-  return acc;
-}
-
 // ---- modification times (seconds) ----
 
 async function mtimesOf(root: string, rels: string[]): Promise<Map<string, number>> {
@@ -150,12 +119,6 @@ async function mtimesOf(root: string, rels: string[]): Promise<Map<string, numbe
       try { out.set(rel, (await stat(join(root, rel))).mtimeMs / 1000); } catch { /* gone */ }
     }
   }));
-  return out;
-}
-
-function mtimesOfSync(root: string, rels: string[]): Map<string, number> {
-  const out = new Map<string, number>();
-  for (const rel of rels) { try { out.set(rel, statSync(join(root, rel)).mtimeMs / 1000); } catch { /* gone */ } }
   return out;
 }
 
@@ -175,19 +138,6 @@ export async function listProjectFiles(root: string, cap: number): Promise<Listi
   const walked = await walkCandidates(root);
   if (walked.rels.length <= cap) return listing(walked, "walk");
   return listing(walked, "walk", await mtimesOf(root, walked.rels.slice(0, STAT_LIMIT)));
-}
-
-/** Same as listProjectFiles, blocking. Only for a caller that needs a map right now and has none cached. */
-export function listProjectFilesSync(root: string, cap: number): Listing {
-  const git = gitCandidatesSync(root);
-  if (git) {
-    if (git.rels.length <= cap) return listing(git, "git");
-    const recent = recentCommitTimesSync(root);
-    return listing(git, "git", merge(recent, mtimesOfSync(root, untrackedOf(git))), recent);
-  }
-  const walked = walkCandidatesSync(root);
-  if (walked.rels.length <= cap) return listing(walked, "walk");
-  return listing(walked, "walk", mtimesOfSync(root, walked.rels.slice(0, STAT_LIMIT)));
 }
 
 /** Of these relative paths, the ones .gitignore excludes (`git check-ignore --stdin`). Empty when git can't say. */

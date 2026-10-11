@@ -9,10 +9,10 @@ export class ReplayController {
   constructor(private replays: ReplayService) {}
 
   /** Every export goes through the private redaction list before it can be published. */
-  @Get("replay") replay(@Query("sessionId") sessionId?: string, @Query("root") root?: string,
+  @Get("replay") async replay(@Query("sessionId") sessionId?: string, @Query("root") root?: string,
     @Query("movesFrom") movesFrom?: string, @Query("movesTo") movesTo?: string, @Query("preview") preview?: string,
-    @Query("until") until?: string): Replay {
-    const raw = this.replays.build(sessionId, root, movesFrom, movesTo, preview, until);
+    @Query("until") until?: string): Promise<Replay> {
+    const raw = await this.replays.build(sessionId, root, movesFrom, movesTo, preview, until);
     return JSON.parse(redactReplayJson(JSON.stringify(raw)).json) as Replay;
   }
 }

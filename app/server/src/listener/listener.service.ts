@@ -12,7 +12,8 @@ import { formerRoots, repoBase, within } from "./moved";
 import { ClaudeSource } from "./claude.source";
 import { CodexSource } from "./codex.source";
 import type { LogFile, LogSource, NewStep, Scope, Sink } from "./source";
-import { promptTitle } from "./text";
+import { promptTitle, storedTitle, titleOfPrompt, UNTITLED } from "./text";
+import { maskSecrets } from "../privacy/mask";
 import { CommandEdits } from "./command-edits";
 import { commandReads } from "./command-writes";
 import { backfillAgentIds } from "./agent-ids";
@@ -26,7 +27,7 @@ export { sanitizeText, promptTitle, withoutPastes } from "./text";
 const RECENT_MS = 14 * 24 * 60 * 60 * 1000;
 const IDLE_AFTER_MS = 2 * 60 * 1000;
 /** `worked`: an agent called a tool or edited a file in the thread (one that only answered a slash command didn't). */
-type SessionRow = { id: string; cwd: string; title: string; started_at: string; last_event_at: string; custom_title: number; title_set: number; worked: number; harness: string | null };
+type SessionRow = { id: string; cwd: string; title: string; started_at: string; last_event_at: string; custom_title: number; title_set: number; worked: number; harness: string };
 type BatchSession = SessionRow & { isNew: boolean; dirty: boolean };
 
 /** One chunk of a file being stored: passed down the parse, so reads of several files can interleave. */
@@ -63,9 +64,7 @@ const isSqliteError = (e: unknown) => String((e as { code?: unknown })?.code ?? 
 @Injectable()
 export class ListenerService implements OnModuleInit, OnModuleDestroy {
   private log = new Logger("Listener");
-  // SESSION_FILTER env is a permanent override (substring of Claude Code's project folder names, old behavior).
-  // Otherwise the active workspace's roots scope every source (set on "workspace", owner: S).
-  private readonly sessionFilterOverride = process.env.SESSION_FILTER || undefined;
+  // The active workspace's roots scope every source (set on "workspace", owner: S).
   private activeRoot: string | null = null;
   /** The active root and the folders the repo lived in before it moved (see moved.ts). */
   private roots: string[] = [];
@@ -82,8 +81,9 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   private codex?: CodexSource;
   /** Files changed through shell commands, made edits of their thread (command-edits.ts). */
   private commandEdits = new CommandEdits((p) => this.isWithinRoot(p), () => this.activeRoot);
-  /** Live command edits waiting for the mapper to see their files change. */
-  private commandTimers = new Set<NodeJS.Timeout>();
+  /** Live command edits waiting for the mapper to see their files change, each with how to store them at once
+   * (without a diff) if the server stops first. */
+  private commandTimers = new Map<NodeJS.Timeout, () => void>();
   private retryTimers = new Map<string, NodeJS.Timeout>();
   private retryCount = new Map<string, number>();
   /** Closes every source's watcher (tests read files themselves). */
@@ -103,8 +103,6 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   private reading = new Map<string, { again?: number; done?: Promise<void> }>();
   /** Each file's size when the backfill listed it: lines up to there are history, anything after is live. */
   private historyEnd = new Map<string, number>();
-  /** SESSION_FILTER's first scan reads files one at a time. */
-  private historyChain: Promise<void> = Promise.resolve();
   private backfillGen = 0;
   private st!: ReturnType<ListenerService["prepare"]>;
   /** listSessions' rows: filtered, titles cleaned, newest first. Dropped when a session row is written or the
@@ -158,6 +156,20 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     db.exec(`CREATE INDEX IF NOT EXISTS steps_file ON steps(file_path)`);
     // Added 3 Oct 2026: compacted-conversation recaps were stored as prompts; they read as the agent's text.
     db.exec(`UPDATE steps SET kind = 'text' WHERE kind = 'prompt' AND text LIKE 'This session is being continued from a previous conversation%'`);
+    // Added 11 Oct 2026: Claude Code's threads were stored with harness NULL (so a re-read of its logs, which deletes
+    // by harness, would have kept them); titles are masked like every other text; times ahead of the clock were kept.
+    this.once("listener: harness claude", () => db.exec(`UPDATE sessions SET harness = 'claude' WHERE harness IS NULL`));
+    this.once("listener: titles masked", () => {
+      const set = db.prepare(`UPDATE sessions SET title = ? WHERE id = ?`);
+      for (const r of db.prepare(`SELECT id, title FROM sessions`).all() as { id: string; title: string }[]) {
+        const masked = maskSecrets(r.title);
+        if (masked !== r.title) set.run(masked, r.id);
+      }
+    });
+    this.once("listener: no future times", () => {
+      const now = new Date().toISOString();
+      db.prepare(`UPDATE sessions SET last_event_at = ? WHERE julianday(last_event_at) > julianday(?)`).run(now, now);
+    });
     this.st = this.prepare();
 
     const warn = (e: Error) => this.log.warn(`watcher error: ${e.message}`);
@@ -188,11 +200,24 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
         ready: () => {
           if (--waiting > 0) return;
           this.ready = true;
-          if (!this.sessionFilterOverride) this.backfillForNewFilter(); // the whole history, once the server is up
-          this.log.log(`watching ${this.cfg.claudeProjectsDir} and ${this.cfg.codexDir} live (${this.sessionFilterOverride ? `filter="${this.sessionFilterOverride}"` : `roots: ${this.roots.join(", ")}`})`);
+          this.backfillForNewFilter(); // the whole history, once the server is up
+          this.log.log(`watching ${this.cfg.claudeProjectsDir} and ${this.cfg.codexDir} live (roots: ${this.roots.join(", ")})`);
         },
       });
     }
+  }
+
+  /** Run `fn` once per database (in a transaction), remembered in `settings` under `key`. */
+  private once(key: string, fn: () => void) {
+    const db = this.dbs.db;
+    db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
+    if (db.prepare(`SELECT 1 FROM settings WHERE key = ?`).get(key)) return;
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      fn();
+      db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?)`).run(key, new Date().toISOString());
+      db.exec("COMMIT");
+    } catch (e) { db.exec("ROLLBACK"); throw e; }
   }
 
   /** A source whose reading changed since its threads were stored (its `version`) has them read again: its threads and
@@ -224,8 +249,11 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     this.backfillGen++; // stops a backfill between files
+    // A command's file edits still waiting for the mapper: stored now, without a diff (the offset is past its line,
+    // so they would never be read again).
+    for (const [t, now] of this.commandTimers) { clearTimeout(t); now(); }
+    this.commandTimers.clear();
     this.destroyed = true;
-    for (const t of this.commandTimers) clearTimeout(t);
     for (const t of this.retryTimers.values()) clearTimeout(t);
     await this.agentIdsDone;
     await this.watcher.close();
@@ -297,7 +325,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private scope(): Scope {
-    return { roots: this.roots, override: this.sessionFilterOverride, guests: { ids: this.visitors, files: this.guestFiles } };
+    return { roots: this.roots, guests: { ids: this.visitors, files: this.guestFiles } };
   }
 
   /** Threads from other projects shown here as visitors (they touched this project's files). */
@@ -334,7 +362,6 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
 
   private onWorkspaceChanged(root: string) {
     this.setRoot(root);
-    if (this.sessionFilterOverride) return; // permanent override, ignore workspace changes
     this.log.log(`workspace changed: now reading the agents' logs for ${this.roots.join(", ")}`);
     this.backfillForNewFilter();
   }
@@ -376,18 +403,9 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   // ---- file tailing ----
 
   private onAdd(file: string) {
-    if (this.ready) {
-      // A new thread (or subagent) is live from its first line; a file the backfill listed is read by it.
-      if (!this.historyEnd.has(file)) void this.runFile(file, 0);
-      return;
-    }
-    // Chokidar's first scan. The backfill reads everything once the server is up; with SESSION_FILTER (no backfill)
-    // the last two weeks are read here, as history, one file at a time.
-    if (!this.sessionFilterOverride) return;
-    let mtimeMs: number;
-    try { mtimeMs = statSync(file).mtimeMs; } catch { return; }
-    if (Date.now() - mtimeMs > RECENT_MS) return;
-    this.historyChain = this.historyChain.then(() => this.runFile(file, Infinity));
+    // A new thread (or subagent) is live from its first line; a file the backfill listed is read by it. Chokidar's
+    // first scan (before ready) is left to the backfill.
+    if (this.ready && !this.historyEnd.has(file)) void this.runFile(file, 0);
   }
 
   /** Read what `file` gained since its offset. One pass at a time per file: a change during a pass queues another.
@@ -571,8 +589,9 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
         const done = this.commandEdits.step(step, opts?.cwd || this.batchSession(b, step.sessionId)?.cwd || "");
         if (!done) return;
         if (b.quiet) { for (const e of this.commandEdits.editsFor(done, step.ts, false)) sink.step(e, { cwd: "" }); return; }
-        const timer = setTimeout(() => { this.commandTimers.delete(timer); safely(this.log, "storing a command's file edits", () => this.storeCommandEdits(done, step.ts, harness)); }, COMMAND_EDIT_WAIT_MS);
-        this.commandTimers.add(timer);
+        const store = (live: boolean) => safely(this.log, "storing a command's file edits", () => this.storeCommandEdits(done, step.ts, harness, live));
+        const timer = setTimeout(() => { this.commandTimers.delete(timer); store(true); }, COMMAND_EDIT_WAIT_MS);
+        this.commandTimers.set(timer, () => store(false));
       },
       customTitle: (sessionId, title) => this.setCustomTitle(b, sessionId, title, harness),
       turnEnded: (sessionId) => { if (!b.quiet) b.events.push({ turnEnded: sessionId }); },
@@ -580,13 +599,14 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     return sink;
   }
 
-  /** A live command's file edits, in a transaction of their own, then announced like any live step. */
-  private storeCommandEdits(done: Parameters<CommandEdits["editsFor"]>[0], ts: string, harness: Harness) {
+  /** A live command's file edits, in a transaction of their own, then announced like any live step. `live: false`
+   * (the server is stopping): without a diff, and quietly. */
+  private storeCommandEdits(done: Parameters<CommandEdits["editsFor"]>[0], ts: string, harness: Harness, live = true) {
     if (this.destroyed) return;
-    const edits = this.commandEdits.editsFor(done, ts, true);
+    const edits = this.commandEdits.editsFor(done, ts, live);
     if (!edits.length) return;
     const db = this.dbs.db;
-    const b: Batch = { quietUntil: 0, quiet: false, sessions: new Map(), events: [], announced: new Set(), seqBefore: new Map() };
+    const b: Batch = { quietUntil: 0, quiet: !live, sessions: new Map(), events: [], announced: new Set(), seqBefore: new Map() };
     try {
       db.exec("BEGIN IMMEDIATE");
       for (const e of edits) {
@@ -678,13 +698,17 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private upsertSession(b: Batch, sessionId: string, harness: Harness, cwd: string, ts: string, rawPrompt?: string, worked = false) {
-    const promptTextForTitle = rawPrompt ? promptTitle(rawPrompt) : undefined;
+    const promptTextForTitle = rawPrompt ? titleOfPrompt(rawPrompt) : undefined;
+    // A time ahead of the clock (a wrong clock, a log from another machine) is stored as now: the thread would read
+    // "running" until the clock caught up.
+    const at = Date.parse(ts);
+    if (at > Date.now()) ts = new Date().toISOString();
     const row = this.batchSession(b, sessionId);
     if (!row) {
-      const title = promptTextForTitle ? promptTextForTitle.slice(0, 80) : "(untitled session)";
+      const title = promptTextForTitle ?? UNTITLED;
       b.sessions.set(sessionId, {
         id: sessionId, cwd, title, started_at: ts, last_event_at: ts, custom_title: 0, title_set: promptTextForTitle ? 1 : 0,
-        worked: worked ? 1 : 0, harness: harness === "claude" ? null : harness, isNew: true, dirty: true,
+        worked: worked ? 1 : 0, harness, isNew: true, dirty: true,
       });
       this.announceSession(b, sessionId);
       return;
@@ -692,10 +716,10 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     let title = row.title;
     let titleSet = row.title_set;
     if (!row.custom_title && !row.title_set && promptTextForTitle) {
-      title = promptTextForTitle.slice(0, 80);
+      title = promptTextForTitle;
       titleSet = 1;
     }
-    const lastEventAt = ts > row.last_event_at ? ts : row.last_event_at;
+    const lastEventAt = !(Date.parse(row.last_event_at) >= Date.parse(ts)) ? ts : row.last_event_at; // as times, not strings
     const newCwd = cwd || row.cwd;
     const titleOrCwdChanged = title !== row.title || newCwd !== row.cwd;
     if (titleOrCwdChanged || lastEventAt !== row.last_event_at || titleSet !== row.title_set) {
@@ -708,13 +732,14 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   private setCustomTitle(b: Batch, sessionId: string, customTitle: string, harness: Harness) {
     const row = this.batchSession(b, sessionId);
     const now = new Date().toISOString();
+    const title = storedTitle(customTitle, Infinity);
     if (!row) {
       b.sessions.set(sessionId, {
-        id: sessionId, cwd: "", title: customTitle, started_at: now, last_event_at: now, custom_title: 1, title_set: 1, worked: 0,
-        harness: harness === "claude" ? null : harness, isNew: true, dirty: true,
+        id: sessionId, cwd: "", title, started_at: now, last_event_at: now, custom_title: 1, title_set: 1, worked: 0,
+        harness, isNew: true, dirty: true,
       });
     } else {
-      Object.assign(row, { title: customTitle, custom_title: 1, title_set: 1, dirty: true });
+      Object.assign(row, { title, custom_title: 1, title_set: 1, dirty: true });
     }
     this.announceSession(b, sessionId);
   }
@@ -776,7 +801,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   scopeRoots(): string[] { return this.roots; }
 
   private rowToSession(row: SessionRow): Session {
-    const idle = Date.now() - Date.parse(row.last_event_at) > IDLE_AFTER_MS;
+    const idle = !(Date.parse(row.last_event_at) >= Date.now() - IDLE_AFTER_MS); // a time that doesn't parse: idle
     const home = this.homeOf(row.cwd);
     return { id: row.id, cwd: row.cwd, title: row.title, startedAt: row.started_at, lastEventAt: row.last_event_at, status: idle ? "idle" : "running", harness: row.harness === "codex" ? "codex" : "claude", ...(home && home !== row.cwd ? { home } : {}) };
   }
@@ -815,9 +840,9 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   private shownSessionRows(): SessionRow[] {
     const rows = this.st.allSessions.all() as SessionRow[];
     // Titles stored before promptTitle() existed can still start with Claude Code's wrapper tags.
-    const cleaned = rows.map((r) => (r.custom_title ? r : { ...r, title: promptTitle(r.title) ?? "(untitled session)" }));
+    const cleaned = rows.map((r) => (r.custom_title ? r : { ...r, title: promptTitle(r.title) ?? UNTITLED }));
     // A thread where no agent did anything but answer a slash command (opening this app, /compact) isn't work to show.
-    const idle = (r: SessionRow) => !r.worked && (r.title.startsWith("/") || r.title === "(untitled session)");
+    const idle = (r: SessionRow) => !r.worked && (r.title.startsWith("/") || r.title === UNTITLED);
     const shown = cleaned.filter((r) => !idle(r));
     if (!this.activeRoot) return shown;
     return shown.filter((r) => this.isWithinRoot(r.cwd) || this.visitors.has(r.id));

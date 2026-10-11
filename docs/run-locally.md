@@ -47,10 +47,9 @@ cp app/.env.example app/.env
 | `NEMOTRON_MODEL` | `nemotron` | The vLLM `--served-model-name` |
 | `PORT` | `4000` | Server port (the web dev server proxies to 4000) |
 | `MAP_ROOT` | `/Users/you/code/my-project` | **The project to map.** The default is this repo |
-| `SESSION_FILTER` | `my-project` | **Which Claude Code sessions to follow.** Any text found in the session's folder name under `~/.claude/projects` (your project path with `/` replaced by `-`). The default is `brainstorm` |
 | `CLAUDE_PROJECTS_DIR` | `~/.claude/projects` | Only if Claude Code stores its logs somewhere else |
 
-To follow your own project, set `MAP_ROOT` to its absolute path and `SESSION_FILTER` to its folder name.
+To follow your own project, set `MAP_ROOT` to its absolute path, or pick it in the app. The threads shown are the ones Claude Code and Codex ran inside it.
 
 ### 3. (Optional) Run Nemotron on NVIDIA Brev
 
@@ -112,7 +111,7 @@ Check `replay.json` for anything private before publishing. Secrets are masked, 
 | --- | --- |
 | Labels stay like `Run: npm test`, and no summaries appear | Nemotron is unreachable. Check the curl above. Brev tunnels can drop, so rerun `brev port-forward …` |
 | Ask answers say "fallback" | Claude failed. The server log (`app/server/data/server.log` if you redirect output there, otherwise the terminal) shows why. A common one: "API key is not scoped to a workspace" means you need to set `ANTHROPIC_WORKSPACE_ID` |
-| No sessions in Follow | `SESSION_FILTER` doesn't match the folder under `~/.claude/projects`, or the session is more than 24 hours old |
+| No sessions in Follow | The open project isn't the folder the threads ran in: pick it in the app, or set `MAP_ROOT` to it |
 | Map shows the wrong project | Set `MAP_ROOT` to an absolute path and restart the server |
 | `npm run dev` fails in `app/server` with a Nest CLI error | Don't use `nest start`. The project builds with plain `tsc`, because TypeScript 7 doesn't ship the compiler API the Nest CLI needs |
 | `.env` changes are ignored | The server reads `.env` only at startup. Restart it |

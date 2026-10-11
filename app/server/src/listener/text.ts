@@ -3,6 +3,10 @@
 import { maskSecrets } from "../privacy/mask";
 
 export const TEXT_LIMIT = 20_000;
+/** A thread's title until a prompt or the person names it. */
+export const UNTITLED = "(untitled session)";
+/** What a NUL character in a log's text is stored as: SQLite hands text back cut at the first one. */
+const NUL_MARK = "\u2400";
 export const TOOL_RESULT_LIMIT = 2_000;
 /** How far past the limit a long text is cut before masking (see sanitizeText). */
 const MASK_MARGIN = 1024;
@@ -24,6 +28,7 @@ export function sanitizeDeep(v: unknown, limit = TEXT_LIMIT): unknown {
  * masking shortens the kept part a lot (big keys replaced), text near the cut could move inside the limit: then the
  * whole text is masked, as before. */
 export function sanitizeText(s: string, limit = TEXT_LIMIT): string {
+  if (s.includes("\u0000")) s = s.replace(/\u0000/g, NUL_MARK);
   let masked: string | undefined;
   if (s.length > limit + MASK_MARGIN) {
     // With no break or space within reach (minified code, base64), cut at the margin itself: it is longer than any
@@ -70,4 +75,14 @@ export function promptTitle(text: string, max = 80): string | undefined {
     .replace(/<\/?[a-z_-]+(\s[^>]*)?>/g, "")
     .trim();
   return plain ? plain.slice(0, max) : undefined;
+}
+
+/** A title as stored: secrets masked (a key typed in a first prompt or a /rename), NULs made visible. A prompt's is
+ * worked out with a margin past `max` and masked before it is cut, so a key across the cut is still masked. */
+export function storedTitle(text: string, max = 80): string {
+  return sanitizeText(text, Infinity).slice(0, max);
+}
+export function titleOfPrompt(raw: string, max = 80): string | undefined {
+  const t = promptTitle(raw, max + MASK_MARGIN);
+  return t === undefined ? undefined : storedTitle(t, max) || undefined;
 }

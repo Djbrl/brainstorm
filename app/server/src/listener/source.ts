@@ -22,8 +22,6 @@ export interface Sink {
 /** The open project: its root, the repo's main checkout and the folders it lived in before it moved. */
 export type Scope = {
   roots: string[];
-  /** SESSION_FILTER: a substring of Claude Code's project folder names, instead of the roots (old behaviour). */
-  override?: string;
   /** Visitors: threads from other projects that touched this one's files. Their ids, and their log files (Claude Code's;
    *  Codex's are known by id), read live like the project's own. */
   guests?: { ids: ReadonlySet<string>; files: readonly string[] };

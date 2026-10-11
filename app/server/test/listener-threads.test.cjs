@@ -90,3 +90,73 @@ test("Claude Code's folder names: a path over 200 characters is cut and hashed a
     await t.close();
   }
 });
+
+const KEY = "sk-ant-api03-abcdefghijklmnop1234";
+
+test("titles are stored masked, from a prompt and from a rename; older titles are cleaned once; Claude rows say claude", async () => {
+  const t = await makeListener();
+  const f = join(t.projectDir, "s1.jsonl");
+  writeFileSync(f, jsonl([line("prompt", { i: 0, text: `use ${KEY} to call the API` }), line("tool", { i: 1 })])
+    + JSON.stringify({ type: "custom-title", sessionId: "s2", customTitle: `key ${KEY}` }) + "\n");
+  await t.readNow(f, true);
+  const titles = () => t.dbs.db.prepare(`SELECT id, title, harness FROM sessions ORDER BY id`).all().map((r) => ({ ...r }));
+  for (const r of titles()) { assert.ok(!r.title.includes(KEY), r.title); assert.equal(r.harness, "claude"); }
+  // A database from before: an unmasked title, harness NULL. The next start fixes both, once.
+  t.dbs.db.prepare(`UPDATE sessions SET title = ?, harness = NULL WHERE id = 's1'`).run(`old ${KEY}`);
+  t.dbs.db.exec(`DELETE FROM settings WHERE key LIKE 'listener:%'`);
+  const { ListenerService } = require(require("./helpers.cjs").dist("listener/listener.service.js"));
+  const again = new ListenerService(t.dbs, t.bus, { broadcast() {} }, t.cfg);
+  again.onModuleInit();
+  await again.watcher.close();
+  const s1 = titles().find((r) => r.id === "s1");
+  assert.ok(!s1.title.includes(KEY) && s1.title.startsWith("old "), s1.title);
+  assert.equal(s1.harness, "claude");
+  await again.onModuleDestroy();
+  await t.close();
+});
+
+test("a time ahead of the clock counts as now; the thread goes idle as any other", async () => {
+  const t = await makeListener();
+  const f = join(t.projectDir, "s1.jsonl");
+  const future = line("prompt", { i: 0, text: "from the future" });
+  future.timestamp = "2031-01-01T00:00:00.000Z";
+  writeFileSync(f, jsonl([future, line("tool", { i: 1 })]));
+  const before = Date.now();
+  await t.readNow(f, true);
+  const s = t.listener.getSession("s1");
+  assert.ok(Date.parse(s.lastEventAt) <= Date.now() && Date.parse(s.lastEventAt) >= before, s.lastEventAt);
+  // Older times in another format still compare as times, not as strings.
+  t.dbs.db.prepare(`UPDATE sessions SET last_event_at = ? WHERE id = 's1'`).run(new Date(Date.now() - 10 * 60_000).toISOString());
+  assert.equal(t.listener.getSession("s1").status, "idle");
+  t.dbs.db.prepare(`UPDATE sessions SET last_event_at = 'not a time' WHERE id = 's1'`).run();
+  assert.equal(t.listener.getSession("s1").status, "idle");
+  await t.close();
+});
+
+test("text after a NUL character is kept, the NUL shown as ␀, the same in the steps JSON", async () => {
+  const t = await makeListener();
+  const f = join(t.projectDir, "s1.jsonl");
+  writeFileSync(f, jsonl([line("prompt", { i: 0, text: "go" }), line("text", { i: 1, text: "before\u0000after" })]));
+  await t.readNow(f, true);
+  const steps = t.listener.listSteps("s1");
+  assert.equal(steps[1].text, "before␀after");
+  assert.equal(t.listener.listStepsJson("s1"), JSON.stringify(steps));
+  await t.close();
+});
+
+test("a command's file edits waiting for the mapper are stored, without a diff, when the server stops", async () => {
+  const ROOT = "/work/demo-repo";
+  const t = await makeListener({ root: ROOT });
+  t.live();
+  const f = join(t.projectDir, "s1.jsonl");
+  writeFileSync(f, jsonl([line("prompt", { i: 0, text: "go" }),
+    line("tool", { i: 1, tool: "Bash", input: { command: "echo hi > out.txt" }, id: "c1" }),
+    line("result", { i: 2, input: "tu_c1", text: "" })]));
+  await t.readNow(f);
+  assert.equal(t.listener.listSteps("s1").filter((s) => s.kind === "edit").length, 0, "still waiting");
+  await t.listener.onModuleDestroy();
+  const edits = t.listener.listSteps("s1").filter((s) => s.kind === "edit");
+  assert.deepEqual(edits.map((e) => e.filePath), [`${ROOT}/out.txt`]);
+  assert.equal(edits[0].diff, undefined);
+  await t.close();
+});

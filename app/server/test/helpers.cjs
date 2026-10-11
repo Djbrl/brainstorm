@@ -16,7 +16,6 @@ async function makeListener({ root = "/work/demo-repo", watch = false } = {}) {
   process.env.RUNDOWN_CLAUDE_DIR = join(tmp, "claude");
   process.env.RUNDOWN_CODEX_DIR = join(tmp, "codex"); // never the person's real ~/.codex
   process.env.MAP_ROOT = root;
-  delete process.env.SESSION_FILTER;
   const { DbService } = require(dist("core/db.service.js"));
   const { BusService } = require(dist("core/bus.service.js"));
   const { ConfigService } = require(dist("core/config.service.js"));

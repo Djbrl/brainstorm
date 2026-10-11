@@ -45,7 +45,6 @@ export class ClaudeSource implements LogSource {
   private watcher?: FSWatcher;
   private ready = false;
   private roots: string[] = [];
-  private override?: string;
   /** Top-level project folders chokidar watches (only the open project's are descended into). */
   private watchedTop = new Set<string>();
   /** Thread id → its transcript files, from the files read; rebuilt when a new one is read. */
@@ -58,8 +57,7 @@ export class ClaudeSource implements LogSource {
   private guestTops = new Set<string>();
 
   private setScope(scope: Scope) {
-    this.override = scope.override;
-    this.roots = scope.override ? [] : scope.roots;
+    this.roots = scope.roots;
     this.guestFiles = scope.guests?.files ?? [];
     this.guestTops = new Set(this.guestFiles.map((f) => relative(this.dir, f).split(sep)[0]).filter(Boolean));
   }
@@ -71,14 +69,12 @@ export class ClaudeSource implements LogSource {
 
   /** True if `projectDir` (a top-level folder name under the projects folder) can hold the open project's threads. */
   private matches(projectDir: string): boolean {
-    if (this.override) return projectDir.includes(this.override);
     return this.roots.some((r) => folderOf(projectDir, r));
   }
   /** Each log's recorded folders (`cwd`), read once it has one (they never change). */
   private cwds = new Map<string, string[]>();
   /** True if a log in a matching folder is the open project's: the folder is a root's own, or the thread ran inside a root. */
   private isOurs(file: string): boolean {
-    if (this.override) return true;
     const top = relative(this.dir, file).split(sep)[0] ?? "";
     if (this.roots.some((r) => folderOf(top, r) === "own")) return true;
     let cwds = this.cwds.get(file);
@@ -221,8 +217,10 @@ export class ClaudeSource implements LogSource {
       return;
     }
 
+    // A subagent's brief (its log's first prompt) never titles the thread.
+    const title = (text: string) => (o.isSidechain ? {} : { promptTitle: text });
     if (typeof content === "string") {
-      sink.step(textStep(o, sessionId, 0, ts, "prompt", content), { cwd: o.cwd, promptTitle: content });
+      sink.step(textStep(o, sessionId, 0, ts, "prompt", content), { cwd: o.cwd, ...title(content) });
       return;
     }
     if (!Array.isArray(content)) return;
@@ -234,7 +232,7 @@ export class ClaudeSource implements LogSource {
     if (textBlocks.length) {
       const joined = textBlocks.map((b) => b.text).join("\n\n");
       if (/^\s*\[Request interrupted by user/.test(joined)) return; // harness notice, not a human prompt
-      sink.step(textStep(o, sessionId, textBlocks[0].i, ts, "prompt", joined), { cwd: o.cwd, promptTitle: joined });
+      sink.step(textStep(o, sessionId, textBlocks[0].i, ts, "prompt", joined), { cwd: o.cwd, ...title(joined) });
     }
 
     content.forEach((block: any, i: number) => {

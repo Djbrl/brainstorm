@@ -211,7 +211,6 @@ export class CodexSource implements LogSource {
     const meta = this.metaOf(file);
     if (!meta || meta.reviewer) return false;
     const folders = [meta.cwd, ...meta.roots].filter(Boolean);
-    if (scope.override) return folders.some((f) => f.includes(scope.override!));
     if (scope.guests?.ids.has(meta.parent ?? meta.id)) return true; // a visitor from another project
     return folders.some((f) => this.inRoots(this.rewrite(meta, f)));
   }
@@ -675,7 +674,7 @@ export class CodexSource implements LogSource {
    * thread's folders in the open project. */
   private threadCwd(st: FileState): string {
     const cwd = this.rewrite(st.meta, st.cwd || st.meta.cwd);
-    if (this.scope.override || this.inRoots(cwd)) return cwd;
+    if (this.inRoots(cwd)) return cwd;
     for (const f of [st.meta.cwd, ...st.meta.roots]) { const r = this.rewrite(st.meta, f); if (this.inRoots(r)) return r; }
     return cwd;
   }

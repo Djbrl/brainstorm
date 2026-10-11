@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import type { AgentPresence, Step } from "@contract";
 import { useLiveSelector } from "./live";
 import { createAtom, useStoreSelector } from "./store";
-import { END, replayCursor, type NavActions, type OpenThread } from "./nav";
+import { END, type NavActions, type OpenThread } from "./nav";
 
 type Focus = { sessionId: string; agent: string } | null;
 const focus = createAtom<Focus>(null);
@@ -80,13 +80,13 @@ export function useThreadAgents(sessionId: string | null): ThreadAgent[] {
  * last one. A thread followed live keeps following (now their newest step).
  */
 export function focusAgent(
-  nav: Pick<NavActions, "setReplayDetail" | "landReplay">, replay: Pick<OpenThread, "sessionId" | "live" | "detail"> | null, steps: Step[] | undefined, agent: string | null,
+  nav: Pick<NavActions, "setReplayDetail" | "landReplay" | "cursorStep">, replay: Pick<OpenThread, "sessionId" | "live" | "detail"> | null, steps: Step[] | undefined, agent: string | null,
 ) {
   if (!replay) return;
   const sid = replay.sessionId;
   setAgentFocus(sid, agent);
   if (replay.live) return;
-  const at = replayCursor.stepId ? steps?.find((s) => s.id === replayCursor.stepId) : undefined;
+  const cur = nav.cursorStep(), at = cur ? steps?.find((s) => s.id === cur) : undefined;
   if (at && (!agent || streamOf(at, sid) === agent)) nav.setReplayDetail(replay.detail, at.id);
   else nav.landReplay(END);   // past their last step: the replay layer brings it back to it
 }

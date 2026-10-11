@@ -48,8 +48,6 @@ export type ReplayCursor = { index: number; playing: boolean };
  */
 export const mapPrefs: { showReads: boolean } = { showReads: true };
 
-/** The step id at the replay cursor, published by the replay layer while rendering. */
-export const replayCursor: { stepId: string | null } = { stepId: null };
 
 type Nav = {
   focusFile: string | null; setFocusFile: (p: string | null) => void;
@@ -79,6 +77,10 @@ type Nav = {
   setReplayDetail: (detail: ReplayDetail, atStep?: string) => void;
   /** Clear `atStep` after landing on it, at `index`. */
   landReplay: (index: number) => void;
+  /** The replay layer says which step the cursor is on (switching the detail, or one agent, lands there). */
+  setCursorStep: (stepId: string | null) => void;
+  /** That step, read without subscribing (null: no thread, or not known yet). */
+  cursorStep: () => string | null;
   /** Close the thread: back to the project. */
   stopReplay: () => void;
 
@@ -104,7 +106,7 @@ type Nav = {
 
 /** Every setter of Nav. */
 export type NavActions = Pick<Nav, "setFocusFile" | "openFile" | "selectFile" | "startReplay" | "setThreadMode" | "followLive" | "setReplayLive"
-  | "setLens" | "setReplayIndex" | "setReplayPlaying" | "setReplaySpeed" | "setReplayDetail" | "landReplay" | "stopReplay" | "openStep"
+  | "setLens" | "setReplayIndex" | "setReplayPlaying" | "setReplaySpeed" | "setReplayDetail" | "landReplay" | "setCursorStep" | "cursorStep" | "stopReplay" | "openStep"
   | "showStep" | "closeStep" | "back" | "toggleAgent" | "setHiddenAgents" | "setShowReads">;
 
 /** The store's state: the open thread and its cursor are kept apart, so moving the cursor leaves `thread` as it was. */
@@ -115,11 +117,13 @@ export type NavData = {
   lens: Lens;
   thread: OpenThread | null;
   cursor: ReplayCursor;
+  /** The step at the replay cursor, as the replay layer last saw it. */
+  cursorStep: string | null;
   hiddenAgents: ReadonlySet<string>;
   showReads: boolean;
 };
 /** Where you are, without the replay cursor. */
-export type NavState = Omit<NavData, "thread" | "cursor"> & { replay: OpenThread | null };
+export type NavState = Omit<NavData, "thread" | "cursor" | "cursorStep"> & { replay: OpenThread | null };
 
 type NavStore = {
   get: () => NavData;
@@ -191,6 +195,7 @@ function createNavStore(): NavStore {
     lens: first.lens,
     thread: first.thread ? { sessionId: first.thread, speed: 1, detail: "light", mode: "steps", atStep: first.step ?? undefined } : null,
     cursor: { index: first.thread ? END : 0, playing: false },
+    cursorStep: null,
     hiddenAgents: loadHidden(),
     showReads: (mapPrefs.showReads = loadShowReads()),
   };
@@ -238,7 +243,7 @@ function createNavStore(): NavStore {
     ...(opts?.lens && { lens: opts.lens }),
   });
   // Back on the project, the lens is the map again (a thread opened from the map, like the Welcome replay, stays there).
-  const stopReplay = () => { replayCursor.stepId = null; set({ thread: null, step: null, lens: "map" }); };
+  const stopReplay = () => set({ thread: null, cursorStep: null, step: null, lens: "map" });
   const setThreadMode = (mode: ThreadMode) => setReplay((r) => (r ? { ...r, mode, playing: mode === "play" ? r.playing : false } : r));
 
   const actions: NavActions = {
@@ -255,8 +260,10 @@ function createNavStore(): NavStore {
     setReplayLive: (live) => setReplay((r) => (r ? { ...r, live, playing: false } : r)),
     setReplayPlaying: (playing) => setReplay((r) => (r ? { ...r, playing, live: playing ? false : r.live, mode: playing ? "play" : r.mode } : r)),
     setReplaySpeed: (speed) => setReplay((r) => (r ? { ...r, speed } : r)),
-    setReplayDetail: (detail, atStep) => setReplay((r) => (r ? { ...r, detail, playing: false, atStep: atStep ?? replayCursor.stepId ?? undefined } : r)),
+    setReplayDetail: (detail, atStep) => setReplay((r) => (r ? { ...r, detail, playing: false, atStep: atStep ?? data.cursorStep ?? undefined } : r)),
     landReplay: (index) => setReplay((r) => (r ? { ...r, index: Math.max(0, index), atStep: undefined } : r)),
+    setCursorStep: (stepId) => set({ cursorStep: stepId }),
+    cursorStep: () => data.cursorStep,
     openStep: (sid, stepId) => set({
       ...replayPatch((r) => (r && r.sessionId === sid
         ? { ...r, atStep: stepId, playing: false, live: false }
@@ -284,8 +291,9 @@ function createNavStore(): NavStore {
       flags.fromUrl = true;
       set({
         lens: p.lens, step: p.step, file: p.file ?? null,
+        ...(p.thread ? {} : { cursorStep: null }),
         ...replayPatch((r) => {
-          if (!p.thread) { replayCursor.stepId = null; return null; }
+          if (!p.thread) return null;
           if (r && r.sessionId === p.thread) return p.step ? { ...r, atStep: p.step, playing: false } : r;
           return { sessionId: p.thread, index: END, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: "steps", atStep: p.step ?? undefined };
         }),

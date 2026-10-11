@@ -13,7 +13,7 @@ import { usePlaceRows, usePlaceTimeline } from "./rows";
 import { Dock } from "../map/replay/ReplayBar";
 import { togglePlay } from "../map/replay/layer";
 import { useShortcut } from "../switch/shortcuts";
-import { HOME, eventsAt, placeOfStep, placeTitle, placesStore, selectPlace, useCowork, usePlaces } from "./data";
+import { HOME, eventsAt, placeOfStep, placeTitle, placesStore, useCowork, usePlaces, useSelectPlace } from "./data";
 import { StepDetail } from "../follow/StepDetail";
 import { pairResults } from "../follow/format";
 import { PlacesMap } from "./PlacesMap";
@@ -26,43 +26,30 @@ const PLACE_MS = 1100;   // a place's time on the player, at 1×
 
 export function PlacesView() {
   const { replay, step: navStep } = useNavState();
-  const { setLens, openStep, closeStep, setReplayPlaying, setThreadMode } = useNavActions();
+  const { setLens, openStep, setReplayPlaying, setThreadMode } = useNavActions();
   const session = useLiveSelector((s) => s.sessions.find((x) => x.id === replay?.sessionId));
   const running = session?.status === "running";
   const connected = useLiveSelector((s) => s.connected);
   const agents = useLiveSelector((s) => s.agents), map = useLiveSelector((s) => s.map);
   const { data, error } = useCowork(replay?.sessionId ?? null, running, connected); // a recording is "connected" once loaded
-  const { selected, stepId, highlight, row: pickedRow } = usePlaces();
+  const { selected, highlight, row: pickedRow } = usePlaces();
+  const selectPlace = useSelectPlace();
 
-  // The step in the panel is the app's open step, so its link, Back and Esc work as everywhere else. Two one-way
-  // syncs: a pick in Places (a place, a row, ‹ ›) opens its step in the app; the app's step (a link, Back, Esc) shows
-  // in Places without echoing back. They used to be two effects that each undid the other on a link to a step
-  // (…/places/step/<id>), until React gave up ("Maximum update depth exceeded").
-  const fromApp = useRef(false);
-  const mirror = (p: Parameters<typeof placesStore.set>[0]) => { fromApp.current = true; try { placesStore.set(p); } finally { fromApp.current = false; } };
-  const navRef = useRef({ replay, openStep, closeStep, setReplayPlaying, setThreadMode });
-  navRef.current = { replay, openStep, closeStep, setReplayPlaying, setThreadMode };
-  useEffect(() => {
-    let last = placesStore.get().stepId;
-    return placesStore.subscribe(() => {
-      const id = placesStore.get().stepId;
-      if (id === last) return;
-      last = id;
-      const { replay: r, openStep: open, closeStep: close } = navRef.current;
-      if (fromApp.current || !r) return;
-      if (id) open(r.sessionId, id); else close();
-    });
-  }, []);
-  useEffect(() => { mirror({ data, selected: null, stepId: null, highlight: null }); }, [replay?.sessionId, !!data]);
+  // The step in the panel is the app's open step, so its link, Back and Esc work as everywhere else: a pick in Places
+  // (a place, a row, ‹ ›) opens its step in the app (useSelectPlace), and the app's step picks its place here.
+  const stepId = navStep;
+  const navRef = useRef({ setReplayPlaying, setThreadMode });
+  navRef.current = { setReplayPlaying, setThreadMode };
+  useEffect(() => { placesStore.set({ data, selected: null, highlight: null }); }, [replay?.sessionId, !!data]);
   useEffect(() => { if (data) placesStore.set({ data }); }, [data]);
-  useEffect(() => () => mirror({ data: null, selected: null, stepId: null, highlight: null }), []);
-  // The app's step into Places, with its place picked if the one picked doesn't hold it (a link opens on its place).
+  useEffect(() => () => placesStore.set({ data: null, selected: null, highlight: null }), []);
+  // The app's step, with its place picked if the one picked doesn't hold it (a link opens on its place).
   useEffect(() => {
     const p = placesStore.get();
-    if (!navStep) { if (p.stepId) mirror({ stepId: null }); return; }
-    const holds = !!p.data && !!p.selected && eventsAt(p.data, p.selected).some((e) => e.stepId === navStep);
-    const place = p.data && !holds ? placeOfStep(p.data, navStep) : null;
-    if (navStep !== p.stepId || place) mirror({ stepId: navStep, ...(place ? { selected: place } : {}) });
+    if (!navStep || !p.data) return;
+    const holds = !!p.selected && eventsAt(p.data, p.selected).some((e) => e.stepId === navStep);
+    const place = holds ? null : placeOfStep(p.data, navStep);
+    if (place) placesStore.set({ selected: place });
   }, [navStep, !!data]);
 
   // The step in the panel, its result, and the other steps in the same place (to step through them).
@@ -130,8 +117,8 @@ export function PlacesView() {
               <div className="pl-panel-nav">
                 <span>{place ? placeTitle(place) : ""}</span>
                 <span className="pl-panel-count">{pos + 1} of {here.length} here</span>
-                <button onClick={() => pos > 0 && placesStore.set({ stepId: here[pos - 1] })} disabled={pos <= 0} aria-label="Previous step here">‹</button>
-                <button onClick={() => pos < here.length - 1 && placesStore.set({ stepId: here[pos + 1] })} disabled={pos >= here.length - 1} aria-label="Next step here">›</button>
+                <button onClick={() => pos > 0 && replay && openStep(replay.sessionId, here[pos - 1])} disabled={pos <= 0} aria-label="Previous step here">‹</button>
+                <button onClick={() => pos < here.length - 1 && replay && openStep(replay.sessionId, here[pos + 1])} disabled={pos >= here.length - 1} aria-label="Next step here">›</button>
               </div>
             )}
             <StepDetail step={step} result={results.get(step.id)} onClose={() => selectPlace(null)} />

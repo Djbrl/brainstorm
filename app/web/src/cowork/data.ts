@@ -1,10 +1,11 @@
 // Loads GET /api/cowork?sessionId= for one thread and shapes it for the view: change groups, verb names, area names.
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CoworkArea, CoworkEvent, CoworkSummary, CoworkVerb } from "@contract";
 import { isReplay, replayCowork } from "../lib/live";
 import { get } from "../lib/api";
 import { usePoll } from "../lib/hooks";
 import { createAtom } from "../lib/store";
+import { useNavActions, useNavSelector } from "../lib/nav";
 
 /** The places of one thread (its subagents included). Refreshes while the thread is running. */
 export function useCowork(sessionId: string | null, running: boolean, loaded = true) {
@@ -42,13 +43,13 @@ export const VERB_NAME: Record<CoworkVerb, string> = {
 };
 
 /** The open thread's places, shared by the places map (canvas) and the list in the sidebar. */
-/** `selected` is a place (or site) id on the map; `stepId` the step its panel shows. */
+/** `selected` is a place (or site) id on the map. The step its panel shows is the app's open step (lib/nav). */
 /** `row`: the list's row you went to (PlaceSteps), so several stretches in one moment of the thread can each be the one
  *  you're on: its index, the moment (the app's cursor), its newest event (null: a Your computer row) and its step (in
  *  the thread's step order, cowork/rows.ts). */
 export type PlacesRow = { i: number; beat: number; event: string | null; step: number };
-type PlacesState = { data: CoworkSummary | null; selected: string | null; stepId: string | null; highlight: string | null; row?: PlacesRow | null };
-const places = createAtom<PlacesState>({ data: null, selected: null, stepId: null, highlight: null, row: null });
+type PlacesState = { data: CoworkSummary | null; selected: string | null; highlight: string | null; row?: PlacesRow | null };
+const places = createAtom<PlacesState>({ data: null, selected: null, highlight: null, row: null });
 export const placesStore = {
   get: places.get,
   set: (p: Partial<PlacesState>) => places.set((s) => ({ ...s, ...p })),
@@ -63,12 +64,21 @@ export function placeOfStep(data: CoworkSummary, stepId: string): string | null 
   const e = data.events.findLast((x) => x.stepId === stepId);
   return e ? `${e.area}|${e.page}` : null;
 }
-/** Select a place and show its newest step (or a given one) in the panel. */
-export function selectPlace(id: string | null, stepId?: string) {
-  const d = places.get().data;
-  if (!id || !d) { placesStore.set({ selected: null, stepId: null }); return; }
-  const at = eventsAt(d, id);
-  placesStore.set({ selected: id, stepId: stepId ?? at[at.length - 1]?.stepId ?? null });
+/**
+ * Select a place and open its newest step (or a given one) in the panel, as the app's open step (so its link, Back and
+ * Esc work as everywhere else); null lets go of the place and closes the step.
+ */
+export function useSelectPlace() {
+  const sessionId = useNavSelector((d) => d.thread?.sessionId ?? null), open = useNavSelector((d) => d.step);
+  const { openStep, closeStep } = useNavActions();
+  return useCallback((id: string | null, stepId?: string) => {
+    const d = places.get().data;
+    let show: string | null = null;
+    if (!id || !d) placesStore.set({ selected: null });
+    else { placesStore.set({ selected: id }); show = stepId ?? eventsAt(d, id).at(-1)?.stepId ?? null; }
+    if (!sessionId || show === open) return;
+    if (show) openStep(sessionId, show); else closeStep();
+  }, [sessionId, open, openStep, closeStep]);
 }
 
 /** A stretch of steps in one place, in order (consecutive steps on the same page fold into one row). */

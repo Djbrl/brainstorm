@@ -3,7 +3,7 @@
 // tab's scroll, the arrow keys and the player's slider.
 import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react";
 import type { ForceGraphMethods } from "react-force-graph-2d";
-import { mapPrefs, replayCursor, useNavActions, useReplay } from "../../lib/nav";
+import { mapPrefs, useNavActions, useReplay } from "../../lib/nav";
 import { useThread, type Thread } from "../../lib/thread";
 import { useLiveSelector } from "../../lib/live";
 import { replayCamera } from "./store";
@@ -140,7 +140,7 @@ export function useReplayLayer({ fg, nodeIndexRef, accent, font, camera, liveSho
   liveShown?: RefObject<boolean>;
 }): ReplayLayerApi {
   const replay = useReplay();
-  const { setReplayIndex, setReplayPlaying, landReplay } = useNavActions();
+  const { setReplayIndex, setReplayPlaying, landReplay, setCursorStep } = useNavActions();
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
   const active = !!replay && !!thread && thread.sessionId === replay.sessionId && thread.detail === replay.detail;
   // A thread opens on its steps. The keys and the wheel drive the replay only once it plays.
@@ -152,7 +152,7 @@ export function useReplayLayer({ fg, nodeIndexRef, accent, font, camera, liveSho
   // Publish the step at the cursor (switching the detail lands on it). After every commit,
   // as the render used to do, but outside the render.
   const cursorStep = active && !replay?.atStep ? thread!.beats[index]?.step.id ?? null : undefined;
-  useEffect(() => { if (cursorStep !== undefined) replayCursor.stepId = cursorStep; });
+  useEffect(() => { if (cursorStep !== undefined) setCursorStep(cursorStep); });
 
   // Landing on a step id (links, Follow, switching detail) is App's LandStep: on every lens, before live-follow.
 

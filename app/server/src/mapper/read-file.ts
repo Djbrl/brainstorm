@@ -2,9 +2,9 @@
 // committed symlink to /dev/zero or to a FIFO, a link out of the project, a multi-gigabyte database dump. Each is
 // checked before anything is read; a file is read into memory only up to MAX_PARSE_BYTES, and counted a chunk at a time
 // up to MAX_COUNT_BYTES. Anything else is left off the map.
-import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, statSync, type Stats } from "node:fs";
-import { lstat, open, stat } from "node:fs/promises";
-import { insideAny } from "../core/roots";
+import { closeSync, constants, fstatSync, openSync, readSync, realpathSync, statSync, type Stats } from "node:fs";
+import { open, realpath, stat } from "node:fs/promises";
+import { sep } from "node:path";
 
 /** Files up to this size are read for their imports (and kept as a snapshot). */
 export const MAX_PARSE_BYTES = 1024 * 1024;
@@ -23,17 +23,19 @@ export function countLines(buf: Buffer): number {
   return n;
 }
 
-/** Worth opening: a regular file of a size we read, reached through a symlink only when it stays inside the project. */
+/** Worth opening: a regular file of a size we read. */
 const mappable = (st: Stats) => st.isFile() && st.size <= MAX_COUNT_BYTES;
-const linkLeaves = (abs: string, root: string) => !insideAny(abs, [root]);
+/** Its real path (every link on the way followed: the file's, or a linked folder above it) is inside the project's. */
+const inside = (real: string, realRoot: string) => real.startsWith(realRoot.replace(/[\\/]+$/, "") + sep);
 
 /** A file's lines and (up to MAX_PARSE_BYTES) its text; null when it's not an ordinary file in the project, is too big, or is gone. */
 export async function readMapped(abs: string, root: string): Promise<FileRead | null> {
   try {
-    let st = await lstat(abs);
-    if (st.isSymbolicLink()) { if (linkLeaves(abs, root)) return null; st = await stat(abs); }
+    const [real, realRoot] = await Promise.all([realpath(abs), realpath(root)]);
+    if (!inside(real, realRoot)) return null;
+    let st = await stat(real);
     if (!mappable(st)) return null;
-    const fh = await open(abs, FLAGS);
+    const fh = await open(real, FLAGS);
     try {
       st = await fh.stat();
       if (!mappable(st)) return null;
@@ -56,10 +58,11 @@ export async function readMapped(abs: string, root: string): Promise<FileRead | 
 /** readMapped, synchronously (the first map of a project, built while a request waits). */
 export function readMappedSync(abs: string, root: string): FileRead | null {
   try {
-    let st = lstatSync(abs);
-    if (st.isSymbolicLink()) { if (linkLeaves(abs, root)) return null; st = statSync(abs); }
+    const real = realpathSync(abs);
+    if (!inside(real, realpathSync(root))) return null;
+    let st = statSync(real);
     if (!mappable(st)) return null;
-    const fd = openSync(abs, FLAGS);
+    const fd = openSync(real, FLAGS);
     try {
       st = fstatSync(fd);
       if (!mappable(st)) return null;

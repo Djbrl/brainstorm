@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from "@nestjs/common";
 import { existsSync, readFileSync } from "node:fs";
 import { deflateRawSync, inflateRawSync } from "node:zlib";
-import { stat } from "node:fs/promises";
+import { lstat, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import type { Edge, FileNode, ProjectMap, Snapshot } from "../types";
 import { BusService } from "../core/bus.service";
@@ -650,7 +650,12 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     await mapLimit([...paths], IO_CONCURRENCY, async (abs) => {
       const rel = relative(root, abs);
       let st;
-      try { st = await stat(abs); } catch {
+      try {
+        st = await lstat(abs);
+        // A link to a folder isn't a new folder to map (it can lead out of the project; git and the walk don't follow
+        // folder links either). A link to a file is read only if it stays inside (read-file.ts).
+        if (st.isSymbolicLink()) { st = await stat(abs); if (st.isDirectory()) return; }
+      } catch {
         c.unselected.delete(abs);
         if (c.byPath.has(abs)) removed.add(abs);
         else { // a folder went away (moved or deleted): everything mapped under it goes too

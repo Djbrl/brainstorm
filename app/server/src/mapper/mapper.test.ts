@@ -455,3 +455,29 @@ test("JS/TS imports stay linear on export-heavy and unclosed files", () => {
     assert.ok(t < 50, `${JSON.stringify(line)} x 20,000: ${t.toFixed(1)} ms`);
   }
 });
+
+test("live: a link to a folder outside the project, made while watching, maps nothing from it", { skip: process.platform === "win32" }, async () => {
+  const outside = mkdtempSync(join(tmpdir(), "bs-outside-"));
+  writeFileSync(join(outside, "secret.md"), "# not yours\n");
+  const root = tempRepo({ "src/a.ts": "export const a = 1;\n" }, false);
+  const projects = mkdtempSync(join(tmpdir(), "bs-projects-"));
+  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { defaultRoot: root, claudeProjectsDir: projects } as never);
+  try {
+    svc.onModuleInit();
+    await svc.getMapAsync(root);
+    await new Promise((r) => setTimeout(r, 300)); // the watch starts right after the first build
+    symlinkSync(outside, join(root, "docs"));
+    mkdirSync(join(root, "src/inner")); symlinkSync(join(root, "src"), join(root, "src/inner/up")); // a link inside, to a folder: not a new folder either
+    writeFileSync(join(root, "src/b.ts"), "export const b = 1;\n");   // a real change, so we know the batch went through
+    const mapped = () => [...svc.getCached(root)!.byPath.keys()].map((p) => p.slice(root.length + 1)).sort();
+    for (let i = 0; i < 50 && !mapped().includes("src/b.ts"); i++) await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 500));
+    assert.deepEqual(mapped(), ["src/a.ts", "src/b.ts"]);
+    assert.equal(await readMapped(join(root, "docs/secret.md"), root), null);  // through a linked folder: its real path is outside
+    assert.equal(readMappedSync(join(root, "docs/secret.md"), root), null);
+    assert.ok(await readMapped(join(root, "src/inner/up/a.ts"), root));          // a linked folder that stays inside is fine to read
+  } finally {
+    svc.onModuleDestroy();
+    rmSync(root, { recursive: true, force: true }); rmSync(outside, { recursive: true, force: true }); rmSync(projects, { recursive: true, force: true });
+  }
+});

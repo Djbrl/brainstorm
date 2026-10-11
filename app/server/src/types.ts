@@ -57,7 +57,7 @@ export type GitState = { root: string; branch: string | null; upstream?: string;
 /** Workspace setup (local app). GET /api/workspace, GET /api/workspace/suggestions, POST /api/workspace {root}. */
 export type SetupStepState = "pending" | "running" | "done" | "warn" | "error";
 export type SetupStep = {
-  id: "scan" | "imports" | "claude" | "nemotron" | "anthropic" | "summaries";
+  id: "scan" | "imports" | "claude" | "anthropic";
   label: string; state: SetupStepState;
   detail?: string;            // e.g. "412 files", "Claude Code 2.1.3 · 6 sessions found", "offline: labels will be plain"
   done?: number; total?: number; // progress, e.g. summaries 120 / 412

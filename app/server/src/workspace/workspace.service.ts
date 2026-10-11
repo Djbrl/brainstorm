@@ -11,7 +11,6 @@ import { EventsGateway } from "../core/events.gateway";
 import { ConfigService } from "../core/config.service";
 import { ListenerService } from "../listener/listener.service";
 import { MapperService } from "../mapper/mapper.service";
-import { ReaderService } from "../reader/reader.service";
 import { isIdleTranscript } from "./threads";
 import { walkCandidates } from "../mapper/list-files";
 import { env } from "../core/local";
@@ -60,7 +59,6 @@ export class WorkspaceService implements OnModuleInit {
   private log = new Logger("Workspace");
   private root: string | null = null;
   private claudeStep: SetupStep = { id: "claude", label: "Connecting to your agents", state: "pending" };
-  private nemotronStep: SetupStep = { id: "nemotron", label: "Nemotron for file summaries", state: "pending" };
   private anthropicStep: SetupStep = { id: "anthropic", label: "Claude for questions", state: "pending" };
   private lastBroadcast = "";
   private pollTimer?: NodeJS.Timeout;
@@ -73,7 +71,6 @@ export class WorkspaceService implements OnModuleInit {
     private cfg: ConfigService,
     private listener: ListenerService,
     private mapper: MapperService,
-    private reader: ReaderService,
   ) {}
 
   onModuleInit() {
@@ -105,11 +102,7 @@ export class WorkspaceService implements OnModuleInit {
     if (!this.root) return { root: null, name: null, ready: false, steps: [] };
     const scan = this.scanStep(this.root);
     const imports = this.importsStep(this.root);
-    const summaries = this.summariesStep();
-    // Nemotron (file summaries) is listed only where it's set up (NEMOTRON_URL): a hackathon extra most people won't have.
-    const steps: SetupStep[] = process.env.NEMOTRON_URL
-      ? [scan, imports, this.claudeStep, this.nemotronStep, this.anthropicStep, summaries]
-      : [scan, imports, this.claudeStep, this.anthropicStep];
+    const steps: SetupStep[] = [scan, imports, this.claudeStep, this.anthropicStep];
     const ready = scan.state === "done" && imports.state === "done" && this.claudeStep.state !== "error";
     return { root: this.root, name: basename(this.root), ready, steps };
   }
@@ -252,17 +245,16 @@ export class WorkspaceService implements OnModuleInit {
 
   // ---- activation pipeline ----
 
-  /** Set the active workspace, notify listener/mapper/reader, and start the checklist checks
-   * (Claude CLI, Nemotron, Anthropic) in the background. Synchronous parts (map build) happen
+  /** Set the active workspace, notify listener/mapper, and start the checklist checks
+   * (Claude CLI, Anthropic) in the background. Synchronous parts (map build) happen
    * inline since they're fast local fs work; the network/subprocess checks are not awaited. */
   private activate(abs: string) {
     this.root = abs;
     this.cfg.defaultRoot = abs;
     this.claudeStep = { id: "claude", label: "Connecting to your agents", state: "running" };
-    this.nemotronStep = { id: "nemotron", label: "Nemotron for file summaries", state: "running" };
     this.anthropicStep = { id: "anthropic", label: "Claude for questions", state: "running" };
 
-    this.bus.emit("workspace", { root: abs }); // listener re-scopes, mapper rebuilds+watches, reader re-summarizes
+    this.bus.emit("workspace", { root: abs }); // listener re-scopes, mapper rebuilds+watches
 
     this.startPolling();
     this.broadcastIfChanged();
@@ -272,10 +264,9 @@ export class WorkspaceService implements OnModuleInit {
   }
 
   private async runChecks(root: string, gen: number) {
-    const [claude, nemotron] = await Promise.all([this.checkClaude(root), this.checkNemotron()]);
+    const claude = await this.checkClaude(root);
     if (gen !== this.gen) return; // superseded by a newer select()
     this.claudeStep = claude;
-    this.nemotronStep = nemotron;
     this.anthropicStep = this.checkAnthropic();
     this.broadcastIfChanged();
   }
@@ -370,46 +361,12 @@ export class WorkspaceService implements OnModuleInit {
     return ids.size;
   }
 
-  // ---- step: nemotron ----
-
-  private async checkNemotron(): Promise<SetupStep> {
-    const label = "Nemotron for file summaries";
-    if (!process.env.NEMOTRON_URL) return { id: "nemotron", label, state: "warn", detail: "not set up: file summaries are off" };
-    try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 3000);
-      try {
-        const res = await fetch(`${this.cfg.nemotron.url}/models`, {
-          headers: this.cfg.nemotron.key ? { Authorization: `Bearer ${this.cfg.nemotron.key}` } : undefined,
-          signal: ctrl.signal,
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      } finally {
-        clearTimeout(timer);
-      }
-      return { id: "nemotron", label, state: "done", detail: "online" };
-    } catch {
-      return { id: "nemotron", label, state: "warn", detail: "offline: plain labels, no summaries" };
-    }
-  }
-
   // ---- step: anthropic ----
 
   private checkAnthropic(): SetupStep {
     const label = "Claude for questions";
     if (this.cfg.claude.key) return { id: "anthropic", label, state: "done", detail: "configured" };
     return { id: "anthropic", label, state: "warn", detail: "no API key: Ask is disabled" };
-  }
-
-  // ---- step: summaries (derived live from the reader) ----
-
-  private summariesStep(): SetupStep {
-    const label = "Summarizing files with Nemotron";
-    if (this.nemotronStep.state === "warn") return { id: "summaries", label, state: "warn", detail: "skipped: Nemotron offline" };
-    if (this.nemotronStep.state !== "done") return { id: "summaries", label, state: "pending" };
-    const { done, total } = this.reader.summaryProgress();
-    if (total === 0) return { id: "summaries", label, state: "pending", done: 0, total: 0 };
-    return { id: "summaries", label, state: done >= total ? "done" : "running", done, total };
   }
 
   // ---- ws broadcast (throttled ~300ms) ----

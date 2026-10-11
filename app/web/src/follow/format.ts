@@ -95,7 +95,7 @@ const firstLine = (t = "", max = 140) => clip(flat(stripNoise(t)), max);
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" ? (v as Record<string, unknown>) : {});
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
-/** A readable fallback while the Nemotron label is on its way. */
+/** A readable label made from the step itself. */
 export function fallbackLabel(s: Step): string {
   const input = obj(s.input);
   switch (s.kind) {
@@ -128,23 +128,10 @@ export function fallbackLabel(s: Step): string {
   }
 }
 
-/** Mirrors the reader's instant heuristic label, so we can keep our richer fallback until Nemotron's label lands. */
-function readerHeuristic(s: Step): string | undefined {
-  if (s.kind === "edit") return `Edit ${s.filePath ? s.filePath.split("/").pop() : "file"}`;
-  if (s.kind === "tool_call") {
-    if (s.tool === "Bash") { const cmd = str(obj(s.input).command); return cmd ? `Run: ${cmd.replace(/\s+/g, " ").trim().slice(0, 40)}` : "Run: shell command"; }
-    if (s.filePath) return `${s.tool ?? "Tool"} ${s.filePath.split("/").pop()}`;
-    return `Run: ${s.tool ?? "tool"}`;
-  }
-  if (s.kind === "prompt") return (s.text ?? "").trim().split(/\s+/).slice(0, 8).join(" ") || "Prompt";
-  return undefined;
-}
-
-/** The model-written label, or undefined while only the heuristic one exists. */
+/** A label stored with the step by an older version (a model wrote it), or undefined. Plain placeholders ("Edit x.ts", "Run: ...", a prompt's first words) are left to fallbackLabel. */
 export function realLabel(s: Step): string | undefined {
   const l = s.label?.trim();
-  // Any "Run: …" on a command is the reader's placeholder, whichever version of it wrote the label.
-  if (!l || l === readerHeuristic(s) || (s.tool === "Bash" && l.startsWith("Run: "))) return undefined;
+  if (!l || s.kind === "prompt" || s.kind === "edit" || l.startsWith("Run: ")) return undefined;
   return l;
 }
 

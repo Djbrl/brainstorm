@@ -6,9 +6,7 @@ import type { AskRequest, AskResponse, Step } from "../types";
 import { DbService } from "../core/db.service";
 import { ConfigService } from "../core/config.service";
 import { ListenerService } from "../listener/listener.service";
-import { ReaderService } from "../reader/reader.service";
 import { ClaudeService } from "../llm/claude.service";
-import { NemotronService } from "../llm/nemotron.service";
 import { maskSecrets } from "../privacy/mask";
 import { UsageService } from "../usage/usage.service";
 import { insideAny } from "../core/roots";
@@ -16,7 +14,7 @@ import { tooBroad } from "../workspace/workspace.service";
 
 // Owner: D.
 const SYSTEM = `You are Rundown, a guide to a codebase that AI coding agents are editing live.
-Answer the question for someone learning this codebase. Use ONLY the context provided (file excerpt, summaries, the agent's recent steps and diff).
+Answer the question for someone learning this codebase. Use ONLY the context provided (file excerpt, the agent's recent steps and diff).
 Be concise: 2 to 6 short sentences or a few bullets, plain language, name concrete files and functions.
 If the context does not contain the answer, say so plainly and say what you would need to look at. Never invent code that is not shown.`;
 
@@ -46,9 +44,7 @@ export class AskService implements OnModuleInit {
     private dbs: DbService,
     private cfg: ConfigService,
     private listener: ListenerService,
-    private reader: ReaderService,
     private claude: ClaudeService,
-    private nemotron: NemotronService,
     private usage: UsageService,
   ) {}
 
@@ -96,18 +92,9 @@ export class AskService implements OnModuleInit {
       const costUsd = +((r.tokensIn * pi + r.tokensOut * po) / 1e6).toFixed(6);
       res = { answer: r.text, model: r.model, tokensIn: r.tokensIn, tokensOut: r.tokensOut, costUsd, fallback: false };
     } catch (e) {
-      this.log.warn(`Claude failed, falling back to Nemotron: ${(e as Error).message}`);
-      if (!this.nemotron.enabled) {
-        const answer = this.cfg.claude.key ? "Could not reach Claude right now. Try again in a moment." : `To ask questions, add an Anthropic API key: run /plugin configure ${process.env.RUNDOWN_PLUGIN_ID || "rundown@rundown"} in Claude Code, then start a new session.`;
-        return { answer, model: "none", tokensIn: 0, tokensOut: 0, costUsd: 0, fallback: true };
-      }
-      try {
-        const r = await this.nemotron.complete(SYSTEM, user, 500);
-        res = { answer: r.text, model: this.cfg.nemotron.model, tokensIn: r.tokensIn, tokensOut: r.tokensOut, costUsd: 0, fallback: true };
-      } catch (e2) {
-        this.log.error(`Nemotron failed too: ${(e2 as Error).message}`);
-        return { answer: "Could not reach a model right now. Try again in a moment.", model: "none", tokensIn: 0, tokensOut: 0, costUsd: 0, fallback: true };
-      }
+      this.log.warn(`Claude failed: ${(e as Error).message}`);
+      const answer = this.cfg.claude.key ? "Could not reach Claude right now. Try again in a moment." : `To ask questions, add an Anthropic API key: run /plugin configure ${process.env.RUNDOWN_PLUGIN_ID || "rundown@rundown"} in Claude Code, then start a new session.`;
+      return { answer, model: "none", tokensIn: 0, tokensOut: 0, costUsd: 0, fallback: true };
     }
 
     this.safe(() => this.dbs.db
@@ -136,11 +123,7 @@ export class AskService implements OnModuleInit {
     if (filePath && rel) {
       const modParts = rel.split("/");
       const moduleId = modParts.length > 2 ? modParts.slice(0, 2).join("/") : modParts.slice(0, -1).join("/") || ".";
-      const fileSummary = this.safe(() => this.reader.getFileSummary(filePath));
-      const moduleSummary = this.safe(() => this.reader.getModuleSummary(moduleId));
       parts.push(`## File: ${rel} (module ${moduleId})`);
-      if (moduleSummary) parts.push(`Module summary: ${moduleSummary}`);
-      if (fileSummary) parts.push(`File summary: ${fileSummary}`);
       if (content !== undefined) {
         const lines = content.split("\n");
         let start = 0;

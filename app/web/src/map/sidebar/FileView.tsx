@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { Edge, FileNode, Step } from "@contract";
 import { AskBox } from "../../ask/AskBox";
 import { clock, useLiveSelector } from "../../lib/live";
-import { missingSummary } from "../../lib/ai";
 import { mapStyle } from "../themes";
 import { relPath } from "../useSelectedFile";
 import { gitWord } from "../gitFilter";
@@ -45,7 +44,6 @@ export function FileView({ file, root, edges, onFocus }: {
   file: FileNode; root: string; edges: Edge[]; onFocus: (path: string) => void;
 }) {
   const now = useNow();
-  const setup = useLiveSelector((s) => s.setup);
   const steps = useLiveSelector((s) => s.steps);
   const git = useLiveSelector((s) => s.git);
   // Unique: a file can import from the same module in several statements.
@@ -81,10 +79,12 @@ export function FileView({ file, root, edges, onFocus }: {
       {inGit && <p className="file-view-git"><i style={{ background: inGit.colour }} />{inGit.word}</p>}
       {file.activeSessionId && <p className="file-view-live"><i />An agent is editing this file right now</p>}
 
-      <section>
-        <h3>What it does</h3>
-        {file.summary ? <p className="file-view-summary">{file.summary}</p> : <p className="file-view-quiet">{missingSummary(setup)}</p>}
-      </section>
+      {file.summary && (
+        <section>
+          <h3>What it does</h3>
+          <p className="file-view-summary">{file.summary}</p>
+        </section>
+      )}
 
       {imports.length > 0 && <Deps title="Imports" color={mapStyle().imports} paths={imports} root={root} onFocus={onFocus} />}
       {usedBy.length > 0 && <Deps title="Used by" color={mapStyle().usedBy} paths={usedBy} root={root} onFocus={onFocus} />}

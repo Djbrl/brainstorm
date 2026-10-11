@@ -16,7 +16,6 @@
     "@nestjs/platform-ws": "^11.2.6",
     "@nestjs/websockets": "^11.2.6",
     "chokidar": "^4.0.3",
-    "openai": "^7.23.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "ws": "^8.22.0"

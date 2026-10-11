@@ -183,7 +183,6 @@ function Loading({ status, root, onDone, onBack }: { status: SetupStatus | null;
   const btnRef = useRef<HTMLButtonElement>(null);
   const ready = !!status?.ready;
   const steps = status?.steps ?? [];
-  const summaries = steps.find((s) => s.id === "summaries");
   const failed = steps.some((s) => s.state === "error") && !ready;
 
   useEffect(() => { if (ready) btnRef.current?.focus(); }, [ready]);
@@ -219,9 +218,6 @@ function Loading({ status, root, onDone, onBack }: { status: SetupStatus | null;
         </button>
         <button className="su-link" onClick={onBack}>{failed ? "Pick another folder" : "Choose a different folder"}</button>
       </div>
-      {ready && summaries && summaries.state === "running" && (
-        <p className="su-note">File summaries keep filling in in the background. The map gets richer as they land.</p>
-      )}
     </div>
   );
 }

@@ -27,6 +27,21 @@ export function commandWrites(command: string, cwd: string): CommandWrite[] {
   }
 }
 
+/**
+ * The simple commands of a shell text as lists of words, quotes removed, in order (`;`, `&&`, `||`, pipes and newlines
+ * separate them; heredoc bodies, comments and redirections are left out; an expansion ($X, $(…)) is an empty word).
+ * For readers of a command's program and flags (cowork/classify.ts). Never throws.
+ */
+export function shellArgv(command: string): string[][] {
+  try {
+    const out: string[][] = [];
+    for (const seg of parseShell(command)) if ("cmd" in seg && seg.cmd.words.length) out.push(seg.cmd.words.map((w) => w.text));
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 class Out {
   private m = new Map<string, CommandWrite>();
   private r = new Set<string>();

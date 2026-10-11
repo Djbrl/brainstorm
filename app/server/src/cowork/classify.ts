@@ -1,6 +1,7 @@
 // Owner: cowork. Turns non-code tool calls (browser, web, connectors, outward CLIs) into places and actions.
 // Pure: no Nest, no db. One tracker per session, fed call/result pairs in order. See docs/cowork.md.
 import { isErrorResult } from "../shared/failed";
+import { shellArgv } from "../listener/command-writes";
 import type { CoworkArea, CoworkConfidence, CoworkEvent, CoworkVerb, Step } from "../types";
 
 type Tab = { url?: string; title?: string };
@@ -290,10 +291,14 @@ const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /** Connectors often have opaque ids for server names; guess a readable name from the tool names. */
 function serviceName(server: string, tool: string): string {
   if (server === "scheduled-tasks") return "Scheduled tasks";
-  if (/event|calendar|suggest_time/.test(tool)) return "Calendar";
-  if (/mail|message|draft|thread|label|inbox/.test(tool)) return "Email";
-  if (/^(batch|guide|export|query|create|read|update|delete)$/.test(tool) && /^[0-9a-f-]{36}$/.test(server)) return "Docs";
-  if (/^[0-9a-f-]{36}$/.test(server)) return `Connector ${server.slice(0, 4)}`;
+  const opaque = /^[0-9a-f-]{36}$/.test(server);
+  // A connector with an opaque id is guessed from its tools' words; a named one by its own name (a GitHub server's
+  // list_events is not a calendar, nor is a Slack server's send_message an email).
+  const words = new Set(nameWords(opaque ? tool : server));
+  if (["event", "events", "calendar", "gcal"].some((w) => words.has(w)) || (opaque && words.has("suggest") && words.has("time"))) return "Calendar";
+  if (["mail", "gmail", "email", "emails", "draft", "drafts", "thread", "threads", "label", "labels", "inbox"].some((w) => words.has(w)) || (opaque && (words.has("message") || words.has("messages")))) return "Email";
+  if (/^(batch|guide|export|query|create|read|update|delete)$/.test(tool) && opaque) return "Docs";
+  if (opaque) return `Connector ${server.slice(0, 4)}`;
   return server.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
@@ -303,23 +308,39 @@ function serviceItem(input: Record<string, any>): string | undefined {
   return typeof v === "string" && v.trim() ? short(v, 60) : undefined;
 }
 
+/** The words of a tool or server name: `create_event`, `createEvent` and `claude_ai_Gmail` split alike. */
+const nameWords = (s: string) => s.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+
+/** What a connector tool does, from its first word (a whole word: `settings_get` and `news_feed` are not verbs). */
 function verbForTool(name: string): CoworkVerb | undefined {
-  if (/^(create|add|insert|new|schedule)/.test(name)) return "created";
-  if (/^(delete|remove|archive|trash)/.test(name)) return "deleted";
-  if (/^(send|reply|forward)/.test(name)) return "sent";
-  if (/^(publish|post|share)/.test(name)) return "published";
-  if (/^(update|edit|patch|set|move|rename|respond|batch|run)/.test(name)) return "updated";
+  const first = nameWords(name)[0] ?? "";
+  if (/^(create|add|insert|new|schedule)$/.test(first)) return "created";
+  if (/^(delete|remove|archive|trash)$/.test(first)) return "deleted";
+  if (/^(send|reply|forward)$/.test(first)) return "sent";
+  if (/^(publish|post|share)$/.test(first)) return "published";
+  if (/^(update|edit|patch|set|move|rename|respond|batch)$/.test(first)) return "updated";
   return undefined;
 }
 
-/** Split a shell command into simple commands (argv lists). Drops heredoc bodies; quotes are handled loosely. */
+const LEADING = /^(sudo|npx|time|exec|command|env|nohup|\{)$/;
+/** Split a shell command into simple commands (argv lists), quote-aware: `echo "a && git push"` is one command, `echo`. */
 export function simpleCommands(cmd: string): string[][] {
-  const noHeredocs = cmd.replace(/<<-?\s*['"]?(\w+)['"]?[^\n]*\n[\s\S]*?\n\s*\1\s*(?=\n|$)/g, "");
-  return noHeredocs.split(/\n|;|&&|\|\||\||\$\(|`/).map((part) => {
-    const argv = part.trim().split(/\s+/).filter(Boolean).map((a) => a.replace(/^["']|["']$/g, ""));
-    while (argv.length && (/^\w+=/.test(argv[0]) || /^(sudo|npx|time|exec|command|env|\(|\{)$/.test(argv[0]))) argv.shift();
+  return shellArgv(cmd).map((argv) => {
+    argv = argv.slice();
+    while (argv.length && (/^\w+=/.test(argv[0]) || LEADING.test(argv[0]))) argv.shift();
     return argv;
   }).filter((a) => a.length);
+}
+
+/** The value of an option given as `-X POST`, `-XPOST`, `--request POST` or `--request=POST`. */
+function flagValue(argv: string[], short: string, long: string): string | undefined {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === short || a === long) return argv[i + 1];
+    if (a.startsWith(long + "=")) return a.slice(long.length + 1);
+    if (a.startsWith(short) && a.length > short.length && !a.startsWith("--")) return a.slice(short.length);
+  }
+  return undefined;
 }
 
 const cleanRef = (r: string) => r.replace(/^\+/, "").split(":").pop()!.replace(/^refs\/heads\//, "");
@@ -328,7 +349,7 @@ const cleanRef = (r: string) => r.replace(/^\+/, "").split(":").pop()!.replace(/
 export function shellEvents(cmd: string, result: string, resultFailed: boolean): Draft[] {
   const out: Draft[] = [];
   // For outward commands, an error line in the output is a failure even when the exit code was swallowed by a pipe.
-  const failed = resultFailed || /(^|\n)\s*(error|fatal|! \[rejected\])\b|\bnot found\b/i.test(result.slice(0, 600));
+  const failed = resultFailed || /(^|\n)\s*((error|fatal)\b|! \[rejected\])|(^|\n)[^\n]{0,80}: (command )?not found\s*(\n|$)/i.test(result.slice(0, 600));
   const svc = (site: string, page: string, action: Draft["action"], what: string, verb?: CoworkVerb): Draft =>
     ({ tool: "Bash", action, what, place: { area: "services", site, page: `${site}:${page}`, title: page }, change: verb && !failed ? { verb, confidence: "sure" } : undefined, failed });
 
@@ -336,7 +357,12 @@ export function shellEvents(cmd: string, result: string, resultFailed: boolean):
     const [prog, sub = "", ...rest] = argv;
     const args = rest.filter((a) => !a.startsWith("-"));
     if (prog === "git" && sub === "push") {
+      if (rest.some((a) => a === "--dry-run" || /^-[a-zA-Z]*n[a-zA-Z]*$/.test(a))) continue;   // a rehearsal: nothing was pushed
       const ref = args[1] ? cleanRef(args[1]) : null;
+      if (rest.some((a) => a === "--delete" || a === "-d")) {
+        out.push(svc("GitHub", ref ? `branch ${ref}` : "branches", "write", `Deleted ${ref ? `branch ${ref}` : "a branch"} on the remote`, "deleted"));
+        continue;
+      }
       const noop = /Everything up-to-date/.test(result);
       out.push(svc("GitHub", ref ? `branch ${ref}` : "current branch", noop ? "read" : "write", noop ? "Push: already up to date" : `Pushed ${ref ? `branch ${ref}` : "commits"}`, noop ? undefined : "pushed"));
     } else if (prog === "gh" && /^(pr|issue|release|repo|run|workflow)$/.test(sub)) {
@@ -344,8 +370,11 @@ export function shellEvents(cmd: string, result: string, resultFailed: boolean):
       const verb: CoworkVerb | undefined = /^(create|new|fork)$/.test(act) ? "created" : act === "delete" ? "deleted" : /^(merge|close|edit|comment|review|reopen|ready|rerun|enable|disable)$/.test(act) ? "updated" : undefined;
       out.push(svc("GitHub", `${sub}s`, verb ? "write" : "read", `gh ${sub} ${act}`.trim(), verb));
     } else if (prog === "gh" && sub === "api") {
-      const writes = /-X\s*(POST|PUT|PATCH|DELETE)|--method\s+(POST|PUT|PATCH|DELETE)|\s-[fF]\s/i.test(argv.join(" "));
-      out.push(svc("GitHub", "api", writes ? "write" : "read", "gh api", writes ? "updated" : undefined));
+      const method = flagValue(argv, "-X", "--method")?.toUpperCase();
+      const fields = argv.some((a) => /^(-f|-F|--field|--raw-field|--input)(=|$)/.test(a) || /^-[fF]./.test(a));
+      const graphql = rest[0] === "graphql" ? argv.some((a) => /^query=\s*mutation\b/i.test(a)) || argv.some((a) => /^-[fF]query=\s*mutation\b/i.test(a)) : undefined;
+      const writes = method ? method !== "GET" && method !== "HEAD" : graphql ?? fields;
+      out.push(svc("GitHub", "api", writes ? "write" : "read", "gh api", writes ? (method === "DELETE" ? "deleted" : "updated") : undefined));
     } else if (prog === "vercel") {
       if (/^(--version|-v|--help|-h|help)$/.test(sub)) continue;
       const deploys = !sub || sub.startsWith("-") || sub === "deploy";
@@ -368,9 +397,11 @@ export function shellEvents(cmd: string, result: string, resultFailed: boolean):
       const line = argv.join(" ");
       const place = placeForUrl(/https?:\/\/[^\s"'`)]+/.exec(line)?.[0]);
       if (!place) continue;
-      const sends = /-X\s*(POST|PUT|PATCH|DELETE)|\s(-d|--data\S*|-F|--form)(\s|$)/i.test(line);
+      const method = flagValue(argv, "-X", "--request")?.toUpperCase();
+      const body = argv.some((a) => /^(-d|-F|-T|--data\S*|--form\S*|--json|--upload-file)(=|$)/.test(a) || /^-[dFT]./.test(a));
+      const sends = method ? method !== "GET" && method !== "HEAD" : body;
       out.push({ tool: "curl", action: sends ? "write" : "read", what: sends ? "Sent a request" : "Fetched with curl", place,
-        change: sends && place.area === "web" && !failed ? { verb: /DELETE/i.test(line) ? "deleted" : "sent", confidence: "likely" } : undefined, failed });
+        change: sends && place.area === "web" && !failed ? { verb: method === "DELETE" ? "deleted" : "sent", confidence: "likely" } : undefined, failed });
     }
   }
   return out;

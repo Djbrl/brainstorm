@@ -5,31 +5,12 @@
 // the repo's name that no longer exists, or that now leads here (a symlink left behind by the move).
 import { closeSync, existsSync, openSync, readSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, join, resolve, sep } from "node:path";
+import { claudeProjectDir, MAX_NAME, repoBase as sharedRepoBase, sanitizeName } from "../shared/paths";
 
-/** A path, or one of its segments, as Claude Code spells it in its folder names: every character but a letter or a
- * digit becomes "-". */
-export const sanitizeName = (s: string) => s.replace(/[^A-Za-z0-9]/g, "-");
-
-/** Claude Code cuts a folder name at this many characters (and adds a hash of the path). */
-const MAX_NAME = 200;
-
-/** Java's String.hashCode (32 bits, over UTF-16 code units), as Claude Code computes it for long folder names. */
-function javaHash(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return h;
-}
-
-/** The folder under ~/.claude/projects that Claude Code keeps the threads that ran in `path` in: the path sanitized
- * ("/Users/me/repo" → "-Users-me-repo"); a name over 200 characters is cut there, with "-" and the path's hash in
- * base 36 after it (Claude Code 2.1's naming, read from its code). */
-export function claudeProjectDir(path: string): string {
-  const name = sanitizeName(path);
-  return name.length <= MAX_NAME ? name : `${name.slice(0, MAX_NAME)}-${Math.abs(javaHash(path)).toString(36)}`;
-}
+export { claudeProjectDir, sanitizeName };
 
 /** The repo's main checkout: the root with any `/.claude/worktrees/<name>` suffix removed. */
-export const repoBase = (root: string) => resolve(root).replace(/\/\.claude\/worktrees\/[^/]+$/, "");
+export const repoBase = (root: string) => sharedRepoBase(resolve(root));
 
 /** How a project folder (a name under ~/.claude/projects) relates to `root`: "own" when its threads ran in the root
  * itself; "maybe" when its name starts the same, which is a subfolder or a worktree of it but also a sibling ("app"

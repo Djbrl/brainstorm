@@ -1,25 +1,9 @@
 // Match a file an agent touched to a node on the map,
 // even when the agent worked in another git worktree of the same repo.
 import type { ProjectMap } from "@contract";
+import { repoBase, repoRelative } from "@shared/paths";
 
-const WORKTREE = /^(.*?)\/\.claude\/worktrees\/[^/]+(?:\/(.*))?$/;
-
-/** The repo's main checkout: the map root with any `/.claude/worktrees/<name>` suffix removed. */
-export function repoBase(root: string): string {
-  return root.replace(/\/+$/, "").replace(/\/\.claude\/worktrees\/[^/]+$/, "");
-}
-
-/**
- * Path relative to the repo, for any checkout of it:
- * `<base>/app/x.ts` and `<base>/.claude/worktrees/<name>/app/x.ts` both give `app/x.ts`.
- * Returns null for files outside the repo (scratch folders, other projects).
- */
-export function repoRelative(abs: string, base: string): string | null {
-  const m = abs.match(WORKTREE);
-  if (m && m[1] === base) return m[2] ?? "";
-  if (abs.startsWith(base + "/")) return abs.slice(base.length + 1);
-  return null;
-}
+export { repoBase, repoRelative };
 
 export type FileResolver = (abs: string | undefined) => string | null;
 

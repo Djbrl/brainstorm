@@ -7,6 +7,7 @@
 // their own island; the rest share one, "+N more projects", with a small island per project inside it.
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { AgentPresence, FileNode, ProjectMap, Session, Step } from "@contract";
+import { outOfWorktree } from "@shared/paths";
 import { isReplay } from "./live";
 import { repoBase, repoRelative } from "./paths";
 
@@ -83,7 +84,7 @@ const useRoots = () => {
 
 /** One path per file whichever checkout the agent used: a worktree's copy (`<repo>/.claude/worktrees/<name>/x`) is the
  *  repo's `<repo>/x` on an island. */
-export const islandPath = (abs: string) => abs.replace(/\/\.claude\/worktrees\/[^/]+(?=\/|$)/, "");
+export const islandPath = outOfWorktree;
 
 /** Folders that hold projects rather than being one: a file in ~/Documents/x belongs to the project x, not to Documents
  *  (which the server refuses to open: workspace.service.ts tooBroad). */

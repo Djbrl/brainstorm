@@ -5,6 +5,7 @@ import { closeSync, existsSync, openSync, readdirSync, readSync, realpathSync, s
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { homedir } from "node:os";
 import type { SetupStatus, SetupStep, WorkspaceSuggestion } from "../shared/contract";
+import { worktreeRepo } from "../shared/paths";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";
@@ -190,14 +191,14 @@ export class WorkspaceService implements OnModuleInit, OnModuleDestroy {
       if (/\/Library\/Application Support\//.test(root)) continue; // Claude Desktop's own scratch folders
       // A worktree (or a folder inside one) belongs to its repo; a folder reached through a symlink, to the real one.
       const threads = jsonlFiles.filter((f) => !f.idle);
-      add(real(real(root).replace(/\/\.claude\/worktrees\/[^/]+(?:\/.*)?$/, "")), threads.map((f) => basename(f.path, ".jsonl")), new Date((threads[0] ?? jsonlFiles[0]).mtimeMs).toISOString());
+      add(real(worktreeRepo(real(root))), threads.map((f) => basename(f.path, ".jsonl")), new Date((threads[0] ?? jsonlFiles[0]).mtimeMs).toISOString());
     }
 
     // Codex's projects (its worktrees count as their repo; see CodexSource.projects).
     for (const [root, threads] of this.listener.codexProjects()) {
       if (/\/Library\/Application Support\//.test(root)) continue;
       const last = Math.max(...threads.map((t) => t.mtimeMs));
-      add(real(real(root).replace(/\/\.claude\/worktrees\/[^/]+(?:\/.*)?$/, "")), threads.map((t) => t.id), new Date(last).toISOString());
+      add(real(worktreeRepo(real(root))), threads.map((t) => t.id), new Date(last).toISOString());
     }
 
     // A repo that moved: its old folder is gone, and one of the same name has threads. Count them together.

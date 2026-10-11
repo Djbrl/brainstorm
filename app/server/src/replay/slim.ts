@@ -1,4 +1,5 @@
 import type { Edge, FileNode, ProjectMap, Step } from "../shared/contract";
+import { repoBase, repoRelative } from "../shared/paths";
 
 // A shared replay carries one thread, so it doesn't need the whole project's map (up to 3,000 files
 // and their imports, megabytes). It keeps the files the thread touched, and a few around them so the map still reads
@@ -9,15 +10,6 @@ import type { Edge, FileNode, ProjectMap, Step } from "../shared/contract";
 /** Files kept around the touched ones, at most. */
 export const NEIGHBOURS = 60;
 
-const WORKTREE = /^(.*?)\/\.claude\/worktrees\/[^/]+(?:\/(.*))?$/;
-const repoBase = (root: string) => root.replace(/\/+$/, "").replace(/\/\.claude\/worktrees\/[^/]+$/, "");
-/** Path inside the repo for any checkout of it (the main one or a worktree), else null. Same as web lib/paths.ts. */
-function repoRelative(abs: string, base: string): string | null {
-  const m = abs.match(WORKTREE);
-  if (m && m[1] === base) return m[2] ?? "";
-  if (abs.startsWith(base + "/")) return abs.slice(base.length + 1);
-  return null;
-}
 const dirOf = (p: string) => p.slice(0, p.lastIndexOf("/"));
 
 /**

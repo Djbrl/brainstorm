@@ -19,6 +19,7 @@ import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import type { StepKind } from "../shared/contract";
+import { inside } from "../shared/paths";
 import type { LogFile, LogSource, NewStep, Scope, Sink, WatchEvents } from "./source";
 import { setAgentName } from "./agent-names";
 import { sanitizeDeep, sanitizeText, TEXT_LIMIT, TOOL_RESULT_LIMIT } from "./text";
@@ -82,7 +83,6 @@ const FIRST_LINE_MAX = 4 * 1024 * 1024;
 
 const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
 const versionOf = (v: unknown) => { const m = /^(\d+)\.(\d+)/.exec(String(v ?? "")); return m ? Number(m[1]) * 1000 + Number(m[2]) : 0; };
-const within = (p: string, root: string) => p === root || p.startsWith(root.endsWith(sep) ? root : root + sep);
 
 export class CodexSource implements LogSource {
   readonly harness = "codex" as const;
@@ -221,7 +221,7 @@ export class CodexSource implements LogSource {
     return meta ? meta.parent ?? meta.id : undefined;
   }
 
-  private inRoots(p: string) { return this.scope.roots.some((r) => within(p, r)); }
+  private inRoots(p: string) { return this.scope.roots.some((r) => inside(p, r)); }
 
   /** The file's first line, read once (up to its first newline). */
   private metaOf(file: string): Meta | null {

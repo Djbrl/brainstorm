@@ -1,4 +1,4 @@
-import type { Step } from "../types";
+import type { Step } from "../shared/contract";
 
 /** A failed result's error, reduced to what repeats: tags, paths, ids, numbers and quoted strings stripped. */
 export function normalizeError(text: string): string {

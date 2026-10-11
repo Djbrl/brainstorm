@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
-import type { Step } from "../types";
+import type { Step } from "../shared/contract";
 import { ReaderService } from "./reader.service";
 
 function setup() {

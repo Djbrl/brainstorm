@@ -3,7 +3,7 @@ import { DbService } from "../core/db.service";
 import { stepsVersion, workSteps } from "../core/work-steps";
 import { ListenerService } from "../listener/listener.service";
 import { CallPairer } from "../listener/pairing";
-import type { CoworkArea, CoworkEvent, CoworkPage, CoworkSite, CoworkSummary, Step } from "../types";
+import type { CoworkArea, CoworkEvent, CoworkPage, CoworkSite, CoworkSummary, Step } from "../shared/contract";
 import { CODE_TOOLS, CoworkTracker } from "./classify";
 
 // Walks threads' steps, pairs calls with results, and aggregates places. Each thread's events are kept until its

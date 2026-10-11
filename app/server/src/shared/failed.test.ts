@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { isErrorResult } from "./failed";
-import type { Step } from "../types";
+import type { Step } from "./contract";
 
 const res = (text: string, isError = false): Step => ({ id: "r", sessionId: "s", seq: 1, ts: "2026-01-01T00:00:00Z", kind: "tool_result", text, ...(isError ? { input: { isError: true } } : {}) });
 const NAV = "mcp__claude-in-chrome__navigate";

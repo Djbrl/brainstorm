@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Logger } from "@nestjs/common";
 import { WorkspaceService } from "./workspace.service";
-import type { SetupStatus } from "../types";
+import type { SetupStatus } from "../shared/contract";
 
 Logger.overrideLogger(false);
 

@@ -4,7 +4,7 @@ Rundown is a local web app that runs next to Claude Code (and Codex). It reads t
 
 - Server: `app/server/`, NestJS 11, TypeScript, Node 22.13 or later (it uses `node:sqlite` and `process.loadEnvFile`)
 - Web: `app/web/`, Vite 7, React 19, TypeScript
-- Shared contract: `app/server/src/types.ts`, imported by the web as `@contract`
+- Shared contract: `app/server/src/shared/contract.ts`, imported by the web as `@contract`
 - The plugin (`plugin/`) starts the built server with `plugin/scripts/launch.mjs`; see `plugin/README.md`
 
 ## Architecture

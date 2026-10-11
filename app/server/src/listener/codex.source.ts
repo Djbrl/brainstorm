@@ -18,7 +18,7 @@ import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, s
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
-import type { StepKind } from "../types";
+import type { StepKind } from "../shared/contract";
 import type { LogFile, LogSource, NewStep, Scope, Sink, WatchEvents } from "./source";
 import { setAgentName } from "./agent-names";
 import { sanitizeDeep, sanitizeText, TEXT_LIMIT, TOOL_RESULT_LIMIT } from "./text";

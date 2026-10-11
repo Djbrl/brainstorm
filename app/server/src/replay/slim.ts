@@ -1,4 +1,4 @@
-import type { Edge, FileNode, ProjectMap, Step } from "../types";
+import type { Edge, FileNode, ProjectMap, Step } from "../shared/contract";
 
 // A shared replay carries one thread, so it doesn't need the whole project's map (up to 3,000 files
 // and their imports, megabytes). It keeps the files the thread touched, and a few around them so the map still reads

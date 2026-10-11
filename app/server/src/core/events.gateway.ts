@@ -1,6 +1,6 @@
 import { WebSocketGateway, WebSocketServer } from "@nestjs/websockets";
 import type { Server, WebSocket } from "ws";
-import type { WsMessage } from "../types";
+import type { WsMessage } from "../shared/contract";
 import { isLocalHost, isLocalOrigin } from "./local";
 import { liveTokenOk } from "./secrets";
 

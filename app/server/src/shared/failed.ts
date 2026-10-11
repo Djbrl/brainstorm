@@ -2,7 +2,7 @@
 // The stored is_error flag is trusted. Text patterns are only a fallback for the tools whose own result text is
 // known to carry the failure: shell commands, file edits and browser navigation. Any other tool's output (a web
 // page, a search result, a file) is content, so "Error handling in Go" or "pets are not allowed" is not a failure.
-import type { Step } from "../types";
+import type { Step } from "./contract";
 
 const SHELL = new Set(["Bash", "BashOutput", "exec_command", "shell", "local_shell", "KillShell"]);
 const EDIT = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit", "apply_patch"]);

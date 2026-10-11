@@ -1,4 +1,4 @@
-import type { Step } from "../types";
+import type { Step } from "../shared/contract";
 
 /**
  * Matches tool results to the calls they answer. By tool_use id when both steps carry one (exact, also across parallel

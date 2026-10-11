@@ -2,7 +2,7 @@
 // Pure: no Nest, no db. One tracker per session, fed call/result pairs in order. See docs/technical.md, "Places".
 import { isErrorResult } from "../shared/failed";
 import { shellArgv } from "../listener/command-writes";
-import type { CoworkArea, CoworkConfidence, CoworkEvent, CoworkVerb, Step } from "../types";
+import type { CoworkArea, CoworkConfidence, CoworkEvent, CoworkVerb, Step } from "../shared/contract";
 
 type Tab = { url?: string; title?: string };
 type Place = { area: CoworkArea; site: string; page: string; url?: string; title?: string };

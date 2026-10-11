@@ -1,5 +1,5 @@
 import { Controller, Get, Query } from "@nestjs/common";
-import type { Replay } from "../types";
+import type { Replay } from "../shared/contract";
 import { redactReplayJson } from "./redact";
 import { ReplayService } from "./replay.service";
 

@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import { closeSync, existsSync, openSync, readdirSync, readSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { homedir } from "node:os";
-import type { SetupStatus, SetupStep, WorkspaceSuggestion } from "../types";
+import type { SetupStatus, SetupStep, WorkspaceSuggestion } from "../shared/contract";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";

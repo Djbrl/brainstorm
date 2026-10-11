@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import type { StatementSync } from "node:sqlite";
-import type { Step } from "../types";
+import type { Step } from "../shared/contract";
 import { BusService } from "../core/bus.service";
 import { DbService } from "../core/db.service";
 

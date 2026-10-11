@@ -1,7 +1,7 @@
 // Which project's map a shared thread carries (share.controller.ts).
 import { existsSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
-import type { Session, Step } from "../types";
+import type { Session, Step } from "../shared/contract";
 import { tooBroad } from "../workspace/workspace.service";
 
 /** A path inside a folder, or the folder itself. */

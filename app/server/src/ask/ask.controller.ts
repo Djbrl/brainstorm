@@ -1,6 +1,6 @@
 import { Body, Controller, Post } from "@nestjs/common";
 import { AskService } from "./ask.service";
-import type { AskRequest } from "../types";
+import type { AskRequest } from "../shared/contract";
 
 // POST /api/ask: a question about a step or a file.
 @Controller()

@@ -3,7 +3,7 @@ import { HttpAdapterHost } from "@nestjs/core";
 import { createHash } from "node:crypto";
 import { closeSync, existsSync, fstatSync, openSync, readdirSync, readSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
-import type { Harness, Session, Step } from "../types";
+import type { Harness, Session, Step } from "../shared/contract";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";

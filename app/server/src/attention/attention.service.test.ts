@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
-import type { Attention, Step, WsMessage } from "../types";
+import type { Attention, Step, WsMessage } from "../shared/contract";
 import { AttentionService } from "./attention.service";
 
 const iso = (msAgo: number) => new Date(Date.now() - msAgo).toISOString();

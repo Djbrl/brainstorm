@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { closeSync, openSync, readdirSync, readSync, realpathSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import type { ElsewhereThread } from "../types";
+import type { ElsewhereThread } from "../shared/contract";
 import { ConfigService } from "../core/config.service";
 import { ListenerService } from "../listener/listener.service";
 import { AttentionService } from "../attention/attention.service";

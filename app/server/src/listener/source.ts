@@ -2,7 +2,7 @@
 // ~/.codex/sessions). The listener (listener.service.ts) does what's the same for every agent: it tails the files a
 // source points it to, a chunk at a time, stores what the source parses from each line and tells the app. A source
 // knows where its logs are, which of them belong to the open project, and what a line means.
-import type { Harness, Step } from "../types";
+import type { Harness, Step } from "../shared/contract";
 
 /** A step as a source parses it: the listener numbers it (`seq`) as it stores it. */
 export type NewStep = Omit<Step, "seq">;

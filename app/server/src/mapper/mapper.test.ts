@@ -14,7 +14,7 @@ import { GitLogParser } from "./git-times";
 import { listProjectFiles, parseLsFiles } from "./list-files";
 import { MapperService, jsImports } from "./mapper.service";
 import { MAX_COUNT_BYTES, readMapped } from "./read-file";
-import type { WsMessage } from "../types";
+import type { WsMessage } from "../shared/contract";
 
 Logger.overrideLogger(false);
 

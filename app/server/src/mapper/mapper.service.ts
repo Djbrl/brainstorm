@@ -3,7 +3,7 @@ import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { deflateRawSync, inflateRawSync } from "node:zlib";
 import { lstat, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
-import type { Edge, FileNode, ProjectMap } from "../types";
+import type { Edge, FileNode, ProjectMap } from "../shared/contract";
 import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";
 import { ConfigService } from "../core/config.service";

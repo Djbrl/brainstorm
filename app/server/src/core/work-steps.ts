@@ -1,5 +1,5 @@
 import type { DatabaseSync, StatementSync } from "node:sqlite";
-import type { Step } from "../types";
+import type { Step } from "../shared/contract";
 
 // The steps a pass over calls and their results needs (failures, places): calls, edits and results only, without
 // diffs, labels or risk, so a long thread costs a fraction of listSteps. Same Step shape for the fields it fills.

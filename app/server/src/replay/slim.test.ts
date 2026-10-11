@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { homedir } from "node:os";
-import type { ProjectMap, Step } from "../types";
+import type { ProjectMap, Step } from "../shared/contract";
 import { forSharing } from "./privacy";
 import { slimMap, touchedFiles } from "./slim";
 

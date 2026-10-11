@@ -7,7 +7,7 @@ import chokidar, { type FSWatcher } from "chokidar";
 import { readdirSync, statSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
 import { homedir } from "node:os";
-import type { StepKind } from "../types";
+import type { StepKind } from "../shared/contract";
 import { fileCwds, folderOf, within } from "./moved";
 import type { LogFile, LogSource, NewStep, Scope, Sink, WatchEvents } from "./source";
 import { sanitizeDeep, sanitizeText, TEXT_LIMIT, TOOL_RESULT_LIMIT } from "./text";

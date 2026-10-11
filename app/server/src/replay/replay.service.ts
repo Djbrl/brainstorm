@@ -6,7 +6,7 @@ import { ConfigService } from "../core/config.service";
 import { WorkspaceService } from "../workspace/workspace.service";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import type { Replay, Session, Step } from "../types";
+import type { Replay, Session, Step } from "../shared/contract";
 import { summarizePlaces } from "../cowork/cowork.service";
 
 type Move = NonNullable<Replay["agentMoves"]>[number];

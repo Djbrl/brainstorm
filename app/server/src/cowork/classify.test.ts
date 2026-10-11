@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { CoworkTracker, shellEvents, simpleCommands } from "./classify";
-import type { Step } from "../types";
+import type { Step } from "../shared/contract";
 
 const sh = (cmd: string, result = "", failed = false) => shellEvents(cmd, result, failed);
 const one = (cmd: string, result = "", failed = false) => { const e = sh(cmd, result, failed); assert.equal(e.length, 1, cmd); return e[0]; };

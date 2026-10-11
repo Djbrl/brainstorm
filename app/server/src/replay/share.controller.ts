@@ -2,7 +2,7 @@ import { Controller, Get, HttpException, Query, Res } from "@nestjs/common";
 import type { Response } from "express";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import type { Replay, Session, Step } from "../types";
+import type { Replay, Session, Step } from "../shared/contract";
 import { ListenerService } from "../listener/listener.service";
 import { ReplayService } from "./replay.service";
 import { threadMarkdown } from "./markdown";

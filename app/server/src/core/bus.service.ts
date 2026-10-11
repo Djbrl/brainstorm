@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import type { Session, Step } from "../types";
+import type { Session, Step } from "../shared/contract";
 
 /** In-process events between modules. Listener emits, reader/mapper react. */
 export type BusEvents = {

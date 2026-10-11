@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
-import type { AskRequest, AskResponse, Step } from "../types";
+import type { AskRequest, AskResponse, Step } from "../shared/contract";
 import { DbService } from "../core/db.service";
 import { ConfigService } from "../core/config.service";
 import { ListenerService } from "../listener/listener.service";

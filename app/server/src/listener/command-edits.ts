@@ -8,7 +8,7 @@
 // Each edit comes with a result (so attention never sees it waiting) and says it came from a command (input.byCommand).
 import { statSync } from "node:fs";
 import { basename, relative, resolve, sep } from "node:path";
-import type { Step } from "../types";
+import type { Step } from "../shared/contract";
 import { mappableRel, skippedRel } from "../mapper/ignore";
 import { MAX_PARSE_BYTES } from "../mapper/read-file";
 import { commandWrites, shellArgv } from "./command-writes";

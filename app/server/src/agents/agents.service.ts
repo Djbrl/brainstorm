@@ -3,7 +3,7 @@ import { isErrorResult } from "../shared/failed";
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
-import type { AgentMove, AgentPresence, Step } from "../types";
+import type { AgentMove, AgentPresence, Step } from "../shared/contract";
 import { BusService } from "../core/bus.service";
 import { ConfigService } from "../core/config.service";
 import { EventsGateway } from "../core/events.gateway";

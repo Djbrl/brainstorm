@@ -1,5 +1,5 @@
 import { relative } from "node:path";
-import type { ProjectMap, Session, Step } from "../types";
+import type { ProjectMap, Session, Step } from "../shared/contract";
 import { isErrorResult } from "../shared/failed";
 import { groupFailed } from "./failure-text";
 import { CallPairer } from "../listener/pairing";

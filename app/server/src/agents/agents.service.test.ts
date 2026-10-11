@@ -3,7 +3,7 @@ import "reflect-metadata";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { BusService } from "../core/bus.service";
-import type { AgentPresence, Session, Step, WsMessage } from "../types";
+import type { AgentPresence, Session, Step, WsMessage } from "../shared/contract";
 import { AgentsService } from "./agents.service";
 
 function setup() {

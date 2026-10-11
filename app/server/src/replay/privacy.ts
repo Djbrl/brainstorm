@@ -8,6 +8,21 @@ const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 // The local part is capped at 64 (the most an address can have): an unbounded one is re-scanned from every character of a long run.
 export const EMAIL =/[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g;
 
+const LOCAL = /[A-Za-z0-9._%+-]/;
+/** Every e-mail address becomes "[email]" (git@ remotes stay). EMAIL caps the local part at 64 characters so it stays
+ *  linear; a longer one is widened back here, one pass, so no part of it is left showing. */
+export function maskEmails(s: string): string {
+  let out = "", last = 0;
+  for (const m of s.matchAll(EMAIL)) {
+    let start = m.index!;
+    while (start > last && LOCAL.test(s[start - 1])) start--;
+    const e = s.slice(start, m.index! + m[0].length);
+    out += s.slice(last, start) + (e.startsWith("git@") ? e : "[email]");
+    last = m.index! + m[0].length;
+  }
+  return out + s.slice(last);
+}
+
 /** This computer's names, longest first: the host name, and on macOS the names shell prompts use (it can be an IP). */
 export function computerNames(): string[] {
   const names = new Set<string>([hostname().replace(/\.local$/, "")]);
@@ -59,7 +74,7 @@ export function forSharing<T>(value: T): T {
       if (encodedRe) m = m.replace(encodedRe, "-~");
       if (hostRe) m = m.replace(hostRe, "computer");
       if (userRe) m = m.replace(userRe, "user");
-      if (m.includes("@")) m = m.replace(EMAIL, (e) => (e.startsWith("git@") ? e : "[email]"));
+      if (m.includes("@")) m = maskEmails(m);
       if (mailboxRe) m = m.replace(mailboxRe, "[email]");
       return m;
     }

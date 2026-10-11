@@ -5,7 +5,7 @@ const { dist } = require("./helpers.cjs");
 require("reflect-metadata");
 const { sanitizeText } = require(dist("listener/text.js"));
 const { commandWrites } = require(dist("listener/command-writes.js"));
-const { EMAIL } = require(dist("replay/privacy.js"));
+const { EMAIL, maskEmails } = require(dist("replay/privacy.js"));
 const { maskSecrets } = require(dist("privacy/mask.js"));
 
 /** The time of `fn` in ms, after a warm-up call. */
@@ -37,8 +37,10 @@ test("email: a long run of word characters, and the 64-character local part", ()
   const swap = (s) => s.replace(EMAIL, "[email]");
   fast("letters then @", () => swap("a".repeat(32_000) + "@")); // 64 steps a character, not the whole run
   fast("a@a.", () => swap("a@" + "a.".repeat(100_000)));
+  fast("a long local part, widened back", () => maskEmails("a".repeat(32_000) + "@b.co " + "c".repeat(32_000)));
   assert.equal(swap("mail ana.lee@example.com."), "mail [email].");
-  assert.equal(swap("x".repeat(80) + "@foo.org"), "x".repeat(16) + "[email]"); // the front of an over-long one stays
+  assert.equal(maskEmails("x".repeat(80) + "@foo.org"), "[email]"); // an over-long local part is masked whole
+  assert.equal(maskEmails("to " + "y".repeat(70) + "@foo.org, git@github.com:a/b and ana@x.io"), "to [email], git@github.com:a/b and [email]");
 });
 
 test("maskSecrets: 500 KB of a hyphenated run takes linear time", () => {

@@ -3,8 +3,7 @@
 // re-renders the parts that changed, not the whole app.
 import { isReplay, shallowEqual, useLiveActions, useLiveSelector, useHarness, useLiveStep } from "./lib/live";
 import { harnessName } from "./lib/harness";
-import { END, NavProvider, useNavActions, useNavState, useReplayCursor } from "./lib/nav";
-import { useThread, type ReplayDetail, type Thread } from "./lib/thread";
+import { END, NavProvider, useNavActions, useNavState } from "./lib/nav";
 import { displayLabel } from "./follow/format";
 import { LinkedLabel } from "./lib/links";
 import { SetupView } from "./setup/SetupView";
@@ -22,6 +21,8 @@ import { Elsewhere } from "./switch/Elsewhere";
 import { Keys } from "./switch/Keys";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { keyRules, useShortcut } from "./switch/shortcuts";
+import { LiveFollow } from "./LiveFollow";
+import { kindOf, screenOf } from "./screen";
 import "./boot.css";
 
 // The views (and the graph library the Map needs) load when they're opened. The Map is what almost every visit
@@ -99,17 +100,20 @@ function Shell() {
   // First load: a quiet "Loading" until we know whether to show setup or the map, rather than a blank page or a flash of either.
   const booting = useBooting();
   const offline = useOffline();
-  // Not while the setup checklist runs: the new project reloads the store, and the checklist must stay where it is.
-  if (booting && !picking) return <Loading />;
+  const kind = kindOf({ replay: state.replay, preview: state.preview, shared: !!state.shared });
+  const screen = screenOf({
+    kind, booting, picking, setupOpen, noProject: !!state.setup && !state.setup.root, offline, hasMap: state.hasMap,
+    thread: !!replay, missing: state.missing, lens,
+  });
+  const local = kind === "local";
 
-  // Local app: pick a workspace first (and whenever "Change" is clicked). The hosted demo never shows setup,
-  // except the post-deadline preview, which plays back a recorded setup run (see lib/preview.ts).
-  if ((setupOpen && (!state.replay || state.preview)) || (!state.replay && (picking || (state.setup && !state.setup.root)))) {
+  if (screen === "loading") return <Loading />;
+  if (screen === "setup") {
     // Another project: whatever was open (a thread, a step, a file) belonged to the old one.
     return <SetupView onDone={() => {
       if (history.state?.rundownSetup) try { history.replaceState({ ...history.state, rundownSetup: false }, ""); } catch { /* fine */ }
       setSetupOpen(false); setPicking(false); stopReplay(); selectFile(null); reload();
-    }} onPicking={setPicking} onCancel={state.setup?.root || state.preview ? closeSetup : undefined} />;
+    }} onPicking={setPicking} onCancel={state.setup?.root || kind === "preview" ? closeSetup : undefined} />;
   }
   const project = state.setup?.name || "";   // none yet (the server out of reach): no name rather than a made-up one
 
@@ -121,19 +125,19 @@ function Shell() {
   };
 
   return (
-    <div className={`shell ${state.preview || state.shared ? "has-banner" : ""}`}>
+    <div className={`shell ${kind === "preview" || kind === "shared" ? "has-banner" : ""}`}>
       <header className="topbar">
         {isReplay()
           ? <a className="wordmark" href="https://brainstorm-landing.vercel.app" aria-label="Rundown home"><Logo label="Rundown home" /></a>
           : <button className="wordmark" onClick={goHome} aria-label="Home" title="Home"><Logo /></button>}
-        {state.replay || state.shared ? <Crumbs project={project || (state.shared ? "The whole map" : "")} /> : <div className="topbar-space" />}
-        {state.shared && replay && <PlayButton />}
+        {!local ? <Crumbs project={project || (kind === "shared" ? "The whole map" : "")} /> : <div className="topbar-space" />}
+        {kind === "shared" && replay && <PlayButton />}
         <div className="status">
-          {!state.replay && !state.shared && <Elsewhere />}
-          {state.preview && (
+          {local && <Elsewhere />}
+          {kind === "preview" && (
             <button className="ws-chip" title="Play back a recorded setup run" onClick={openSetup}>Setup preview</button>
           )}
-          {!state.replay && state.setup?.root && (
+          {local && state.setup?.root && (
             <button className="ws-chip ws-change" title={state.setup.root} onClick={openSetup}>
               <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.75 6.25V15a1.25 1.25 0 0 0 1.25 1.25h12A1.25 1.25 0 0 0 17.25 15V8A1.25 1.25 0 0 0 16 6.75h-6.2L8.3 4.5a1 1 0 0 0-.83-.45H4A1.25 1.25 0 0 0 2.75 5.3Z" /></svg>
               Change project
@@ -141,15 +145,15 @@ function Shell() {
           )}
           <SettingsButton />
           {/* No "Live" pill: being live is the normal state. Only what isn't is said: a replay, or the server out of reach. */}
-          {(state.shared || state.replay || !state.connected) && (
+          {(!local || !state.connected) && (
             <>
               <span className="dot" />
-              <span className="status-text">{state.shared ? "Shared replay" : state.replay ? "Recorded demo" : "Connecting…"}</span>
+              <span className="status-text">{kind === "shared" ? "Shared replay" : !local ? "Recorded demo" : "Connecting…"}</span>
             </>
           )}
         </div>
       </header>
-      {state.preview && (
+      {kind === "preview" && (
         <div className="preview-banner">
           A recording of a real Claude Code thread, played back. To see your own agents live,{" "}
           <a href="https://github.com/Djbrl/brainstorm#install-claude-code-plugin-preview" target="_blank" rel="noopener">install the plugin</a>.
@@ -163,16 +167,16 @@ function Shell() {
         </div>
       )}
       {offline && state.hasMap && <OfflineBanner />}
-      {!state.replay && !state.shared && <ThreadBar project={project} onFind={() => setFinding(true)} onHelp={() => setHelp(true)} onAllProjects={openSetup} />}
-      {!state.replay && !state.shared && <Keys finding={finding} setFinding={setFinding} help={help} setHelp={setHelp} />}
-      {state.shared && <OpenShared />}
+      {local && <ThreadBar project={project} onFind={() => setFinding(true)} onHelp={() => setHelp(true)} onAllProjects={openSetup} />}
+      {local && <Keys finding={finding} setFinding={setFinding} help={help} setHelp={setHelp} />}
+      {kind === "shared" && <OpenShared />}
       <LiveFollow />
       {/* The hosted demo keeps its one welcome card; your own Rundown has the tour (its last step asks about usage stats). */}
-      {isReplay() ? !replay && !state.shared && <Welcome /> : !state.shared && !state.preview && <><Tour /><AfterTour /></>}
+      {isReplay() ? !replay && kind !== "shared" && <Welcome /> : kind !== "shared" && kind !== "preview" && <><Tour /><AfterTour /></>}
       <main className="view"><Crashed where="the map" key={`${replay?.sessionId ?? ""}|${lens}`}><Suspense fallback={<Loading />}>{
-        offline && !state.hasMap ? <Offline />
-          : replay && state.missing ? <MissingThread onBack={stopReplay} />
-          : replay && lens === "places" ? <PlacesView />
+        screen === "offline" ? <Offline />
+          : screen === "missing" ? <MissingThread onBack={stopReplay} />
+          : screen === "places" ? <PlacesView />
           : <MapView />
       }</Suspense></Crashed></main>
     </div>
@@ -222,91 +226,11 @@ function OpenShared() {
   return null;
 }
 
-/**
- * A thread you chose to follow live stays on its newest step; a replay that reaches the end of a running thread
- * starts following it. Nothing opens or plays by itself: running threads show as moving dots until you click one.
- * The parts that build the thread are mounted only while they're needed.
- */
 /** The usage question, for someone who skipped the tour (its last step asks it): once the tour is done, mounted then so
  *  it reads the setting as it is now. */
 function AfterTour() {
   const ready = useTour((t) => t.done === true && !t.step);
   return ready ? <UsageAsk /> : null;
-}
-
-function LiveFollow() {
-  const { replay } = useNavState();
-  const sid = replay?.sessionId;
-  const running = useLiveSelector((s) => !!sid && s.sessions.find((x) => x.id === sid)?.status === "running");
-  if (!replay) return null;
-  // A step opened (a row, a link): the cursor lands on it first, on any lens, and only then may it follow live again.
-  if (replay.atStep) return <LandStep sessionId={replay.sessionId} detail={replay.detail} stepId={replay.atStep} />;
-  if (replay.live) return <FollowNewest sessionId={replay.sessionId} detail={replay.detail} />;
-  // Live is a state, not a switch: a running thread you bring back to its newest step (scrolling, stepping, playing)
-  // follows it live again; moving off it is looking back.
-  return (
-    <>
-      <KeepCursor sessionId={replay.sessionId} detail={replay.detail} />
-      {running && <FollowAtEnd sessionId={replay.sessionId} detail={replay.detail} />}
-    </>
-  );
-}
-
-/** Looking back at a growing thread, the cursor stays on its step, not on its number: when the thread is built again and
- *  its moments renumber (an edit takes in the talk before it), the cursor moves to the moment that now holds the step it
- *  was on, as LandStep does. */
-function KeepCursor({ sessionId, detail }: { sessionId: string; detail: ReplayDetail }) {
-  const { landReplay } = useNavActions();
-  const thread = useThread(sessionId, detail);
-  const index = useReplayCursor((c) => c.index);
-  const was = useRef<{ thread: Thread; index: number; stepId?: string } | null>(null);
-  useEffect(() => {
-    const prev = was.current;
-    if (!thread || thread.sessionId !== sessionId || thread.detail !== detail || !thread.beats.length) { was.current = null; return; }
-    const at = Math.min(index, thread.beats.length - 1);
-    if (prev && prev.thread !== thread && prev.index === index && prev.stepId && thread.beats[at]?.step.id !== prev.stepId) {
-      const moved = thread.stepBeat.get(prev.stepId);
-      if (moved !== undefined && moved !== at) {
-        was.current = { thread, index: moved, stepId: prev.stepId };
-        landReplay(moved);
-        return;
-      }
-    }
-    was.current = { thread, index, stepId: thread.beats[at]?.step.id };
-  }, [thread, index, sessionId, detail, landReplay]);
-  return null;
-}
-
-/** Put the cursor on the moment holding a step just opened. A step the thread doesn't hold keeps the cursor where it
- *  is (not the thread's start). Until it lands, nothing pulls it back to live: a link to a step of a running thread used
- *  to open on the step and show the newest one, the panel and the Track on two different moments. */
-function LandStep({ sessionId, detail, stepId }: { sessionId: string; detail: ReplayDetail; stepId: string }) {
-  const { landReplay } = useNavActions();
-  const thread = useThread(sessionId, detail);
-  const index = useReplayCursor((c) => c.index);
-  useEffect(() => {
-    if (!thread || thread.sessionId !== sessionId || thread.detail !== detail || !thread.beats.length) return;
-    landReplay(thread.stepBeat.get(stepId) ?? Math.min(index, thread.beats.length - 1));
-  }, [thread, sessionId, detail, stepId]);
-  return null;
-}
-
-/** Following live: keep the cursor on the newest beat as the thread grows. */
-function FollowNewest({ sessionId, detail }: { sessionId: string; detail: ReplayDetail }) {
-  const { followLive } = useNavActions();
-  const beats = useThread(sessionId, detail)?.beats.length ?? 0;
-  useEffect(() => { if (beats) followLive(beats - 1); }, [beats, followLive]);
-  return null;
-}
-
-/** A running thread you look back through: once the cursor is back on its last beat (and not playing), follow it live. */
-function FollowAtEnd({ sessionId, detail }: { sessionId: string; detail: ReplayDetail }) {
-  const { setReplayLive } = useNavActions();
-  const all = useThread(sessionId, detail);
-  const last = all ? all.beats.length - 1 : -1;
-  const atEnd = useReplayCursor((c) => last >= 0 && c.index >= last && !c.playing);
-  useEffect(() => { if (atEnd) setReplayLive(true); }, [atEnd, setReplayLive]);
-  return null;
 }
 
 export function App() {

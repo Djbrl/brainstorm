@@ -232,10 +232,26 @@ function LiveFollow() {
   const sid = replay?.sessionId;
   const running = useLiveSelector((s) => !!sid && s.sessions.find((x) => x.id === sid)?.status === "running");
   if (!replay) return null;
+  // A step opened (a row, a link): the cursor lands on it first, on any lens, and only then may it follow live again.
+  if (replay.atStep) return <LandStep sessionId={replay.sessionId} detail={replay.detail} stepId={replay.atStep} />;
   if (replay.live) return <FollowNewest sessionId={replay.sessionId} detail={replay.detail} />;
   // Live is a state, not a switch: a running thread you bring back to its newest step (scrolling, stepping, playing)
   // follows it live again; moving off it is looking back.
   if (running) return <FollowAtEnd sessionId={replay.sessionId} detail={replay.detail} />;
+  return null;
+}
+
+/** Put the cursor on the moment holding a step just opened. A step the thread doesn't hold keeps the cursor where it
+ *  is (not the thread's start). Until it lands, nothing pulls it back to live: a link to a step of a running thread used
+ *  to open on the step and show the newest one, the panel and the Track on two different moments. */
+function LandStep({ sessionId, detail, stepId }: { sessionId: string; detail: ReplayDetail; stepId: string }) {
+  const { landReplay } = useNavActions();
+  const thread = useThread(sessionId, detail);
+  const index = useReplayCursor((c) => c.index);
+  useEffect(() => {
+    if (!thread || thread.sessionId !== sessionId || thread.detail !== detail || !thread.beats.length) return;
+    landReplay(thread.stepBeat.get(stepId) ?? Math.min(index, thread.beats.length - 1));
+  }, [thread, sessionId, detail, stepId]);
   return null;
 }
 

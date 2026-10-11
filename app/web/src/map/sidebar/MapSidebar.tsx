@@ -9,6 +9,7 @@
 // thread folds it too, and picking a file opens it. That narrow state isn't saved, so the desktop's folded-or-not
 // choice stays as it was. Folding the sheet slides it away (it leaves, then unmounts). On a phone the thread's sheet
 // under the map has a grab bar: drag it to set its height (until the page reloads), down past its lowest to fold it.
+// On a tablet-sized window, the open sheet and a step's panel take turns (one opening closes the other).
 // On a wide window it's open: ‹ or T folds it for now, not for next time (it used to be saved,
 // and a fold left from a small window kept it folded on a wide one). T folds and unfolds it anywhere. Folded with a thread open, it's a card with the thread's
 // state and the step it's on (NowCard), except on a phone.
@@ -69,7 +70,7 @@ const PIP_START = 50;   // each page load starts the sheet at the middle (its he
 const PHONE = "(max-width: 600px)";
 
 export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, map, file, picked, onCloseFile }: MapSidebarProps) {
-  const { replay, file: fileLink } = useNav();
+  const { replay, file: fileLink, step: openStep, closeStep } = useNav();
   // A file link opens on Files, a thread link on the thread.
   const [tab, setTab] = useState<Tab>(() => (fileLink ? "files" : replay ? "threads" : loadTab()));
   // Threads with a thread open: the thread, or (after its back arrow) the list.
@@ -113,6 +114,12 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
     setTab("files");
     if (narrow) setOver(true); else setFolded(false);
   }, [picked]);
+  // A tablet-sized window has no room for the open sheet and a step's panel side by side (it used to slide over the
+  // step, or leave the map no room): a step opening folds the sheet, the sheet opening closes the step (its row is still
+  // the highlighted one, a tap opens it again). A phone shows the step in the sheet's place (map.css).
+  const tablet = narrow && !phone;
+  useEffect(() => { if (tablet && openStep && over) setOver(false); }, [openStep]);
+  useEffect(() => { if (tablet && over && openStep) closeStep(); }, [over]);
   // Esc folds the open sheet first (before the app's Esc steps back out of a thread).
   useEffect(() => {
     if (!over) return;

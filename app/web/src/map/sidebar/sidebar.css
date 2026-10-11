@@ -74,6 +74,11 @@
   /* Room for three lines whatever the step, so the card doesn't change height as you scroll. */
   .sn-m.current { height: 70px; }
   .sn-m.current span { white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+  /* A step's panel open on the right: the card keeps to its left. */
+  .map-wrap:has(.map-panel.open) .sidebar-now { right: 464px; }
+  /* The open sheet is as tall as what it holds (up to the full height): no white block under a short list hiding the map. */
+  .map-sidebar.sidebar-overlay { height: auto; max-height: var(--sb-h); }
+  .map-sidebar.sidebar-overlay :is(.sidebar-body, .sidebar-track, .rp-steps, .rp-list) { flex: 0 1 auto; height: auto; }
 }
 
 .sidebar-empty { color: var(--ink-3); font-size: 14px; padding: 16px 4px; margin: 0; }

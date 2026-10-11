@@ -51,10 +51,11 @@ export function usePlaceRows() {
   if (rows.length && steps - 1 > prev) home(prev + 1, steps - 1 - prev);
   if (rows[0]?.run) rows.unshift({ start: 0, to: 0, moments: 0, step: full?.beats[0]?.step.id ?? null });   // every thread starts on Your computer
   let at = -1;
-  if (replay?.live) at = rows.length - 1;
-  // The row you went to, while the thread is still on its moment (several rows can share one); else the last row that
-  // starts by the cursor's step.
-  else if (picked && rows[picked.i] && picked.beat === index) at = picked.i;
+  // The row you went to, while the thread is still on its moment (several rows can share one: going to one near the
+  // end of a running thread puts it back on live, and that's still the row you picked, not the last); live, the last
+  // row; else the last row that starts by the cursor's step.
+  if (picked && rows[picked.i] && picked.beat === index) at = picked.i;
+  else if (replay?.live) at = rows.length - 1;
   else for (let i = 0; i < rows.length; i++) if (rows[i].start <= pos) at = i;
   /** Go to a row: paused (by hand), or still playing (the player's own steps). The app's cursor goes to the moment
    *  holding its step. */

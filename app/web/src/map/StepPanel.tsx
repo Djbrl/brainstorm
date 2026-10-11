@@ -47,6 +47,7 @@ export function StepPanel() {
   const shown = useLastShown(step ? { step, result: results.get(step.id) } : null);
   return (
     <div className={`map-panel pl-panel ${step ? "open" : ""}`} aria-hidden={!step} inert={!step}>
+      {shown && <button className="pl-panel-back" onClick={closeStep}><i aria-hidden="true">‹</i>Back to the steps</button>}
       {shown && <StepDetail step={shown.step} result={shown.result} onClose={closeStep} />}
     </div>
   );

@@ -217,6 +217,8 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
         return true;
       };
       const folderName = (n: GNode) => n.id.replace(/\/+$/, "").split("/").pop() ?? "";
+      // Nothing read: the header says where the agent is (its folder, and the one that holds it), or that it's the whole project.
+      let idle = { verb: "", file: "The whole project", dir: "" };
       if (read) {
         const rx = X(read.x!), ry = Y(read.y!), name = baseName(read.file?.path ?? read.id);
         if (!label(name, rx, ry + ring + 2, 11, 700, color, 1)) label(name, rx, ry - ring - 14, 11, 700, color, 1);
@@ -240,6 +242,8 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
         const busy = drawn.filter((a) => A?.get(a.id)).sort((a, b) => Number(b.active) - Number(a.active) || (Date.parse(b.ts) || 0) - (Date.parse(a.ts) || 0));
         const lead = busy.find((a) => a.id === followRef.current) ?? busy[0];
         const here = lead ? idx.m.get(A!.get(lead.id)!.file) : undefined;
+        const home = here?.dir ? here : here?.up;
+        if (home) idle = { verb: lead!.active ? "In" : "Last in", file: folderName(home), dir: folderOf(home.id.replace(/\/+$/, ""), rootsRef.current) };
         const mine = new Set<GNode>();
         let named = 0;
         for (let f = here?.dir ? here : here?.up; f && named < 2; f = f.up) {
@@ -307,10 +311,11 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
       }
       ctx.globalAlpha = 1;
 
-      // What it shows, in its header: what was read, the file (or how many), its folder. Nothing over the whole project.
-      const verb = read ? (R?.past ? "Read at this step" : `${who?.isSubagent ? `${shortName(who, 14)} read` : "Read"}`) : "";
-      const file = read ? (together.length > 1 ? `${together.length} files` : baseName(read.file?.path ?? read.id)) : "";
-      const dir = read?.file?.path ? folderOf(read.file.path, rootsRef.current) : "";
+      // What it shows, in its header: what was read, the file (or how many), its folder; with nothing read, where the
+      // agent is (an empty header looked broken).
+      const verb = read ? (R?.past ? "Read at this step" : `${who?.isSubagent ? `${shortName(who, 14)} read` : "Read"}`) : idle.verb;
+      const file = read ? (together.length > 1 ? `${together.length} files` : baseName(read.file?.path ?? read.id)) : idle.file;
+      const dir = read?.file?.path ? folderOf(read.file.path, rootsRef.current) : read ? "" : idle.dir;
       for (const [el2, text] of [[verbEl.current, verb], [fileEl.current, file], [dirEl.current, dir]] as const) {
         if (el2 && el2.textContent !== text) el2.textContent = text;
       }

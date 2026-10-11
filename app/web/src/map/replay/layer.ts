@@ -156,11 +156,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
   const cursorStep = active && !replay?.atStep ? thread!.beats[index]?.step.id ?? null : undefined;
   useEffect(() => { if (cursorStep !== undefined) replayCursor.stepId = cursorStep; });
 
-  // Land on a step id (links, Follow, switching detail) once the thread is built.
-  useEffect(() => {
-    if (!active || !replay?.atStep) return;
-    landReplay(thread!.stepBeat.get(replay.atStep) ?? 0);
-  }, [active, replay?.atStep, thread, landReplay]);
+  // Landing on a step id (links, Follow, switching detail) is App's LandStep: on every lens, before live-follow.
 
   replayCamera.fg = fg;
   replayCamera.safe = camera.current.safe;

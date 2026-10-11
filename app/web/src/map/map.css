@@ -34,6 +34,11 @@
 .pl-panel-nav button { width: 26px; height: 26px; border-radius: 50%; border: 0; background: #f0f0f3; color: var(--ink-2); font-size: 16px; line-height: 1; }
 .pl-panel-nav button:hover:not(:disabled) { background: #e7e7ec; color: var(--ink); }
 .pl-panel-nav button:disabled { opacity: .35; }
+/* Back to the thread's steps: a phone's only way out of a step (elsewhere a click away or Esc closes it). */
+.pl-panel-back { display: none; flex: none; align-items: center; gap: 6px; align-self: flex-start; margin: 14px 0 0 12px; padding: 6px 12px 6px 8px;
+  border: 0; border-radius: 999px; background: #f0f0f3; color: var(--ink-2); font: inherit; font-size: 13.5px; font-weight: 600; }
+.pl-panel-back:hover { background: #e7e7ec; color: var(--ink); }
+.pl-panel-back i { font-style: normal; font-size: 16px; line-height: 1; }
 
 /* With a side panel open beside the sidebar, the footer lines up against the panel: it never slides under it. */
 .map-wrap:has(.map-sidebar:not(.sidebar-overlay)):has(.map-panel.open) .dock { left: auto; right: 464px; transform: none; align-items: flex-end; }
@@ -44,7 +49,13 @@
 }
 @media (max-width: 600px) {
   /* Side panels fill the width, with room at the bottom for the footer that floats over them. */
-  .map-panel { width: 100%; border-left: 0; box-shadow: none; }
+  /* A step opens where the thread's sheet is (the map stays in view above it), and Back goes back to its steps. */
+  .map-panel { top: var(--pip-top, 50%); width: 100%; border-left: 0; border-top: 1px solid var(--line); border-radius: 18px 18px 0 0;
+    box-shadow: 0 -10px 30px rgba(0,0,0,.08); z-index: 12; transform: translateY(104%); }
+  .map-panel.open { transform: none; }
+  .map-wrap:has(.map-panel.open) .dock { bottom: calc(100% - var(--pip-top, 50%) + 10px); z-index: 13; }
+  .map-wrap:has(.map-panel.open) { --fade-bottom: 0px; }
+  .pl-panel-back { display: flex; }
   .map-wrap .dock { z-index: 8; } /* the footer stays over a panel, so a replay can still be driven */
   .pl-panel-nav { padding: 12px 14px 0 20px; }
   .pl-panel .sd-scroll { padding: 18px 18px 120px; }

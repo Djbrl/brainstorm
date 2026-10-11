@@ -134,6 +134,7 @@ export function PlacesView() {
       <div className={`map-panel pl-panel ${step ? "open" : ""}`} aria-hidden={!step}>
         {step && (
           <>
+            <button className="pl-panel-back" onClick={() => selectPlace(null)}><i aria-hidden="true">‹</i>Back to the places</button>
             {here.length > 1 && (
               <div className="pl-panel-nav">
                 <span>{place ? placeTitle(place) : ""}</span>

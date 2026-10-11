@@ -29,7 +29,13 @@ export function measureSafe(host: HTMLElement): Safe {
   const shown = (b: DOMRect) => b.width > 0 && b.height > 0;
   for (const el of scope.querySelectorAll(LEFT)) { const b = el.getBoundingClientRect(); if (shown(b)) left = Math.max(left, b.right - r.left + GAP); }
   // Side panels slide in with a transform: their layout width says how much they will cover once open.
-  for (const el of scope.querySelectorAll<HTMLElement>(RIGHT)) if (el.offsetWidth) right = Math.max(right, el.offsetWidth + GAP);
+  // On a phone the panel is as wide as the map and stands where the thread's sheet is (map.css): it covers the bottom.
+  let sheet = 0;
+  for (const el of scope.querySelectorAll<HTMLElement>(RIGHT)) {
+    if (!el.offsetWidth) continue;
+    if (el.offsetWidth >= w - 2) sheet = Math.max(sheet, h - el.offsetTop + GAP);
+    else right = Math.max(right, el.offsetWidth + GAP);
+  }
   // The file window (replay/Peek.tsx): the tracer and the thread's files keep to its left, never under it.
   for (const el of scope.querySelectorAll(FLOAT_RIGHT)) { const b = el.getBoundingClientRect(); if (shown(b)) right = Math.max(right, r.right - b.left + GAP); }
   // Top and bottom bands count only where they reach into the space between the side panels.
@@ -37,6 +43,7 @@ export function measureSafe(host: HTMLElement): Safe {
   const across = (b: DOMRect) => shown(b) && b.right > x0 && b.left < x1;
   for (const el of scope.querySelectorAll(TOP)) { const b = el.getBoundingClientRect(); if (across(b)) top = Math.max(top, b.bottom - r.top + GAP); }
   for (const el of scope.querySelectorAll(BOTTOM)) { const b = el.getBoundingClientRect(); if (across(b)) bottom = Math.max(bottom, r.bottom - b.top + GAP); }
+  bottom = Math.max(bottom, sheet);
   // The canvas fades out in a band at the top and bottom (map.css, --fade-top / --fade-bottom): keep framings out of it too.
   const cs = getComputedStyle(scope);
   top = Math.max(top, parseFloat(cs.getPropertyValue("--fade-top")) || 0);

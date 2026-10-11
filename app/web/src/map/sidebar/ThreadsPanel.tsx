@@ -47,7 +47,7 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
   useTick(5000);
   const now = clock();
   const { state } = useLive();
-  const { replay, hiddenAgents, toggleAgent, setHiddenAgents, startReplay, stopReplay } = useNav();
+  const { replay, hiddenAgents, toggleAgent, setHiddenAgents, startReplay } = useNav();
   const [all, setAll] = useState(false);
   // Sections you folded, remembered in this browser.
   const [closed, setClosed] = useState<ReadonlySet<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem(FOLDED_KEY) ?? "[]") as string[]); } catch { return new Set(); } });

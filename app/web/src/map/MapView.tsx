@@ -25,7 +25,7 @@ import { focusAgent, setAgentFocus, useAgentFocus } from "../lib/agentFocus";
 import { useLiveActions } from "../lib/live";
 import { useNavActions } from "../lib/nav";
 import { clearTextWidths, drawQueuedLabels, LabelSpace, type QueuedLabel } from "./labels";
-import { boxOf, useCamera, type Camera } from "./camera";
+import { useCamera, type Camera } from "./camera";
 import { useTheme } from "../lib/theme";
 import { mapStyle, settleLandings } from "./themes";
 import { clearSprites, spriteFrame } from "./sprites";
@@ -33,7 +33,7 @@ import { createRedraw, Motion } from "./redraw";
 import { css, readTokens } from "./color";
 import { hitAt, nodeReach, shownLinks, stepTween, useGraph, type GLink, type GNode } from "./graph";
 import { foldFrame, openAround, useFoldOn } from "./fold";
-import { drawFile, drawFocusLinks, drawFolderNames, FILE_LABELS_MAX, flushDots, labelFor, lookOf, moreMotion, newCaches, RIPPLE_MS, type Frame } from "./drawNode";
+import { drawFile, drawFocusLinks, drawFolderNames, FILE_LABELS_MAX, flushDots, labelFor, moreMotion, newCaches, RIPPLE_MS, type Frame } from "./drawNode";
 import { useMapCamera } from "./useMapCamera";
 import { useLiveAgents } from "./useLiveAgents";
 import { Readmap, trackable } from "./Readmap";
@@ -174,7 +174,7 @@ export function MapView() {
 
   // ---- the camera (useMapCamera.ts) ----
   const hasNodes = graph.nodes.length > 0;
-  const { followId, setFollowId, refollow, followRef, focusOnFile, applyIntent } = useMapCamera({
+  const { followId, setFollowId, refollow, followRef, focusOnFile } = useMapCamera({
     cam, camRef, nodeIndex, nodeIndexRef, replayRef, replayActive: replayLayer.active, replay, step, selected, selectedRef, setSelected,
     resolveId, anim, hasNodes, focusFile, setFocusFile, smallRef,
   });

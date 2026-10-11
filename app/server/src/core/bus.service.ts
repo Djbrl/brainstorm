@@ -10,6 +10,8 @@ export type BusEvents = {
   "files-changed": [{ root: string }];
   "turn-ended": [{ sessionId: string }];
   // a mapped file changed on disk: what it was (null: unknown, "": it didn't exist) and is (null: deleted) (mapper → listener)
+  // a map was built: the folders its .gitignore excludes (undefined: not a git repo), kept up to date in place (mapper → listener)
+  "map-rules": [{ root: string; ignoredDirs: Set<string> | undefined }];
   "file-content": [{ path: string; before: string | null; after: string | null; at: number }];         // an agent finished its turn, from its log (listener → attention)           // the mapper saw files change in the project (mapper → git)
 };
 

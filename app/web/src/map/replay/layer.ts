@@ -130,7 +130,7 @@ function isTyping(t: EventTarget | null) {
   return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable;
 }
 
-export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera, liveShown }: {
+export function useReplayLayer({ fg, nodeIndexRef, accent, font, camera, liveShown }: {
   fg: RefObject<ForceGraphMethods | undefined>;
   wrapRef: RefObject<HTMLDivElement | null>;
   nodeIndexRef: RefObject<Map<string, NodePos>>;

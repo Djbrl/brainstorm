@@ -81,12 +81,6 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     return [...this.agents.values()].sort((a, b) => b.ts.localeCompare(a.ts));
   }
 
-  private inWorkspace(p: string | undefined): p is string {
-    if (!p || !isAbsolute(p)) return false;
-    const root = this.cfg.defaultRoot.replace(/\/+$/, "");
-    return p === root || p.startsWith(root + "/");
-  }
-
   /** A file the map can put an agent on: any real file. The open project's are on the map; any other is on an island
    *  beside it (lib/islands.ts): another project, the temporary files, Claude Code's own folder, the rest of the computer.
    *  It used to leave out the hidden and system folders, and an agent working only there (a reviewer writing its

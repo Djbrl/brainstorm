@@ -1,7 +1,7 @@
 // When each mapped file was last committed, from `git log --name-only`, read as a stream in the background.
 // It stops as soon as every wanted file has a time, and in any case after `maxCommits` commits or `timeoutMs`,
 // so a repo with a long history never blocks the server or fills memory.
-import { execFileSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { gitEnvOrThrow } from "../core/git-safety";
 
 export type GitTimesOptions = { maxCommits?: number; timeoutMs?: number };

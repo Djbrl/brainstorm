@@ -135,7 +135,9 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   private sources: LogSource[] = [];
   private codex?: CodexSource;
   /** Files changed through shell commands, made edits of their thread (command-edits.ts). */
-  private commandEdits = new CommandEdits((p) => this.isWithinRoot(p), () => this.activeRoot);
+  /** Each built map's .gitignore folders (see the bus's "map-rules"), so command edits follow the map's rules. */
+  private mapRules = new Map<string, Set<string> | undefined>();
+  private commandEdits = new CommandEdits((p) => this.isWithinRoot(p), () => this.activeRoot, () => (this.activeRoot ? this.mapRules.get(this.activeRoot) : undefined));
   /** Live command edits waiting for the mapper to see their files change, each with how to store them at once
    * (without a diff) if the server stops first. */
   private commandTimers = new Map<NodeJS.Timeout, () => void>();
@@ -251,6 +253,11 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     this.setRoot(this.cfg.defaultRoot);
     this.bus.on("workspace", ({ root }) => this.onWorkspaceChanged(root));
     this.bus.on("file-content", (c) => this.commandEdits.fileChanged(c));
+    this.bus.on("map-rules", ({ root, ignoredDirs }) => {
+      this.mapRules.delete(root);
+      this.mapRules.set(root, ignoredDirs);
+      if (this.mapRules.size > 8) this.mapRules.delete(this.mapRules.keys().next().value!);
+    });
 
     let waiting = this.sources.length;
     for (const source of this.sources) {
@@ -749,7 +756,8 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     this.retryTimers.set(file, t);
   }
 
-  private saveOffset(file: string, offset: number) {
+  /** Sets where reading a log resumes (tests use it to replay a restart mid-file). */
+  saveOffset(file: string, offset: number) {
     this.st.saveOffset.run(file, offset, null, null);
     this.setOffset(file, offset);
     this.idents.delete(file);

@@ -19,7 +19,7 @@
 // (layout, path resolvers, the file tree) key memos on `state.structureVersion` instead.
 import { installSetupShim, startAgentPlayback } from "./preview";
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
-import type { AgentPresence, Attention, AskRequest, AskResponse, Edge, FileNode, Harness, SetupStatus, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
+import type { AgentPresence, Attention, AskRequest, AskResponse, Edge, Harness, SetupStatus, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
 import { harnessOf, withHarness } from "./harness";
 import { listeners, shallowEqual, useStoreSelector } from "./store";
 

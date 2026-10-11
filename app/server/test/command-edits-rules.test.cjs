@@ -72,3 +72,9 @@ test("ignored folders and folder deletes give no edits", () => {
   assert.deepEqual(run(ce, "rm src/old.ts", { live: false }), ["src/old.ts"]);
   assert.deepEqual(run(ce, "rm -rf node_modules && npm install", { live: false }), []);
 });
+
+test("in a git repo the map's .gitignore rules decide which folders are left out", () => {
+  const git = new CommandEdits((p) => p.startsWith(ROOT), () => ROOT, () => new Set(["gen"]));
+  assert.deepEqual(run(git, "echo x > build/a.ts && echo x > gen/b.ts", { live: false }), ["build/a.ts"], "build shows unless .gitignore excludes it");
+  assert.deepEqual(run(make(), "echo x > build/a.ts && echo x > gen/b.ts", { live: false }), ["gen/b.ts"], "outside git, build is left out by name");
+});

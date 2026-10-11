@@ -22,7 +22,7 @@ export const LOCKFILES = new Set(["package-lock.json", "yarn.lock", "pnpm-lock.y
 /** Code, styles and docs. Widened 6 Oct 2026 (Vue, Svelte, Swift, Kotlin, Ruby, PHP, C-family...): a Nuxt or iOS project's
  * main files were missing from its map. Imports are read for JS/TS only. */
 export const SOURCE_EXT = new Set([
-  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py", ".go", ".rs", ".java", ".md", ".json", ".css", ".html",
+  ".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs", ".py", ".go", ".rs", ".java", ".md", ".json", ".css", ".html",
   ".vue", ".svelte", ".astro", ".scss", ".sass", ".less", ".swift", ".kt", ".kts", ".rb", ".php", ".c", ".h", ".cc", ".cpp",
   ".hpp", ".cs", ".m", ".mm", ".dart", ".scala", ".ex", ".exs", ".lua", ".sh", ".sql",
   // More C and C++ (CUDA, Arduino, inline headers), other languages, build and config files (6 Oct 2026).
@@ -93,6 +93,12 @@ export function inIgnoredFolder(rel: string, folders: Set<string> | undefined): 
   for (let i = 1; i <= p.length; i++) if (folders.has(p.slice(0, i).join("/"))) return true;
   return false;
 }
+
+/** The map's rule for a folder or watcher path: in a git repo (`ignoredDirs` set, the folders .gitignore excludes)
+ * git's own rules, else the ignored names. */
+export const skippedRel = (rel: string, ignoredDirs?: Set<string>) => (ignoredDirs ? isInIgnoredDir(rel, true) || inIgnoredFolder(rel, ignoredDirs) : isInIgnoredDir(rel));
+/** The map's rule for a file, the same way. */
+export const mappableRel = (rel: string, ignoredDirs?: Set<string>) => (ignoredDirs ? isMappableRel(rel, true) && !inIgnoredFolder(rel, ignoredDirs) : isMappableRel(rel));
 
 /** The map's module for a file: its first two folders ("packages/web"), or "." at the root. Either separator. */
 export function moduleOf(rel: string): string {

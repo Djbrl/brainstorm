@@ -6,7 +6,6 @@
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { useLive } from "../lib/live";
 import { useNav, useReplayCursor } from "../lib/nav";
-import { useThread } from "../lib/thread";
 import { initial } from "../map/agents";
 import { MapSidebar } from "../map/sidebar/MapSidebar";
 import { LensSwitch } from "../map/LensSwitch";

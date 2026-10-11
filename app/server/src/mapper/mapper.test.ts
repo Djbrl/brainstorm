@@ -48,6 +48,8 @@ test("ignored folders: dot folders, dependencies, build output, caches", () => {
 test("mappable files: source extensions outside ignored folders, no lockfiles", () => {
   assert.equal(isMappableRel("src/a.ts"), true);
   assert.equal(isMappableRel("README.md"), true);
+  assert.equal(isMappableRel("src/vite.config.mts"), true); // ES module and CommonJS TypeScript
+  assert.equal(isMappableRel("src/b.cts"), true);
   assert.equal(isMappableRel(".eslintrc.json"), true); // a dot file is fine, a dot folder isn't
   assert.equal(isMappableRel("src\\win\\b.tsx"), true);
   assert.equal(isMappableRel("node_modules/x/index.js"), false);

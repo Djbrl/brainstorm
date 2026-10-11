@@ -4,8 +4,6 @@
 // the camera recenters itself, "Every step" is under the step list.
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useNav, useNavState, type ReplaySpeed } from "../../lib/nav";
-import { isReplay, useLive } from "../../lib/live";
-import { track } from "../../lib/usage";
 import { useThread, type Thread } from "../../lib/thread";
 import { chaptersOf } from "../../lib/chapters";
 import { togglePlay } from "./layer";

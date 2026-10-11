@@ -9,7 +9,7 @@
 import { statSync } from "node:fs";
 import { basename, relative, resolve, sep } from "node:path";
 import type { Step } from "../types";
-import { isInIgnoredDir, isMappableRel } from "../mapper/ignore";
+import { mappableRel, skippedRel } from "../mapper/ignore";
 import { MAX_PARSE_BYTES } from "../mapper/read-file";
 import { commandWrites, shellArgv } from "./command-writes";
 import { lineHunks } from "./line-diff";
@@ -38,8 +38,10 @@ export class CommandEdits {
   private changes: Change[] = [];
 
   /** `inProject`: whether a path is part of the open project (writes elsewhere, like /tmp, aren't the project's).
-   * `root`: the open project's folder (to tell the folders the map ignores, and what it can show). */
-  constructor(private inProject: (path: string) => boolean, private root: () => string | null = () => null) {}
+   * `root`: the open project's folder (to tell the folders the map ignores, and what it can show).
+   * `ignoredDirs`: in a git repo, the folders its .gitignore excludes (the map's rules); undefined: the map's names. */
+  constructor(private inProject: (path: string) => boolean, private root: () => string | null = () => null,
+    private ignoredDirs: () => Set<string> | undefined = () => undefined) {}
 
   /** A change on disk, from the mapper. */
   fileChanged(c: Change) {
@@ -91,8 +93,10 @@ export class CommandEdits {
     const writes = new Map<string, { kind: "write" | "delete"; from?: string }>();
     const root = this.root();
     const rel = (p: string) => (root ? relative(root, p) : "");
-    // Not the map's: inside a folder it ignores (node_modules, dist, dot folders), or a folder itself.
-    const ignored = (p: string) => !!root && isInIgnoredDir(rel(p));
+    const git = this.ignoredDirs();
+    const mappable = (p: string) => mappableRel(rel(p), git);
+    // Not the map's: inside a folder it ignores (.gitignore's in a git repo; else node_modules, dist, dot folders), or a folder itself.
+    const ignored = (p: string) => !!root && skippedRel(rel(p), git);
     for (const w of commandWrites(call.command, call.cwd)) {
       const p = resolve(w.path);
       if (this.inProject(p) && !insideGit(p) && !ignored(p)) writes.set(p, { kind: w.kind, ...(w.from ? { from: w.from } : {}) });
@@ -126,10 +130,10 @@ export class CommandEdits {
       if (live && !ch && root) {
         // The mapper saw nothing change. For a file it follows, that means nothing did (`touch`, a `sed -i` that matched
         // nothing, a copy of the same content): no edit. A folder removed, or a file the map can't show, stays unknown.
-        if (w.kind === "write" && unchangedOnDisk(path, rel(path))) continue;
-        if (w.kind === "delete" && !isMappableRel(rel(path))) continue;
+        if (w.kind === "write" && mappable(path) && unchangedOnDisk(path)) continue;
+        if (w.kind === "delete" && !mappable(path)) continue;
       }
-      if (!live && w.kind === "delete" && root && !isMappableRel(rel(path))) continue; // `rm -rf src/old`: a folder, not a file
+      if (!live && w.kind === "delete" && root && !mappable(path)) continue; // `rm -rf src/old`: a folder, not a file
       const id = `${call.id}:wrote:${k++}`;
       const created = ch ? ch.before === "" : false;
       const deleted = w.kind === "delete" || (ch !== undefined && ch.after === null);
@@ -163,9 +167,8 @@ function namedBy(path: string, words: string[]): boolean {
   return words.some((w) => w === base || (w.includes("/") && (w === path || path.endsWith("/" + w.replace(/^\.\//, "")))));
 }
 
-/** A file the map follows (a source file up to the size it reads) that is on disk: if no change was seen, none happened. */
-function unchangedOnDisk(path: string, rel: string): boolean {
-  if (!isMappableRel(rel)) return false;
+/** A file on disk, up to the size the map reads: if the mapper saw no change, none happened. */
+function unchangedOnDisk(path: string): boolean {
   try { const st = statSync(path); return st.isFile() && st.size <= MAX_PARSE_BYTES; } catch { return false; }
 }
 

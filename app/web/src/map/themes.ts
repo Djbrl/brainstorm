@@ -351,7 +351,6 @@ export function octagonPath(ctx: CanvasRenderingContext2D, x: number, y: number,
  * white, ringed in its colour, the letter in its colour, like an RER line's roundel.
  */
 export function drawMarker(ctx: CanvasRenderingContext2D, x: number, y: number, R: number, color: string, text: string, fontPx: number, family: string, scale: number, st = mapStyle()) {
-  const rgb = toRGB(color);
   ctx.save();
   if (st.marker === "badge") {
     ctx.shadowColor = "rgba(60,40,0,0.18)"; ctx.shadowBlur = 5; ctx.shadowOffsetY = 1;
@@ -372,11 +371,6 @@ export function drawMarker(ctx: CanvasRenderingContext2D, x: number, y: number, 
   ctx.restore();
 }
 
-const mix = (a: RGB, b: RGB, k: number): RGB => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k].map(Math.round) as RGB;
-const toRGB = (c: string): RGB => {
-  if (c.startsWith("#")) { const h = c.slice(1), n = parseInt(h.length === 3 ? h.split("").map((x) => x + x).join("") : h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
-  return ((c.match(/\d+/g) ?? ["0", "0", "0"]).slice(0, 3).map(Number)) as RGB;
-};
 
 /** Files a marker just landed on (Prism: the cube spins up and flashes). Set by the agent and replay layers, read by the map. */
 export const landings = new Map<string, number>();
@@ -390,7 +384,7 @@ export function settleLandings(now = performance.now()) {
  * The trip itself, drawn under the marker while it travels (p: 0..1 of the trip, e: the eased position on it).
  * Prism: fading afterimages of the marker along the arc behind it.
  */
-export function drawTrip(ctx: CanvasRenderingContext2D, route: MapStyle["route"], pts: Pt2[], p: number, e: number, color: string, r: number, alpha: number, scale: number) {
+export function drawTrip(ctx: CanvasRenderingContext2D, route: MapStyle["route"], pts: Pt2[], p: number, e: number, color: string, r: number, alpha: number, _scale: number) {
   if (p >= 1) return;
   ctx.save();
   if (route === "hop") {

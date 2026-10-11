@@ -9,14 +9,14 @@ import { EventsGateway } from "../core/events.gateway";
 import { ConfigService } from "../core/config.service";
 import { DbService } from "../core/db.service";
 import { formerRoots } from "../listener/moved";
-import { inIgnoredFolder, isInIgnoredDir, liveHeadroom, maxFiles, isMappableRel, moduleOf } from "./ignore";
+import { liveHeadroom, maxFiles, mappableRel, moduleOf, skippedRel } from "./ignore";
 import { type Listing, gitIgnored, listFolder, listProjectFiles } from "./list-files";
 import { type Signals, scoreFrom, selectFiles } from "./select";
 import { gitLastCommitTimes } from "./git-times";
 import { readMapped } from "./read-file";
 import { Batcher, ProjectWatcher, foldersToWatch } from "./watch";
 
-const JS_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
+const JS_EXT = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]);
 /** Components whose <script> imports like JavaScript does. */
 const COMPONENT_EXT = new Set([".vue", ".svelte", ".astro"]);
 /** C and C++ (and CUDA, Arduino): their `#include`s. */
@@ -146,8 +146,7 @@ const TS_EXT = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".
 const COMPILED_TO_SOURCE: Record<string, string[]> = { ".js": [".ts", ".tsx"], ".jsx": [".tsx"], ".mjs": [".mts"], ".cjs": [".cts"] };
 
 /** The map's ignore rule for a project: a git repo's .gitignore'd folders (plus .git and caches), else the name list. */
-const skipped = (rel: string, ignoredDirs?: Set<string>) => (ignoredDirs ? isInIgnoredDir(rel, true) || inIgnoredFolder(rel, ignoredDirs) : isInIgnoredDir(rel));
-const mappable = (rel: string, ignoredDirs?: Set<string>) => (ignoredDirs ? isMappableRel(rel, true) && !inIgnoredFolder(rel, ignoredDirs) : isMappableRel(rel));
+const skipped = skippedRel, mappable = mappableRel;
 
 const sameSet = (a: Set<string> | undefined, b: Set<string>) => !!a && a.size === b.size && [...a].every((x) => b.has(x));
 
@@ -372,6 +371,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
   private remember(abs: string, c: Cached) {
     this.cache.delete(abs);
     this.cache.set(abs, c);
+    this.bus.emit("map-rules", { root: abs, ignoredDirs: c.ignoredDirs });
     for (const key of this.cache.keys()) {
       if (this.cache.size <= MAX_ROOTS) break;
       if (key === abs || key === this.activeRoot) continue;

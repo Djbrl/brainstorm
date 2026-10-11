@@ -7,6 +7,7 @@ import { EventsGateway } from "../core/events.gateway";
 import { safely } from "../core/safely";
 import { ListenerService } from "../listener/listener.service";
 import { isErrorResult } from "../shared/failed";
+import { CallPairer } from "../shared/pairing";
 import { maskSecrets } from "../privacy/mask";
 
 // Does a thread need you? Worked out from the log (calls with no result, failures in a row, a finished
@@ -53,7 +54,7 @@ export type HookSignal = {
 type Tracker = {
   lastTs: number;
   lastMain?: Step;                 // last main-thread step that isn't a tool result
-  pending: Map<string, Step>;      // calls waiting for a result, by tool_use id (or step id for old steps)
+  pending: CallPairer;             // calls waiting for a result
   streak: { tool: string; n: number; error: string; stepId: string } | null;
   hook?: HookSignal & { at: number };
 };
@@ -164,7 +165,7 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
   private tracker(sid: string): Tracker {
     let t = this.trackers.get(sid);
     if (t) return t;
-    t = { lastTs: 0, pending: new Map(), streak: null };
+    t = { lastTs: 0, pending: new CallPairer(), streak: null };
     this.trackers.set(sid, t);
     // Catch up from the stored log (the bus only carries live steps): the recent tail is enough, oldest first.
     const rows = this.q.tail.all(sid, CATCH_UP) as TailRow[];
@@ -174,7 +175,7 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
     if (h) {
       this.saved.delete(sid);
       const moved = (Date.parse(t.lastMain?.ts ?? "") || 0) > h.at + (h.event === "PermissionRequest" ? 1000 : 0);
-      const answered = h.event === "PermissionRequest" && !!h.tool_use_id && !t.pending.has(h.tool_use_id) && rows.some((r) => r.tool_use_id === h.tool_use_id);
+      const answered = h.event === "PermissionRequest" && !!h.tool_use_id && !t.pending.get(h.tool_use_id) && rows.some((r) => r.tool_use_id === h.tool_use_id);
       if (!moved && !answered) t.hook = h;
     }
     return t;
@@ -194,12 +195,9 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
 
   private apply(t: Tracker, s: Step) {
     t.lastTs = Math.max(t.lastTs, Date.parse(s.ts) || 0);
-    const key = s.toolUseId ?? s.id;
-    if (s.kind === "tool_call" || s.kind === "edit") t.pending.set(key, s);
+    if (s.kind === "tool_call" || s.kind === "edit") t.pending.call(s);
     if (s.kind === "tool_result") {
-      const call = s.toolUseId ? t.pending.get(s.toolUseId) : undefined;
-      if (s.toolUseId) t.pending.delete(s.toolUseId);
-      else { const first = [...t.pending.entries()].find(([, c]) => !!c.isSubagent === !!s.isSubagent); if (first) t.pending.delete(first[0]); }
+      const call = t.pending.result(s);
       if (t.hook?.event === "PermissionRequest" && t.hook.tool_use_id && t.hook.tool_use_id === s.toolUseId) t.hook = undefined;
       if (!s.isSubagent) {
         const tool = call?.tool ?? "a tool";
@@ -229,7 +227,7 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
     const since = (ms: number) => new Date(ms || now).toISOString();
     const base = { sessionId: sid };
     const quiet = now - t.lastTs;
-    const pending = [...t.pending.values()].sort((a, b) => a.ts.localeCompare(b.ts));
+    const pending = t.pending.pending().sort((a, b) => a.ts.localeCompare(b.ts));
     const about = (c: Step | undefined): Partial<Attention> => c ? { tool: c.tool ?? (c.kind === "edit" ? "Edit" : undefined), detail: describe(c.tool, c.input), stepId: c.id, ...(c.agentId ? { agentId: c.agentId } : {}) } : {};
     const make = (state: AttentionState, sure: boolean, at: number, extra: Partial<Attention> = {}): Attention => ({ ...base, state, sure, since: since(at), ...extra });
 
@@ -320,7 +318,7 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
   private prune(now: number, recent: Set<string>) {
     for (const [sid, t] of this.trackers) {
       if (recent.has(sid) || now - Math.max(t.lastTs, t.hook?.at ?? 0) <= FORGET_MS) continue;
-      if ([...t.pending.values()].some((c) => ASKS.has(c.tool ?? "") || PLANS.has(c.tool ?? ""))) continue;
+      if (t.pending.pending().some((c) => ASKS.has(c.tool ?? "") || PLANS.has(c.tool ?? ""))) continue;
       const a = this.last.get(sid);
       if (a && a.state !== "idle") this.gateway.broadcast({ type: "attention", attention: { sessionId: sid, state: "idle", sure: true, since: new Date(t.lastTs || now).toISOString() } });
       this.trackers.delete(sid);

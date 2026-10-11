@@ -11,7 +11,7 @@ import { useLive } from "./live";
 import { isVisible } from "../follow/format";
 import { BREAK_MS, stepTime, worked } from "./chapters";
 import { actionOf, onlyRelabelled } from "./thread";
-import { CallPairer } from "./pairing";
+import { CallPairer } from "@shared/pairing";
 import { repoBase, repoRelative } from "./paths";
 
 /** "1 step", "962 steps", "1,204 files". */

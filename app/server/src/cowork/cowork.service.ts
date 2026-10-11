@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { DbService } from "../core/db.service";
 import { stepsVersion, workSteps } from "../core/work-steps";
 import { ListenerService } from "../listener/listener.service";
-import { CallPairer } from "../listener/pairing";
+import { CallPairer } from "../shared/pairing";
 import type { CoworkArea, CoworkEvent, CoworkPage, CoworkSite, CoworkSummary, Step } from "../shared/contract";
 import { CODE_TOOLS, CoworkTracker } from "./classify";
 

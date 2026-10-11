@@ -46,7 +46,7 @@ test("catch-up reads the newest 600 steps, oldest first", () => {
   }
   store({ sessionId: "a", kind: "text", text: "Done.", ts: iso(10_000) });
   const t = (att as any).tracker("a");
-  assert.equal(t.pending.size, 0);
+  assert.equal(t.pending.pending().length, 0);
   assert.equal(t.lastMain.kind, "text");
   assert.equal(att.list()[0]?.state, "done");
 });

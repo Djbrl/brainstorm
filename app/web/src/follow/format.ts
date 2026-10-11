@@ -1,7 +1,7 @@
 // Display helpers for steps and sessions.
 import { clock } from "../lib/live";
 import type { Step } from "@contract";
-import { CallPairer } from "../lib/pairing";
+import { CallPairer } from "@shared/pairing";
 import { commandLabel, toolLabel } from "@shared/labels";
 import { parsePrompt } from "./prompt";
 

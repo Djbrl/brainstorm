@@ -2,7 +2,7 @@ import { relative } from "node:path";
 import type { ProjectMap, Session, Step } from "../shared/contract";
 import { isErrorResult } from "../shared/failed";
 import { groupFailed } from "./failure-text";
-import { CallPairer } from "../listener/pairing";
+import { CallPairer } from "../shared/pairing";
 import { promptTitle } from "../listener/listener.service";
 
 const oneLine = (s: string, n: number) => { const t = s.replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1) + "…" : t; };

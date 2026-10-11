@@ -13,7 +13,7 @@
 //   --project DIR  the project (default: CLAUDE_PROJECT_DIR, then the current folder)
 //   --stop         stop the running server
 //   --share        save a thread as a replay file (.html) and a summary (.md), in Downloads: the thread named by
-//                  --session ID, else the project's newest one
+//                  --session ID (never another one)
 // It always exits 0 and prints any problem on stdout, so a skill can run it as one plain command.
 // RUNDOWN_PORT: the first port to try (default 4747).
 import { execFileSync, spawn } from "node:child_process";
@@ -397,10 +397,19 @@ async function share(port) {
   mkdirSync(dir, { recursive: true });
   const get = async (path, id) => fetch(`http://127.0.0.1:${port}${path}${id ? `?sessionId=${encodeURIComponent(id)}` : ""}`);
   const saved = [];
+  // No id, or one the skill couldn't fill in: never guess another thread.
+  if (!sid || sid.includes("$")) return say("Couldn't save the replay: Claude Code didn't say which thread this is. Run /rundown:open and use Share in the thread instead.");
   for (const path of ["/api/share", "/api/export.md"]) {
-    // A session id the skill couldn't fill in (or one Rundown hasn't read yet) falls back to the newest thread.
-    let r = await get(path, sid && !sid.includes("$") ? sid : undefined);
-    if (r.status === 404 && sid) r = await get(path);
+    // A thread Rundown hasn't read yet (it just started): wait for it a little, never fall back to another thread.
+    let r;
+    const deadline = Date.now() + 8_000;
+    for (;;) {
+      r = await get(path, sid).catch(() => null);
+      if (r?.status !== 404 || Date.now() >= deadline) break;
+      await sleep(500);
+    }
+    if (!r) return say("Couldn't save the replay: Rundown didn't answer.");
+    if (r.status === 404) return say(`Couldn't save the replay: Rundown couldn't find this thread (${sid}). Try again in a moment, or run /rundown:open and use Share in the thread.`);
     if (!r.ok) return say(`Couldn't save the replay: ${await r.text()}`);
     // Only a plain file name, in that folder: never a path the answer names ("../.zshrc").
     const ext = path.endsWith(".md") ? ".md" : ".html";

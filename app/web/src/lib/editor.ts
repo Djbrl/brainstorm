@@ -2,6 +2,7 @@
 // its own link (vscode://file/…; nothing goes through Rundown's server), or whatever app the computer uses for that
 // kind of file (the server opens it: server/src/open). Remembered per browser, like the map's prefs.
 import { useSyncExternalStore } from "react";
+import { post } from "./api";
 
 export type Editor = "vscode" | "cursor" | "windsurf" | "zed" | "system";
 export const EDITORS: { id: Editor; name: string }[] = [
@@ -31,5 +32,5 @@ export function editorLink(e: Editor, path: string, line?: number): string | nul
 export function openInEditor(e: Editor, path: string, line?: number) {
   const link = editorLink(e, path, line);
   if (link) { location.href = link; return; }
-  void fetch("/api/open", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path }) });
+  post("/api/open", { path }).catch(() => { /* the server can't open it: nothing to do */ });
 }

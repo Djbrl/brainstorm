@@ -7,6 +7,7 @@ import { clock, useLiveActions } from "../lib/live";
 import { useNavActions } from "../lib/nav";
 import { enterProject } from "../lib/switcher";
 import { relTime } from "../follow/format";
+import { get } from "../lib/api";
 
 const SHOWN = 8;
 
@@ -21,7 +22,7 @@ export function WorkspaceMenu({ project, root, onAll }: { project: string; root:
   // Asked each time it opens: the list moves with your agents.
   useEffect(() => {
     if (!open) return;
-    fetch("/api/workspace/suggestions").then((r) => (r.ok ? r.json() : [])).then((l) => setList(Array.isArray(l) ? l : [])).catch(() => setList([]));
+    get<WorkspaceSuggestion[]>("/api/workspace/suggestions").then((l) => setList(Array.isArray(l) ? l : []), () => setList([]));
     const onDown = (e: PointerEvent) => { const t = e.target as Node; if (!box.current?.contains(t) && !pop.current?.contains(t)) setOpen(false); };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setOpen(false); return; }

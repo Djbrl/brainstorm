@@ -11,6 +11,7 @@ import { placeName } from "../../lib/islands";
 
 const modName = (m: string) => (!m || m === "." ? "root" : m);
 import { basename as baseName } from "@shared/text";
+import { post } from "../../lib/api";
 
 /** "changed just now" (under 45 s), "changed 5 min ago", "changed 3 h ago", "changed 2 days ago" (rounded). */
 function changedAgo(iso: string | undefined, now: number): string {
@@ -114,7 +115,7 @@ function Touching({ steps, file, now }: { steps: Step[]; file: FileNode; now: nu
 
 const REVEAL = /Mac/.test(navigator.platform) ? "Show in Finder" : /Win/.test(navigator.platform) ? "Show in Explorer" : "Show in its folder";
 const reveal = (path: string) => {
-  fetch("/api/reveal", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path }) })
+  post("/api/reveal", { path })
     .catch(() => { /* the server can't reach it: nothing to do */ });
 };
 /** Which island the file is on, in words ("Temporary files", "skindiff"). */

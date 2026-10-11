@@ -2,6 +2,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { CoworkArea, CoworkEvent, CoworkSummary, CoworkVerb } from "@contract";
 import { isReplay, replayCowork } from "../lib/live";
+import { get } from "../lib/api";
 
 /** The places of one thread (its subagents included). Refreshes while the thread is running. */
 export function useCowork(sessionId: string | null, running: boolean, loaded = true) {
@@ -15,9 +16,8 @@ export function useCowork(sessionId: string | null, running: boolean, loaded = t
       return;
     }
     let stop = false;
-    const load = () => fetch(`/api/cowork?sessionId=${encodeURIComponent(sessionId)}`)
-      .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
-      .then((d: CoworkSummary) => { if (!stop) { setData(d); setError(false); } }).catch(() => !stop && setError(true));
+    const load = () => get<CoworkSummary>(`/api/cowork?sessionId=${encodeURIComponent(sessionId)}`)
+      .then((d) => { if (!stop) { setData(d); setError(false); } }).catch(() => !stop && setError(true));
     load();
     // While it runs: again every 8 s, but not while the tab is hidden (once more when it shows again).
     const t = running ? setInterval(() => { if (document.visibilityState === "visible") load(); }, 8000) : undefined;

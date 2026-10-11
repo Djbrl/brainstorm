@@ -4,16 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import type { UpdatesStatus, UsageStatus } from "@contract";
 import { isReplay } from "./live";
 import { getTheme } from "./theme";
+import { get, post, put } from "./api";
 
 type WebEvent = "op" | "th" | "rp" | "lv";
 
 /** One use: app opened (with the theme in use), thread opened, replay played, live follow. Fire and forget. */
 export function track(name: WebEvent) {
   if (isReplay()) return;
-  fetch("/api/usage/event", {
-    method: "POST", headers: { "content-type": "application/json" }, keepalive: true,
-    body: JSON.stringify(name === "op" ? { name, theme: getTheme() } : { name }),
-  }).catch(() => { /* offline or an older server: nothing to do */ });
+  post("/api/usage/event", name === "op" ? { name, theme: getTheme() } : { name }, { keepalive: true }).catch(() => { /* offline or an older server: nothing to do */ });
 }
 
 export type { UsageStatus, UpdatesStatus };
@@ -21,24 +19,21 @@ export type { UsageStatus, UpdatesStatus };
 /** Where the site says exactly what's sent, how long it's kept and how to have it deleted. */
 export const PRIVACY_URL = "https://brainstorm-landing.vercel.app/privacy.html#usage-stats";
 
-const put = (enabled: boolean) => fetch("/api/usage", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled }) })
-  .then((r) => (r.ok ? (r.json() as Promise<UsageStatus>) : null));
 
 /** The setting: off until the person says yes (the app asks once), and off again with one click. */
 export function useUsageSetting() {
   const [status, setStatus] = useState<UsageStatus | null>(null);
   useEffect(() => {
     if (isReplay()) return;
-    fetch("/api/usage").then((r) => (r.ok ? r.json() : null)).then(setStatus).catch(() => setStatus(null));
+    get<UsageStatus>("/api/usage").then(setStatus, () => setStatus(null));
   }, []);
   const set = useCallback((enabled: boolean) => {
-    put(enabled).then((s) => s && setStatus(s)).catch(() => { /* keep what's shown */ });
+    put<UsageStatus>("/api/usage", { enabled }).then(setStatus).catch(() => { /* keep what's shown */ });
   }, []);
   const toggle = useCallback(() => { if (status) set(!status.enabled); }, [status, set]);
   /** Ask the site to delete every report sent from this install. Resolves to whether it worked. */
-  const forget = useCallback(() => fetch("/api/usage/forget", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })
-    .then((r) => (r.ok ? r.json() : null))
-    .then((r: { status: UsageStatus; deleted: boolean } | null) => { if (r) setStatus(r.status); return !!r?.deleted; })
+  const forget = useCallback(() => post<{ status: UsageStatus; deleted: boolean }>("/api/usage/forget")
+    .then((r) => { setStatus(r.status); return !!r.deleted; })
     .catch(() => false), []);
   return { status, set, toggle, forget };
 }
@@ -48,12 +43,11 @@ export function useUpdatesSetting() {
   const [status, setStatus] = useState<UpdatesStatus | null>(null);
   useEffect(() => {
     if (isReplay()) return;
-    fetch("/api/updates").then((r) => (r.ok ? r.json() : null)).then(setStatus).catch(() => setStatus(null));
+    get<UpdatesStatus>("/api/updates").then(setStatus, () => setStatus(null));
   }, []);
   const toggle = useCallback(() => {
     if (!status) return;
-    fetch("/api/updates", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled: !status.enabled }) })
-      .then((r) => (r.ok ? (r.json() as Promise<UpdatesStatus>) : null)).then((s) => s && setStatus(s)).catch(() => { /* keep what's shown */ });
+    put<UpdatesStatus>("/api/updates", { enabled: !status.enabled }).then(setStatus).catch(() => { /* keep what's shown */ });
   }, [status]);
   return { status, toggle };
 }

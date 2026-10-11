@@ -10,6 +10,7 @@ import type { AgentPresence, FileNode, ProjectMap, Session, Step } from "@contra
 import { outOfWorktree } from "@shared/paths";
 import { isReplay } from "./live";
 import { repoBase, repoRelative } from "./paths";
+import { get } from "./api";
 
 export type Island = {
   root: string; name: string; files: FileNode[];
@@ -73,8 +74,8 @@ const subs = new Set<() => void>();
 function loadRoots() {
   if (asked || isReplay()) return;
   asked = true;
-  fetch("/api/workspace/suggestions").then((r) => r.json())
-    .then((list: { root: string }[]) => { roots = list.map((s) => s.root.replace(/\/+$/, "")).sort((a, b) => b.length - a.length); subs.forEach((f) => f()); })
+  get<{ root: string }[]>("/api/workspace/suggestions")
+    .then((list) => { roots = list.map((s) => s.root.replace(/\/+$/, "")).sort((a, b) => b.length - a.length); subs.forEach((f) => f()); })
     .catch(() => { roots = []; });
 }
 const useRoots = () => {

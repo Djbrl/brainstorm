@@ -22,6 +22,7 @@ import { createContext, useContext, useEffect, useMemo, useState, useSyncExterna
 import type { AgentPresence, Attention, AskRequest, AskResponse, Edge, Harness, LiveToken, SetupStatus, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
 import { harnessOf, withHarness } from "./harness";
 import { listeners, shallowEqual, useStoreSelector } from "./store";
+import { get } from "./api";
 
 export { shallowEqual };
 
@@ -313,8 +314,8 @@ export function createLiveStore(start: LiveState = initial): LiveStore {
     if (isReplay() || loading.has(sessionId)) return;
     loading.add(sessionId);
     const gen = generation;
-    fetch(`/api/sessions/${encodeURIComponent(sessionId)}/steps`).then((r) => r.json())
-      .then((steps: Step[]) => { if (gen === generation && Array.isArray(steps)) dispatch({ type: "steps", sessionId, steps }); })
+    get<Step[]>(`/api/sessions/${encodeURIComponent(sessionId)}/steps`)
+      .then((steps) => { if (gen === generation && Array.isArray(steps)) dispatch({ type: "steps", sessionId, steps }); })
       .catch(() => {})
       .finally(() => {
         if (gen !== generation) return;
@@ -329,8 +330,8 @@ export function createLiveStore(start: LiveState = initial): LiveStore {
     if (catching.has(sessionId)) { catching.set(sessionId, true); return; }
     catching.set(sessionId, false);
     const gen = generation;
-    fetch(`/api/sessions/${encodeURIComponent(sessionId)}/steps?afterSeq=${ix.through.get(sessionId) ?? -1}`).then((r) => r.json())
-      .then((steps: Step[]) => { if (gen === generation && Array.isArray(steps) && steps.length) dispatch({ type: "steps-more", sessionId, steps }); })
+    get<Step[]>(`/api/sessions/${encodeURIComponent(sessionId)}/steps?afterSeq=${ix.through.get(sessionId) ?? -1}`)
+      .then((steps) => { if (gen === generation && Array.isArray(steps) && steps.length) dispatch({ type: "steps-more", sessionId, steps }); })
       .catch(() => {})
       .finally(() => {
         if (gen !== generation) return;
@@ -393,23 +394,23 @@ export async function replayAnswer(req: AskRequest): Promise<AskResponse> {
  * Answers that arrive after a newer reload are for the previous project: dropped. */
 function loadAll(store: LiveStore) {
   const gen = store.generation();
-  const get = <T,>(path: string, then: (v: T) => void, text = false) => fetch(path).then((r) => (text ? r.text() : r.json()) as Promise<T>)
+  const load = <T,>(path: string, then: (v: T) => void) => get<T>(path)
     .then((v) => { if (gen === store.generation()) then(v); }).catch(() => {});
-  get<SetupStatus>("/api/workspace", (status) => {
+  load<SetupStatus>("/api/workspace", (status) => {
     store.checkRoot(status?.root ?? null);
     if (gen === store.generation()) store.dispatch({ type: "setup", status });
   });
-  get<Session[]>("/api/sessions", (sessions) => store.dispatch({ type: "sessions", sessions }));
-  get<ProjectMap>("/api/map", (map) => store.dispatch({ type: "map", map }));
-  get<AgentPresence[]>("/api/agents", (agents) => store.dispatch({ type: "agents", agents }));
-  get<Attention[]>("/api/attention", (list) => { if (Array.isArray(list)) store.dispatch({ type: "attention-all", list }); });
+  load<Session[]>("/api/sessions", (sessions) => store.dispatch({ type: "sessions", sessions }));
+  load<ProjectMap>("/api/map", (map) => store.dispatch({ type: "map", map }));
+  load<AgentPresence[]>("/api/agents", (agents) => store.dispatch({ type: "agents", agents }));
+  load<Attention[]>("/api/attention", (list) => { if (Array.isArray(list)) store.dispatch({ type: "attention-all", list }); });
 }
 
 /** The server's version when the page first reached it: a different one after a reconnect (an update) has other
  * chunks than this page knows, so the page reloads itself. */
 let serverVersion: string | undefined;
 function checkServerVersion() {
-  fetch("/api/health").then((r) => r.json()).then((h: { version?: string }) => {
+  get<{ version?: string }>("/api/health").then((h) => {
     if (typeof h?.version !== "string") return;
     if (serverVersion !== undefined && h.version !== serverVersion) location.reload();
     serverVersion = h.version;
@@ -425,7 +426,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
     const url = replayUrl(), inline = embeddedReplay();
     if (inline || url) {
       let stopPlayback = () => {};
-      (inline ? Promise.resolve(inline) : fetch(url!).then((r) => r.json() as Promise<Replay>)).then((data: Replay) => {
+      (inline ? Promise.resolve(inline) : get<Replay>(url!)).then((data: Replay) => {
         replayData = data; clockOffset = Math.max(0, Date.now() - Date.parse(data.exportedAt));
         store.dispatch({ type: "replay", data });
         installSetupShim(data);
@@ -442,8 +443,8 @@ export function LiveProvider({ children }: { children: ReactNode }) {
     // The live feed needs a token only this page can read (another site, or another app on localhost, can't). It changes
     // when the server restarts, so it's fetched again on every connection.
     const connect = () => {
-      fetch("/api/live-token").then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-        .then(({ token }: LiveToken) => { if (!stop) open(token); }, retry);
+      get<LiveToken>("/api/live-token")
+        .then(({ token }) => { if (!stop) open(token); }, retry);
     };
     const open = (token: string) => {
       const sock = (ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?t=${encodeURIComponent(token)}`));

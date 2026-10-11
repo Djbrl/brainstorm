@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { SetupStatus, SetupStep, WorkspaceConflict, WorkspaceSuggestion } from "@contract";
 import { clock, useLive } from "../lib/live";
+import { ApiError, errorWords, get, post } from "../lib/api";
 import { relTime } from "../follow/format";
 import { Logo } from "../Logo";
 import "./setup.css";
@@ -10,9 +11,7 @@ const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`;
 const nameOf = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p;
 
 async function getSuggestions(): Promise<WorkspaceSuggestion[]> {
-  const r = await fetch("/api/workspace/suggestions");
-  if (!r.ok) return [];
-  const d = await r.json();
+  const d = await get<WorkspaceSuggestion[]>("/api/workspace/suggestions").catch(() => []);
   return Array.isArray(d) ? d : [];
 }
 
@@ -20,30 +19,21 @@ async function getSuggestions(): Promise<WorkspaceSuggestion[]> {
 class AskFirst extends Error { constructor(message: string, readonly root: string) { super(message); } }
 
 async function openWorkspace(root: string, anyway = false): Promise<SetupStatus> {
-  const r = await fetch("/api/workspace", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ root, ...(anyway ? { anyway } : {}) }) });
-  if (!r.ok) {
-    let msg = `Couldn't open that folder (${r.status}).`, code: string | undefined;
-    try { const b: { code?: string; message?: string | string[]; error?: string } = await r.json(); code = b.code; msg = (Array.isArray(b.message) ? b.message.join(" ") : b.message) || b.error || msg; } catch { /* keep default */ }
-    if (r.status === 409 && code === ("large" satisfies WorkspaceConflict["code"])) throw new AskFirst(msg, root);
-    throw new Error(msg);
+  try {
+    return await post<SetupStatus>("/api/workspace", { root, ...(anyway ? { anyway } : {}) });
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 409 && e.code === ("large" satisfies WorkspaceConflict["code"])) throw new AskFirst(errorWords(e, ""), root);
+    throw new Error(errorWords(e, `Couldn't open that folder (${e instanceof ApiError ? e.status : "?"}).`));
   }
-  return r.json();
 }
 
 /** The system's folder picker, opened by the local server: the folder's path, or null if cancelled. */
 async function chooseFolder(): Promise<string | null> {
-  const r = await fetch("/api/workspace/choose", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-  if (!r.ok) {
-    let msg = "The folder picker didn't open.";
-    try { const b = await r.json(); msg = b.message || msg; } catch { /* keep default */ }
-    throw new Error(msg);
-  }
-  return ((await r.json()) as { root: string | null }).root;
+  try { return (await post<{ root: string | null }>("/api/workspace/choose")).root; }
+  catch (e) { throw new Error(errorWords(e, "The folder picker didn't open.")); }
 }
 
-async function getStatus(): Promise<SetupStatus | null> {
-  try { const r = await fetch("/api/workspace"); return r.ok ? r.json() : null; } catch { return null; }
-}
+const getStatus = () => get<SetupStatus>("/api/workspace").catch(() => null);
 
 /* ---------- Pick ---------- */
 

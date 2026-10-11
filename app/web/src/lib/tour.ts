@@ -4,6 +4,7 @@
 // pill) are hidden until the step that shows them (`:root[data-tour]`, tour.css), and an example agent can walk the map.
 import { useSyncExternalStore } from "react";
 import type { AgentPresence } from "@contract";
+import { ApiError, get, put } from "./api";
 
 export type TourStep = "hello" | "threads" | "steps" | "step" | "files" | "map" | "readmap" | "keys" | "stats" | "end";
 
@@ -42,7 +43,7 @@ export const tourStore = {
   },
   /** Whether the server says this install had it; starts it if not. */
   load: () => {
-    fetch("/api/onboarding").then((r) => (r.ok ? r.json() : null)).then((r: { done: boolean } | null) => {
+    get<{ done: boolean }>("/api/onboarding").catch((e: unknown) => { if (e instanceof ApiError && e.status) return null; throw e; }).then((r) => {
       if (state.done !== null) return;
       // An older server without the route: count it as done, so nothing nags.
       const done = r ? !!r.done : true;
@@ -52,7 +53,7 @@ export const tourStore = {
 };
 
 function save(done: boolean) {
-  fetch("/api/onboarding", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ done }) })
+  put("/api/onboarding", { done })
     .catch(() => { /* offline: it shows again next time, which is fine */ });
 }
 

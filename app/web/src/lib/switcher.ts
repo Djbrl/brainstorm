@@ -7,6 +7,7 @@ import { isReplay, useLiveSelector, shallowEqual } from "./live";
 import { needsYou, yourTurn } from "./attention";
 import { END, type NavActions } from "./nav";
 import { track } from "./usage";
+import { ApiError, get, post } from "./api";
 
 // ---- opening a thread (the same move as a click in the Threads list) ----
 
@@ -103,11 +104,8 @@ async function poll() {
   if (document.visibilityState === "visible" || !asked) { // once even in a background tab, then only while it's in view
     asked = true;
     try {
-      const r = await fetch("/api/elsewhere");
-      if (r.ok) {
-        const next = (await r.json()) as ElsewhereThread[];
-        if (JSON.stringify(next) !== JSON.stringify(elsewhere)) { elsewhere = next; esubs.forEach((f) => f()); }
-      }
+      const next = await get<ElsewhereThread[]>("/api/elsewhere");
+      if (JSON.stringify(next) !== JSON.stringify(elsewhere)) { elsewhere = next; esubs.forEach((f) => f()); }
     } catch { /* the server is out of reach: keep what we had */ }
   }
   if (pollers && !timer) timer = setTimeout(poll, POLL_MS);
@@ -128,8 +126,7 @@ export function useElsewhere(): ElsewhereThread[] {
 
 /** Switch the server to another project, then open one of its threads there. */
 export async function jumpElsewhere(t: ElsewhereThread, nav: Pick<NavActions, "startReplay" | "stopReplay" | "selectFile">, reload: () => void) {
-  const r = await fetch("/api/workspace", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ root: t.root }) });
-  if (!r.ok) throw new Error(`switch failed: ${r.status}`);
+  await post("/api/workspace", { root: t.root });
   nav.stopReplay(); nav.selectFile(null);
   reload();
   // The other project's thread list comes with the reload; a thread that works is followed live, one that waits opens at its end.
@@ -144,15 +141,14 @@ export async function jumpElsewhere(t: ElsewhereThread, nav: Pick<NavActions, "s
  * it touched that project's files.
  */
 export async function enterProject(root: string, nav: Pick<NavActions, "startReplay" | "stopReplay" | "selectFile">, reload: () => void, threadId?: string, landOn?: string) {
-  const post = (anyway: boolean) => fetch("/api/workspace", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ root, ...(threadId ? { guest: threadId } : {}), ...(anyway ? { anyway } : {}) }) });
-  let r = await post(false);
-  // A big folder that isn't a git project: the server asks first (WorkspaceService.checkSize); so do we.
-  if (r.status === 409) {
-    const b = await r.json().catch(() => ({})) as { code?: string; message?: string };
-    if (b.code !== "large" || !confirm(b.message ?? "This folder is big. Open it anyway?")) return;
-    r = await post(true);
+  const open = (anyway: boolean) => post("/api/workspace", { root, ...(threadId ? { guest: threadId } : {}), ...(anyway ? { anyway } : {}) });
+  try { await open(false); }
+  catch (e) {
+    // A big folder that isn't a git project: the server asks first (WorkspaceService.checkSize); so do we.
+    if (!(e instanceof ApiError) || e.status !== 409) throw e;
+    if (e.code !== "large" || !confirm(e.said ?? "This folder is big. Open it anyway?")) return;
+    await open(true);
   }
-  if (!r.ok) throw new Error(`switch failed: ${r.status}`);
   nav.stopReplay(); nav.selectFile(null);
   reload();
   // On its last step in that project (the camera and the Track land there), else at its end.

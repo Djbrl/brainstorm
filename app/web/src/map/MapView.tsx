@@ -38,7 +38,7 @@ import { useLiveAgents } from "./useLiveAgents";
 import { Readmap, trackable } from "./Readmap";
 import { useAutoTrack } from "./autoTrack";
 import { setReadmap, useReadmap } from "./prefs";
-import { isTyping } from "../switch/shortcuts";
+import { useShortcut, windowOpen } from "../switch/shortcuts";
 import "./map.css";
 import { readStored, writeStored } from "../lib/store";
 import { useNow, useSize } from "../lib/hooks";
@@ -207,20 +207,11 @@ export function MapView() {
   // ---- the Readmap (Readmap.tsx; M, in switch/Keys.tsx, shows or hides it) and A: follow the next agent (Shift A, the one before) ----
   const readmap = useReadmap();
   const tracks = useMemo(() => trackable(drawnAgents), [drawnAgents]);
-  const keysRef = useRef({ readmap, tracks, followId, follow }); keysRef.current = { readmap, tracks, followId, follow };
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target) || document.querySelector('[aria-modal="true"], .lightbox')) return;
-      const k = keysRef.current;
-      if ((e.key === "a" || e.key === "A") && k.tracks.length) {
-        e.preventDefault();
-        const i = k.tracks.findIndex((a) => a.id === k.followId), n = k.tracks.length;
-        k.follow(k.tracks[i < 0 ? (e.shiftKey ? n - 1 : 0) : (i + (e.shiftKey ? n - 1 : 1)) % n].id);
-      }
-    };
-    addEventListener("keydown", onKey);
-    return () => removeEventListener("keydown", onKey);
-  }, []);
+  useShortcut("follow.next", (e) => {
+    if (windowOpen() || !tracks.length) return false;
+    const back = !!e?.shiftKey, i = tracks.findIndex((a) => a.id === followId), n = tracks.length;
+    follow(tracks[i < 0 ? (back ? n - 1 : 0) : (i + (back ? n - 1 : 1)) % n].id);
+  });
   /** The Readmap follows what agents read, with the map's own rules (agents.tsx): with a thread open, its agents; on
    *  the project overview, only the one followed. */
   const readmapReads = useCallback(() => {

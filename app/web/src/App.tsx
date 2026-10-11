@@ -21,6 +21,7 @@ import { PlayButton, ThreadBar } from "./switch/ThreadBar";
 import { Elsewhere } from "./switch/Elsewhere";
 import { Keys } from "./switch/Keys";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { keyRules, useShortcut } from "./switch/shortcuts";
 import "./boot.css";
 
 // The views (and the graph library the Map needs) load when they're opened. The Map is what almost every visit
@@ -92,15 +93,7 @@ function Shell() {
 
   // Esc closes the innermost thing first: a popover (it handles Esc itself and marks it handled), then a panel (step,
   // file), then the player, then the thread (not while typing).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (e.key !== "Escape" || e.defaultPrevented || (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable))) return;
-      back();
-    };
-    addEventListener("keydown", onKey);
-    return () => removeEventListener("keydown", onKey);
-  }, [back]);
+  useShortcut("back", (e) => { if (e && (e.defaultPrevented || keyRules.inField(e.target))) return false; back(); });
 
   // First load: a quiet "Loading" until we know whether to show setup or the map, rather than a blank page or a flash of either.
   const booting = useBooting();

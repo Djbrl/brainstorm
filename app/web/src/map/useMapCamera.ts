@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { ThreadReplay } from "../lib/nav";
 import { getCameraLock, setCameraLock } from "./prefs";
+import { keyRules, useShortcut, windowOpen } from "../switch/shortcuts";
 import { replayCamera } from "./replay/store";
 import type { ReplayLayerApi } from "./replay/layer";
 import { boxOf, fitView, type Camera, type View } from "./camera";
@@ -88,6 +89,7 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
   // replay player ← → step through it, so only Shift ↑ ↓ zoom there; none in the Track's list (there they scroll it).
   // One loop, only while a key is held or a glide eases out. Moving the map stops following an agent and unlocks the
   // camera, like a drag would want.
+  const keyDown = useRef<(e: KeyboardEvent) => boolean>(() => false);
   useEffect(() => {
     const DIR: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
     const ZOOM: Record<string, number> = { "+": 1, "=": 1, "-": -1, "_": -1 };
@@ -114,16 +116,16 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
       if (vel.z) camRef.current.zoomBy(Math.exp(vel.z * dt));
       raf = requestAnimationFrame(tick);
     };
-    const onDown = (e: KeyboardEvent) => {
-      if (e.key === "Shift") { shift = true; return; }
+    keyDown.current = (e: KeyboardEvent) => {
+      if (e.key === "Shift") { shift = true; return false; }
       const d = DIR[e.key];
       const z = e.shiftKey && (e.key === "ArrowUp" || e.key === "ArrowDown") ? (e.key === "ArrowUp" ? 1 : -1) : ZOOM[e.key];
-      if ((!d && !z) || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || (!z && replayRef.current.playable)) return;
+      if ((!d && !z) || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || (!z && replayRef.current.playable)) return false;
       const t = e.target instanceof HTMLElement ? e.target : null;
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable || t.closest(".rp-list, [role=listbox], [aria-modal=true]"))) return;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable || t.closest(".rp-list, [role=listbox], [aria-modal=true]"))) return false;
       e.preventDefault();
       shift = e.shiftKey;
-      if (held.has(e.key)) return; // the key's own repeats: the loop is already gliding
+      if (held.has(e.key)) return true; // the key's own repeats: the loop is already gliding
       held.add(e.key);
       setIntent({ kind: "free" });
       // A tap still moves a little: start at half speed rather than from rest (a zoom at full speed: a tap is a step).
@@ -135,6 +137,7 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
         if (Math.abs(vel.y) < SPEED / 2 && d[1]) vel.y = d[1] * SPEED / 2;
       }
       if (!raf) { last = performance.now(); raf = requestAnimationFrame(tick); }
+      return true;
     };
     const onUp = (e: KeyboardEvent) => {
       if (e.key === "Shift") { shift = false; held.delete("+"); held.delete("_"); } // + and _ need Shift: no key-up of their own may come
@@ -142,46 +145,33 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
       if (e.key === "=") held.delete("+"); if (e.key === "-") held.delete("_");
     };
     const release = () => { held.clear(); shift = false; }; // the window lost focus: no key-up will come
-    addEventListener("keydown", onDown);
     addEventListener("keyup", onUp);
     addEventListener("blur", release);
-    return () => { removeEventListener("keydown", onDown); removeEventListener("keyup", onUp); removeEventListener("blur", release); cancelAnimationFrame(raf); };
+    return () => { keyDown.current = () => false; removeEventListener("keyup", onUp); removeEventListener("blur", release); cancelAnimationFrame(raf); };
   }, [setIntent]);
+  useShortcut("map.move", (e) => !!e && keyDown.current(e));
+  useShortcut("map.zoom", (e) => !!e && keyDown.current(e));
   // C centres the camera on the agent once, without locking: the replay's marker, the agent you follow, the open thread's
   // agent, or else the agent that moved last. Zoomed far out, it comes in a little so the agent reads.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.key !== "c" && e.key !== "C") || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
-      const t = e.target instanceof HTMLElement ? e.target : null;
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
-      const agents = anim.current;
-      const newest = () => { let best: AgentAnim | undefined; for (const a of agents.values()) if (!best || a.lastTs > best.lastTs) best = a; return best; };
-      const at = replayRef.current.subject()
-        ?? (followRef.current ? agents.get(followRef.current) : undefined)
-        ?? (replay ? agents.get(replay.sessionId) : undefined)
-        ?? (replay ? undefined : newest());
-      if (!at) return;
-      e.preventDefault();
-      setIntent({ kind: "free" });
-      const k = camRef.current.view()?.k ?? 1;
-      camRef.current.lookAt(at.x, at.y, Math.max(k, 1.6), 600);
-    };
-    addEventListener("keydown", onKey);
-    return () => removeEventListener("keydown", onKey);
-  }, [replay?.sessionId, setIntent]);
-  // Esc stops following an agent before it steps back out of anything else (capture: ahead of the shell's Esc). A window
+  useShortcut("center", () => {
+    const agents = anim.current;
+    const newest = () => { let best: AgentAnim | undefined; for (const a of agents.values()) if (!best || a.lastTs > best.lastTs) best = a; return best; };
+    const at = replayRef.current.subject()
+      ?? (followRef.current ? agents.get(followRef.current) : undefined)
+      ?? (replay ? agents.get(replay.sessionId) : undefined)
+      ?? (replay ? undefined : newest());
+    if (!at) return false;
+    setIntent({ kind: "free" });
+    const k = camRef.current.view()?.k ?? 1;
+    camRef.current.lookAt(at.x, at.y, Math.max(k, 1.6), 600);
+  });
+  // Esc stops following an agent before it steps back out of anything else (the registry tries it before "back"). A window
   // open over the map (Settings, Find a thread, a picture) takes that Esc for itself.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (e.key !== "Escape" || e.defaultPrevented || !followRef.current || (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable))) return;
-      if (document.querySelector('[aria-modal="true"], .lightbox')) return;
-      e.preventDefault();
-      setFollowId(null);
-    };
-    addEventListener("keydown", onKey, true);
-    return () => removeEventListener("keydown", onKey, true);
-  }, []);
+  useShortcut("follow.stop", (e) => {
+    if ((e && (e.defaultPrevented || keyRules.inField(e.target))) || !followRef.current || windowOpen()) return false;
+    e?.preventDefault();
+    setFollowId(null);
+  });
 
   // Follow an agent (from the sidebar), like the tracer: the camera frames it once; locked, it keeps it centred (easing,
   // every frame, no stacked tweens) at whatever zoom you pick; unlocked, it stays where you put it, and frames the agent

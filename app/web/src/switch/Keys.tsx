@@ -7,7 +7,7 @@ import { useNavActions, useNavState } from "../lib/nav";
 import { getCameraLock, getReadmap, setCameraLock, setReadmap } from "../map/prefs";
 import { Picker } from "./Picker";
 import { useDialogFocus } from "../lib/useDialogFocus";
-import { isTyping, SHORTCUTS } from "./shortcuts";
+import { SHORTCUTS, useShortcut } from "./shortcuts";
 
 export function Keys({ finding, setFinding, help, setHelp }: {
   finding: boolean; setFinding: (v: boolean) => void;
@@ -18,26 +18,16 @@ export function Keys({ finding, setFinding, help, setHelp }: {
   const [toast, setToast] = useState<string | null>(null);
   const toastT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const say = (s: string) => { setToast(s); clearTimeout(toastT.current); toastT.current = setTimeout(() => setToast(null), 1400); };
-  const now = useRef({ replay, lens }); now.current = { replay, lens };
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented) return;
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") { e.preventDefault(); setFinding(!finding); return; }
-      if (e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target) || finding) return;
-      const { replay, lens } = now.current;
-      switch (e.key) {
-        case "?": setHelp((h) => !h); break;
-        case "l": case "L": { const on = !getCameraLock(); setCameraLock(on); say(on ? "Camera locked on the agent" : "Camera free"); break; }
-        case "m": case "M": if (lens !== "map") return; setReadmap(!getReadmap()); break;
-        case "p": case "P": if (!replay) return; setLens(lens === "places" ? "map" : "places"); break;
-        default: return;
-      }
-      e.preventDefault();
-    };
-    addEventListener("keydown", onKey);
-    return () => removeEventListener("keydown", onKey);
-  }, [finding, setFinding, setHelp, setLens]);
+  useShortcut("find", (e) => { if (e?.defaultPrevented) return false; e?.preventDefault(); setFinding(!finding); });
+  // The single keys wait while Find a thread is open.
+  useShortcut("help", () => { if (finding) return false; setHelp((h) => !h); });
+  useShortcut("lock", () => {
+    if (finding) return false;
+    const on = !getCameraLock(); setCameraLock(on); say(on ? "Camera locked on the agent" : "Camera free");
+  });
+  useShortcut("readmap", () => { if (finding || lens !== "map") return false; setReadmap(!getReadmap()); });
+  useShortcut("lens", () => { if (finding || !replay) return false; setLens(lens === "places" ? "map" : "places"); });
 
   return <>
     {finding && <Picker onClose={() => setFinding(false)} />}

@@ -119,17 +119,12 @@ const badgeAt = (n: { x: number; y: number; r: number }, scale: number) => {
 const BADGE_FONT = 9.5, MARK_R = 10, NAME_FONT = 12;
 import { basename as baseName } from "@shared/text";
 import { reducedMotion } from "../../lib/breakpoints";
+import { useShortcut } from "../../switch/shortcuts";
 const INK = "#1d1d1f";
 
 type Anim = { x: number; y: number; fromX: number; fromY: number; t0: number; file: string | null; lastIndex: number; beatAt: number;
   cam: { x: number; y: number } | null; landedT0?: number };
 
-function isTyping(t: EventTarget | null) {
-  const el = t as HTMLElement | null;
-  if (!el || !el.tagName) return false;
-  if (el.tagName === "INPUT" && /^(range|checkbox|radio|button)$/.test((el as HTMLInputElement).type)) return false; // not typing: the replay slider
-  return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable;
-}
 
 export function useReplayLayer({ fg, nodeIndexRef, accent, font, camera, liveShown }: {
   fg: RefObject<ForceGraphMethods | undefined>;
@@ -205,29 +200,20 @@ export function useReplayLayer({ fg, nodeIndexRef, accent, font, camera, liveSho
   // Outside the player the arrows move the map (useMapCamera). ----
   const replayPlayingRef = useRef(false);
   replayPlayingRef.current = !!replay?.playing;
-  useEffect(() => {
-    if (!active) return;
-    const step = (d: number) => { setReplayPlaying(false); setReplayIndex((i) => Math.max(0, Math.min(st.current.len - 1, i + d))); };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return;
-      if (e.key !== " " && st.current.mode !== "play") return;
-      switch (e.key) {
-        case "ArrowRight": step(e.shiftKey ? 10 : 1); break;
-        case "ArrowLeft": step(e.shiftKey ? -10 : -1); break;
-        case "Home": setReplayPlaying(false); setReplayIndex(0); break;
-        case "End": setReplayPlaying(false); setReplayIndex(st.current.len - 1); break;
-        case " ": {
-          if ((e.target as HTMLElement | null)?.tagName === "BUTTON") return; // let the focused button click
-          togglePlay(replayPlayingRef.current, setReplayPlaying, st.current.index >= st.current.len - 1, () => setReplayIndex(0));
-          break;
-        }
-        default: return;
-      }
-      e.preventDefault();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [active, setReplayIndex, setReplayPlaying]);
+  const inPlayer = () => st.current.active && st.current.mode === "play";
+  useShortcut("play", (e) => {
+    if (!st.current.active || (e?.target as HTMLElement | null)?.tagName === "BUTTON") return false; // let the focused button click
+    togglePlay(replayPlayingRef.current, setReplayPlaying, st.current.index >= st.current.len - 1, () => setReplayIndex(0));
+  });
+  useShortcut("player.step", (e) => {
+    if (!inPlayer() || !e) return false;
+    const d = (e.key === "ArrowRight" ? 1 : -1) * (e.shiftKey ? 10 : 1);
+    setReplayPlaying(false); setReplayIndex((i) => Math.max(0, Math.min(st.current.len - 1, i + d)));
+  });
+  useShortcut("player.ends", (e) => {
+    if (!inPlayer() || !e) return false;
+    setReplayPlaying(false); setReplayIndex(e.key === "Home" ? 0 : st.current.len - 1);
+  });
 
   // ---- camera ----
   // Locked: the marker stays in the middle of the part of the map no panel covers (easing, never snapping); the wheel

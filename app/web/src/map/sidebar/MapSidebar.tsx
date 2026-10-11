@@ -21,7 +21,7 @@ import { TrackPanel } from "./TrackPanel";
 import { FilesPanel } from "./FilesPanel";
 import { FileView, FileViewBack } from "./FileView";
 import { NowCard } from "./NowCard";
-import { isTyping } from "../../switch/shortcuts";
+import { useShortcut, windowOpen } from "../../switch/shortcuts";
 import "./sidebar.css";
 import { readStored, writeStored } from "../../lib/store";
 import { NARROW, PHONE, reducedMotion, useMedia } from "../../lib/breakpoints";
@@ -125,17 +125,7 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
     return () => removeEventListener("rundown-sidebar", on);
   }, []);
   // T folds or unfolds it (not while typing, nor with a window open over the map).
-  const toggle = useRef(() => {}); toggle.current = () => setCollapsed(!collapsed);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.key !== "t" && e.key !== "T") || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return;
-      if (document.querySelector('[aria-modal="true"], .lightbox')) return;
-      e.preventDefault();
-      toggle.current();
-    };
-    addEventListener("keydown", onKey);
-    return () => removeEventListener("keydown", onKey);
-  }, []);
+  useShortcut("sidebar", () => { if (windowOpen()) return false; setCollapsed(!collapsed); });
   // On a phone, following an agent folds the sheet to show the map. A file opens here instead (see above).
   const fold = <T,>(f: (x: T) => void) => (x: T) => { if (phone) setOver(false); f(x); };
 

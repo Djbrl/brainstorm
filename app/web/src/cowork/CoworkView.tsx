@@ -12,7 +12,7 @@ import { LensSwitch } from "../map/LensSwitch";
 import { usePlaceRows, usePlaceTimeline } from "./rows";
 import { Dock } from "../map/replay/ReplayBar";
 import { togglePlay } from "../map/replay/layer";
-import { isTyping } from "../switch/shortcuts";
+import { useShortcut } from "../switch/shortcuts";
 import { HOME, eventsAt, placeOfStep, placeTitle, placesStore, selectPlace, useCowork, usePlaces } from "./data";
 import { StepDetail } from "../follow/StepDetail";
 import { pairResults } from "../follow/format";
@@ -91,29 +91,22 @@ export function PlacesView() {
     const t = setTimeout(() => now.current.go(now.current.at + 1, true), PLACE_MS / (replay.speed ?? 1));
     return () => clearTimeout(t);
   }, [playing, at, rows.length, replay?.speed]);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return;
-      const { rows: rs, at: i, go: to, playing: p, replay: r } = now.current;
-      if (!r || !rs.length) return;
-      switch (e.key) {
-        case " ": {
-          if ((e.target as HTMLElement | null)?.tagName === "BUTTON") return;
-          if (r.mode !== "play") navRef.current.setThreadMode("play");
-          togglePlay(p, navRef.current.setReplayPlaying, i >= rs.length - 1, () => to(0));   // at the end: from the start
-          break;
-        }
-        case "ArrowLeft": if (r.mode !== "play") return; to(Math.max(0, i - 1)); break;
-        case "ArrowRight": if (r.mode !== "play") return; to(Math.min(rs.length - 1, i + 1)); break;
-        case "Home": if (r.mode !== "play") return; to(0); break;
-        case "End": if (r.mode !== "play") return; to(rs.length - 1); break;
-        default: return;
-      }
-      e.preventDefault();
-    };
-    addEventListener("keydown", onKey);
-    return () => removeEventListener("keydown", onKey);
-  }, []);
+  useShortcut("play", (e) => {
+    const { rows: rs, at: i, go: to, playing: p, replay: r } = now.current;
+    if (!r || !rs.length || (e?.target as HTMLElement | null)?.tagName === "BUTTON") return false;
+    if (r.mode !== "play") navRef.current.setThreadMode("play");
+    togglePlay(p, navRef.current.setReplayPlaying, i >= rs.length - 1, () => to(0));   // at the end: from the start
+  });
+  useShortcut("player.step", (e) => {
+    const { rows: rs, at: i, go: to, replay: r } = now.current;
+    if (!e || !r || !rs.length || r.mode !== "play") return false;
+    to(e.key === "ArrowLeft" ? Math.max(0, i - 1) : Math.min(rs.length - 1, i + 1));
+  });
+  useShortcut("player.ends", (e) => {
+    const { rows: rs, go: to, replay: r } = now.current;
+    if (!e || !r || !rs.length || r.mode !== "play") return false;
+    to(e.key === "Home" ? 0 : rs.length - 1);
+  });
 
   return (
     <div className="map-wrap cw-wrap">

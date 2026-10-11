@@ -11,7 +11,7 @@ Phases 1, 2 and 3 of the audit's plan are done on local branches. Nothing is pus
 | Branch | State |
 | --- | --- |
 | `cleanup/phase-1` | Done, reviewed. 17 commits on `main` 56eb7a5. |
-| `cleanup/phase-2` | Phases 2 and 3, on top of `cleanup/phase-1`: 64 commits, 236/236 tests, both typechecks clean. Phase 2 reviewed (three plausible findings fixed, one became the ask-key marker). The Phase 3 part is not reviewed yet. |
+| `cleanup/phase-2` | Phases 2 and 3, on top of `cleanup/phase-1`: 64 commits, 236/236 tests, both typechecks clean. Phases 2 and 3 reviewed; every finding fixed (Phase 3: tsconfig lookup bounded to the project, exact aliases, a 10 s limit on git's ignored-folder listing, a returning folder's spelling saved). The To-do tab is ticked for both phases. |
 | `cleanup/p2-*`, `cleanup/p3-*` | All merged into `cleanup/phase-2`; their worktrees can be removed. |
 
 ## Before release (maintainer)
@@ -30,7 +30,7 @@ Phases 1, 2 and 3 of the audit's plan are done on local branches. Nothing is pus
 
 ## Left for later
 
-- A review pass on the Phase 3 part (`git diff 952267e..cleanup/phase-2`).
+- Hooks: the server doesn't yet check an HMAC proof from the hook (the hook checks the server). Release tags. The reader rework (risk in the listener's sink).
 - `ListenerService.updateStep` and the `step-update` message are never sent; delete or use.
 - `app/README.md` (the hackathon brief) still mentions Nemotron and `brainstorm.db`.
 - Audit items not done: peek and diff line-number colours, the nav trailing-slash case.

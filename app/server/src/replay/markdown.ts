@@ -27,16 +27,36 @@ function duration(from: string, to: string): string {
 
 type Turn = { prompt: string; edits: Step[]; commands: Step[]; delegated: Step[]; reads: number; failed: { call?: Step; result: Step }[]; lastText?: string };
 
+/** What a thread's report says, worked out from its steps and the map (aggregate), before any of it is written. */
+type Report = {
+  turns: Turn[];
+  /** The requests the person made (turns with a prompt). */
+  asked: Turn[];
+  /** Files changed, with how many edits; and by module (the map's), with the modules' summaries. */
+  changed: Map<string, { edits: number }>;
+  byModule: Map<string, string[]>;
+  moduleSummary: Map<string, string | undefined>;
+  /** A file's node on the map (its summary). */
+  files: Map<string, { summary?: string }>;
+  failedAll: { call?: Step; result: Step }[];
+  edits: number;
+  commands: number;
+  subagentSteps: number;
+  /** A path as the report shows it: relative to the project. */
+  rel: (p: string) => string;
+};
+
 /**
  * A thread as a Markdown report for a review or a pull request: what was asked, the files changed (by module, with
  * their summaries), what failed, then each request with what the agent did. Reads are counted, not listed.
  */
 export function threadMarkdown(session: Session, steps: Step[], map: ProjectMap | null): string {
-  const root = map?.root ?? session.cwd;
-  const rel = (p: string) => (root ? relativeTo(p, root) ?? p : p); // /a/bc is not inside /a/b
-  const files = new Map((map?.files ?? []).map((f) => [f.path, f]));
-  const main = steps.filter((s) => !s.isSubagent);
+  return render(session, aggregate(session, steps, collect(steps), map));
+}
 
+/** The thread's steps in turns: one per request, with what the agent did for it (an edit or a call before the first
+ * request opens a turn without a prompt). */
+function collect(steps: Step[]): Turn[] {
   const turns: Turn[] = [];
   const pairer = new CallPairer();
   let turn: Turn | undefined;
@@ -64,6 +84,15 @@ export function threadMarkdown(session: Session, steps: Step[], map: ProjectMap 
     }
     if (st.kind === "text" && !st.isSubagent && st.text?.trim()) cur().lastText = st.text;
   }
+  return turns;
+}
+
+/** The counts and the files changed, by module. */
+function aggregate(session: Session, steps: Step[], turns: Turn[], map: ProjectMap | null): Report {
+  const root = map?.root ?? session.cwd;
+  const rel = (p: string) => (root ? relativeTo(p, root) ?? p : p); // /a/bc is not inside /a/b
+  const files = new Map((map?.files ?? []).map((f) => [f.path, f]));
+  const main = steps.filter((s) => !s.isSubagent);
 
   // Files changed, with how many edits.
   const changed = new Map<string, { edits: number }>();
@@ -79,12 +108,20 @@ export function threadMarkdown(session: Session, steps: Step[], map: ProjectMap 
   }
   const moduleSummary = new Map((map?.modules ?? []).map((m) => [m.id, m.summary]));
 
-  const edits = steps.filter((s) => s.kind === "edit").length;
-  const commands = steps.filter((s) => s.kind === "tool_call" && s.tool === "Bash").length;
-  const failedAll = turns.flatMap((t) => t.failed);
+  return {
+    turns, asked: turns.filter((t) => t.prompt), changed, byModule, moduleSummary, files,
+    failedAll: turns.flatMap((t) => t.failed),
+    edits: steps.filter((s) => s.kind === "edit").length,
+    commands: steps.filter((s) => s.kind === "tool_call" && s.tool === "Bash").length,
+    subagentSteps: steps.length - main.length,
+    rel,
+  };
+}
+
+/** The report as Markdown: the header and counts, what was asked, files changed, what failed, step by step. */
+function render(session: Session, r: Report): string {
+  const { turns, asked, changed, byModule, moduleSummary, files, failedAll, edits, commands, subagentSteps, rel } = r;
   const failedCalls = failedAll.length;
-  const subagentSteps = steps.length - main.length;
-  const asked = turns.filter((t) => t.prompt);
 
   const out: string[] = [];
   out.push(`# ${session.title || "Untitled thread"}`, "");

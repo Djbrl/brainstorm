@@ -1,9 +1,11 @@
 // POST /api/usage: the app's anonymous daily report (see _usage.js for what's in it and how it's kept). Adds the country
 // from Vercel's header and keeps no IP. A bad report is refused without saying why.
-const { blobAuth, blobHeaders, validate, countryOf, pathnameFor, dayOf } = require("./_usage");
+const { sameOrigin, blobAuth, blobHeaders, validate, countryOf, pathnameFor, dayOf } = require("./_usage");
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).end();
+  if (!sameOrigin(req)) return res.status(403).end(); // a page on another site posting through a visitor's browser
+  if (!/^application\/json\b/i.test(String(req.headers["content-type"] || ""))) return res.status(415).end(); // the app sends JSON; a cross-site form or text/plain post doesn't
   const body = typeof req.body === "string" ? (() => { try { return JSON.parse(req.body); } catch { return null; } })() : req.body;
   if (JSON.stringify(body ?? "").length > 2048) return res.status(413).end();
   const report = validate(body);

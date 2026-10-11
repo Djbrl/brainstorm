@@ -3,10 +3,13 @@
 // Credentials, as the SDK resolves them: Vercel's OIDC token plus BLOB_STORE_ID, else BLOB_READ_WRITE_TOKEN.
 // Read the list with `vercel blob list --prefix waitlist/` from site/.
 
+const { sameOrigin } = require("./_usage");
+
 const EMAIL = /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/;
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+  if (!sameOrigin(req)) return res.status(403).json({ error: "Not from here." }); // another site posting through a visitor's browser
   const body = req.body || {};
   if (body.company) return res.status(200).json({ ok: true }); // honeypot: bots fill every field
   const email = String(body.email || "").trim().toLowerCase();

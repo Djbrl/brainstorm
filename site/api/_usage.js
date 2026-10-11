@@ -22,6 +22,15 @@ function blobAuth(req) {
 }
 const blobHeaders = (auth) => ({ authorization: `Bearer ${auth.token}`, "x-api-version": "12", "x-vercel-blob-store-id": auth.storeId });
 
+/** True when the request carries no Origin header (the app, curl) or one that is this site's own. A page on another site
+ * always sends its own Origin on a POST, so this keeps other sites from submitting through their visitors' browsers. */
+function sameOrigin(req) {
+  const origin = req.headers.origin;
+  if (origin === undefined) return true;
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim().toLowerCase();
+  try { return !!host && new URL(String(origin)).host.toLowerCase() === host; } catch { return false; }
+}
+
 /** A report from the app, checked field by field. Anything unexpected is refused, so nothing else can be smuggled in. */
 function validate(body) {
   if (!body || typeof body !== "object") return null;
@@ -110,4 +119,4 @@ function aggregate(records, today, days = 30) {
   };
 }
 
-module.exports = { KEYS, blobAuth, blobHeaders, validate, countryOf, pathnameFor, parsePathname, aggregate, dayOf };
+module.exports = { KEYS, sameOrigin, blobAuth, blobHeaders, validate, countryOf, pathnameFor, parsePathname, aggregate, dayOf };

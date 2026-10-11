@@ -80,7 +80,7 @@ const READ_MS = 520;        // playback pace for reads
 const STEP_MS = 700;        // playback pace for edits and your prompts (at 1×)
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-const STILL = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+const STILL = reducedMotion();
 /**
  * The numbered stops: each file visited within the window, by its latest stop (the marker's own file has none), in the
  * order of each file's first visit (the order they are drawn in). Moves are in beat order, so only the moves inside the
@@ -118,6 +118,7 @@ const badgeAt = (n: { x: number; y: number; r: number }, scale: number) => {
 };
 const BADGE_FONT = 9.5, MARK_R = 10, NAME_FONT = 12;
 import { basename as baseName } from "@shared/text";
+import { reducedMotion } from "../../lib/breakpoints";
 const INK = "#1d1d1f";
 
 type Anim = { x: number; y: number; fromX: number; fromY: number; t0: number; file: string | null; lastIndex: number; beatAt: number;

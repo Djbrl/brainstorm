@@ -1,10 +1,10 @@
 // The selected file, in the sidebar's Files tab in place of the tree: what it does, its imports and the files that use
 // it, the agent steps that touched it, and Ask. "All files" at the top (or Esc) goes back to the tree and lets go of
 // the file on the map. Picking a file anywhere (the map, the tree, a link, a step's file) opens it here.
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { Edge, FileNode, Step } from "@contract";
 import { AskBox } from "../../ask/AskBox";
-import { clock, useLiveSelector } from "../../lib/live";
+import { useLiveSelector } from "../../lib/live";
 import { mapStyle } from "../themes";
 import { relPath } from "../useSelectedFile";
 import { placeName } from "../../lib/islands";
@@ -12,6 +12,7 @@ import { placeName } from "../../lib/islands";
 const modName = (m: string) => (!m || m === "." ? "root" : m);
 import { basename as baseName } from "@shared/text";
 import { post } from "../../lib/api";
+import { useNow } from "../../lib/hooks";
 
 /** "changed just now" (under 45 s), "changed 5 min ago", "changed 3 h ago", "changed 2 days ago" (rounded). */
 function changedAgo(iso: string | undefined, now: number): string {
@@ -23,11 +24,6 @@ function changedAgo(iso: string | undefined, now: number): string {
   return `changed ${Math.round(s / 86400)} days ago`;
 }
 
-function useNow(ms = 20000) {
-  const [now, setNow] = useState(clock());
-  useEffect(() => { const t = setInterval(() => setNow(clock()), ms); return () => clearInterval(t); }, [ms]);
-  return now;
-}
 
 /** "‹ All files": above the file, outside its scroll (MapSidebar puts it under the tabs). */
 export function FileViewBack({ onBack }: { onBack: () => void }) {
@@ -43,7 +39,7 @@ export function FileViewBack({ onBack }: { onBack: () => void }) {
 export function FileView({ file, root, edges, onFocus }: {
   file: FileNode; root: string; edges: Edge[]; onFocus: (path: string) => void;
 }) {
-  const now = useNow();
+  const now = useNow(20_000);
   const steps = useLiveSelector((s) => s.steps);
   // Unique: a file can import from the same module in several statements.
   const imports = useMemo(() => [...new Set(edges.filter((e) => e.from === file.path).map((e) => e.to))], [file.path, edges]);

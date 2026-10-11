@@ -11,11 +11,11 @@ import { END, useNav } from "../../lib/nav";
 import { PRIVACY_URL, useUsageSetting } from "../../lib/usage";
 import { TOUR_AGENT, tourStore, useTour, type TourStep } from "../../lib/tour";
 import { getReadmap } from "../prefs";
+import { NARROW, PHONE, matches } from "../../lib/breakpoints";
 import "./tour.css";
 
 type Card = { title: string; body: string; anchor?: string };
 
-const PHONE = "(max-width: 440px)";
 const WALK_MS = 1500;    // the example agent's pace
 
 export function Tour() {
@@ -37,7 +37,7 @@ export function Tour() {
 
   // The steps this install gets, in order.
   const order: TourStep[] = useMemo(() => {
-    const phone = matchMedia(PHONE).matches;
+    const phone = matches(PHONE);
     const shownEl = (sel: string) => ((document.querySelector(sel) as HTMLElement | null)?.offsetWidth ?? 0) > 0;
     const o: TourStep[] = ["hello", "threads"];
     if (latest) o.push("steps");
@@ -69,7 +69,7 @@ export function Tour() {
       send(); timers.push(setTimeout(send, 150), setTimeout(send, 500));
     };
     const timers: ReturnType<typeof setTimeout>[] = [];
-    const narrow = matchMedia("(max-width: 1100px)").matches;
+    const narrow = matches(NARROW);
     switch (step) {
       case "hello": n.closeStep(); if (n.replay) n.stopReplay(); if (n.lens !== "map") n.setLens("map"); break;
       case "threads": n.closeStep(); if (n.replay) n.stopReplay(); sidebar({ open: true, tab: "threads" }); break;
@@ -193,7 +193,7 @@ function TourCard({ card, index, count, actions }: { card: Card; index: number; 
     const c = el.current?.getBoundingClientRect();
     if (!c) return;
     const W = innerWidth, H = innerHeight, gap = 16, m = 12;
-    if (matchMedia(PHONE).matches) { setPos({ left: m, top: 118 }); return; }
+    if (matches(PHONE)) { setPos({ left: m, top: 118 }); return; }
     if (!box) { setPos({ left: (W - c.width) / 2, top: Math.max(m, H - c.height - 96) }); return; }
     const clampY = (y: number) => Math.max(m + 64, Math.min(H - c.height - m, y));
     const clampX = (x: number) => Math.max(m, Math.min(W - c.width - m, x));

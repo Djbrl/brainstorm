@@ -2,22 +2,15 @@
 // panel. Nothing in it runs and nothing leaves the machine: the frame allows no scripts, forms, popups or navigation
 // (sandbox with no permissions), and the page's own policy refuses every request except styles and images written
 // into it. So its own stylesheet links and pictures by path don't show: the layout and the text do.
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { useSize } from "../../lib/hooks";
 
 const WIDTH = 1280, HEIGHT = 800;   // the page is laid out as on a laptop, then scaled to the panel
 const POLICY = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; media-src data:">`;
 
 export function HtmlPreview({ html }: { html: string }) {
-  const box = useRef<HTMLDivElement>(null);
-  const [w, setW] = useState(0);
+  const [box, { w }] = useSize<HTMLDivElement>({ w: 0, h: 0 });
   const [tall, setTall] = useState(false);
-  useEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([e]) => setW(Math.round(e.contentRect.width)));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
   const k = w ? w / WIDTH : 0, h = tall ? HEIGHT * 2 : HEIGHT;
   return (
     <div className="cv-html" ref={box}>

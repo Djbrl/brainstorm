@@ -3,6 +3,7 @@
 // pill at the top, the player at the bottom: all float over the canvas. Every framing (fit, a file, a followed agent,
 // the replay tracer) centres its content in what's left, measured from the DOM, not hard-coded.
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { reducedMotion } from "../lib/breakpoints";
 
 /** Canvas size, and how much of each side is covered, in CSS pixels. */
 export type Safe = { w: number; h: number; left: number; top: number; right: number; bottom: number };
@@ -187,7 +188,7 @@ export function useCamera(fg: RefObject<Graph | undefined | null>, hostRef: RefO
       const c = g(), from = view();
       stop();
       if (!c || !from || !Number.isFinite(to.x) || !Number.isFinite(to.y) || !Number.isFinite(to.k)) return;
-      if (ms <= 0 || matchMedia?.("(prefers-reduced-motion: reduce)").matches) { c.zoom(to.k); c.centerAt(to.x, to.y); return; }
+      if (ms <= 0 || reducedMotion()) { c.zoom(to.k); c.centerAt(to.x, to.y); return; }
       const t0 = performance.now(), lk0 = Math.log(from.k), lk1 = Math.log(to.k);
       const tick = () => {
         const p = Math.min(1, (performance.now() - t0) / ms), e = ease(p);

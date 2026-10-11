@@ -19,6 +19,7 @@ import { agentFocusOf, streamOf, useAgentFocus, useThreadAgents } from "../../li
 import { useTheme } from "../../lib/theme";
 import { agentColor, initial, inkOn } from "../agents";
 import { readTokens } from "../color";
+import { useNow } from "../../lib/hooks";
 import "./replay.css";
 
 const USER_MS = 400;       // the list stops following the cursor this long after the user scrolls it
@@ -317,8 +318,7 @@ function stoppedAt(iso: string): string {
 
 /** The live end of the list while the model works on its next step (nothing in the log yet): "Thinking", and for how long. */
 function ThinkingRow({ since }: { since: string }) {
-  const [, tick] = useState(0);
-  useEffect(() => { const t = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(t); }, []);
+  useNow(1000);
   const s = Math.max(0, Math.round((Date.now() - Date.parse(since)) / 1000));
   const took = s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`;
   return (

@@ -4,7 +4,7 @@
 // that touched this one, each row naming its project).
 // Under the open thread: what it waits on you for, if it's blocked, and its agents, each on its row (follow, show/hide).
 // The eye in the title row shows or hides all its agents.
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { AgentPresence, Session } from "@contract";
 import { clock, useLive } from "../../lib/live";
 import { END, useNav } from "../../lib/nav";
@@ -15,16 +15,10 @@ import { harnessName, harnessOf } from "../../lib/harness";
 import { visitorHome } from "../../lib/islands";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
 import { readStoredJson, writeStored } from "../../lib/store";
+import { useNow } from "../../lib/hooks";
 
 const FOLDED_KEY = "rundown-folded-sections";
 
-function useTick(ms: number) {
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setTick((x) => x + 1), ms);
-    return () => clearInterval(t);
-  }, [ms]);
-}
 
 function EyeIcon({ off }: { off: boolean }) {
   return (
@@ -45,7 +39,7 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
   /** The open thread clicked again: show it (the sidebar had gone back to the list). */
   onShowThread?: () => void;
 }) {
-  useTick(5000);
+  useNow(5000);
   const now = clock();
   const { state } = useLive();
   const { replay, hiddenAgents, toggleAgent, setHiddenAgents, startReplay } = useNav();

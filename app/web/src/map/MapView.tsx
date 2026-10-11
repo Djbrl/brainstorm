@@ -42,6 +42,7 @@ import { setReadmap, useReadmap } from "./prefs";
 import { isTyping } from "../switch/shortcuts";
 import "./map.css";
 import { readStored, writeStored } from "../lib/store";
+import { useNow, useSize } from "../lib/hooks";
 
 /** Below this width the map is small (the Claude app's browser pane, a half screen): the camera follows an open
  *  thread's agent up close by itself. */
@@ -60,18 +61,6 @@ export function relTime(iso: string | undefined, now = clock()): string {
   return `changed ${Math.round(s / 86400)} days ago`;
 }
 
-function useSize<T extends HTMLElement>() {
-  const ref = useRef<T>(null);
-  const [size, setSize] = useState({ w: 800, h: 600 });
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([e]) => setSize({ w: Math.round(e.contentRect.width), h: Math.round(e.contentRect.height) }));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  return [ref, size] as const;
-}
 
 // ---------- view ----------
 export function MapView() {
@@ -86,8 +75,7 @@ export function MapView() {
   const islandSteps = replay ? state.steps[replay.sessionId] : undefined;
   // On the overview, only the agents still on the map (working, or seen in the last 10 minutes) keep an island: looked
   // at again every minute, so an agent that went quiet hours ago no longer leaves one beside the map.
-  const [islandMinute, setIslandMinute] = useState(0);
-  useEffect(() => { const t = setInterval(() => setIslandMinute((n) => n + 1), 60_000); return () => clearInterval(t); }, []);
+  const islandMinute = useNow(60_000);
   const islandAgents = useMemo(() => {
     const all = Object.values(state.agents ?? {});
     return replay ? all.filter((a) => a.sessionId === replay.sessionId) : visibleAgents(all);

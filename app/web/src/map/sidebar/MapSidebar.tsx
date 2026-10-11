@@ -13,7 +13,7 @@
 // On a wide window it's open: ‹ or T folds it for now, not for next time (it used to be saved,
 // and a fold left from a small window kept it folded on a wide one). T folds and unfolds it anywhere. Folded with a thread open, it's a card with the thread's
 // state and the step it's on (NowCard), except on a phone.
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { AgentPresence, FileNode, ProjectMap } from "@contract";
 import { useNav } from "../../lib/nav";
 import { ThreadsPanel } from "./ThreadsPanel";
@@ -24,6 +24,7 @@ import { NowCard } from "./NowCard";
 import { isTyping } from "../../switch/shortcuts";
 import "./sidebar.css";
 import { readStored, writeStored } from "../../lib/store";
+import { NARROW, PHONE, reducedMotion, useMedia } from "../../lib/breakpoints";
 
 export type MapSidebarProps = {
   /** All live agents, including hidden ones (so they can be shown again). */
@@ -47,21 +48,12 @@ const TAB_KEY = "rundown-sidebar-tab";
 
 const loadTab = (): Tab => (readStored(TAB_KEY) === "files" ? "files" : "threads");
 
-/** Whether a media query matches, kept up to date as the window resizes. */
-function useMedia(query: string): boolean {
-  return useSyncExternalStore(
-    (on) => { const m = matchMedia(query); m.addEventListener("change", on); return () => m.removeEventListener("change", on); },
-    () => matchMedia(query).matches,
-  );
-}
-export const NARROW = "(max-width: 1100px)";
 const LEAVE_MS = 220;                 // the sheet sliding away as it folds (sidebar.css)
 // Where its top may go, within a thumb's reach: no higher than a quarter of the map (and 96 px, under the map's top
 // controls), no lower than 170 px above the bottom (a few steps and the grab bar stay in view); dragged 6% past that, it folds.
 const PIP_MIN = 25, PIP_MAX = 72, TOP_PX = 96, BOTTOM_PX = 170, FOLD_PAST = 6;
 const pipRange = (h: number) => ({ lo: Math.max(PIP_MIN, (TOP_PX / Math.max(1, h)) * 100), hi: Math.max(PIP_MIN + 5, Math.min(PIP_MAX, ((h - BOTTOM_PX) / Math.max(1, h)) * 100)) });
 const PIP_START = 50;   // each page load starts the sheet at the middle (its height isn't remembered)
-const PHONE = "(max-width: 440px)";
 
 export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, map, file, picked, onCloseFile }: MapSidebarProps) {
   const { replay, file: fileLink, step: openStep, closeStep } = useNav();
@@ -77,7 +69,7 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
   const leaveT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const setOver = (on: boolean) => {
     clearTimeout(leaveT.current);
-    if (on || !over || matchMedia("(prefers-reduced-motion: reduce)").matches) { setLeaving(false); setOverNow(on); return; }
+    if (on || !over || reducedMotion()) { setLeaving(false); setOverNow(on); return; }
     setLeaving(true);
     leaveT.current = setTimeout(() => { setLeaving(false); setOverNow(false); }, LEAVE_MS);
   };

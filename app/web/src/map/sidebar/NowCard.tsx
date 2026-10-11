@@ -13,6 +13,7 @@ import { useLiveSelector } from "../../lib/live";
 import { useThread } from "../../lib/thread";
 import { needsYou, yourTurn } from "../../lib/attention";
 import { textOf } from "../replay/ReplaySteps";
+import { reducedMotion } from "../../lib/breakpoints";
 
 const NOTCH = 40;   // px of wheel per moment (a mouse notch, or a stretch of a trackpad's glide)
 const ROWS = 4;     // moments on the card
@@ -70,7 +71,7 @@ export function NowCard({ onOpen }: { onOpen: () => void }) {
   useLayoutEffect(() => {
     const el = list.current, d = Math.max(-3, Math.min(3, start - was.current));
     was.current = start;
-    if (!el || !d || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!el || !d || reducedMotion()) return;
     el.getAnimations().forEach((a) => a.cancel());
     el.animate([{ transform: `translateY(${d * ROW_H}px)` }, { transform: "none" }], { duration: SLIDE_MS, easing: "cubic-bezier(.2,.7,.25,1)" });
   }, [start]);

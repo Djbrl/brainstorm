@@ -1,6 +1,6 @@
 // Files tab: a searchable folder tree of the codebase, with per-file recency
 // dots and, during a replay, which files that thread touched.
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useMemo, useRef, useState } from "react";
 import type { ProjectMap } from "@contract";
 import { clock, useLiveSelector } from "../../lib/live";
 import { useNav } from "../../lib/nav";
@@ -8,14 +8,8 @@ import { useThread } from "../../lib/thread";
 import { repoBase } from "../../lib/paths";
 import { buildTree, filterTree, flattenTree, refreshLeaves, samePaths, type BuiltTree } from "./fileTree";
 import { FileTreeView } from "./FileTreeView";
+import { useNow } from "../../lib/hooks";
 
-function useTick(ms: number) {
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setTick((x) => x + 1), ms);
-    return () => clearInterval(t);
-  }, [ms]);
-}
 
 /**
  * The folder tree for a map, built again only when a file is added or removed (or the root changes). An agent editing
@@ -42,7 +36,7 @@ export function FilesPanel({ map, onFocusFile, hidden = false }: {
   /** A file is open in its place (FileView): the tree stays, as it was, out of sight. */
   hidden?: boolean;
 }) {
-  useTick(20000);
+  useNow(20000);
   const now = clock();
   const { replay } = useNav();
   const shared = useLiveSelector((s) => !!s.shared);

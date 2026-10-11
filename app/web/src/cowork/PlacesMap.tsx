@@ -19,6 +19,7 @@ import { useTheme } from "../lib/theme";
 import { clock, isReplay } from "../lib/live";
 import { sinceMs } from "../lib/visit";
 import { useStepWindow } from "../map/prefs";
+import { useSize } from "../lib/hooks";
 
 /** One circle of the places map. */
 export type PNode = NodeObject & {
@@ -93,15 +94,7 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
   /** The letter on the marker (the thread's). */
   letter: string;
 }) {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ w: 800, h: 600 });
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([e]) => setSize({ w: Math.round(e.contentRect.width), h: Math.round(e.contentRect.height) }));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  const [wrapRef, size] = useSize<HTMLDivElement>();
   const fg = useRef<ForceGraphMethods<PNode, never> | undefined>(undefined);
   const theme = useTheme();
   const tokens = useMemo(readTokens, [theme]);

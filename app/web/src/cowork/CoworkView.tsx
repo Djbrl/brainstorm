@@ -3,7 +3,7 @@
 // in the sidebar lists its places (PlaceSteps). No Readmap here: a visit is the thread's movement itself, which the
 // camera already follows.
 // Clicking a place opens its step in the side panel, the same step view as on the Map and the Track (and the same link: …/places/step/<id>).
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useLive } from "../lib/live";
 import { useNav, useReplayCursor } from "../lib/nav";
 import { initial } from "../map/agents";
@@ -17,16 +17,12 @@ import { HOME, eventsAt, placeOfStep, placeTitle, placesStore, selectPlace, useC
 import { StepDetail } from "../follow/StepDetail";
 import { pairResults } from "../follow/format";
 import { PlacesMap } from "./PlacesMap";
+import { NARROW, useMedia } from "../lib/breakpoints";
 import "../map/map.css";
 import "../follow/follow.css";
 import "./cowork.css";
 
-const NARROW = "(max-width: 1100px)";
 const PLACE_MS = 1100;   // a place's time on the player, at 1×
-const useNarrow = () => useSyncExternalStore(
-  (on) => { const m = matchMedia(NARROW); m.addEventListener("change", on); return () => m.removeEventListener("change", on); },
-  () => matchMedia(NARROW).matches,
-);
 
 export function PlacesView() {
   const { state } = useLive();
@@ -80,7 +76,7 @@ export function PlacesView() {
   const timeline = usePlaceTimeline();
   const { full } = timeline;
   const beatOf = useCallback((id: string) => full?.stepBeat.get(id), [full]);
-  const small = useNarrow();
+  const small = useMedia(NARROW);
 
   // ---- the player, place by place: Space plays from the place you're on, one place every ~1.1 s (faster at 2× 4×);
   // in the player ← → go one place back or forward, Home and End the first and the last ----

@@ -83,7 +83,8 @@ function Shell() {
   const [help, setHelp] = useState(false);       // the keyboard shortcuts (?)
   // Picking a project is a screen of its own: the browser's back (and Esc, and its Back link) return from it.
   const openSetup = () => { try { history.pushState({ ...(history.state ?? {}), rundownSetup: true }, ""); } catch { /* still opens */ } setSetupOpen(true); };
-  const closeSetup = () => { if (history.state?.rundownSetup) history.back(); else setSetupOpen(false); };
+  // Picking stops too: a checklist left behind (its screen went away under it) mustn't keep the picker up.
+  const closeSetup = () => { setPicking(false); if (history.state?.rundownSetup) history.back(); else setSetupOpen(false); };
   useEffect(() => {
     if (!setupOpen) return;
     const onPop = () => { setSetupOpen(false); setPicking(false); };
@@ -98,7 +99,8 @@ function Shell() {
   // First load: a quiet "Loading" until we know whether to show setup or the map, rather than a blank page or a flash of either.
   const booting = useBooting();
   const offline = useOffline();
-  if (booting) return <Loading />;
+  // Not while the setup checklist runs: the new project reloads the store, and the checklist must stay where it is.
+  if (booting && !picking) return <Loading />;
 
   // Local app: pick a workspace first (and whenever "Change" is clicked). The hosted demo never shows setup,
   // except the post-deadline preview, which plays back a recorded setup run (see lib/preview.ts).

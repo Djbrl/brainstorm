@@ -74,7 +74,7 @@ export class ShareController {
     const old = !template.includes(PLACEHOLDER) && template.includes(OLD_PLACEHOLDER);
     const data = `<script id="${old ? "brainstorm" : "rundown"}-replay" type="application/json">${JSON.stringify(replay).replace(/</g, "\\u003c")}</script>`;
     const html = template
-      .replace(/<title>[^<]*<\/title>/, `<title>${escHtml(replay.shared!.title)} · Rundown replay</title>`)
+      .replace(/<title>[^<]*<\/title>/, () => `<title>${escHtml(replay.shared!.title)} · Rundown replay</title>`)
       .replace(old ? OLD_PLACEHOLDER : PLACEHOLDER, () => data);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${name}.html"`);

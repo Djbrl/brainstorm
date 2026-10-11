@@ -13,6 +13,13 @@ export function agentColor(a: Pick<AgentPresence, "id" | "isSubagent">, accent: 
   return palette[h % palette.length];
 }
 
+/** The letter's colour on an agent's colour: white on a dark one, near-black on a light one (the dark themes' pastels). */
+export function inkOn(color: string): string {
+  if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(color.trim())) return "#fff";
+  const [r, g, b] = hex(color).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.179 ? "#111114" : "#fff";
+}
+
 export const shortName = (a: AgentPresence, max = 34) => {
   const n = a.name || a.id.slice(0, 7);
   return n.length > max ? n.slice(0, max - 1).trimEnd() + "…" : n;

@@ -17,9 +17,8 @@
 .mm-agents { flex: none; display: flex; align-items: center; gap: 2px; margin-left: auto; }
 .mm-agents button { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 0; padding: 0; background: none; display: grid; place-content: center; }
 .mm-agents button i { width: 18px; height: 18px; border-radius: 50%; display: grid; place-content: center; font-style: normal;
-  font-size: 9.5px; font-weight: 700; color: #fff; background: var(--c); opacity: .7; transition: opacity .15s, box-shadow .15s; }
-.mm-agents button:hover i { opacity: 1; }
-.mm-agents button.on i { opacity: 1; box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--c); }
+  font-size: 9.5px; font-weight: 700; color: var(--c-ink, #fff); background: var(--c); transition: box-shadow .15s; }
+.mm-agents button.on i { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--c); }
 .mm-agents button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* A side panel covers the right side: the Readmap steps aside. */
 .map-wrap:has(.map-panel.open) .readmap { display: none; }

@@ -8,7 +8,7 @@ import { useNav } from "../../lib/nav";
 import { useLiveSelector } from "../../lib/live";
 import { focusAgent, useAgentFocus, useThreadAgents } from "../../lib/agentFocus";
 import { useTheme } from "../../lib/theme";
-import { agentColor, initial } from "../agents";
+import { agentColor, initial, inkOn } from "../agents";
 import { readTokens } from "../color";
 import { ReplaySteps } from "../replay/ReplaySteps";
 import { ShareMenu } from "../replay/ReplayBar";
@@ -85,7 +85,7 @@ function AgentPicker({ title }: { title?: string }) {
         return (
           <button key={a.id} role="radio" aria-checked={focus === a.id} className={focus === a.id ? "on" : ""} onClick={() => pick(a.id)}
             title={`${a.name}: ${a.steps} step${a.steps === 1 ? "" : "s"}. Click to see only its steps`}>
-            <i style={{ background: agentColor(a, accent) }} aria-hidden="true">{initial(a.isSubagent ? a : { name: title ?? "", isSubagent: false })}</i>
+            <i style={{ background: agentColor(a, accent), color: inkOn(agentColor(a, accent)) }} aria-hidden="true">{initial(a.isSubagent ? a : { name: title ?? "", isSubagent: false })}</i>
             <span>{a.isSubagent ? name : "Main"}</span>
           </button>
         );

@@ -48,7 +48,7 @@
 .sn-m.edit b { background: var(--warm); }
 .sn-m.say b { background: var(--accent); }
 .sn-m.fl b { background: var(--risk); }
-.sn-m em { flex: none; font-style: normal; font-size: 12px; font-weight: 600; color: #b3261e; }
+.sn-m em { flex: none; font-style: normal; font-size: 12px; font-weight: 600; color: var(--risk-ink); }
 .sn-m.current { background: var(--accent-soft); color: var(--ink); }
 .sn-m.working b { background: var(--accent); }   /* the newest moment, while the thread works */
 .sn-m.done.d1 { opacity: .62; }

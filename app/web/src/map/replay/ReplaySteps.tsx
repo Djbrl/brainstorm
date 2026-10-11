@@ -17,7 +17,7 @@ import { LinkedLabel } from "../../lib/links";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
 import { agentFocusOf, streamOf, useAgentFocus, useThreadAgents } from "../../lib/agentFocus";
 import { useTheme } from "../../lib/theme";
-import { agentColor, initial } from "../agents";
+import { agentColor, initial, inkOn } from "../agents";
 import { readTokens } from "../color";
 import "./replay.css";
 
@@ -52,7 +52,7 @@ const Moment = memo(function Moment({ index, label, tone, failed, state, onPick,
   return (
     <button className={`rp-m ${tone} ${state}${who ? " by-sub" : ""}`} data-beat={index} onClick={() => onPick(index)}
       aria-current={state === "current" ? "step" : undefined} title={who ? `${who}: ${label}` : label}>
-      {who ? <i className="rp-who" style={{ background: whoColor }} aria-hidden="true">{whoLetter}</i> : <b aria-hidden="true" />}
+      {who ? <i className="rp-who" style={{ background: whoColor, color: whoColor && inkOn(whoColor) }} aria-hidden="true">{whoLetter}</i> : <b aria-hidden="true" />}
       <span><LinkedLabel text={label} max={40} /></span>
       {failed && <em>failed</em>}
     </button>

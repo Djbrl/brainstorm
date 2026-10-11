@@ -10,7 +10,7 @@ import { clock, useLive } from "../../lib/live";
 import { END, useNav } from "../../lib/nav";
 import { track } from "../../lib/usage";
 import { relTime } from "../../follow/format";
-import { agentColor, baseName, initial, shortName, verbIng } from "../agents";
+import { agentColor, baseName, initial, inkOn, shortName, verbIng } from "../agents";
 import { harnessName, harnessOf } from "../../lib/harness";
 import { visitorHome } from "../../lib/islands";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
@@ -184,7 +184,7 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
             return (
               <li key={a.id} className={`${following ? "following" : ""} ${hidden ? "hidden-agent" : ""}`}>
                 <div className="sidebar-agent-main">
-                  <i className="sidebar-agent-avatar" style={{ background: agentColor(a, accent) }} aria-hidden="true">{initial(a)}</i>
+                  <i className="sidebar-agent-avatar" style={{ background: agentColor(a, accent), color: inkOn(agentColor(a, accent)) }} aria-hidden="true">{initial(a)}</i>
                   <span className="sidebar-agent-text">
                     <button className="sidebar-agent-name sidebar-agent-follow" onClick={() => onFollow(following ? null : a.id)} aria-pressed={following}
                       aria-describedby={`agent-doing-${a.id}`} title={following ? "Stop following" : a.file ? "Follow this agent on the map, and see only its steps" : "See only its steps (it hasn't touched a file on the map yet)"}>{name}</button>

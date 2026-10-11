@@ -50,7 +50,8 @@
   --surface: #1f1f4a;
   --ink: #eef0ff;
   --ink-2: #c3c8ee;
-  --ink-3: #8d93c4;
+  --ink-3: #a4a9d8;
+  --risk-ink: #ff9a90;
   --line: rgba(160,170,255,.18);
   --accent: #9fd0ff;
   --accent-soft: rgba(120,160,255,.18);
@@ -82,7 +83,8 @@
   --surface: #121a1c;
   --ink: #dcf6f8;
   --ink-2: #a9cdd3;
-  --ink-3: #6f9399;
+  --ink-3: #87abb0;
+  --risk-ink: #ff9a90;
   --line: rgba(143,233,240,.16);
   --accent: #8b8fff;        /* the locator: agents, a blue going violet */
   --accent-soft: rgba(139,143,255,.16);

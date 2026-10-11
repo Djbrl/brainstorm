@@ -8,7 +8,7 @@
 // map. Shown unless turned off (its ×, or M; a Readmap button brings it back), on any map but a phone's.
 import { useEffect, useRef, type MouseEvent, type RefObject } from "react";
 import type { AgentPresence } from "@contract";
-import { agentColor, baseName, initial, lastReadAt, readsWithTimes, shortName, type AgentAnim } from "./agents";
+import { agentColor, baseName, initial, inkOn, lastReadAt, readsWithTimes, shortName, type AgentAnim } from "./agents";
 import type { Camera } from "./camera";
 import type { Graph, GNode } from "./graph";
 import { mapStyle } from "./themes";
@@ -343,7 +343,7 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
             {agents.map((a) => {
               const on = a.id === followId, color = agentColor(a, accent);
               return (
-                <button key={a.id} className={on ? "on" : ""} style={{ ["--c" as string]: color }} onClick={() => onTrack(a.id)}
+                <button key={a.id} className={on ? "on" : ""} style={{ ["--c" as string]: color, ["--c-ink" as string]: inkOn(color) }} onClick={() => onTrack(a.id)}
                   aria-pressed={on} title={`${on ? "Following" : "Follow"} ${a.isSubagent ? shortName(a, 40) : "the main agent"} (A: the next one)`}>
                   <i aria-hidden="true">{initial(a)}</i>
                 </button>

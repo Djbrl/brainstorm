@@ -40,3 +40,11 @@ export function useSize<T extends HTMLElement>(initial: Size = { w: 800, h: 600 
   }, []);
   return [ref, size] as const;
 }
+
+/** A ref that always holds the latest `value` (set on every render): what the map's frame callbacks, which keep one
+ *  identity for the canvas's life, read instead of a ref mirror per value. */
+export function useLatest<T>(value: T): { readonly current: T } {
+  const ref = useRef(value);
+  ref.current = value;
+  return ref;
+}

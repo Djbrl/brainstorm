@@ -41,6 +41,7 @@ import { useAutoTrack } from "./autoTrack";
 import { setReadmap, useReadmap } from "./prefs";
 import { isTyping } from "../switch/shortcuts";
 import "./map.css";
+import { readStored, writeStored } from "../lib/store";
 
 /** Below this width the map is small (the Claude app's browser pane, a half screen): the camera follows an open
  *  thread's agent up close by itself. */
@@ -608,10 +609,10 @@ const noLabel = () => "";
  */
 function CapNote({ map }: { map: ProjectMap }) {
   const key = "rundown-cap-note:" + map.root;
-  const [closed, setClosed] = useState(() => { try { return localStorage.getItem(key) === "1"; } catch { return false; } });
+  const [closed, setClosed] = useState(() => readStored(key) === "1");
   const total = map.totalFiles ?? 0, shown = map.files.length;
   if (closed || total <= shown) return null;
-  const close = () => { setClosed(true); try { localStorage.setItem(key, "1"); } catch { /* shown again next time */ } };
+  const close = () => { setClosed(true); writeStored(key, "1"); }; // storage blocked: shown again next time
   return (
     <p className="map-cap">
       The map shows {shown.toLocaleString()} of this project's {total.toLocaleString()} files, the ones that matter most. Files says how they're picked.

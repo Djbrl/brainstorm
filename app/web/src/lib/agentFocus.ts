@@ -1,28 +1,27 @@
 // One agent of a thread on its own: its steps in the Track, its files on the map, its moments in the player. A thread's
 // steps interleave the main agent's and its subagents'; every view builds the thread through useThread, which reads
 // this, so they all agree. Not saved: opening another thread shows everyone again.
-import { useMemo, useSyncExternalStore } from "react";
+import { useMemo } from "react";
 import type { AgentPresence, Step } from "@contract";
 import { useLiveSelector } from "./live";
+import { createAtom, useStoreSelector } from "./store";
 import { END, replayCursor, type NavActions, type ThreadReplay } from "./nav";
 
 type Focus = { sessionId: string; agent: string } | null;
-let focus: Focus = null;
-const subs = new Set<() => void>();
-const subscribe = (f: () => void) => { subs.add(f); return () => { subs.delete(f); }; };
+const focus = createAtom<Focus>(null);
 
 /** Who made a step: the subagent's id, or the session's id for the main agent (as AgentPresence ids are). */
 export const streamOf = (s: Pick<Step, "agentId" | "isSubagent">, sessionId: string) => s.agentId ?? (s.isSubagent ? "sub" : sessionId);
 
 export function setAgentFocus(sessionId: string, agent: string | null) {
   const next: Focus = agent ? { sessionId, agent } : null;
-  if (next?.sessionId === focus?.sessionId && next?.agent === focus?.agent) return;
-  focus = next;
-  subs.forEach((f) => f());
+  const now = focus.get();
+  if (next?.sessionId === now?.sessionId && next?.agent === now?.agent) return;
+  focus.set(next);
 }
 /** The agent shown on its own in this thread, or null for everyone. */
-export const agentFocusOf = (sessionId: string | null) => (sessionId && focus?.sessionId === sessionId ? focus.agent : null);
-export const useAgentFocus = (sessionId: string | null) => useSyncExternalStore(subscribe, () => agentFocusOf(sessionId), () => agentFocusOf(sessionId));
+export const agentFocusOf = (sessionId: string | null) => { const f = focus.get(); return sessionId && f?.sessionId === sessionId ? f.agent : null; };
+export const useAgentFocus = (sessionId: string | null) => useStoreSelector(focus, () => agentFocusOf(sessionId));
 
 /** One agent's steps, the same list each time for the same steps (so a thread built from it is reused). */
 const only = new WeakMap<Step[], Map<string, Step[]>>();

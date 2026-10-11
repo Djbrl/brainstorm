@@ -3,7 +3,7 @@
 // its files fade in where they always are (graph.ts never moves them). The files you look at, an open thread's files,
 // where a followed or working agent is: their folders show open at any zoom. Nothing here changes the layout, only
 // what's drawn and what a click hits. "Group files into folders" in Settings turns it off (every folder open).
-import { useSyncExternalStore } from "react";
+import { createAtom } from "../lib/store";
 import type { Graph, GNode } from "./graph";
 
 const OPEN_PX = 80;     // a folder starts to open when its circle's radius on screen reaches this
@@ -37,15 +37,6 @@ export function openAround(n: GNode | undefined, into: Set<GNode>) {
 }
 
 // ---------- the setting (like map/prefs.ts) ----------
-const KEY = "rundown-map-fold";
-let foldOn = (() => { try { return localStorage.getItem(KEY) !== "0"; } catch { return true; } })();
-const listeners = new Set<() => void>();
-const subscribe = (f: () => void) => { listeners.add(f); return () => { listeners.delete(f); }; };
-const getFold = () => foldOn;
-export function setFoldOn(on: boolean) {
-  if (on === foldOn) return;
-  foldOn = on;
-  try { localStorage.setItem(KEY, on ? "1" : "0"); } catch { /* not remembered, still applied */ }
-  listeners.forEach((f) => f());
-}
-export const useFoldOn = () => useSyncExternalStore(subscribe, getFold, getFold);
+const fold = createAtom(true, { key: "rundown-map-fold", parse: (v) => v !== "0", serialize: (on) => (on ? "1" : "0") });
+export const setFoldOn = (on: boolean) => fold.set(on);
+export const useFoldOn = fold.use;

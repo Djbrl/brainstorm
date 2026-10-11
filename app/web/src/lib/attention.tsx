@@ -4,6 +4,7 @@ import type { Attention, AttentionState } from "@contract";
 import { EDIT_TOOLS } from "@shared/tools";
 import { useLive } from "./live";
 import { isCodex } from "./harness";
+import { readStored, writeStored } from "./store";
 
 /** States where the agent can't go on without you. "done" (your turn) is softer: it finished, nothing is blocked. */
 export const BLOCKED: ReadonlySet<AttentionState> = new Set(["permission", "question", "plan", "stuck"]);
@@ -37,7 +38,7 @@ export function attentionText(a: Attention): { badge: string; line: string; titl
 }
 
 const NOTIFY_KEY = "rundown-notify";
-const notifyPref = () => { try { return localStorage.getItem(NOTIFY_KEY) === "1"; } catch { return false; } };
+const notifyPref = () => readStored(NOTIFY_KEY) === "1";
 
 /** Desktop notifications, opt-in per browser. */
 export function useNotifyPref() {
@@ -46,7 +47,7 @@ export function useNotifyPref() {
     if (typeof Notification === "undefined") return;
     let next = !on;
     if (next && Notification.permission !== "granted") next = (await Notification.requestPermission()) === "granted";
-    try { localStorage.setItem(NOTIFY_KEY, next ? "1" : "0"); } catch { /* storage blocked: lasts until reload */ }
+    writeStored(NOTIFY_KEY, next ? "1" : "0"); // storage blocked: lasts until reload
     setOn(next);
   }, [on]);
   return { on, toggle, supported: typeof Notification !== "undefined" };

@@ -2,9 +2,9 @@
 // the server (GET/PUT /api/onboarding), not in a browser: the Claude app's pane, Chrome and Safari would each show it
 // again. While it runs, the extras (the Readmap, the file window, read lines, the key hints, the "agents elsewhere"
 // pill) are hidden until the step that shows them (`:root[data-tour]`, tour.css), and an example agent can walk the map.
-import { useSyncExternalStore } from "react";
 import type { AgentPresence } from "@contract";
 import { ApiError, get, put } from "./api";
+import { createAtom, useStoreSelector } from "./store";
 
 export type TourStep = "hello" | "threads" | "steps" | "step" | "files" | "map" | "readmap" | "keys" | "stats" | "end";
 
@@ -17,20 +17,18 @@ type State = {
   agent: AgentPresence | null;
 };
 
-let state: State = { step: null, done: null, agent: null };
-const subs = new Set<() => void>();
-const set = (patch: Partial<State>) => {
-  state = { ...state, ...patch };
-  if (typeof document !== "undefined") {
-    if (state.step) document.documentElement.dataset.tour = state.step;
-    else delete document.documentElement.dataset.tour;
-  }
-  subs.forEach((f) => f());
-};
+const tour = createAtom<State>({ step: null, done: null, agent: null });
+tour.subscribe(() => { // before the views hear of it
+  if (typeof document === "undefined") return;
+  const { step } = tour.get();
+  if (step) document.documentElement.dataset.tour = step;
+  else delete document.documentElement.dataset.tour;
+});
+const set = (patch: Partial<State>) => tour.set((s) => ({ ...s, ...patch }));
 
 export const tourStore = {
-  get: () => state,
-  subscribe: (f: () => void) => { subs.add(f); return () => { subs.delete(f); }; },
+  get: tour.get,
+  subscribe: tour.subscribe,
   /** Start (again) from the first step. */
   start: () => set({ step: "hello" }),
   go: (step: TourStep) => set({ step }),
@@ -44,7 +42,7 @@ export const tourStore = {
   /** Whether the server says this install had it; starts it if not. */
   load: () => {
     get<{ done: boolean }>("/api/onboarding").catch((e: unknown) => { if (e instanceof ApiError && e.status) return null; throw e; }).then((r) => {
-      if (state.done !== null) return;
+      if (tour.get().done !== null) return;
       // An older server without the route: count it as done, so nothing nags.
       const done = r ? !!r.done : true;
       set({ done, ...(done ? {} : { step: "hello" as TourStep }) });
@@ -58,10 +56,10 @@ function save(done: boolean) {
 }
 
 export function useTour<T>(pick: (s: State) => T): T {
-  return useSyncExternalStore(tourStore.subscribe, () => pick(state), () => pick(state));
+  return useStoreSelector(tour, pick);
 }
 
 /** The tour is on and the step isn't one that shows the extras: the map leaves out read lines and the like. */
-export const tourHidesExtras = () => !!state.step && state.step !== "map";
+export const tourHidesExtras = () => { const { step } = tour.get(); return !!step && step !== "map"; };
 
 export const TOUR_AGENT = "tour-example-agent";

@@ -5,12 +5,13 @@
 // Which islands: a thread of this project shows every project it reached; a visitor (a thread from elsewhere that touched
 // this project) shows only the project it comes from, not the others it went on to. The most recent MAX_ISLANDS get
 // their own island; the rest share one, "+N more projects", with a small island per project inside it.
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo } from "react";
 import type { AgentPresence, FileNode, ProjectMap, Session, Step } from "@contract";
 import { outOfWorktree } from "@shared/paths";
 import { isReplay } from "./live";
 import { repoBase, repoRelative } from "./paths";
 import { get } from "./api";
+import { createAtom } from "./store";
 
 export type Island = {
   root: string; name: string; files: FileNode[];
@@ -69,18 +70,18 @@ export const placeName = (abs: string): string | null => { const r = placeOf(abs
 export const isPlaceRoot = (root: string) => placeNames.has(root);
 
 // ---- the projects Rundown knows (the workspace picker's list), to name an island after its project ----
-let roots: string[] | null = null, asked = false;
-const subs = new Set<() => void>();
+const roots = createAtom<string[] | null>(null);
+let asked = false;
 function loadRoots() {
   if (asked || isReplay()) return;
   asked = true;
   get<{ root: string }[]>("/api/workspace/suggestions")
-    .then((list) => { roots = list.map((s) => s.root.replace(/\/+$/, "")).sort((a, b) => b.length - a.length); subs.forEach((f) => f()); })
-    .catch(() => { roots = []; });
+    .then((list) => roots.set(list.map((s) => s.root.replace(/\/+$/, "")).sort((a, b) => b.length - a.length)))
+    .catch(() => roots.set([]));
 }
 const useRoots = () => {
   useEffect(loadRoots, []);
-  return useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, () => roots);
+  return roots.use();
 };
 
 /** One path per file whichever checkout the agent used: a worktree's copy (`<repo>/.claude/worktrees/<name>/x`) is the
@@ -104,9 +105,9 @@ export function projectOf(abs: string, known: string[] | null): string {
 }
 
 /** The projects Rundown knows, deepest first (null until loaded). */
-export const knownRoots = () => roots;
+export const knownRoots = roots.get;
 /** A visitor's home (see homeOf), with the projects known so far. */
-export const visitorHome = (cwd: string | undefined, map: ProjectMap | null) => homeOf(cwd, map, roots);
+export const visitorHome = (cwd: string | undefined, map: ProjectMap | null) => homeOf(cwd, map, roots.get());
 /** A visitor's home: the project its thread works in, when that isn't this one (null for this project's own threads). */
 function homeOf(cwd: string | undefined, map: ProjectMap | null, known: string[] | null): string | null {
   if (!cwd || !map || !cwd.startsWith("/") || inProject(cwd, map)) return null;

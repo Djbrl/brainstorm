@@ -1,13 +1,14 @@
 // Getting from one thread to another in one move: the threads in the tab bar (which, in which order),
 // the threads you opened lately (remembered per project, per browser), and the threads at work in your other projects
 // (GET /api/elsewhere, asked every few seconds while the page is in view).
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo } from "react";
 import type { Attention, ElsewhereThread, Session } from "@contract";
 import { isReplay, useLiveSelector, shallowEqual } from "./live";
 import { needsYou, yourTurn } from "./attention";
 import { END, type NavActions } from "./nav";
 import { track } from "./usage";
 import { ApiError, get, post } from "./api";
+import { createAtom } from "./store";
 
 // ---- opening a thread (the same move as a click in the Threads list) ----
 
@@ -25,35 +26,24 @@ const RECENT_KEY = "rundown-recent-threads";
 const RECENT_MS = 12 * 60 * 60_000;
 type Recent = Record<string, { id: string; at: number }[]>; // by project root
 
-let recent: Recent = (() => { try { return JSON.parse(localStorage.getItem(RECENT_KEY) ?? "{}") as Recent; } catch { return {}; } })();
-const subs = new Set<() => void>();
-const save = () => {
-  try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent)); } catch { /* kept for this visit only */ }
-  subs.forEach((f) => f());
-};
+const json = { parse: (v: string) => JSON.parse(v) as Recent, serialize: (v: Recent) => JSON.stringify(v) };
+const recent = createAtom<Recent>({}, { key: RECENT_KEY, ...json }); // storage blocked: kept for this visit only
 
 // Threads you closed in the bar stay out of it, even while they work, until you open them again or they need you.
 const CLOSED_KEY = "rundown-closed-threads";
-let closed: Recent = (() => { try { return JSON.parse(localStorage.getItem(CLOSED_KEY) ?? "{}") as Recent; } catch { return {}; } })();
-const saveClosed = () => { try { localStorage.setItem(CLOSED_KEY, JSON.stringify(closed)); } catch { /* kept for this visit only */ } };
+const closed = createAtom<Recent>({}, { key: CLOSED_KEY, ...json });
 
 export function rememberThread(root: string, id: string) {
   const now = Date.now();
-  const list = (recent[root] ?? []).filter((x) => x.id !== id && now - x.at < RECENT_MS);
-  recent = { ...recent, [root]: [{ id, at: now }, ...list].slice(0, 20) };
-  if (closed[root]?.some((x) => x.id === id)) { closed = { ...closed, [root]: closed[root].filter((x) => x.id !== id) }; saveClosed(); }
-  save();
+  if (closed.get()[root]?.some((x) => x.id === id)) closed.set((c) => ({ ...c, [root]: c[root].filter((x) => x.id !== id) }));
+  recent.set((r) => ({ ...r, [root]: [{ id, at: now }, ...(r[root] ?? []).filter((x) => x.id !== id && now - x.at < RECENT_MS)].slice(0, 20) }));
 }
 /** Close a thread's tab: out of the bar, a running one too, until you open it again or it needs you. */
 export function forgetThread(root: string, id: string) {
   const now = Date.now();
-  recent = { ...recent, [root]: (recent[root] ?? []).filter((x) => x.id !== id) };
-  closed = { ...closed, [root]: [{ id, at: now }, ...(closed[root] ?? []).filter((x) => x.id !== id && now - x.at < RECENT_MS)].slice(0, 40) };
-  saveClosed();
-  save();
+  closed.set((c) => ({ ...c, [root]: [{ id, at: now }, ...(c[root] ?? []).filter((x) => x.id !== id && now - x.at < RECENT_MS)].slice(0, 40) }));
+  recent.set((r) => ({ ...r, [root]: (r[root] ?? []).filter((x) => x.id !== id) }));
 }
-const useRecent = () => useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, () => recent);
-const useClosed = () => useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, () => closed);
 
 // ---- the tab bar ----
 
@@ -67,7 +57,7 @@ const MAX_TABS = 9;
  */
 export function useBarThreads(openId: string | null): BarThread[] {
   const { sessions, attention, root } = useLiveSelector((s) => ({ sessions: s.sessions, attention: s.attention, root: s.setup?.root ?? "" }), shallowEqual);
-  const mine = useRecent()[root], shut = useClosed()[root];
+  const mine = recent.use()[root], shut = closed.use()[root];
   return useMemo(() => {
     const now = Date.now();
     const lately = new Map((mine ?? []).filter((x) => now - x.at < RECENT_MS).map((x) => [x.id, x.at]));
@@ -94,9 +84,8 @@ export function useBarThreads(openId: string | null): BarThread[] {
 // ---- threads at work in other projects ----
 
 const POLL_MS = 8_000;
-let elsewhere: ElsewhereThread[] = [];
+const elsewhere = createAtom<ElsewhereThread[]>([]);
 let pollers = 0, timer: ReturnType<typeof setTimeout> | undefined, asked = false;
-const esubs = new Set<() => void>();
 
 async function poll() {
   timer = undefined;
@@ -105,7 +94,7 @@ async function poll() {
     asked = true;
     try {
       const next = await get<ElsewhereThread[]>("/api/elsewhere");
-      if (JSON.stringify(next) !== JSON.stringify(elsewhere)) { elsewhere = next; esubs.forEach((f) => f()); }
+      if (JSON.stringify(next) !== JSON.stringify(elsewhere.get())) elsewhere.set(next);
     } catch { /* the server is out of reach: keep what we had */ }
   }
   if (pollers && !timer) timer = setTimeout(poll, POLL_MS);
@@ -121,7 +110,7 @@ export function useElsewhere(): ElsewhereThread[] {
       if (--pollers === 0) { if (timer) clearTimeout(timer); timer = undefined; document.removeEventListener("visibilitychange", onVisible); }
     };
   }, []);
-  return useSyncExternalStore((f) => { esubs.add(f); return () => { esubs.delete(f); }; }, () => elsewhere);
+  return elsewhere.use();
 }
 
 /** Switch the server to another project, then open one of its threads there. */
@@ -131,7 +120,7 @@ export async function jumpElsewhere(t: ElsewhereThread, nav: Pick<NavActions, "s
   reload();
   // The other project's thread list comes with the reload; a thread that works is followed live, one that waits opens at its end.
   openThread(nav, { id: t.sessionId, status: t.state === "working" ? "running" : "idle" });
-  elsewhere = elsewhere.filter((x) => x.root !== t.root); esubs.forEach((f) => f());
+  elsewhere.set((l) => l.filter((x) => x.root !== t.root));
   if (timer) clearTimeout(timer);
   poll();
 }

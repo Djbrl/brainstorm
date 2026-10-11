@@ -1,9 +1,10 @@
 // Loads GET /api/cowork?sessionId= for one thread and shapes it for the view: change groups, verb names, area names.
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CoworkArea, CoworkEvent, CoworkSummary, CoworkVerb } from "@contract";
 import { isReplay, replayCowork } from "../lib/live";
 import { get } from "../lib/api";
 import { usePoll } from "../lib/hooks";
+import { createAtom } from "../lib/store";
 
 /** The places of one thread (its subagents included). Refreshes while the thread is running. */
 export function useCowork(sessionId: string | null, running: boolean, loaded = true) {
@@ -47,14 +48,13 @@ export const VERB_NAME: Record<CoworkVerb, string> = {
  *  the thread's step order, cowork/rows.ts). */
 export type PlacesRow = { i: number; beat: number; event: string | null; step: number };
 type PlacesState = { data: CoworkSummary | null; selected: string | null; stepId: string | null; highlight: string | null; row?: PlacesRow | null };
-let places: PlacesState = { data: null, selected: null, stepId: null, highlight: null, row: null };
-const subs = new Set<() => void>();
+const places = createAtom<PlacesState>({ data: null, selected: null, stepId: null, highlight: null, row: null });
 export const placesStore = {
-  get: () => places,
-  set(p: Partial<PlacesState>) { places = { ...places, ...p }; subs.forEach((f) => f()); },
-  subscribe(f: () => void) { subs.add(f); return () => { subs.delete(f); }; },
+  get: places.get,
+  set: (p: Partial<PlacesState>) => places.set((s) => ({ ...s, ...p })),
+  subscribe: places.subscribe,
 };
-export const usePlaces = () => useSyncExternalStore(placesStore.subscribe, placesStore.get);
+export const usePlaces = places.use;
 
 /** The events at a place id: a page (`area|page`) or, for the map's site bubbles, a whole site (`area|site`). */
 export const eventsAt = (data: CoworkSummary, id: string) => data.events.filter((e) => `${e.area}|${e.page}` === id || `${e.area}|${e.site}` === id);
@@ -65,7 +65,7 @@ export function placeOfStep(data: CoworkSummary, stepId: string): string | null 
 }
 /** Select a place and show its newest step (or a given one) in the panel. */
 export function selectPlace(id: string | null, stepId?: string) {
-  const d = places.data;
+  const d = places.get().data;
   if (!id || !d) { placesStore.set({ selected: null, stepId: null }); return; }
   const at = eventsAt(d, id);
   placesStore.set({ selected: id, stepId: stepId ?? at[at.length - 1]?.stepId ?? null });

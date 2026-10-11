@@ -14,6 +14,7 @@ import { agentColor, baseName, initial, inkOn, shortName, verbIng } from "../age
 import { harnessName, harnessOf } from "../../lib/harness";
 import { visitorHome } from "../../lib/islands";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
+import { readStoredJson, writeStored } from "../../lib/store";
 
 const FOLDED_KEY = "rundown-folded-sections";
 
@@ -50,10 +51,10 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
   const { replay, hiddenAgents, toggleAgent, setHiddenAgents, startReplay } = useNav();
   const [all, setAll] = useState(false);
   // Sections you folded, remembered in this browser.
-  const [closed, setClosed] = useState<ReadonlySet<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem(FOLDED_KEY) ?? "[]") as string[]); } catch { return new Set(); } });
+  const [closed, setClosed] = useState<ReadonlySet<string>>(() => new Set(readStoredJson<string[]>(FOLDED_KEY, [])));
   const toggleGroup = (key: string) => setClosed((c) => {
     const n = new Set(c); if (n.has(key)) n.delete(key); else n.add(key);
-    try { localStorage.setItem(FOLDED_KEY, JSON.stringify([...n])); } catch { /* folded for this visit only */ }
+    writeStored(FOLDED_KEY, JSON.stringify([...n])); // storage blocked: folded for this visit only
     return n;
   });
 

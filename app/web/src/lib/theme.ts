@@ -2,7 +2,7 @@
 //
 // The theme is set as <html data-theme="…"> so CSS can restyle surfaces (styles/themes.css), and read on every
 // frame by the canvas layers through getTheme() (see map/themes.ts), like mapPrefs.
-import { useSyncExternalStore } from "react";
+import { createAtom, readStored, writeStored } from "./store";
 
 export type ThemeId = "default" | "prism" | "hologram" | "metro";
 
@@ -18,27 +18,12 @@ const isTheme = (v: unknown): v is ThemeId => THEMES.some((t) => t.id === v);
 /** Themes renamed in 0.6 (the old names were other companies' trademarks): a choice saved under the old id carries over. */
 const RENAMED: Record<string, ThemeId> = { ps2: "prism", deadspace: "hologram" };
 
-function read(): ThemeId {
-  try {
-    let v = localStorage.getItem(KEY);
-    if (v && RENAMED[v]) { v = RENAMED[v]; localStorage.setItem(KEY, v); }
-    if (isTheme(v)) return v;
-  } catch { /* storage blocked: the default */ }
-  return "default";
-}
-
-let current: ThemeId = read();
-const listeners = new Set<() => void>();
-const apply = () => { document.documentElement.dataset.theme = current; };
+const theme = createAtom<ThemeId>("default", { key: KEY, parse: (v) => { const t = RENAMED[v] ?? v; return isTheme(t) ? t : undefined; } });
+{ const saved = readStored(KEY); if (saved && RENAMED[saved]) writeStored(KEY, RENAMED[saved]); } // kept under its new name
+const apply = () => { document.documentElement.dataset.theme = theme.get(); };
 apply();
+theme.subscribe(apply);
 
-export const getTheme = () => current;
-export function setTheme(id: ThemeId) {
-  if (id === current) return;
-  current = id;
-  try { localStorage.setItem(KEY, id); } catch { /* not remembered, still applied */ }
-  apply();
-  listeners.forEach((f) => f());
-}
-const subscribe = (f: () => void) => { listeners.add(f); return () => { listeners.delete(f); }; };
-export const useTheme = () => useSyncExternalStore(subscribe, getTheme, getTheme);
+export const getTheme = theme.get;
+export const setTheme = (id: ThemeId) => theme.set(id);
+export const useTheme = theme.use;

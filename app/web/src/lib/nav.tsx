@@ -22,7 +22,7 @@
 // read `index`/`playing` with useReplayCursor only where they're drawn (ideally a small child component).
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { ReplayDetail } from "./thread";
-import { listeners, shallowEqual, useStoreSelector } from "./store";
+import { listeners, readStored, readStoredJson, shallowEqual, useStoreSelector, writeStored } from "./store";
 
 /** How a thread is shown: where it happened in the code, or the places it went outside the code. */
 export type Lens = "map" | "places";
@@ -134,12 +134,8 @@ const Ctx = createContext<NavStore | null>(null);
 
 const HIDDEN_KEY = "rundown-hidden-agents";
 const READS_KEY = "rundown-map-show-reads";
-function loadShowReads(): boolean {
-  try { return localStorage.getItem(READS_KEY) !== "0"; } catch { return true; }
-}
-function loadHidden(): Set<string> {
-  try { return new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? "[]") as string[]); } catch { return new Set(); }
-}
+const loadShowReads = () => readStored(READS_KEY) !== "0";
+const loadHidden = () => new Set(readStoredJson<string[]>(HIDDEN_KEY, []));
 
 // ---- links ----
 
@@ -228,11 +224,11 @@ function createNavStore(): NavStore {
   const setShowReads = (v: boolean) => {
     mapPrefs.showReads = v;
     set({ showReads: v });
-    try { localStorage.setItem(READS_KEY, v ? "1" : "0"); } catch { /* storage blocked: resets on reload */ }
+    writeStored(READS_KEY, v ? "1" : "0"); // storage blocked: resets on reload
   };
   const setHidden = (h: ReadonlySet<string>) => {
     set({ hiddenAgents: h });
-    try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...h])); } catch { /* storage blocked: hidden agents reset on reload */ }
+    writeStored(HIDDEN_KEY, JSON.stringify([...h])); // storage blocked: hidden agents reset on reload
   };
 
   const startReplay: NavActions["startReplay"] = (sid, at = 0, opts) => set({

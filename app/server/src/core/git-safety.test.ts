@@ -154,3 +154,20 @@ test("a map root inside the repo: included files are found from the top of the r
     assert.equal(pinsOf(gitEnv(sub))["filter.y.clean"], "cat");
   } finally { rmSync(tmp, { recursive: true, force: true }); }
 });
+
+test("git-lfs and git-crypt as their installers write them are left alone; anything else is pinned", () => {
+  const { tmp, repo } = scratchRepo();
+  try {
+    git(repo, "config", "filter.lfs.clean", "git-lfs clean -- %f"); git(repo, "config", "filter.lfs.smudge", "git-lfs smudge -- %f");
+    git(repo, "config", "filter.lfs.process", "git-lfs filter-process"); git(repo, "config", "filter.lfs.required", "true");
+    git(repo, "config", "filter.git-crypt.clean", '"git-crypt" clean'); git(repo, "config", "filter.git-crypt.smudge", '"git-crypt" smudge');
+    git(repo, "config", "filter.git-crypt.required", "true"); git(repo, "config", "diff.git-crypt.textconv", '"git-crypt" diff');
+    git(repo, "config", "filter.fake.clean", "git-lfs clean -- %f; touch /tmp/owned");      // mentions git-lfs: still pinned
+    git(repo, "config", "filter.fake2.process", "/tmp/git-lfs filter-process");
+    git(repo, "config", "filter.half.clean", "git-lfs clean -- %f"); git(repo, "config", "filter.half.smudge", "evil");
+    git(repo, "config", "diff.fake.textconv", '"git-crypt" diff && evil');
+    const pins = pinsOf(gitEnv(repo));
+    for (const k of Object.keys(pins)) assert.ok(!/^(filter|diff)\.(lfs|git-crypt)\./.test(k), k);
+    for (const k of ["filter.fake.clean", "filter.fake2.process", "filter.half.clean", "filter.half.smudge", "diff.fake.textconv"]) assert.ok(k in pins, k);
+  } finally { rmSync(tmp, { recursive: true, force: true }); }
+});

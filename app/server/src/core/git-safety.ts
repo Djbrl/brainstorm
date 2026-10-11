@@ -11,6 +11,17 @@ import { dirname, resolve } from "node:path";
 
 const SAFE: [string, string][] = [["core.fsmonitor", "false"], ["core.hooksPath", "/dev/null"], ["log.showSignature", "false"]];
 
+/**
+ * Drivers a repo's own config may name and keep: exactly what `git lfs install --local` and `git-crypt init` write.
+ * Pinning these would make every file they handle look changed. Anything else, even a command that merely mentions
+ * one of these tools, is pinned.
+ */
+const KNOWN: Record<string, Set<string>> = {
+  "filter.clean": new Set(["git-lfs clean -- %f", '"git-crypt" clean']),
+  "filter.smudge": new Set(["git-lfs smudge -- %f", '"git-crypt" smudge']),
+  "filter.process": new Set(["git-lfs filter-process"]),
+  "diff.textconv": new Set(['"git-crypt" diff']),
+};
 /** The keys of a driver that name a program. */
 const COMMANDS = new Set(["filter.clean", "filter.smudge", "filter.process", "diff.textconv", "diff.command", "merge.driver"]);
 
@@ -81,11 +92,11 @@ function driverPins(root: string): [string, string][] | null {
     if (!m) continue;
     const kind = m[1].toLowerCase(), id = `${kind}\0${m[2]}`, command = `${kind}.${m[3].toLowerCase()}`;
     const list = commands.get(id) ?? commands.set(id, []).get(id)!;
-    if (COMMANDS.has(command)) list.push(value);
+    if (COMMANDS.has(command) && !KNOWN[command]?.has(value.trim())) list.push(value);
   }
   const pins: [string, string][] = [];
   for (const [id, unknown] of commands) {
-    if (!unknown.length) continue;   // no command here (it comes from the person's own config)
+    if (!unknown.length) continue;   // only known tools' commands (or none: they come from the person's own config)
     const [kind, name] = id.split("\0");
     if (kind === "filter") pins.push([`filter.${name}.clean`, "cat"], [`filter.${name}.smudge`, "cat"], [`filter.${name}.process`, ""], [`filter.${name}.required`, "false"]);
     else if (kind === "diff") pins.push([`diff.${name}.textconv`, ""], [`diff.${name}.command`, ""]);

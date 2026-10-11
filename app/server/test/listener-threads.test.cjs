@@ -103,7 +103,8 @@ test("titles are stored masked, from a prompt and from a rename; older titles ar
   for (const r of titles()) { assert.ok(!r.title.includes(KEY), r.title); assert.equal(r.harness, "claude"); }
   // A database from before: an unmasked title, harness NULL. The next start fixes both, once.
   t.dbs.db.prepare(`UPDATE sessions SET title = ?, harness = NULL WHERE id = 's1'`).run(`old ${KEY}`);
-  t.dbs.db.exec(`DELETE FROM settings WHERE key LIKE 'listener:%'`);
+  t.dbs.db.exec(`DELETE FROM settings WHERE key LIKE 'listener:%'; PRAGMA user_version = 0`);
+  require(require("./helpers.cjs").dist("core/schema.js")).migrate(t.dbs.db);
   const { ListenerService } = require(require("./helpers.cjs").dist("listener/listener.service.js"));
   const again = new ListenerService(t.dbs, t.bus, { broadcast() {} }, t.cfg);
   again.onModuleInit();

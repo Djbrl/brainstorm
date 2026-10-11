@@ -1,6 +1,7 @@
 import { closeSync, openSync, readSync, statSync } from "node:fs";
 import { basename, dirname, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
+import { getSetting, setSetting } from "../core/settings.service";
 
 // Steps stored by older versions have no agent_id: it was live only. Without it, a reloaded thread can't tell parallel
 // subagents apart. This fills it in once, from the subagent logs the steps came from
@@ -24,8 +25,7 @@ export async function backfillAgentIds(
   const stopped = opts.stopped ?? (() => false);
   const chunkBytes = opts.chunkBytes ?? 1024 * 1024;
   const maxLineBytes = opts.maxLineBytes ?? 16 * 1024 * 1024;
-  db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
-  if (db.prepare(`SELECT 1 FROM settings WHERE key = ?`).get(AGENT_IDS_DONE)) return undefined;
+  if (getSetting(db, AGENT_IDS_DONE) !== null) return undefined;
 
   // Threads with subagent steps still missing their id, and the subagent logs of those threads read so far.
   const sessions = new Set((db.prepare(`SELECT DISTINCT session_id AS s FROM steps WHERE is_subagent = 1 AND agent_id IS NULL`).all() as { s: string }[]).map((r) => r.s));
@@ -88,8 +88,7 @@ export async function backfillAgentIds(
     }
   }
   if (stopped()) return undefined;
-  db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
-    .run(AGENT_IDS_DONE, JSON.stringify({ at: new Date().toISOString(), ...result }));
+  setSetting(db, AGENT_IDS_DONE, JSON.stringify({ at: new Date().toISOString(), ...result }));
   return result;
 }
 

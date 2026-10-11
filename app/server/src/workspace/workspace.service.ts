@@ -7,7 +7,7 @@ import { homedir } from "node:os";
 import type { SetupStatus, SetupStep, WorkspaceConflict, WorkspaceSuggestion } from "../shared/contract";
 import { worktreeRepo } from "../shared/paths";
 import { inside, real } from "../core/paths";
-import { DbService } from "../core/db.service";
+import { SettingsService } from "../core/settings.service";
 import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";
 import { ConfigService } from "../core/config.service";
@@ -75,16 +75,15 @@ export class WorkspaceService implements OnModuleInit, OnModuleDestroy {
   private gen = 0;
 
   constructor(
-    private dbs: DbService,
     private bus: BusService,
     private gateway: EventsGateway,
     private cfg: ConfigService,
     private listener: ListenerService,
     private mapper: MapperService,
+    private settings: SettingsService,
   ) {}
 
   onModuleInit() {
-    this.dbs.db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
     this.folderTimer = setInterval(() => safely(this.log, "project folder check", () => this.checkFolder()), FOLDER_CHECK_MS);
     this.folderTimer.unref?.();
     // The saved project wins: a restart (an update, a crash) keeps the project the pages show. The project of the session
@@ -101,7 +100,7 @@ export class WorkspaceService implements OnModuleInit, OnModuleDestroy {
     if (saved && tooBroad(saved)) {
       // Saved before this guard (an island named after ~/Documents): mapping it would hang the server. Pick again.
       this.log.warn(`boot: the saved workspace ${saved} is a folder of folders, not a project: showing the setup screen`);
-      this.dbs.db.prepare(`DELETE FROM settings WHERE key = 'workspace'`).run();
+      this.settings.delete("workspace");
       if (useGiven()) return;
     } else if (saved && this.isValidDir(saved)) {
       this.log.log(`boot: applying saved workspace ${saved}`);
@@ -285,16 +284,8 @@ export class WorkspaceService implements OnModuleInit, OnModuleDestroy {
 
   // ---- settings persistence ----
 
-  private getSetting(key: string): string | null {
-    const row = this.dbs.db.prepare(`SELECT value FROM settings WHERE key = ?`).get(key) as { value: string } | undefined;
-    return row?.value ?? null;
-  }
-
-  private setSetting(key: string, value: string) {
-    this.dbs.db
-      .prepare(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
-      .run(key, value);
-  }
+  private getSetting(key: string) { return this.settings.get(key); }
+  private setSetting(key: string, value: string) { this.settings.set(key, value); }
 
   // ---- activation pipeline ----
 

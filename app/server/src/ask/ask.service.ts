@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { config } from "../core/config";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -39,7 +39,7 @@ const MAX_FILE_LINES = 150;
 const clip = (s: string | undefined, n: number) => (!s ? "" : s.length > n ? s.slice(0, n) + "\n…(truncated)" : s);
 
 @Injectable()
-export class AskService implements OnModuleInit {
+export class AskService {
   private log = new Logger("Ask");
   constructor(
     private dbs: DbService,
@@ -48,14 +48,6 @@ export class AskService implements OnModuleInit {
     private claude: ClaudeService,
     private usage: UsageService,
   ) {}
-
-  onModuleInit() {
-    this.dbs.db.exec(`CREATE TABLE IF NOT EXISTS ask_answers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      question TEXT NOT NULL, step_id TEXT NOT NULL DEFAULT '', file_path TEXT NOT NULL DEFAULT '',
-      file_hash TEXT NOT NULL DEFAULT '', request TEXT NOT NULL, response TEXT NOT NULL, created_at TEXT NOT NULL)`);
-    this.dbs.db.exec(`CREATE INDEX IF NOT EXISTS ask_answers_key ON ask_answers(question, step_id, file_path)`);
-  }
 
   async ask(req: AskRequest): Promise<AskResponse> {
     if (typeof req !== "object" || req === null) req = {} as AskRequest;

@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
-import { DbService } from "../core/db.service";
+import { SettingsService } from "../core/settings.service";
 import { BusService } from "../core/bus.service";
 import { config } from "../core/config";
 import { safely } from "../core/safely";
@@ -43,10 +43,9 @@ export class UsageService implements OnModuleInit, OnModuleDestroy {
   private on = false;                 // the setting, read once (a step bumps a count: no database read each time)
   private timers: NodeJS.Timeout[] = [];
 
-  constructor(private dbs: DbService, private bus: BusService) {}
+  constructor(private settings: SettingsService, private bus: BusService) {}
 
   onModuleInit() {
-    this.dbs.db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
     try { this.counts = JSON.parse(this.get("usage.counts") ?? "{}"); } catch { this.counts = {}; }
     try { for (const s of JSON.parse(this.get("usage.sessions") ?? "[]")) this.sessions.add(s); } catch { /* none */ }
     this.theme = this.get("usage.theme") ?? "";
@@ -173,14 +172,7 @@ export class UsageService implements OnModuleInit, OnModuleDestroy {
     this.set("usage.sessions", JSON.stringify([...this.sessions].slice(-500)));
   }
 
-  private get(key: string): string | null {
-    const row = this.dbs.db.prepare(`SELECT value FROM settings WHERE key = ?`).get(key) as { value: string } | undefined;
-    return row?.value ?? null;
-  }
-
-  private set(key: string, value: string) {
-    this.dbs.db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(key, value);
-  }
-
-  private del(key: string) { this.dbs.db.prepare(`DELETE FROM settings WHERE key = ?`).run(key); }
+  private get(key: string) { return this.settings.get(key); }
+  private set(key: string, value: string) { this.settings.set(key, value); }
+  private del(key: string) { this.settings.delete(key); }
 }

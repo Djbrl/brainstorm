@@ -14,7 +14,6 @@ import { ClaudeSource } from "./claude.source";
 import { CodexSource } from "./codex.source";
 import type { LogFile, LogSource, NewStep, Scope, Sink } from "./source";
 import { promptTitle, storedTitle, titleOfPrompt, UNTITLED } from "./text";
-import { maskSecrets } from "../privacy/mask";
 import { CommandEdits } from "./command-edits";
 import { commandReads } from "./command-writes";
 import { backfillAgentIds } from "./agent-ids";
@@ -179,58 +178,6 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     const db = this.dbs.db;
-    db.exec(`CREATE TABLE IF NOT EXISTS listener_offsets (file TEXT PRIMARY KEY, offset INTEGER NOT NULL)`);
-    db.exec(`CREATE TABLE IF NOT EXISTS sessions (
-      id TEXT PRIMARY KEY, cwd TEXT NOT NULL, title TEXT NOT NULL,
-      started_at TEXT NOT NULL, last_event_at TEXT NOT NULL,
-      custom_title INTEGER NOT NULL DEFAULT 0, title_set INTEGER NOT NULL DEFAULT 0
-    )`);
-    db.exec(`CREATE TABLE IF NOT EXISTS steps (
-      id TEXT PRIMARY KEY, session_id TEXT NOT NULL, seq INTEGER NOT NULL, ts TEXT NOT NULL, kind TEXT NOT NULL,
-      text TEXT, tool TEXT, input TEXT, file_path TEXT, diff TEXT, label TEXT, risk TEXT,
-      is_subagent INTEGER NOT NULL DEFAULT 0
-    )`);
-    // `sessions.worked`, kept up to date as steps are stored, instead of a scan of every step per list.
-    if (!(db.prepare(`PRAGMA table_info(sessions)`).all() as { name: string }[]).some((c) => c.name === "worked")) {
-      db.exec("BEGIN");
-      try {
-        db.exec(`ALTER TABLE sessions ADD COLUMN worked INTEGER NOT NULL DEFAULT 0`);
-        db.exec(`UPDATE sessions SET worked = 1 WHERE id IN (SELECT DISTINCT session_id FROM steps WHERE kind IN ('tool_call', 'edit'))`);
-        db.exec("COMMIT");
-      } catch (e) { db.exec("ROLLBACK"); throw e; }
-    }
-    // Pairs a tool result with its call exactly (older rows are paired by order).
-    const stepCols = (db.prepare(`PRAGMA table_info(steps)`).all() as { name: string }[]).map((c) => c.name);
-    // Which coding agent a thread ran in (null: Claude Code, every thread stored before).
-    if (!(db.prepare(`PRAGMA table_info(sessions)`).all() as { name: string }[]).some((c) => c.name === "harness")) db.exec(`ALTER TABLE sessions ADD COLUMN harness TEXT`);
-    if (!stepCols.includes("tool_use_id")) db.exec(`ALTER TABLE steps ADD COLUMN tool_use_id TEXT`);
-    // Which subagent a step comes from, so parallel subagents stay apart after a reload. Steps stored
-    // before then get theirs from their logs, once (see agent-ids.ts).
-    if (!stepCols.includes("agent_id")) db.exec(`ALTER TABLE steps ADD COLUMN agent_id TEXT`);
-    // Which file an offset is in, to notice a log replaced or cut short (see openLog).
-    const offsetCols = (db.prepare(`PRAGMA table_info(listener_offsets)`).all() as { name: string }[]).map((c) => c.name);
-    if (!offsetCols.includes("ino")) db.exec(`ALTER TABLE listener_offsets ADD COLUMN ino INTEGER`);
-    if (!offsetCols.includes("head")) db.exec(`ALTER TABLE listener_offsets ADD COLUMN head TEXT`);
-    db.exec(`CREATE INDEX IF NOT EXISTS steps_session_seq ON steps(session_id, seq)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS steps_label ON steps(kind, label)`);
-    // "was this file touched by a step?" for the picture endpoint (image/).
-    db.exec(`CREATE INDEX IF NOT EXISTS steps_file ON steps(file_path)`);
-    // Compacted-conversation recaps were stored as prompts; they read as the agent's text.
-    db.exec(`UPDATE steps SET kind = 'text' WHERE kind = 'prompt' AND text LIKE 'This session is being continued from a previous conversation%'`);
-    // Claude Code's threads were stored with harness NULL (so a re-read of its logs, which deletes
-    // by harness, would have kept them); titles are masked like every other text; times ahead of the clock were kept.
-    this.once("listener: harness claude", () => db.exec(`UPDATE sessions SET harness = 'claude' WHERE harness IS NULL`));
-    this.once("listener: titles masked", () => {
-      const set = db.prepare(`UPDATE sessions SET title = ? WHERE id = ?`);
-      for (const r of db.prepare(`SELECT id, title FROM sessions`).all() as { id: string; title: string }[]) {
-        const masked = maskSecrets(r.title);
-        if (masked !== r.title) set.run(masked, r.id);
-      }
-    });
-    this.once("listener: no future times", () => {
-      const now = new Date().toISOString();
-      db.prepare(`UPDATE sessions SET last_event_at = ? WHERE julianday(last_event_at) > julianday(?)`).run(now, now);
-    });
     this.st = this.prepare();
 
     const warn = (e: Error) => this.log.warn(`watcher error: ${e.message}`);
@@ -274,24 +221,10 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /** Run `fn` once per database (in a transaction), remembered in `settings` under `key`. */
-  private once(key: string, fn: () => void) {
-    const db = this.dbs.db;
-    db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
-    if (db.prepare(`SELECT 1 FROM settings WHERE key = ?`).get(key)) return;
-    db.exec("BEGIN IMMEDIATE");
-    try {
-      fn();
-      db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?)`).run(key, new Date().toISOString());
-      db.exec("COMMIT");
-    } catch (e) { db.exec("ROLLBACK"); throw e; }
-  }
-
   /** A source whose reading changed since its threads were stored (its `version`) has them read again: its threads and
    * steps are dropped and its files read from the start (in the background, like any history). */
   private rereadChangedSources() {
     const db = this.dbs.db;
-    db.exec(`CREATE TABLE IF NOT EXISTS source_versions (harness TEXT PRIMARY KEY, version INTEGER NOT NULL)`);
     for (const source of this.sources) {
       if (source.version === undefined) continue;
       const row = db.prepare(`SELECT version FROM source_versions WHERE harness = ?`).get(source.harness) as { version: number } | undefined;

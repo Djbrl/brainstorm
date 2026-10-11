@@ -77,7 +77,8 @@ test("the cached list matches the old query, and follows new steps, titles and w
 test("the worked flag is filled in for a database from before it existed", async () => {
   const { t } = await fixture();
   const expected = t.listener.listSessions();
-  t.dbs.db.exec(`ALTER TABLE sessions DROP COLUMN worked`);
+  t.dbs.db.exec(`ALTER TABLE sessions DROP COLUMN worked; PRAGMA user_version = 0`);
+  require(dist("core/schema.js")).migrate(t.dbs.db);
   const { ListenerService } = require(dist("listener/listener.service.js"));
   const again = new ListenerService(t.dbs, t.bus, { broadcast() {} }, t.cfg);
   again.onModuleInit();

@@ -6,7 +6,6 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import { Logger } from "@nestjs/common";
 import { WorkspaceService } from "./workspace.service";
 import type { SetupStatus } from "../shared/contract";
@@ -15,14 +14,16 @@ Logger.overrideLogger(false);
 
 function service(dir: string) {
   const sent: SetupStatus[] = [];
+  const kept = new Map<string, string>();
+  const settings = { get: (k: string) => kept.get(k) ?? null, set: (k: string, v: string) => kept.set(k, v), delete: (k: string) => kept.delete(k) };
   const cfg = { defaultRoot: "", claudeProjectsDir: join(dir, "projects"), codexDir: join(dir, "codex"), claude: {} };
   const svc = new WorkspaceService(
-    { db: new DatabaseSync(":memory:") } as never,
     { emit() {}, on() {} } as never,
     { broadcast: (m: { type: string; status: SetupStatus }) => { if (m.type === "setup") sent.push(m.status); } } as never,
     cfg as never,
     { codexProjects: () => new Map(), bringGuest() {} } as never,
     { getCached: () => undefined, isBuilding: () => false } as never,
+    settings as never,
   );
   const check = () => (svc as unknown as { checkFolder(): void }).checkFolder();
   return { svc, sent, check };

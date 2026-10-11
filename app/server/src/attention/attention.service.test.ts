@@ -15,9 +15,6 @@ const iso = (msAgo: number) => new Date(Date.now() - msAgo).toISOString();
 function setup(visible = ["a", "b"]) {
   process.env.RUNDOWN_DATA_DIR = mkdtempSync(join(tmpdir(), "bs-attention-"));
   const dbs = new DbService();
-  dbs.db.exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY, cwd TEXT NOT NULL, title TEXT NOT NULL, started_at TEXT NOT NULL, last_event_at TEXT NOT NULL)`);
-  dbs.db.exec(`CREATE TABLE steps (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, seq INTEGER NOT NULL, ts TEXT NOT NULL, kind TEXT NOT NULL,
-    text TEXT, tool TEXT, input TEXT, file_path TEXT, diff TEXT, label TEXT, risk TEXT, is_subagent INTEGER NOT NULL DEFAULT 0, tool_use_id TEXT, agent_id TEXT)`);
   const sent: Attention[] = [];
   const bus = new BusService();
   const gateway = { broadcast: (m: WsMessage) => { if (m.type === "attention") sent.push(m.attention); } };
@@ -25,7 +22,7 @@ function setup(visible = ["a", "b"]) {
   const listener = { listSessions: () => { listed++; return visible.map((id) => ({ id })); } };
   const att = new AttentionService(bus, gateway as any, listener as any, dbs);
   att.onModuleInit(); // the bus wiring (its sweep timer is unref'd)
-  const session = (id: string, at: string) => dbs.db.prepare(`INSERT OR REPLACE INTO sessions VALUES (?, '/r', 't', ?, ?)`).run(id, at, at);
+  const session = (id: string, at: string) => dbs.db.prepare(`INSERT OR REPLACE INTO sessions (id, cwd, title, started_at, last_event_at) VALUES (?, '/r', 't', ?, ?)`).run(id, at, at);
   let seq = 0;
   const store = (s: Partial<Step> & { sessionId: string; kind: Step["kind"]; ts: string }) => {
     const id = s.id ?? `st${seq}`;

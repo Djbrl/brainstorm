@@ -102,7 +102,6 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
     // Another project: what pages were sent starts over, but what's known about each thread (its hooks above all, the
     // only word that it waits on the person) stays: trackers are per thread, whatever project is open.
     this.bus.on("workspace", () => { this.last.clear(); this.scope = undefined; this.rechecked.clear(); });
-    this.dbs.db.exec(`CREATE TABLE IF NOT EXISTS attention_hooks (session_id TEXT PRIMARY KEY, signal TEXT NOT NULL, at INTEGER NOT NULL)`);
     safely(this.log, "reading the last hooks", () => {
       const since = Date.now() - HOOKS_TRUSTED_MS;
       this.dbs.db.prepare(`DELETE FROM attention_hooks WHERE at < ?`).run(since);

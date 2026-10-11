@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { closeSync, existsSync, openSync, readdirSync, readSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { DbService } from "../core/db.service";
@@ -16,18 +16,11 @@ const SHOT_MISS_MS = 30 * 1000;
 export const SHOT_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
 @Injectable()
-export class ShotsService implements OnModuleInit {
+export class ShotsService {
   /** Shots asked for and not found, by `stepId:idx` → when to look again, so a missing one doesn't rescan the logs on every request. */
   private missed = new Map<string, number>();
 
   constructor(private dbs: DbService, private cfg: ConfigService, private listener: ListenerService) {}
-
-  onModuleInit() {
-    const db = this.dbs.db;
-    db.exec(`CREATE TABLE IF NOT EXISTS task_shots (step_id TEXT NOT NULL, idx INTEGER NOT NULL, session_id TEXT NOT NULL, media TEXT NOT NULL, data BLOB NOT NULL, PRIMARY KEY (step_id, idx))`);
-    db.exec(`CREATE INDEX IF NOT EXISTS task_shots_session ON task_shots(session_id)`);
-    db.exec(`CREATE TABLE IF NOT EXISTS task_shot_files (file TEXT PRIMARY KEY, offset INTEGER NOT NULL)`);
-  }
 
   /** The session's log and its subagents' logs. */
   private logFiles(sessionId: string): string[] {

@@ -3,10 +3,11 @@ import { DatabaseSync } from "node:sqlite";
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { dataDir } from "./local";
+import { migrate } from "./schema";
 
 /**
  * One SQLite file (Node's built-in node:sqlite, no native build).
- * Each module creates its own tables in onModuleInit with `CREATE TABLE IF NOT EXISTS`.
+ * Every table is in schema.ts, created and brought up to date here, before any module uses the database.
  * Store complex fields as JSON text.
  */
 @Injectable()
@@ -31,6 +32,7 @@ export class DbService implements OnApplicationShutdown {
       PRAGMA cache_size = -32768; PRAGMA mmap_size = 268435456;`);
     // WAL mode creates the -wal and -shm files now: with the main file's mode, set again in case they predate it.
     for (const f of [file + "-wal", file + "-shm"]) try { chmodSync(f, 0o600); } catch { /* not there */ }
+    migrate(this.db);
   }
 
   /**

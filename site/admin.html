@@ -86,10 +86,11 @@ const fmt = (n) => n.toLocaleString("en");
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
-let token = ""; try { token = localStorage.getItem("rundown-stats-token") || ""; } catch {}
+// The token lives in this tab only (sessionStorage), not on disk; an older copy in localStorage is removed.
+let token = ""; try { token = sessionStorage.getItem("rundown-stats-token") || ""; localStorage.removeItem("rundown-stats-token"); } catch {}
 $("token").value = token;
 
-$("auth").addEventListener("submit", (e) => { e.preventDefault(); token = $("token").value.trim(); try { localStorage.setItem("rundown-stats-token", token); } catch {} load(); });
+$("auth").addEventListener("submit", (e) => { e.preventDefault(); token = $("token").value.trim(); try { sessionStorage.setItem("rundown-stats-token", token); } catch {} load(); });
 
 async function load() {
   if (!token) return;

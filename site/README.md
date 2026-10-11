@@ -6,6 +6,8 @@ One static file, `index.html`. No build step. Preview with `python3 -m http.serv
 
 **Deploying:** `sh tools/predeploy.sh && vercel deploy --prod --yes`. The check stops while the privacy or terms page still has a highlighted blank (name, address, country, city, contact email), and fetches the font if it's missing.
 
+**Security headers:** `vercel.json` sends a Content-Security-Policy (scripts and styles from the page itself and inline, no other host; the pages have inline `<script>` and `<style>`, so `'unsafe-inline'` stays until they move to files), nosniff, a referrer policy, `frame-ancestors 'none'`, a permissions policy and HSTS. A new CDN, font host or embed needs the policy changed first. The admin page keeps the stats token in `sessionStorage` (this tab only).
+
 **Fonts:** Satoshi is served from `fonts/` (no visitor's browser talks to Fontshare). The files aren't in git, because the ITF Free Font License forbids making them available through a public repository: `sh tools/fetch-fonts.sh` downloads them, and `vercel deploy` uploads them (it reads `.vercelignore`, not `.gitignore`).
 
 **Privacy and terms:** `privacy.html` and `terms.html` (styles in `legal.css`). Keep them true when what the app or the site collects changes.

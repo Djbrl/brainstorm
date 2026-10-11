@@ -76,6 +76,7 @@ function Shell() {
     hasMap: !!s.map,
   }), shallowEqual);
   const [setupOpen, setSetupOpen] = useState(false);
+  const [picking, setPicking] = useState(false); // the setup checklist is running: it stays up until "Open Rundown"
   const [finding, setFinding] = useState(false); // Find a thread (⌘K)
   const [help, setHelp] = useState(false);       // the keyboard shortcuts (?)
   // Picking a project is a screen of its own: the browser's back (and Esc, and its Back link) return from it.
@@ -83,7 +84,7 @@ function Shell() {
   const closeSetup = () => { if (history.state?.rundownSetup) history.back(); else setSetupOpen(false); };
   useEffect(() => {
     if (!setupOpen) return;
-    const onPop = () => setSetupOpen(false);
+    const onPop = () => { setSetupOpen(false); setPicking(false); };
     addEventListener("popstate", onPop);
     return () => removeEventListener("popstate", onPop);
   }, [setupOpen]);
@@ -107,12 +108,12 @@ function Shell() {
 
   // Local app: pick a workspace first (and whenever "Change" is clicked). The hosted demo never shows setup,
   // except the post-deadline preview, which plays back a recorded setup run (see lib/preview.ts).
-  if ((setupOpen && (!state.replay || state.preview)) || (!state.replay && state.setup && !state.setup.root)) {
+  if ((setupOpen && (!state.replay || state.preview)) || (!state.replay && (picking || (state.setup && !state.setup.root)))) {
     // Another project: whatever was open (a thread, a step, a file) belonged to the old one.
     return <SetupView onDone={() => {
       if (history.state?.rundownSetup) try { history.replaceState({ ...history.state, rundownSetup: false }, ""); } catch { /* fine */ }
-      setSetupOpen(false); stopReplay(); selectFile(null); reload();
-    }} onCancel={state.setup?.root || state.preview ? closeSetup : undefined} />;
+      setSetupOpen(false); setPicking(false); stopReplay(); selectFile(null); reload();
+    }} onPicking={setPicking} onCancel={state.setup?.root || state.preview ? closeSetup : undefined} />;
   }
   const project = state.setup?.name || "";   // none yet (the server out of reach): no name rather than a made-up one
 

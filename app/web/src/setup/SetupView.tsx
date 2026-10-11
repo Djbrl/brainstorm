@@ -224,7 +224,9 @@ function Loading({ status, root, onDone, onBack }: { status: SetupStatus | null;
 
 /* ---------- Screen ---------- */
 
-export function SetupView({ onDone, onCancel }: { onDone: () => void; onCancel?: () => void }) {
+/** `onPicking`: told when the checklist starts and ends, so the app keeps this screen up through it (the server
+ * announces the new project before the person presses "Open Rundown"). */
+export function SetupView({ onDone, onCancel, onPicking }: { onDone: () => void; onCancel?: () => void; onPicking?: (on: boolean) => void }) {
   const { state } = useLive();
   const [phase, setPhase] = useState<"pick" | "loading">("pick");
   const [root, setRoot] = useState("");
@@ -244,9 +246,9 @@ export function SetupView({ onDone, onCancel }: { onDone: () => void; onCancel?:
       {/* The logo goes home: back to the project you had open, when there is one. */}
       {onCancel ? <button className="su-wordmark su-home" onClick={onCancel} aria-label="Home" title="Home"><Logo /></button> : <div className="su-wordmark"><Logo /></div>}
       {phase === "pick" ? (
-        <Pick onCancel={onCancel} onOpened={(s, r) => { setStatus(s); setRoot(r); setPhase("loading"); }} />
+        <Pick onCancel={onCancel} onOpened={(s, r) => { setStatus(s); setRoot(r); setPhase("loading"); onPicking?.(true); }} />
       ) : (
-        <Loading status={status} root={root} onDone={onDone} onBack={() => { setPhase("pick"); setStatus(null); }} />
+        <Loading status={status} root={root} onDone={onDone} onBack={() => { setPhase("pick"); setStatus(null); onPicking?.(false); }} />
       )}
     </div>
   );

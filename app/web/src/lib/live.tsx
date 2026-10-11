@@ -255,6 +255,10 @@ export type LiveStore = {
   catchUp: (sessionId: string) => void;
   /** Refetch everything for the (new) active workspace. */
   reload: () => void;
+  /** Bumps on every reload: an answer fetched under an older one is for another workspace, and is dropped. */
+  generation: () => number;
+  /** The server's project as it says now (a setup message, a reconnect): reloads when it isn't the one loaded. */
+  checkRoot: (root: string | null) => void;
 };
 
 export function createLiveStore(start: LiveState = initial): LiveStore {
@@ -333,12 +337,18 @@ export function createLiveStore(start: LiveState = initial): LiveStore {
         if (again) catchUp(sessionId);
       });
   };
-  const reload = () => { if (isReplay()) return; generation++; loading.clear(); early.clear(); catching.clear(); dispatch({ type: "reset" }); loadAll(dispatch); };
+  let loadedRoot: string | null | undefined; // the project the data was loaded for (undefined: not known yet)
+  const reload = () => { if (isReplay()) return; generation++; loadedRoot = undefined; loading.clear(); early.clear(); catching.clear(); dispatch({ type: "reset" }); loadAll(store); };
+  const checkRoot = (root: string | null) => {
+    if (loadedRoot !== undefined && root !== loadedRoot && root) reload(); // another project than the one shown
+    else if (loadedRoot === undefined || root) loadedRoot = root;
+  };
   const stepOf = (id: string) => {
     const at = ix.stepAt.get(id), st = at && state.steps[at.sid]?.[at.i];
     return st && st.id === id ? st : undefined;
   };
-  return { get: () => state, subscribe, dispatch, enqueue, stepOf, loadSteps, catchUp, reload };
+  const store: LiveStore = { get: () => state, subscribe, dispatch, enqueue, stepOf, loadSteps, catchUp, reload, generation: () => generation, checkRoot };
+  return store;
 }
 
 // Hosted demo: built with VITE_REPLAY_URL=/replay.json so it opens straight into the recording.
@@ -377,13 +387,31 @@ export async function replayAnswer(req: AskRequest): Promise<AskResponse> {
   return { answer: "This is a recording, so it can't answer new questions. Run Rundown on your own computer to ask.", model: "replay", tokensIn: 0, tokensOut: 0, costUsd: 0, fallback: false };
 }
 
-/** Load everything for the active workspace (on start, and again after the setup screen switches workspace). */
-function loadAll(dispatch: (a: Action) => void) {
-  fetch("/api/workspace").then((r) => r.json()).then((status) => dispatch({ type: "setup-status", status })).catch(() => {});
-  fetch("/api/sessions").then((r) => r.json()).then((sessions) => dispatch({ type: "sessions", sessions })).catch(() => {});
-  fetch("/api/map").then((r) => r.json()).then((map) => dispatch({ type: "map", map })).catch(() => {});
-  fetch("/api/agents").then((r) => r.json()).then((agents) => dispatch({ type: "agents", agents })).catch(() => {});
-  fetch("/api/attention").then((r) => r.json()).then((list) => Array.isArray(list) && dispatch({ type: "attention-all", list })).catch(() => {});
+/** Load everything for the active workspace (on start, on a reconnect, and again whenever the server's project changes).
+ * Answers that arrive after a newer reload are for the previous project: dropped. */
+function loadAll(store: LiveStore) {
+  const gen = store.generation();
+  const get = <T,>(path: string, then: (v: T) => void, text = false) => fetch(path).then((r) => (text ? r.text() : r.json()) as Promise<T>)
+    .then((v) => { if (gen === store.generation()) then(v); }).catch(() => {});
+  get<SetupStatus>("/api/workspace", (status) => {
+    store.checkRoot(status?.root ?? null);
+    if (gen === store.generation()) store.dispatch({ type: "setup-status", status });
+  });
+  get<Session[]>("/api/sessions", (sessions) => store.dispatch({ type: "sessions", sessions }));
+  get<ProjectMap>("/api/map", (map) => store.dispatch({ type: "map", map }));
+  get<AgentPresence[]>("/api/agents", (agents) => store.dispatch({ type: "agents", agents }));
+  get<Attention[]>("/api/attention", (list) => { if (Array.isArray(list)) store.dispatch({ type: "attention-all", list }); });
+}
+
+/** The server's version when the page first reached it: a different one after a reconnect (an update) has other
+ * chunks than this page knows, so the page reloads itself. */
+let serverVersion: string | undefined;
+function checkServerVersion() {
+  fetch("/api/health").then((r) => r.json()).then((h: { version?: string }) => {
+    if (typeof h?.version !== "string") return;
+    if (serverVersion !== undefined && h.version !== serverVersion) location.reload();
+    serverVersion = h.version;
+  }).catch(() => {});
 }
 
 const Ctx = createContext<LiveStore | null>(null);
@@ -403,7 +431,8 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       });
       return () => stopPlayback();
     }
-    loadAll(store.dispatch);
+    loadAll(store);
+    checkServerVersion();
 
     let ws: WebSocket | null = null;
     let stop = false, opened = false;
@@ -424,13 +453,20 @@ export function LiveProvider({ children }: { children: ReactNode }) {
         store.dispatch({ type: "connected", value: true });
         // Back after an outage: what changed meanwhile (the server may have restarted, even on another project). The
         // first time too if the page loaded while the server was away (nothing came).
-        if (opened || !store.get().setup) loadAll(store.dispatch);
+        if (opened) checkServerVersion();
+        if (opened || !store.get().setup) loadAll(store);
         opened = true;
         // Steps stored while the page wasn't listening (an outage, a restart, or before this first connection).
         for (const sid of Object.keys(store.get().steps)) store.catchUp(sid);
       };
       sock.onclose = () => { clearTimeout(giveUp); retry(); };
-      sock.onmessage = (e) => { try { store.enqueue(JSON.parse(e.data) as WsMessage); } catch {} };
+      sock.onmessage = (e) => {
+        let m: WsMessage;
+        try { m = JSON.parse(e.data) as WsMessage; } catch { return; }
+        // Another project (picked here, in another tab, by /rundown:open in another session): everything is reloaded.
+        if (m.type === "setup") store.checkRoot(m.status?.root ?? null);
+        store.enqueue(m);
+      };
     };
     connect();
     return () => { stop = true; ws?.close(); };

@@ -23,6 +23,8 @@ export type Listing = {
   changedAt?: Map<string, number>;
   /** Only past the cap: exact last-commit times (s) learned from that recent history. */
   recent?: Map<string, number>;
+  /** Git: the folders .gitignore excludes (relative, "/" separators), so the watcher can drop their churn by path. */
+  ignoredDirs?: Set<string>;
 };
 
 type Candidates = { rels: string[]; tracked?: Set<string>; total: number; stopped?: boolean };
@@ -46,7 +48,7 @@ export function parseLsFiles(entries: Iterable<string>, out: { rels: string[]; t
   for (const entry of entries) {
     if (entry.length < 3) continue;
     const tag = entry[0], rel = entry.slice(2);
-    if (!isMappableRel(rel)) continue;
+    if (!isMappableRel(rel, true)) continue; // git already left out what .gitignore excludes
     out.total++;
     if (out.rels.length >= CANDIDATE_LIMIT) continue;
     out.rels.push(rel);
@@ -78,6 +80,28 @@ function gitCandidates(root: string): Promise<Candidates | null> {
       if (rest) parseLsFiles([rest], acc);
       resolveP(code === 0 && acc.total ? acc : null); // not a repo, no git, or nothing mappable: walk instead
     });
+  });
+}
+
+/** The folders .gitignore excludes (`ls-files -o -i --directory`: an ignored folder is named once, with a "/"). At most IGNORED_DIRS_LIMIT. */
+const IGNORED_DIRS_LIMIT = 10_000;
+export function gitIgnoredDirs(root: string): Promise<Set<string>> {
+  return new Promise((resolveP) => {
+    const out = new Set<string>();
+    let child;
+    try {
+      child = spawn("git", ["-C", root, "-c", "core.quotepath=off", "ls-files", "-z", "-o", "-i", "--exclude-standard", "--directory"], { stdio: ["ignore", "pipe", "ignore"], windowsHide: true, env: gitEnvOrThrow(root) });
+    } catch { return resolveP(out); }
+    let rest = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      const entries = (rest + chunk).split("\0");
+      rest = entries.pop() ?? "";
+      for (const e of entries) if (e.endsWith("/") && out.size < IGNORED_DIRS_LIMIT) out.add(e.slice(0, -1));
+      if (out.size >= IGNORED_DIRS_LIMIT) child.kill();
+    });
+    child.on("error", () => resolveP(out));
+    child.on("close", () => resolveP(out));
   });
 }
 
@@ -131,9 +155,10 @@ const merge = (recent: Map<string, number>, mtimes: Map<string, number>) => { co
 export async function listProjectFiles(root: string, cap: number): Promise<Listing> {
   const git = await gitCandidates(root);
   if (git) {
-    if (git.rels.length <= cap) return listing(git, "git");
+    const ignoredDirs = gitIgnoredDirs(root);
+    if (git.rels.length <= cap) return { ...listing(git, "git"), ignoredDirs: await ignoredDirs };
     const [recent, mtimes] = await Promise.all([recentCommitTimes(root), mtimesOf(root, untrackedOf(git))]);
-    return listing(git, "git", merge(recent, mtimes), recent);
+    return { ...listing(git, "git", merge(recent, mtimes), recent), ignoredDirs: await ignoredDirs };
   }
   const walked = await walkCandidates(root);
   if (walked.rels.length <= cap) return listing(walked, "walk");
@@ -162,7 +187,7 @@ export function gitIgnored(root: string, rels: string[]): Promise<Set<string>> {
 }
 
 /** Mappable files under a folder (for a folder that appeared while watching), at most `limit`. */
-export async function listFolder(dir: string, limit: number): Promise<string[]> {
+export async function listFolder(dir: string, limit: number, git = false): Promise<string[]> {
   const out: string[] = [];
   const visit = async (d: string): Promise<void> => {
     let entries: Dirent[];
@@ -170,7 +195,7 @@ export async function listFolder(dir: string, limit: number): Promise<string[]> 
     for (const e of entries) {
       if (out.length >= limit) return;
       const abs = join(d, e.name);
-      if (e.isDirectory()) { if (!isIgnoredDirName(e.name)) await visit(abs); }
+      if (e.isDirectory()) { if (!isIgnoredDirName(e.name, git)) await visit(abs); }
       else if ((e.isFile() || e.isSymbolicLink()) && isSourceName(e.name)) out.push(abs);
     }
   };

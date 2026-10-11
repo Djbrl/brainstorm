@@ -62,7 +62,8 @@ export class ProjectWatcher {
   mode: WatchMode;
 
   /** `onPath` gets absolute paths that may belong on the map (ignored folders already filtered out). */
-  constructor(private root: string, private onPath: (abs: string) => void, private log: (msg: string) => void, mode = defaultWatchMode()) {
+  /** `skip`: a path (relative) the map never shows; the shared name rule unless the map says otherwise (a git repo's .gitignore). */
+  constructor(private root: string, private onPath: (abs: string) => void, private log: (msg: string) => void, mode = defaultWatchMode(), private skip: (rel: string) => boolean = (rel) => isInIgnoredDir(rel)) {
     this.mode = mode;
   }
 
@@ -73,7 +74,7 @@ export class ProjectWatcher {
         this.recursive = watch(this.root, { recursive: true, persistent: true }, (_e, name) => {
           if (!name) return;
           const rel = name.toString();
-          if (!isInIgnoredDir(rel)) this.onPath(join(this.root, rel)); // node_modules churn etc. stops here: a string check
+          if (!this.skip(rel)) this.onPath(join(this.root, rel)); // node_modules churn etc. stops here: a string check
         });
         this.recursive.on("error", (e) => { this.log(`recursive watch failed (${e.message}), watching folders instead`); this.recursive?.close(); this.recursive = undefined; this.mode = "folders"; this.start(dirs); });
         return;
@@ -89,7 +90,7 @@ export class ProjectWatcher {
   addFolder(dir: string) {
     if (this.closed || this.mode !== "folders" || this.folders.has(dir)) return;
     const rel = relative(this.root, dir);
-    if (rel && isInIgnoredDir(rel)) return;
+    if (rel && this.skip(rel)) return;
     try {
       const w = watch(dir, { persistent: true }, (_e, name) => { if (name) this.onFolderEvent(dir, name.toString()); });
       w.on("error", () => { w.close(); this.folders.delete(dir); }); // the folder went away
@@ -109,7 +110,7 @@ export class ProjectWatcher {
   private onFolderEvent(dir: string, name: string) {
     const abs = join(dir, name);
     const rel = relative(this.root, abs);
-    if (!isInIgnoredDir(rel)) this.onPath(abs);
+    if (!this.skip(rel)) this.onPath(abs);
   }
 
   /** How many OS watch handles this uses. */

@@ -160,19 +160,21 @@ test("ls-files parsing: mappable paths only, tracked vs new", () => {
   assert.deepEqual([...acc.tracked], ["src/a.ts"]);
 });
 
-test("listing a git repo follows .gitignore and the shared rule; a plain folder is walked the same way", { skip: !hasGit }, async () => {
+test("listing a git repo follows .gitignore (plus .git and caches by name); a plain folder is walked the same way", { skip: !hasGit }, async () => {
   const files = {
     ".gitignore": "generated/\n",
     "src/a.ts": "import './b';", "src/b.ts": "", ".eslintrc.json": "{}",
-    "generated/out.ts": "", "target/debug/x.js": "", ".idea/w.json": "{}", "vendor/lib.js": "",
+    "generated/out.ts": "", "target/debug/x.js": "", ".idea/w.json": "{}", "vendor/lib.js": "", "node_modules/m/i.js": "",
   };
   const root = tempRepo(files);
   try {
     writeFileSync(join(root, "src", "untracked.ts"), "");
     const l = await listProjectFiles(root, 800);
     assert.equal(l.source, "git");
-    assert.deepEqual(l.rels, [".eslintrc.json", "src/a.ts", "src/b.ts", "src/untracked.ts"]);
-    assert.deepEqual([...(l.tracked ?? [])].sort(), [".eslintrc.json", "src/a.ts", "src/b.ts"]);
+    // committed .idea, target and vendor files show: the repo didn't ignore them
+    assert.deepEqual(l.rels, [".eslintrc.json", ".idea/w.json", "src/a.ts", "src/b.ts", "src/untracked.ts", "target/debug/x.js", "vendor/lib.js"]);
+    assert.deepEqual([...(l.tracked ?? [])].sort(), [".eslintrc.json", ".idea/w.json", "src/a.ts", "src/b.ts", "target/debug/x.js", "vendor/lib.js"]);
+    assert.deepEqual([...(l.ignoredDirs ?? [])], ["generated"]);
     assert.equal(l.changedAt, undefined); // under the cap: no ranking needed
   } finally { rmSync(root, { recursive: true, force: true }); }
 
@@ -505,4 +507,44 @@ test("presence: deleting a file or switching project cancels its 60 s 'working o
     svc.onModuleDestroy();
     for (const d of [root, other, projects]) rmSync(d, { recursive: true, force: true });
   }
+});
+
+test("a git repo follows .gitignore alone (plus .git and caches): .github, build and scripts/build show unless ignored, live too", { skip: !hasGit }, async () => {
+  const root = tempRepo({
+    ".gitignore": "out/\n*.gen.ts\n",
+    "src/a.ts": "export const a = 1;\n",
+    ".github/workflows/ci.yml": "on: push\n",
+    "scripts/build/run.ts": "export {};\n",
+    "build/tool.ts": "export {};\n",
+  });
+  const projects = mkdtempSync(join(tmpdir(), "bs-projects-"));
+  mkdirSync(join(root, "out"));
+  writeFileSync(join(root, "out/bundle.js"), "");
+  writeFileSync(join(root, "src/x.gen.ts"), "");
+  mkdirSync(join(root, "node_modules/x"), { recursive: true });
+  writeFileSync(join(root, "node_modules/x/index.js"), "");
+  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { defaultRoot: root, claudeProjectsDir: projects } as never);
+  const mapped = () => [...svc.getCached(root)!.byPath.keys()].map((p) => p.slice(root.length + 1)).sort();
+  try {
+    svc.onModuleInit();
+    await svc.getMapAsync(root);
+    assert.deepEqual(mapped(), [".github/workflows/ci.yml", ".gitignore", "build/tool.ts", "scripts/build/run.ts", "src/a.ts"].filter((f) => isMappableRel(f, true)));
+    assert.ok(svc.getCached(root)!.ignoredDirs!.has("out"));
+    await new Promise((r) => setTimeout(r, 300));
+    // Live: a new ignored folder stays off, a new .github file joins.
+    mkdirSync(join(root, "out2"));
+    appendFileSync(join(root, ".gitignore"), "out2/\n");
+    writeFileSync(join(root, "out2/a.ts"), "");
+    writeFileSync(join(root, "out/more.ts"), "");
+    writeFileSync(join(root, ".github/dependabot.yml"), "version: 2\n");
+    await waitFor(() => mapped().includes(".github/dependabot.yml") || undefined);
+    await new Promise((r) => setTimeout(r, 400));
+    assert.equal(mapped().some((f) => f.startsWith("out")), false);
+  } finally {
+    svc.onModuleDestroy();
+    rmSync(root, { recursive: true, force: true }); rmSync(projects, { recursive: true, force: true });
+  }
+  // Not a git repo: the name list as before.
+  const plain = tempRepo({ "src/a.ts": "", ".github/workflows/ci.yml": "", "build/tool.ts": "" }, false);
+  try { assert.deepEqual((await listProjectFiles(plain, 800)).rels, ["src/a.ts"]); } finally { rmSync(plain, { recursive: true, force: true }); }
 });

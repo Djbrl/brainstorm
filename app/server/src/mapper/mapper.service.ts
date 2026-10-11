@@ -9,7 +9,7 @@ import { EventsGateway } from "../core/events.gateway";
 import { ConfigService } from "../core/config.service";
 import { DbService } from "../core/db.service";
 import { formerRoots } from "../listener/moved";
-import { isInIgnoredDir, liveHeadroom, maxFiles, isMappableRel, moduleOf } from "./ignore";
+import { inIgnoredFolder, isInIgnoredDir, liveHeadroom, maxFiles, isMappableRel, moduleOf } from "./ignore";
 import { type Listing, gitIgnored, listFolder, listProjectFiles } from "./list-files";
 import { type Signals, scoreFrom, selectFiles } from "./select";
 import { gitLastCommitTimes } from "./git-times";
@@ -49,6 +49,8 @@ type Cached = {
   mtimes: Map<string, number>;
   /** Mapped files git tracks (relative, "/" separators); undefined when not a git repo. */
   tracked?: Set<string>;
+  /** A git repo: what to leave out comes from .gitignore. These are the folders it excludes (relative, "/" separators), grown as new ones appear. */
+  ignoredDirs?: Set<string>;
   listing: Pick<Listing, "source" | "total"> & { ms: number };
   /** Files the cap left out (absolute). A change to one doesn't put it on the map (a branch switch would flood it); an agent's edit does. */
   unselected: Set<string>;
@@ -99,6 +101,10 @@ export function jsImports(content: string): string[] {
   for (const re of JS_IMPORTS) for (const m of content.matchAll(re)) specs.push(m[1]);
   return specs;
 }
+
+/** The map's ignore rule for a project: a git repo's .gitignore'd folders (plus .git and caches), else the name list. */
+const skipped = (rel: string, ignoredDirs?: Set<string>) => (ignoredDirs ? isInIgnoredDir(rel, true) || inIgnoredFolder(rel, ignoredDirs) : isInIgnoredDir(rel));
+const mappable = (rel: string, ignoredDirs?: Set<string>) => (ignoredDirs ? isMappableRel(rel, true) && !inIgnoredFolder(rel, ignoredDirs) : isMappableRel(rel));
 
 const sameSet = (a: Set<string> | undefined, b: Set<string>) => !!a && a.size === b.size && [...a].every((x) => b.has(x));
 
@@ -224,7 +230,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
   /** Before reading anything: when files changed (git, mtime, an agent's last step on it) and which ones agents touched. */
   private firstSignals(root: string, listing: Listing): Signals {
     const changedAt = new Map(listing.changedAt ?? []);
-    const touched = this.agentFiles(root);
+    const touched = this.agentFiles(root, listing.source === "git" ? listing.ignoredDirs ?? new Set() : undefined);
     for (const [rel, t] of touched) if (t > (changedAt.get(rel) ?? 0)) changedAt.set(rel, t);
     return { changedAt, touched: new Set(touched.keys()) };
   }
@@ -248,7 +254,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Files agents touched in this project's threads (newest step time, s), from the steps the listener stored. */
-  private agentFiles(root: string): Map<string, number> {
+  private agentFiles(root: string, ignoredDirs?: Set<string>): Map<string, number> {
     const out = new Map<string, number>();
     if (!this.dbs) return out;
     try {
@@ -256,7 +262,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
         .all(root + sep, root + sep + "￿") as { p: string; ts: string }[];
       for (const { p, ts } of rows) {
         const rel = posix(relative(root, p));
-        if (isMappableRel(rel)) out.set(rel, (Date.parse(ts) || 0) / 1000);
+        if (mappable(rel, ignoredDirs)) out.set(rel, (Date.parse(ts) || 0) / 1000);
       }
     } catch { /* no steps table yet */ }
     return out;
@@ -293,6 +299,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     const c: Cached = {
       map, gitTimes, byPath, fileSet, specs, out, mtimes,
       tracked: listing.tracked && new Set([...chosen].filter((rel) => listing.tracked!.has(rel))),
+      ignoredDirs: listing.source === "git" ? listing.ignoredDirs ?? new Set() : undefined,
       listing: { source: listing.source, total: listing.total, ms: listMs },
       unselected, uncounted: Math.max(0, listing.total - listing.rels.length), agentTouched: new Set(), snapshots: new Map(),
     };
@@ -580,7 +587,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     const live: Live = {
       root, folders, pending: new Set(), running: false,
       batch: new Batcher<string>(BATCH_MS, (paths) => { this.enqueue(live, paths); this.bus.emit("files-changed", { root }); }),
-      watcher: new ProjectWatcher(root, (p) => live.batch.add(p), (m) => this.log.warn(m)),
+      watcher: new ProjectWatcher(root, (p) => live.batch.add(p), (m) => this.log.warn(m), undefined, (rel) => skipped(rel, c.ignoredDirs)),
     };
     live.watcher.start(folders);
     this.live = live;
@@ -618,7 +625,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     if (!c) return;
     const removed = new Set<string>();
     const files = new Map<string, number>(); // existing source files to (re)read → mtime
-    const newFolders: string[] = [];
+    let newFolders: string[] = [];
 
     await mapLimit([...paths], IO_CONCURRENCY, async (abs) => {
       const rel = relative(root, abs);
@@ -639,14 +646,19 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
         }
         return;
       }
-      if (st.isDirectory()) { if (!live.folders.has(abs) && !isInIgnoredDir(rel)) newFolders.push(abs); }
-      else if (st.isFile() && isMappableRel(rel)) files.set(abs, st.mtimeMs);
+      if (st.isDirectory()) { if (!live.folders.has(abs) && !skipped(rel, c.ignoredDirs)) newFolders.push(abs); }
+      else if (st.isFile() && mappable(rel, c.ignoredDirs)) files.set(abs, st.mtimeMs);
     });
+    if (newFolders.length && c.ignoredDirs) { // a git repo: a new folder .gitignore excludes (a fresh build/) is remembered and left alone
+      const ignored = await gitIgnored(root, newFolders.map((abs) => posix(relative(root, abs))));
+      for (const rel of ignored) c.ignoredDirs.add(rel.replace(/\/$/, ""));
+      if (ignored.size) newFolders = newFolders.filter((abs) => !ignored.has(posix(relative(root, abs))));
+    }
 
     // New files, and the files of folders that appeared, while there is room for them.
     let room = maxFiles() + liveHeadroom() - (c.byPath.size - removed.size);
     for (const dir of newFolders) {
-      for (const abs of await listFolder(dir, Math.max(0, room))) if (!files.has(abs)) {
+      for (const abs of await listFolder(dir, Math.max(0, room), !!c.ignoredDirs)) if (!files.has(abs)) {
         try { files.set(abs, (await stat(abs)).mtimeMs); } catch { /* gone */ }
       }
     }
@@ -780,7 +792,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     const node = cached.byPath.get(path);
     if (!node) {
       // Not on the map (the cap left it out, or it's being created): it joins with the next batch, whatever the cap.
-      if (this.live?.root !== abs || !isMappableRel(relative(abs, path))) return;
+      if (this.live?.root !== abs || !mappable(relative(abs, path), cached.ignoredDirs)) return;
       cached.agentTouched.add(path);
       if (this.pendingTouches.size > 1000) this.pendingTouches.clear();
       this.pendingTouches.set(path, { sessionId, ts });

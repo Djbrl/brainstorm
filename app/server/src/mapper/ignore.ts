@@ -12,6 +12,12 @@ export const IGNORE_DIRS = new Set([
   // Rundown's own data folder (app/server/data)
   "data",
 ]);
+/**
+ * In a git repo .gitignore says what to leave out (git lists the files; ignored folders are learned from git too), so
+ * only these are skipped by name: git's own folder and caches nobody means to look at. A folder like .github, .claude,
+ * build or scripts/build shows when the repo doesn't ignore it.
+ */
+export const GIT_IGNORE_DIRS = new Set([".git", "node_modules", "__pycache__", ".cache", ".pytest_cache", ".mypy_cache", ".ruff_cache"]);
 export const LOCKFILES = new Set(["package-lock.json", "yarn.lock", "pnpm-lock.yaml", "Cargo.lock", "poetry.lock", "composer.lock"]);
 /** Code, styles and docs. Widened 6 Oct 2026 (Vue, Svelte, Swift, Kotlin, Ruby, PHP, C-family...): a Nuxt or iOS project's
  * main files were missing from its map. Imports are read for JS/TS only. */
@@ -41,8 +47,9 @@ export function maxFiles(): number {
 /** New files that appear while the map is open may take it this far past maxFiles(). */
 export const liveHeadroom = () => Math.max(100, Math.round(maxFiles() / 8));
 
-/** A folder name the map never looks inside. */
-export function isIgnoredDirName(name: string): boolean {
+/** A folder name the map never looks inside. `git`: the project is a git repo (only GIT_IGNORE_DIRS by name). */
+export function isIgnoredDirName(name: string, git = false): boolean {
+  if (git) return GIT_IGNORE_DIRS.has(name);
   return name.startsWith(".") || IGNORE_DIRS.has(name) || name.endsWith(".egg-info");
 }
 
@@ -57,11 +64,11 @@ const parts = (rel: string) => rel.split(/[\\/]/).filter((p) => p && p !== ".");
 const outside = (rel: string) => !rel || rel.startsWith("..") || rel.startsWith("/") || /^[A-Za-z]:/.test(rel);
 
 /** A path relative to the root (either separator) that belongs on the map: no ignored folder on the way, a source file name. */
-export function isMappableRel(rel: string): boolean {
+export function isMappableRel(rel: string, git = false): boolean {
   if (outside(rel)) return false;
   const p = parts(rel);
   if (!p.length) return false;
-  for (let i = 0; i < p.length - 1; i++) if (isIgnoredDirName(p[i])) return false;
+  for (let i = 0; i < p.length - 1; i++) if (isIgnoredDirName(p[i], git)) return false;
   return isSourceName(p[p.length - 1]);
 }
 
@@ -70,13 +77,21 @@ export function isMappableRel(rel: string): boolean {
  * watcher events, which don't say whether the path is a file: a last part that could be a source file (".eslintrc.json")
  * is kept.
  */
-export function isInIgnoredDir(rel: string): boolean {
+export function isInIgnoredDir(rel: string, git = false): boolean {
   if (outside(rel)) return true;
   const p = parts(rel);
   if (!p.length) return false;
-  for (let i = 0; i < p.length - 1; i++) if (isIgnoredDirName(p[i])) return true;
+  for (let i = 0; i < p.length - 1; i++) if (isIgnoredDirName(p[i], git)) return true;
   const last = p[p.length - 1];
-  return isIgnoredDirName(last) && !isSourceName(last);
+  return isIgnoredDirName(last, git) && !isSourceName(last);
+}
+
+/** In a git repo: the path is, or is inside, one of the folders .gitignore excludes (relative, "/" separators). */
+export function inIgnoredFolder(rel: string, folders: Set<string> | undefined): boolean {
+  if (!folders?.size) return false;
+  const p = parts(rel);
+  for (let i = 1; i <= p.length; i++) if (folders.has(p.slice(0, i).join("/"))) return true;
+  return false;
 }
 
 /** The map's module for a file: its first two folders ("packages/web"), or "." at the root. Either separator. */

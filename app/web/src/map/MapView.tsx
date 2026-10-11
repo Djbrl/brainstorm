@@ -9,7 +9,7 @@ import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-for
 import type { FileNode, ProjectMap } from "@contract";
 import { useLive } from "../lib/live";
 import { mapPrefs, useNav } from "../lib/nav";
-import { drawAgents, PARK, type AgentRing } from "./agents";
+import { drawAgents, PARK, visibleAgents, type AgentRing } from "./agents";
 import { TOUR_AGENT, tourHidesExtras, useTour } from "../lib/tour";
 import { MapSidebar } from "./sidebar/MapSidebar";
 import { Dock } from "./replay/ReplayBar";
@@ -83,7 +83,14 @@ export function MapView() {
   const sv = (state as unknown as { structureVersion?: number }).structureVersion;
   // Files outside the project (another repo an orchestrator edits, a visitor's own project): islands beside the map.
   const islandSteps = replay ? state.steps[replay.sessionId] : undefined;
-  const islandAgents = useMemo(() => Object.values(state.agents ?? {}).filter((a) => !replay || a.sessionId === replay.sessionId), [state.agents, replay?.sessionId]);
+  // On the overview, only the agents still on the map (working, or seen in the last 10 minutes) keep an island: looked
+  // at again every minute, so an agent that went quiet hours ago no longer leaves one beside the map.
+  const [islandMinute, setIslandMinute] = useState(0);
+  useEffect(() => { const t = setInterval(() => setIslandMinute((n) => n + 1), 60_000); return () => clearInterval(t); }, []);
+  const islandAgents = useMemo(() => {
+    const all = Object.values(state.agents ?? {});
+    return replay ? all.filter((a) => a.sessionId === replay.sessionId) : visibleAgents(all);
+  }, [state.agents, replay?.sessionId, islandMinute]); // eslint-disable-line react-hooks/exhaustive-deps
   const islandThread = replay ? state.sessions.find((x) => x.id === replay.sessionId) : undefined;
   const islands = useIslands(map, islandThread, islandSteps, islandAgents, state.sessions);
   const { graph, tween } = useGraph(map, theme, sv, islands);

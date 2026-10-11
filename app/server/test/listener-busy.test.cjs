@@ -33,11 +33,11 @@ test("a write lock held 1.5 s by another program: the steps wait for it, none is
     const f = join(t.projectDir, "s1.jsonl");
     writeFileSync(f, jsonl([line("prompt", { i: 0 }), line("tool", { i: 1 })]));
     await t.readNow(f);
-    assert.equal(t.listener.listSteps("s1").length, 2);
+    assert.equal(t.listener.store.listSteps("s1").length, 2);
     const { exited } = await holdLock(join(process.env.RUNDOWN_DATA_DIR, "rundown.db"), 1500);
     appendFileSync(f, jsonl([line("text", { i: 2, text: "during the lock" }), line("tool", { i: 3 })]));
     await t.readNow(f);
-    assert.equal(t.listener.listSteps("s1").length, 4);
+    assert.equal(t.listener.store.listSteps("s1").length, 4);
     await exited;
   } finally { await t.close(); }
 });
@@ -51,10 +51,10 @@ test("a lock held past the timeout: the chunk is read again a moment later witho
     const { exited } = await holdLock(join(process.env.RUNDOWN_DATA_DIR, "rundown.db"), 1200);
     writeFileSync(f, jsonl([line("prompt", { sessionId: "s2", i: 0 }), line("tool", { sessionId: "s2", i: 1 }), line("text", { sessionId: "s2", i: 2, text: "last words" })]));
     await t.readNow(f);
-    assert.equal(t.listener.listSteps("s2").length, 0, "the lock is held: nothing stored yet");
+    assert.equal(t.listener.store.listSteps("s2").length, 0, "the lock is held: nothing stored yet");
     await exited;
-    await until(() => t.listener.listSteps("s2").length === 3, 5000);
-    assert.deepEqual(t.listener.listSteps("s2").map((s) => s.seq), [0, 1, 2]);
+    await until(() => t.listener.store.listSteps("s2").length === 3, 5000);
+    assert.deepEqual(t.listener.store.listSteps("s2").map((s) => s.seq), [0, 1, 2]);
     assert.equal(t.sent.filter((m) => m.type === "step" && m.step.sessionId === "s2").length, 3, "each step announced once");
   } finally { await t.close(); }
 });

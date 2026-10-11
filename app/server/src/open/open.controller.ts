@@ -2,7 +2,7 @@ import { BadRequestException, Body, Controller, ForbiddenException, HttpCode, Po
 import { execFile } from "node:child_process";
 import { realpathSync, statSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, normalize } from "node:path";
-import { ListenerService } from "../listener/listener.service";
+import { StepsStore } from "../listener/step-store";
 import { tooBroad, WorkspaceService } from "../workspace/workspace.service";
 import { insideAny } from "../core/paths";
 
@@ -32,7 +32,7 @@ export function openable(path: string, mode = 0): boolean {
 
 @Controller()
 export class OpenController {
-  constructor(private ws: WorkspaceService, private listener: ListenerService) {}
+  constructor(private ws: WorkspaceService, private store: StepsStore) {}
 
   @Post("open") @HttpCode(204)
   open(@Body() body: { path?: unknown }) {
@@ -45,7 +45,7 @@ export class OpenController {
     if (!st.isFile()) throw new BadRequestException("Not a file");
     if (!openable(path, st.mode) || !openable(real, st.mode)) throw new ForbiddenException("Only text and code files open from here");
     // A thread started in the home folder (or /) doesn't make every file on the disk "a thread's folder".
-    const roots = [this.ws.status().root, ...this.listener.listSessions().map((s) => s.cwd)].filter((r): r is string => !!r && !tooBroad(r));
+    const roots = [this.ws.status().root, ...this.store.listSessions().map((s) => s.cwd)].filter((r): r is string => !!r && !tooBroad(r));
     if (!insideAny(real, roots)) throw new ForbiddenException("Outside the project and the threads' folders");
     const [cmd, args] = process.platform === "darwin" ? ["open", [real]] : process.platform === "win32" ? ["explorer.exe", [real]] : ["xdg-open", [real]];
     execFile(cmd, args, () => { /* the app opens on its own; nothing to report */ });

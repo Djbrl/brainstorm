@@ -9,7 +9,7 @@ import { BusService } from "../core/bus.service";
 import { ConfigService } from "../core/config.service";
 import { EventsGateway } from "../core/events.gateway";
 import { safely } from "../core/safely";
-import { ListenerService } from "../listener/listener.service";
+import { StepsStore } from "../listener/step-store";
 
 // Live presence of agents (main session threads and subagents): which file each one is on, and its recent route.
 const INACTIVE_MS = 2 * 60_000;
@@ -67,7 +67,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
   private timer?: NodeJS.Timeout;
 
   private log = new Logger("Agents");
-  constructor(private bus: BusService, private cfg: ConfigService, private gateway: EventsGateway, private listener: ListenerService) {}
+  constructor(private bus: BusService, private cfg: ConfigService, private gateway: EventsGateway, private store: StepsStore) {}
 
   onModuleInit() {
     this.bus.on("step", (s) => { try { this.onStep(s); } catch { /* never break the listener */ } });
@@ -109,7 +109,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     if (!step.agentId) {
       let name = this.sessionNames.get(step.sessionId);
       if (name === undefined) {
-        const title = this.listener.getSession(step.sessionId)?.title;
+        const title = this.store.getSession(step.sessionId)?.title;
         name = shortLabel(title, 48) ?? `Session ${step.sessionId.slice(0, 6)}`;
         this.sessionNames.set(step.sessionId, name);
       }

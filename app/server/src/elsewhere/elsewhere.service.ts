@@ -6,6 +6,7 @@ import { worktreeRepo } from "../shared/paths";
 import { inside, real } from "../core/paths";
 import { ConfigService } from "../core/config.service";
 import { ListenerService } from "../listener/listener.service";
+import { StepsStore } from "../listener/step-store";
 import { AttentionService } from "../attention/attention.service";
 import { promptTitle } from "../listener/text";
 import { maskSecrets } from "../privacy/mask";
@@ -42,7 +43,7 @@ export class ElsewhereService {
   private roots = new Map<string, string | null>(); // Claude Code project folder → its repo (decoded once)
   private cwds = new Map<string, string | null>();  // log file → where its thread runs (its first cwd)
 
-  constructor(private cfg: ConfigService, private listener: ListenerService, private attention: AttentionService) {}
+  constructor(private cfg: ConfigService, private listener: ListenerService, private attention: AttentionService, private store: StepsStore) {}
 
   list(): ElsewhereThread[] {
     const now = Date.now();
@@ -83,7 +84,7 @@ export class ElsewhereService {
       const state = this.stateOf(t.id, t.mtimeMs, now);
       if (!state) continue;
       const root = repoOf(t.root);
-      out.push({ sessionId: t.id, harness: "codex", title: t.title ?? this.listener.getSession(t.id)?.title, root, project: basename(root), lastEventAt: new Date(t.mtimeMs).toISOString(), state });
+      out.push({ sessionId: t.id, harness: "codex", title: t.title ?? this.store.getSession(t.id)?.title, root, project: basename(root), lastEventAt: new Date(t.mtimeMs).toISOString(), state });
     }
 
     // Titles come from other projects' raw logs (a custom title, the latest prompt) or from rows stored before titles
@@ -140,6 +141,6 @@ export class ElsewhereService {
       if (line.startsWith('{"type":"custom-title"')) { try { custom = JSON.parse(line).customTitle || custom; } catch { /* cut */ } }
       else if (line.startsWith('{"type":"last-prompt"')) { try { prompt = JSON.parse(line).lastPrompt || prompt; } catch { /* cut */ } }
     }
-    return custom ?? this.listener.getSession(sid)?.title ?? (prompt ? promptTitle(maskSecrets(prompt)) : undefined);
+    return custom ?? this.store.getSession(sid)?.title ?? (prompt ? promptTitle(maskSecrets(prompt)) : undefined);
   }
 }

@@ -15,7 +15,7 @@ function fakeRes() {
 async function setup() {
   const t = await makeListener();
   const { ImageController } = require(dist("image/image.controller.js"));
-  const ctl = new ImageController(t.listener);
+  const ctl = new ImageController(t.listener.store);
   const dir = join(t.tmp, "pics");
   mkdirSync(dir);
   const files = { png: join(dir, "shot.png"), upper: join(dir, "SHOT2.JPG"), unref: join(dir, "other.png"), txt: join(dir, "notes.txt"), link: join(dir, "link.png"), txtLink: join(dir, "t.txt") };

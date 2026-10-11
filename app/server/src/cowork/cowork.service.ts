@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { DbService } from "../core/db.service";
 import { stepsVersion, workSteps } from "../core/work-steps";
-import { ListenerService } from "../listener/listener.service";
+import { StepsStore } from "../listener/step-store";
 import { CallPairer } from "../shared/pairing";
 import type { CoworkArea, CoworkEvent, CoworkPage, CoworkSite, CoworkSummary, Step } from "../shared/contract";
 import { CODE_TOOLS, CoworkTracker } from "./classify";
@@ -17,10 +17,10 @@ const KEEP = 64; // threads whose events stay cached
 export class CoworkService {
   private parts = new Map<string, { version: string; part: Part }>();
 
-  constructor(private dbs: DbService, private listener: ListenerService) {}
+  constructor(private dbs: DbService, private store: StepsStore) {}
 
   summary(sessionId?: string): CoworkSummary {
-    const sessions = sessionId ? sessionId.split(",") : this.listener.listSessions().map((s) => s.id);
+    const sessions = sessionId ? sessionId.split(",") : this.store.listSessions().map((s) => s.id);
     return aggregatePlaces(sessions.map((sid) => this.part(sid)));
   }
 

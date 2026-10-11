@@ -37,7 +37,7 @@ async function makeListener({ root = "/work/demo-repo", watch = false } = {}) {
     /** Steps go out as live activity from now on. */
     live() { listener.ready = true; },
     /** Read what `file` gained; `history` reads it quietly. */
-    readNow(file, history = false) { return listener.runFile(file, history ? Infinity : 0); },
+    readNow(file, history = false) { return listener.tailer.runFile(file, history ? Infinity : 0); },
     async close() { await listener.onModuleDestroy?.(); dbs.db.close(); rmSync(tmp, { recursive: true, force: true }); },
   };
   return t;

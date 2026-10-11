@@ -5,7 +5,7 @@ import { BusService } from "../core/bus.service";
 import { DbService } from "../core/db.service";
 import { EventsGateway } from "../core/events.gateway";
 import { safely } from "../core/safely";
-import { ListenerService } from "../listener/listener.service";
+import { StepsStore } from "../listener/step-store";
 import { errorText, isErrorResult } from "../shared/failed";
 import { CallPairer } from "../shared/pairing";
 import { EDIT_TOOLS } from "../shared/tools";
@@ -85,7 +85,7 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
   private saved = new Map<string, HookSignal & { at: number }>();
 
   private log = new Logger("Attention");
-  constructor(private bus: BusService, private gateway: EventsGateway, private listener: ListenerService, private dbs: DbService) {}
+  constructor(private bus: BusService, private gateway: EventsGateway, private steps: StepsStore, private dbs: DbService) {}
 
   /** Prepared on first use: the listener creates the tables in its own init. */
   private get q() {
@@ -281,7 +281,7 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
   private inScope(ids: Set<string>, now: number): Set<string> {
     let sc = this.scope;
     if (!sc || now - sc.at > SCOPE_MS || [...ids].some((id) => !sc!.checked.has(id))) {
-      const visible = new Set(this.listener.listSessions().map((s) => s.id));
+      const visible = new Set(this.steps.listSessions().map((s) => s.id));
       sc = this.scope = { at: now, visible, checked: new Set([...visible, ...ids]) };
     }
     return sc.visible;

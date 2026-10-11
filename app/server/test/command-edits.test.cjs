@@ -22,7 +22,7 @@ test("history: a command that writes a file is an edit of the thread, without a 
   const f = join(t.projectDir, "s1.jsonl");
   writeFileSync(f, jsonl([line("prompt", { sessionId: "s1", cwd: ROOT, i: 0, text: "say hi to dad" }), ...thread(t, 1, SCRIPT, "c1"), ...thread(t, 3, "cat src/a.ts > /tmp/copy.ts", "c2")]));
   await t.readNow(f, true);
-  const steps = t.listener.listSteps("s1");
+  const steps = t.listener.store.listSteps("s1");
   const edits = steps.filter((s) => s.kind === "edit");
   assert.equal(edits.length, 1, "the /tmp copy isn't the project's");
   assert.equal(edits[0].filePath, `${ROOT}/app.vue`);
@@ -53,7 +53,7 @@ test("live: the diff comes from what the mapper saw change while the command ran
   appendFileSync(f, jsonl([call, result]));
   await t.readNow(f);
   await new Promise((r) => setTimeout(r, 1800)); // live command edits wait for the mapper
-  const edits = t.listener.listSteps("s1").filter((s) => s.kind === "edit");
+  const edits = t.listener.store.listSteps("s1").filter((s) => s.kind === "edit");
   assert.deepEqual(edits.map((e) => e.filePath).sort(), [`${ROOT}/app.css`, `${ROOT}/app.vue`]);
   const vue = edits.find((e) => e.filePath.endsWith("app.vue"));
   assert.deepEqual(vue.diff, { before: "<h1>Hi</h1>\n<p>a</p>\n", after: "<h1>Hi dad</h1>\n<p>a</p>\n" });

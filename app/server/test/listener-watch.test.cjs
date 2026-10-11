@@ -33,10 +33,10 @@ test("boot: history quietly once listening, then live steps; other projects' fol
   const sent = [];
   const L = new ListenerService(new DbService(), new BusService(), { broadcast: (m) => sent.push(m) }, new ConfigService(), new (require("../dist/core/workspace-state.js").WorkspaceState)());
   L.onModuleInit();
-  await until(() => L.listSessions().length === 2);
-  assert.deepEqual(L.listSessions().map((s) => s.id).sort(), ["old", "wt"]);
-  assert.equal(L.listSteps("old").length, 2);
-  await until(() => L.ready && L.reading.size === 0);
+  await until(() => L.store.listSessions().length === 2);
+  assert.deepEqual(L.store.listSessions().map((s) => s.id).sort(), ["old", "wt"]);
+  assert.equal(L.store.listSteps("old").length, 2);
+  await until(() => L.ready && L.tailer.reading.size === 0);
   assert.equal(sent.filter((m) => m.type === "step").length, 0, "history isn't broadcast as live");
 
   const watched = Object.keys(L.watcher.getWatched());
@@ -55,7 +55,7 @@ test("boot: history quietly once listening, then live steps; other projects' fol
   // Another workspace: its folder is read (quietly) and watched from then on.
   const before = sent.filter((m) => m.type === "step").length;
   L.bus.emit("workspace", { root: "/somewhere/else" });
-  await until(() => L.listSessions().some((s) => s.id === "x"));
+  await until(() => L.store.listSessions().some((s) => s.id === "x"));
   await until(() => Object.keys(L.watcher.getWatched()).some((d) => d.startsWith(other)));
   assert.equal(sent.filter((m) => m.type === "step").length, before);
   appendFileSync(join(other, "x.jsonl"), jsonl([line("text", { sessionId: "x", cwd: "/somewhere/else", i: 9, text: "over there" })]));

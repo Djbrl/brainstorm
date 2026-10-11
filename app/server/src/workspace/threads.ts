@@ -4,7 +4,7 @@
 // Not threads: subagent transcripts (`<session>/subagents/*.jsonl`, part of their session), a session whose
 // transcript is gone (deleted in Claude Code, or cleaned up), and a session where nothing happened but a slash
 // command (opening this app, /compact): no tool used and no message typed. The sidebar applies the same rules to
-// what it read (ListenerService.listSessions).
+// what it read (StepsStore.listSessions).
 import { closeSync, openSync, readSync } from "node:fs";
 import { promptTitle } from "../listener/listener.service";
 

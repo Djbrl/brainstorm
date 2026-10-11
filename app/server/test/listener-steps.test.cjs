@@ -23,28 +23,28 @@ test("the steps JSON is byte for byte the serialized step objects, and afterSeq 
   ]));
   await t.readNow(f, true);
   const L = t.listener;
-  const steps = L.listSteps("s1");
+  const steps = L.store.listSteps("s1");
   assert.equal(steps.find((s) => s.id.startsWith("err-1")).isError, true); // Step.isError, set at ingestion
   assert.equal(steps.filter((s) => s.isError).length, 1);
-  L.updateStep(steps[1].id, { label: "Ran a command", risk: ["touches auth", odd] });
-  L.updateStep(steps[0].id, { label: "" });
+  L.store.updateStep(steps[1].id, { label: "Ran a command", risk: ["touches auth", odd] });
+  L.store.updateStep(steps[0].id, { label: "" });
   // Rows written by older versions or other paths: odd stored values.
   t.dbs.db.prepare(`INSERT INTO steps (id, session_id, seq, ts, kind, text, input, diff, risk, is_subagent) VALUES ('x:0', 's1', 100, 't', 'tool_call', '', 'null', '', NULL, 0)`).run();
   t.dbs.db.prepare(`INSERT INTO steps (id, session_id, seq, ts, kind, input, is_subagent) VALUES ('x:1', 's1', 101, 't', 'tool_call', '{"a":[1,2,{"b":"c"}],"d":1.5}', 1)`).run();
 
-  const full = JSON.stringify(L.listSteps("s1"));
-  assert.equal(L.listStepsJson("s1"), full);
-  assert.deepEqual(JSON.parse(L.listStepsJson("s1")), JSON.parse(full));
+  const full = JSON.stringify(L.store.listSteps("s1"));
+  assert.equal(L.store.listStepsJson("s1"), full);
+  assert.deepEqual(JSON.parse(L.store.listStepsJson("s1")), JSON.parse(full));
   for (const after of [-1, 0, 2, 5, 100, 101, 1000]) {
-    assert.equal(L.listStepsJson("s1", after), JSON.stringify(L.listSteps("s1").filter((s) => s.seq > after)), `afterSeq ${after}`);
+    assert.equal(L.store.listStepsJson("s1", after), JSON.stringify(L.store.listSteps("s1").filter((s) => s.seq > after)), `afterSeq ${after}`);
   }
-  assert.equal(L.listStepsJson("nope"), "[]");
+  assert.equal(L.store.listStepsJson("nope"), "[]");
 
   // The controller sends that text as JSON; a bad afterSeq is ignored.
   const { SessionsController } = require(dist("listener/sessions.controller.js"));
-  const c = new SessionsController(L);
+  const c = new SessionsController(L.store);
   const res = () => ({ body: undefined, ct: undefined, type(t) { this.ct = t; return this; }, send(b) { this.body = b; return this; } });
-  for (const [q, expected] of [[undefined, full], ["3", L.listStepsJson("s1", 3)], ["abc", full], ["", full]]) {
+  for (const [q, expected] of [[undefined, full], ["3", L.store.listStepsJson("s1", 3)], ["abc", full], ["", full]]) {
     const r = res();
     c.steps("s1", q, r);
     assert.equal(r.ct, "application/json");
@@ -58,12 +58,12 @@ test("updateStep can store a label without broadcasting it", async () => {
   const f = join(t.projectDir, "s1.jsonl");
   writeFileSync(f, jsonl([line("tool", { i: 1 })]));
   await t.readNow(f, true);
-  const [step] = t.listener.listSteps("s1");
-  t.listener.updateStep(step.id, { label: "quiet" }, { broadcast: false });
+  const [step] = t.listener.store.listSteps("s1");
+  t.listener.store.updateStep(step.id, { label: "quiet" }, { broadcast: false });
   const updates = () => t.sent.filter((m) => m.type === "step-update");
   assert.equal(updates().length, 0);
-  assert.equal(t.listener.getStep(step.id).label, "quiet");
-  t.listener.updateStep(step.id, { label: "loud", risk: ["x"] });
+  assert.equal(t.listener.store.getStep(step.id).label, "quiet");
+  t.listener.store.updateStep(step.id, { label: "loud", risk: ["x"] });
   assert.deepEqual(updates(), [{ type: "step-update", id: step.id, label: "loud", risk: ["x"] }]);
   await t.close();
 });

@@ -11,11 +11,11 @@ function legacyList(t) {
   const L = t.listener;
   const db = t.dbs.db;
   const rows = db.prepare(`SELECT * FROM sessions ORDER BY last_event_at DESC`).all();
-  const sessions = rows.map((r) => L.rowToSession(r.custom_title ? r : { ...r, title: promptTitle(r.title) ?? "(untitled session)" }));
+  const sessions = rows.map((r) => L.store.rowToSession(r.custom_title ? r : { ...r, title: promptTitle(r.title) ?? "(untitled session)" }));
   const worked = new Set(db.prepare(`SELECT DISTINCT session_id FROM steps WHERE kind IN ('tool_call', 'edit')`).all().map((r) => r.session_id));
   const idle = (s) => !worked.has(s.id) && (s.title.startsWith("/") || s.title === "(untitled session)");
   const shown = sessions.filter((s) => !idle(s));
-  return shown.filter((s) => L.isWithinRoot(s.cwd));
+  return shown.filter((s) => L.project.isWithinRoot(s.cwd));
 }
 
 async function fixture() {
@@ -37,54 +37,54 @@ test("the cached list matches the old query, and follows new steps, titles and w
   const { t, f } = await fixture();
   const L = t.listener;
   const ids = (list) => list.map((s) => s.id);
-  assert.deepEqual(L.listSessions(), legacyList(t));
-  assert.deepEqual(ids(L.listSessions()).sort(), ["custom", "talk", "worked", "worktree"]);
+  assert.deepEqual(L.store.listSessions(), legacyList(t));
+  assert.deepEqual(ids(L.store.listSessions()).sort(), ["custom", "talk", "worked", "worktree"]);
 
   // The slash-command thread does some work: it shows up (the cache is dropped on the worked flip).
   appendFileSync(f("slash"), jsonl([line("edit", { sessionId: "slash", i: 20 })]));
   await t.readNow(f("slash"));
-  assert.ok(ids(L.listSessions()).includes("slash"));
-  assert.deepEqual(L.listSessions(), legacyList(t));
+  assert.ok(ids(L.store.listSessions()).includes("slash"));
+  assert.deepEqual(L.store.listSessions(), legacyList(t));
 
   // A new untitled thread, then its title arrives.
   writeFileSync(f("late"), jsonl([line("text", { sessionId: "late", i: 21 })]));
   await t.readNow(f("late"));
-  assert.deepEqual(L.listSessions(), legacyList(t));
+  assert.deepEqual(L.store.listSessions(), legacyList(t));
   appendFileSync(f("late"), jsonl([line("prompt", { sessionId: "late", i: 22, text: "now with a title" })]));
   await t.readNow(f("late"));
-  assert.ok(ids(L.listSessions()).includes("late"));
-  assert.deepEqual(L.listSessions(), legacyList(t));
+  assert.ok(ids(L.store.listSessions()).includes("late"));
+  assert.deepEqual(L.store.listSessions(), legacyList(t));
 
   // Another workspace: the list follows.
   L.setRoot("/elsewhere");
-  assert.deepEqual(ids(L.listSessions()), ["outside"]);
-  assert.deepEqual(L.listSessions(), legacyList(t));
+  assert.deepEqual(ids(L.store.listSessions()), ["outside"]);
+  assert.deepEqual(L.store.listSessions(), legacyList(t));
   L.setRoot("/work/demo-repo");
-  assert.deepEqual(L.listSessions(), legacyList(t));
+  assert.deepEqual(L.store.listSessions(), legacyList(t));
 
   // Status is worked out on each call, not cached.
   ctx.mock.timers.enable({ apis: ["Date"], now: Date.parse("2026-10-01T12:00:12Z") });
-  assert.equal(L.listSessions().find((s) => s.id === "talk").status, "running");
+  assert.equal(L.store.listSessions().find((s) => s.id === "talk").status, "running");
   ctx.mock.timers.tick(3 * 60_000);
-  assert.equal(L.listSessions().find((s) => s.id === "talk").status, "idle");
+  assert.equal(L.store.listSessions().find((s) => s.id === "talk").status, "idle");
   ctx.mock.timers.reset();
   // Returned objects are fresh: callers may change them.
-  L.listSessions()[0].title = "changed";
-  assert.notEqual(L.listSessions()[0].title, "changed");
+  L.store.listSessions()[0].title = "changed";
+  assert.notEqual(L.store.listSessions()[0].title, "changed");
   await t.close();
 });
 
 test("the worked flag is filled in for a database from before it existed", async () => {
   const { t } = await fixture();
-  const expected = t.listener.listSessions();
+  const expected = t.listener.store.listSessions();
   t.dbs.db.exec(`ALTER TABLE sessions DROP COLUMN worked; PRAGMA user_version = 0`);
   require(dist("core/schema.js")).migrate(t.dbs.db);
   const { ListenerService } = require(dist("listener/listener.service.js"));
   const again = new ListenerService(t.dbs, t.bus, { broadcast() {} }, t.cfg, t.state);
   again.onModuleInit();
   await again.watcher.close();
-  again.offsets = t.listener.offsets;
-  assert.deepEqual(again.listSessions(), expected);
+  again.tailer.offsets = t.listener.tailer.offsets;
+  assert.deepEqual(again.store.listSessions(), expected);
   const worked = t.dbs.db.prepare(`SELECT id FROM sessions WHERE worked = 1 ORDER BY id`).all().map((r) => r.id);
   assert.deepEqual(worked, ["outside", "worked"]);
   await t.close();
@@ -93,7 +93,7 @@ test("the worked flag is filled in for a database from before it existed", async
 test("a thread from another project that edits this one's files is a visitor here: listed, and read live", async () => {
   const { t, f } = await fixture();
   const L = t.listener;
-  const ids = () => L.listSessions().map((s) => s.id);
+  const ids = () => L.store.listSessions().map((s) => s.id);
   assert.ok(!ids().includes("orch"));
   // An orchestrator in its own folder edits a file of the demo repo: from that step on, it's listed here too.
   writeFileSync(f("orch"), jsonl([line("prompt", { sessionId: "orch", cwd: "/orchestrator", i: 30, text: "fix the demo" }),

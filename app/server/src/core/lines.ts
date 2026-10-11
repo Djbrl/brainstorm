@@ -1,6 +1,6 @@
 // Reading a log a line at a time, a chunk at a time: lines are cut on the newline byte and only then decoded, so a
 // character split between two chunks stays whole. Only complete lines (ending in "\n") are given; empty lines are skipped.
-// The listener's own reader (listener.service.ts fill) keeps its cursor and byte offsets across calls, so it stays its own.
+// The listener's own reader (tailer.ts fill) keeps its cursor and byte offsets across calls, so it stays its own.
 import { closeSync, openSync, readSync } from "node:fs";
 
 const NL = 0x0a;

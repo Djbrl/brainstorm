@@ -46,7 +46,7 @@ test("a subagent step's agentId is stored and read back on every path", async ()
   const t = await makeListener();
   await threadWithSubagents(t);
   const L = t.listener;
-  const steps = L.listSteps("s1");
+  const steps = L.store.listSteps("s1");
   const subs = steps.filter((s) => s.isSubagent);
   assert.equal(subs.length, 9);
   assert.ok(subs.every((s) => s.agentId === "a1" || s.agentId === "a2"));
@@ -58,12 +58,12 @@ test("a subagent step's agentId is stored and read back on every path", async ()
   // The column, getStep, stepsBefore, the reader's backfill list, the JSON the web loads, the light steps.
   const ids = agentIds(t.dbs.db);
   for (const s of steps) assert.equal(ids[s.id], s.agentId ?? null);
-  for (const s of subs) assert.equal(L.getStep(s.id).agentId, s.agentId);
+  for (const s of subs) assert.equal(L.store.getStep(s.id).agentId, s.agentId);
   const last = steps[steps.length - 1];
-  assert.deepEqual(L.stepsBefore(last.id, 100), steps.slice(0, -1));
-  assert.ok(L.unlabeledSteps(100).filter((s) => s.isSubagent).every((s) => s.agentId));
-  assert.equal(L.listStepsJson("s1"), JSON.stringify(steps));
-  assert.equal(L.listStepsJson("s1", 4), JSON.stringify(steps.filter((s) => s.seq > 4)));
+  assert.deepEqual(L.store.stepsBefore(last.id, 100), steps.slice(0, -1));
+  assert.ok(L.store.unlabeledSteps(100).filter((s) => s.isSubagent).every((s) => s.agentId));
+  assert.equal(L.store.listStepsJson("s1"), JSON.stringify(steps));
+  assert.equal(L.store.listStepsJson("s1", 4), JSON.stringify(steps.filter((s) => s.seq > 4)));
   const { workSteps } = require(dist("core/work-steps.js"));
   const light = workSteps(t.dbs.db, "s1");
   assert.ok(light.length > 0);
@@ -75,7 +75,7 @@ test("a subagent step's agentId is stored and read back on every path", async ()
   const sent = t.sent.filter((m) => m.type === "step").map((m) => m.step);
   assert.equal(sent.length, 1);
   assert.equal(sent[0].agentId, "a2");
-  assert.equal(JSON.stringify(L.getStep(sent[0].id)), JSON.stringify(sent[0]));
+  assert.equal(JSON.stringify(L.store.getStep(sent[0].id)), JSON.stringify(sent[0]));
   await t.close();
 });
 
@@ -100,9 +100,9 @@ test("the steps JSON of steps without an agent id is what it was before the colu
     const { toolUseId, ...head } = before(r);
     return { ...head, ...(r.agent_id ? { agentId: r.agent_id } : {}), ...(toolUseId ? { toolUseId } : {}) };
   };
-  assert.equal(t.listener.listStepsJson("s1"), JSON.stringify(rows.map(now)));
+  assert.equal(t.listener.store.listStepsJson("s1"), JSON.stringify(rows.map(now)));
   for (const r of rows.filter((r) => r.agent_id === null)) {
-    assert.equal(t.listener.listStepsJson("s1", r.seq - 1).split(',{"id":')[0].slice(1).replace(/]$/, ""), JSON.stringify(before(r)), r.id);
+    assert.equal(t.listener.store.listStepsJson("s1", r.seq - 1).split(',{"id":')[0].slice(1).replace(/]$/, ""), JSON.stringify(before(r)), r.id);
   }
   // A thread with no subagents: byte for byte what it was.
   const f = join(t.projectDir, "s2.jsonl");
@@ -110,8 +110,8 @@ test("the steps JSON of steps without an agent id is what it was before the colu
   await t.readNow(f, true);
   const rows2 = t.dbs.db.prepare(`SELECT * FROM steps WHERE session_id = 's2' ORDER BY seq`).all();
   assert.equal(rows2.length, 4);
-  assert.equal(t.listener.listStepsJson("s2"), JSON.stringify(rows2.map(before)));
-  assert.ok(!t.listener.listStepsJson("s2").includes("agentId"));
+  assert.equal(t.listener.store.listStepsJson("s2"), JSON.stringify(rows2.map(before)));
+  assert.ok(!t.listener.store.listStepsJson("s2").includes("agentId"));
   await t.close();
 });
 

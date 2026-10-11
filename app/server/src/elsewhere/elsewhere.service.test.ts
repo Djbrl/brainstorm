@@ -24,7 +24,7 @@ function setup(hooks: Record<string, HookSignal & { at: number }> = {}) {
   const here = join(base, "here"), there = join(base, "there");
   const listener = { scopeRoots: () => [here], getSession: () => undefined, codexRecent: () => [], isVisitor: (id: string) => id === "guest" };
   const attention = { hookOf: (sid: string) => hooks[sid] };
-  const svc = new ElsewhereService({ claudeProjectsDir: projects } as any, listener as any, attention as any);
+  const svc = new ElsewhereService({ claudeProjectsDir: projects } as any, listener as any, attention as any, listener as any);
   return { svc, thread, here, there };
 }
 

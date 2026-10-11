@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { ListenerService } from "../listener/listener.service";
+import { StepsStore } from "../listener/step-store";
 import { MapperService } from "../mapper/mapper.service";
 import { AskService } from "../ask/ask.service";
 import { WorkspaceState } from "../core/workspace-state";
@@ -26,7 +26,7 @@ function actionOf(step: Step): string | undefined {
 // Builds replays: the hosted demo's export (GET /api/replay) and shared replays (GET /api/share).
 @Injectable()
 export class ReplayService {
-  constructor(private listener: ListenerService, private mapper: MapperService, private askService: AskService, private cfg: ConfigService, private state: WorkspaceState, private workspace: WorkspaceService) {}
+  constructor(private store: StepsStore, private mapper: MapperService, private askService: AskService, private cfg: ConfigService, private state: WorkspaceState, private workspace: WorkspaceService) {}
 
   /** Which subagent wrote each log line: uuid → {agentId, name}, from Claude Code's subagents/agent-<id>.jsonl (+ .meta.json). */
   private subagentIndex(sessionId: string): Map<string, { id: string; name: string }> {
@@ -74,12 +74,12 @@ export class ReplayService {
    * project the server worked out for it (share-root.ts), never one a link names.
    */
   async build(sessionId?: string, root?: string, movesFrom?: string, movesTo?: string, preview?: string, until?: string, share?: { mapRoot: string }): Promise<Replay> {
-    const all = this.listener.listSessions();
+    const all = this.store.listSessions();
     const wanted = sessionId ? sessionId.split(",") : [];
     const sessions = !wanted.length ? all.slice(0, 1)
-      : share ? wanted.map((id) => all.find((s) => s.id === id) ?? this.listener.getSession(id)).filter((s): s is Session => !!s)
+      : share ? wanted.map((id) => all.find((s) => s.id === id) ?? this.store.getSession(id)).filter((s): s is Session => !!s)
       : all.filter((s) => wanted.includes(s.id));
-    const steps = sessions.flatMap((s) => this.listener.listSteps(s.id)).filter((st) => !until || st.ts <= until);
+    const steps = sessions.flatMap((s) => this.store.listSteps(s.id)).filter((st) => !until || st.ts <= until);
     // The open project only (or the same folder written another way): never a walk of any folder a link names.
     const map = await this.mapper.getMapAsync(share ? share.mapRoot : root && resolve(root) === resolve(this.state.root) ? root : this.state.root);
     const answers = this.askService.listAnswers();

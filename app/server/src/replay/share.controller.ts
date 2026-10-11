@@ -3,7 +3,7 @@ import type { Response } from "express";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { Replay, Session, Step } from "../shared/contract";
-import { ListenerService } from "../listener/listener.service";
+import { StepsStore } from "../listener/step-store";
 import { ReplayService } from "./replay.service";
 import { threadMarkdown } from "./markdown";
 import { forSharing, slug } from "./privacy";
@@ -35,13 +35,13 @@ const escHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<":
 // Sharing a thread: GET /api/share (one .html file anyone can open) and GET /api/export.md (a report).
 @Controller()
 export class ShareController {
-  constructor(private listener: ListenerService, private replays: ReplayService, private usage: UsageService, private state: WorkspaceState) {}
+  constructor(private store: StepsStore, private replays: ReplayService, private usage: UsageService, private state: WorkspaceState) {}
 
   /** The thread to share: the one asked for, or the newest one working in the open project (not one from another
    *  project that only visited it). */
   private pick(sessionId?: string): Session {
     const id = sessionId?.split(",")[0];
-    const s = id ? this.listener.getSession(id) : this.listener.listSessions().find((t) => [t.cwd, t.home].some((f) => f && within(f, this.state.root)));
+    const s = id ? this.store.getSession(id) : this.store.listSessions().find((t) => [t.cwd, t.home].some((f) => f && within(f, this.state.root)));
     if (!s) throw new HttpException(id ? `No thread ${id}` : "No thread in this project to share yet", 404);
     return s;
   }
@@ -49,7 +49,7 @@ export class ShareController {
   /** A replay of one thread for someone else: only this thread (no Ask answers), the part of the map it touched (slim.ts),
    *  secrets masked, no screenshots. */
   async sharedReplay(session: Session): Promise<Replay> {
-    const steps = this.listener.listSteps(session.id);
+    const steps = this.store.listSteps(session.id);
     const raw = await this.replays.build(session.id, undefined, undefined, undefined, undefined, undefined, { mapRoot: shareMapRoot(session, steps, this.state.root) });
     const answers: Replay["answers"] = []; // a shared file carries no Ask answers: they were asked here, about this machine
     const shared = { title: session.title || "Untitled thread", createdAt: new Date().toISOString(), version: config.version ?? "dev" };

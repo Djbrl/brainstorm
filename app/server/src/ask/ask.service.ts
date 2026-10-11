@@ -7,7 +7,7 @@ import type { AskRequest, AskResponse, Step } from "../shared/contract";
 import { DbService } from "../core/db.service";
 import { WorkspaceState } from "../core/workspace-state";
 import { ConfigService } from "../core/config.service";
-import { ListenerService } from "../listener/listener.service";
+import { StepsStore } from "../listener/step-store";
 import { ClaudeService } from "../llm/claude.service";
 import { maskSecrets } from "../privacy/mask";
 import { UsageService } from "../usage/usage.service";
@@ -46,7 +46,7 @@ export class AskService {
     private dbs: DbService,
     private cfg: ConfigService,
     private state: WorkspaceState,
-    private listener: ListenerService,
+    private store: StepsStore,
     private claude: ClaudeService,
     private usage: UsageService,
   ) {}
@@ -59,11 +59,11 @@ export class AskService {
     this.usage.bump("ak");
 
     const stepId = text(req.stepId);
-    const step: Step | undefined = stepId ? this.safe(() => this.listener.getStep(stepId)) : undefined;
+    const step: Step | undefined = stepId ? this.safe(() => this.store.getStep(stepId)) : undefined;
     let filePath = text(req.filePath) ?? step?.filePath;
     if (filePath && !isAbsolute(filePath)) filePath = resolve(this.state.root, filePath);
     // Only a file of the project or of a thread's folder goes to the model, never any other file on the disk.
-    const roots = [this.state.root, ...this.listener.listSessions().map((s) => s.cwd)].filter((r): r is string => !!r && !tooBroad(r));
+    const roots = [this.state.root, ...this.store.listSessions().map((s) => s.cwd)].filter((r): r is string => !!r && !tooBroad(r));
     if (filePath && !insideAny(filePath, roots)) filePath = undefined;
     const content = filePath ? this.safe(() => readFileSync(filePath!, "utf8")) : undefined;
     const fileHash = content !== undefined ? createHash("sha1").update(content).digest("hex") : "";
@@ -112,7 +112,7 @@ export class AskService {
     const rel = filePath ? relative(base, filePath) : undefined;
 
     if (step) {
-      const before: Step[] = this.safe(() => this.listener.stepsBefore(step.id, 3)) ?? [];
+      const before: Step[] = this.safe(() => this.store.stepsBefore(step.id, 3)) ?? [];
       if (before.length) parts.push("## What the agent did just before\n" + before.map((s) => `- ${this.describe(s)}`).join("\n"));
       parts.push("## The step in question\n" + this.describe(step));
       if (step.diff) parts.push(`## Its diff\n--- before\n${clip(step.diff.before, 3000)}\n+++ after\n${clip(step.diff.after, 3000)}`);

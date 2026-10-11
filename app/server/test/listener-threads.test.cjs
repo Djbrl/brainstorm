@@ -44,7 +44,7 @@ test("a line repeated within a thread keeps its first place; reading the log aga
   await t.readNow(f, true);
   const first = stepsOf(t, "s1");
   assert.deepEqual(first.map((s) => s.text), ["x 0", "x 1", "x 2", "x 3", "y 0", "y 1"]);
-  t.listener.saveOffset(f, 0);
+  t.listener.tailer.saveOffset(f, 0);
   await t.readNow(f, true);
   assert.deepEqual(stepsOf(t, "s1"), first);
   await t.close();
@@ -86,7 +86,7 @@ test("Claude Code's folder names: a path over 200 characters is cut and hashed a
     const claude = t.listener.sources.find((s) => s.harness === "claude");
     assert.deepEqual(claude.list(t.listener.scope()).map((x) => x.path), [f], root);
     await t.readNow(f, true);
-    assert.deepEqual(t.listener.listSessions().map((s) => s.id), ["s1"], root);
+    assert.deepEqual(t.listener.store.listSessions().map((s) => s.id), ["s1"], root);
     await t.close();
   }
 });
@@ -124,13 +124,13 @@ test("a time ahead of the clock counts as now; the thread goes idle as any other
   writeFileSync(f, jsonl([future, line("tool", { i: 1 })]));
   const before = Date.now();
   await t.readNow(f, true);
-  const s = t.listener.getSession("s1");
+  const s = t.listener.store.getSession("s1");
   assert.ok(Date.parse(s.lastEventAt) <= Date.now() && Date.parse(s.lastEventAt) >= before, s.lastEventAt);
   // Older times in another format still compare as times, not as strings.
   t.dbs.db.prepare(`UPDATE sessions SET last_event_at = ? WHERE id = 's1'`).run(new Date(Date.now() - 10 * 60_000).toISOString());
-  assert.equal(t.listener.getSession("s1").status, "idle");
+  assert.equal(t.listener.store.getSession("s1").status, "idle");
   t.dbs.db.prepare(`UPDATE sessions SET last_event_at = 'not a time' WHERE id = 's1'`).run();
-  assert.equal(t.listener.getSession("s1").status, "idle");
+  assert.equal(t.listener.store.getSession("s1").status, "idle");
   await t.close();
 });
 
@@ -139,9 +139,9 @@ test("text after a NUL character is kept, the NUL shown as ␀, the same in the 
   const f = join(t.projectDir, "s1.jsonl");
   writeFileSync(f, jsonl([line("prompt", { i: 0, text: "go" }), line("text", { i: 1, text: "before\u0000after" })]));
   await t.readNow(f, true);
-  const steps = t.listener.listSteps("s1");
+  const steps = t.listener.store.listSteps("s1");
   assert.equal(steps[1].text, "before␀after");
-  assert.equal(t.listener.listStepsJson("s1"), JSON.stringify(steps));
+  assert.equal(t.listener.store.listStepsJson("s1"), JSON.stringify(steps));
   await t.close();
 });
 
@@ -154,9 +154,9 @@ test("a command's file edits waiting for the mapper are stored, without a diff, 
     line("tool", { i: 1, tool: "Bash", input: { command: "echo hi > out.txt" }, id: "c1" }),
     line("result", { i: 2, input: "tu_c1", text: "" })]));
   await t.readNow(f);
-  assert.equal(t.listener.listSteps("s1").filter((s) => s.kind === "edit").length, 0, "still waiting");
+  assert.equal(t.listener.store.listSteps("s1").filter((s) => s.kind === "edit").length, 0, "still waiting");
   await t.listener.onModuleDestroy();
-  const edits = t.listener.listSteps("s1").filter((s) => s.kind === "edit");
+  const edits = t.listener.store.listSteps("s1").filter((s) => s.kind === "edit");
   assert.deepEqual(edits.map((e) => e.filePath), [`${ROOT}/out.txt`]);
   assert.equal(edits[0].diff, undefined);
   await t.close();
@@ -165,7 +165,7 @@ test("a command's file edits waiting for the mapper are stored, without a diff, 
 /** Wait for the backfill (history read) to end. */
 async function backfilled(L) {
   await new Promise((r) => setImmediate(r));
-  while (L.historyEnd.size || L.reading.size) await new Promise((r) => setTimeout(r, 10));
+  while (L.tailer.historyEnd.size || L.tailer.reading.size) await new Promise((r) => setTimeout(r, 10));
 }
 
 test("history reads a thread's own log and its subagents' together, in time order, whichever file is newer", async () => {
@@ -183,10 +183,10 @@ test("history reads a thread's own log and its subagents' together, in time orde
     utimesSync(newer === "main" ? sub : main, old, old);
     L.backfillForNewFilter();
     await backfilled(L);
-    const steps = L.listSteps("S");
+    const steps = L.store.listSteps("S");
     assert.deepEqual(steps.map((s) => s.text ?? s.tool), ["main ask", "SUBAGENT-BRIEF look at the API", "Task", "sub 3", "sub 4", "final answer"], newer);
     assert.deepEqual(steps.map((s) => s.seq), [0, 1, 2, 3, 4, 5]);
-    const s = L.getSession("S");
+    const s = L.store.getSession("S");
     assert.equal(s.title, "main ask");
     assert.equal(s.startedAt, steps[0].ts);
     const notices = t.sent.filter((m) => m.type === "steps-stored");

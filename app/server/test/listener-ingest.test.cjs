@@ -22,8 +22,8 @@ test("small chunks and batches store exactly what one big read stores, offsets b
   const results = [];
   for (const [chunk, batch] of [[4 << 20, 1 << 20], [7, 13], [64, 5], [1000, 300]]) {
     const t = await makeListener();
-    t.listener.chunkBytes = chunk;
-    t.listener.batchBytes = batch;
+    t.listener.tailer.chunkBytes = chunk;
+    t.listener.tailer.batchBytes = batch;
     const f = join(t.projectDir, "s1.jsonl");
     writeFileSync(f, jsonl(lines));
     await t.readNow(f, true);
@@ -38,7 +38,7 @@ test("small chunks and batches store exactly what one big read stores, offsets b
 
 test("a partial last line waits; the rest is read once it is complete", async () => {
   const t = await makeListener();
-  t.listener.chunkBytes = 16;
+  t.listener.tailer.chunkBytes = 16;
   const f = join(t.projectDir, "s1.jsonl");
   const [a, b] = [JSON.stringify(line("prompt", { i: 0, text: "première ✨" })), JSON.stringify(line("text", { i: 1, text: "deuxième 🎉" }))];
   const cut = Buffer.from(b).length - 5; // inside the 🎉's bytes area or near it
@@ -56,8 +56,8 @@ test("a partial last line waits; the rest is read once it is complete", async ()
 test("a line longer than the limit is skipped, wherever the chunks fall; the lines around it are kept", async () => {
   for (const chunk of [64, 100_000]) {
     const t = await makeListener();
-    t.listener.chunkBytes = chunk;
-    t.listener.maxLineBytes = 2_000;
+    t.listener.tailer.chunkBytes = chunk;
+    t.listener.tailer.maxLineBytes = 2_000;
     const f = join(t.projectDir, "s1.jsonl");
     writeFileSync(f, jsonl([line("prompt", { i: 0, text: "avant" }), line("text", { i: 1, text: "x".repeat(5_000) }), line("text", { i: 2, text: "après" })]));
     await t.readNow(f, true);
@@ -69,8 +69,8 @@ test("a line longer than the limit is skipped, wherever the chunks fall; the lin
 
 test("an over-long line still being written: the offset stays before it", async () => {
   const t = await makeListener();
-  t.listener.chunkBytes = 64;
-  t.listener.maxLineBytes = 500;
+  t.listener.tailer.chunkBytes = 64;
+  t.listener.tailer.maxLineBytes = 500;
   const f = join(t.projectDir, "s1.jsonl");
   const first = JSON.stringify(line("prompt", { i: 0, text: "avant" })) + "\n";
   writeFileSync(f, first + JSON.stringify(line("text", { i: 1, text: "y".repeat(3000) })).slice(0, 2000));
@@ -83,23 +83,23 @@ test("an over-long line still being written: the offset stays before it", async 
 test("history is stored quietly; what a file gains after it was listed goes out live, labels riding on the step", async () => {
   const t = await makeListener();
   t.live();
-  t.listener.chunkBytes = 50; // many chunks: the read yields often
-  t.listener.batchBytes = 50;
+  t.listener.tailer.chunkBytes = 50; // many chunks: the read yields often
+  t.listener.tailer.batchBytes = 50;
   t.bus.on("step", (s) => { s.label = `label ${s.seq}`; }); // what the reader does in its bus handler
   const f = join(t.projectDir, "s1.jsonl");
   writeFileSync(f, jsonl(thread(30)));
   const listed = statSync(f).size;
-  t.listener.historyEnd.set(f, listed);
-  const reading = t.listener.runFile(f, listed); // the backfill
+  t.listener.tailer.historyEnd.set(f, listed);
+  const reading = t.listener.tailer.runFile(f, listed); // the backfill
   await new Promise((r) => setImmediate(r));
   appendFileSync(f, jsonl([line("text", { i: 99, text: "en direct" })]));
-  const live = t.listener.runFile(f, t.listener.historyEnd.get(f) ?? 0); // chokidar "change" during the read
+  const live = t.listener.tailer.runFile(f, t.listener.tailer.historyEnd.get(f) ?? 0); // chokidar "change" during the read
   await Promise.all([reading, live]);
   const steps = t.sent.filter((m) => m.type === "step").map((m) => m.step);
   assert.deepEqual(steps.map((s) => s.text), ["en direct"]);
   assert.equal(steps[0].label, `label ${steps[0].seq}`);
   assert.equal(offset(t, f), statSync(f).size);
-  assert.equal(t.listener.historyEnd.has(f), false);
+  assert.equal(t.listener.tailer.historyEnd.has(f), false);
   await t.close();
 });
 
@@ -126,21 +126,21 @@ test("a database error rolls the batch back: no rows, offset and seqs unchanged,
   await clean.close();
 
   const t = await makeListener();
-  t.listener.batchBytes = 1500;
+  t.listener.tailer.batchBytes = 1500;
   const f = join(t.projectDir, "s1.jsonl");
   writeFileSync(f, jsonl(lines));
-  const stmt = t.listener.st.insertStep;
+  const stmt = t.listener.store.st.insertStep;
   const run = stmt.run.bind(stmt);
   let calls = 0;
-  t.listener.st.insertStep = { run: (...a) => { if (++calls === 8) { const e = new Error("disk I/O error"); e.code = "ERR_SQLITE_ERROR"; throw e; } return run(...a); } };
+  t.listener.store.st.insertStep = { run: (...a) => { if (++calls === 8) { const e = new Error("disk I/O error"); e.code = "ERR_SQLITE_ERROR"; throw e; } return run(...a); } };
   await t.readNow(f, true);
   const partial = rows(t);
   const off = offset(t, f);
   assert.ok(off > 0 && off < statSync(f).size, "stopped at a batch boundary");
   assert.ok(partial.length > 0);
   assert.deepEqual(partial, expected.slice(0, partial.length));
-  assert.equal(t.listener.nextSeq.get("s1"), partial.length);
-  t.listener.st.insertStep = stmt;
+  assert.equal(t.listener.writer.nextSeq.get("s1"), partial.length);
+  t.listener.store.st.insertStep = stmt;
   await t.readNow(f, true);
   assert.deepEqual(rows(t), expected);
   assert.equal(offset(t, f), statSync(f).size);

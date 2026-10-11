@@ -3,7 +3,7 @@ import { closeSync, existsSync, openSync, readdirSync, readSync, statSync } from
 import { join } from "node:path";
 import { DbService } from "../core/db.service";
 import { ConfigService } from "../core/config.service";
-import { ListenerService } from "../listener/listener.service";
+import { StepsStore } from "../listener/step-store";
 
 // Screenshots that tools returned (browser, computer use, simulator), read from Claude Code's
 // session logs and kept in the local database, so they survive Claude Code's log cleanup. The step panel shows them
@@ -20,7 +20,7 @@ export class ShotsService {
   /** Shots asked for and not found, by `stepId:idx` → when to look again, so a missing one doesn't rescan the logs on every request. */
   private missed = new Map<string, number>();
 
-  constructor(private dbs: DbService, private cfg: ConfigService, private listener: ListenerService) {}
+  constructor(private dbs: DbService, private cfg: ConfigService, private store: StepsStore) {}
 
   /** The session's log and its subagents' logs. */
   private logFiles(sessionId: string): string[] {
@@ -80,7 +80,7 @@ export class ShotsService {
     const now = Date.now();
     if ((this.missed.get(key) ?? 0) > now) return undefined;
     // A step's screenshots are stored together: if some are here, this one doesn't exist (the step panel probes one past the last).
-    const sessionId = this.has(stepId) ? undefined : this.listener.getStep(stepId)?.sessionId;
+    const sessionId = this.has(stepId) ? undefined : this.store.getStep(stepId)?.sessionId;
     if (sessionId) {
       this.scan(sessionId);
       const found = this.get(stepId, idx);

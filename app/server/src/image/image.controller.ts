@@ -4,7 +4,7 @@ import { realpathSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { extname, isAbsolute, resolve } from "node:path";
 import { isLocalHost } from "../core/local";
-import { ListenerService } from "../listener/listener.service";
+import { StepsStore } from "../listener/step-store";
 
 // "Show the picture" in the step panel: an image an agent read, loaded from the person's disk when they
 // ask (Codex's log keeps only the path; Claude Code's keeps the picture, served by shots/). It reads files from the
@@ -21,7 +21,7 @@ const typeOf = (path: string) => TYPES[extname(path).slice(1).toLowerCase()];
 
 @Controller()
 export class ImageController {
-  constructor(private listener: ListenerService) {}
+  constructor(private store: StepsStore) {}
 
   @Get("image")
   async image(
@@ -36,7 +36,7 @@ export class ImageController {
     if (host && !isLocalHost(host)) throw new NotFoundException();   // DNS rebinding
     if (typeof raw !== "string" || !raw || raw.includes("\0") || !isAbsolute(raw)) throw new NotFoundException();
     const path = resolve(raw);
-    if (!typeOf(path) || !this.listener.stepTouches(path)) throw new NotFoundException();
+    if (!typeOf(path) || !this.store.stepTouches(path)) throw new NotFoundException();
     let data: Buffer, type: string | undefined;
     try {
       const real = realpathSync(path);

@@ -33,7 +33,7 @@ function file(t, id, lines, { dir = join(t.cfg.codexDir, "sessions", "2026", "10
   return f;
 }
 
-const steps = (t, id) => t.listener.listSteps(id);
+const steps = (t, id) => t.listener.store.listSteps(id);
 const calls = (ss) => ss.filter((s) => s.kind === "tool_call" || s.kind === "edit");
 const resultOf = (ss, call) => ss.find((s) => s.kind === "tool_result" && s.toolUseId === call.toolUseId);
 
@@ -79,7 +79,7 @@ test("a Codex thread end to end: prompt, reply, read, command, search, edits, MC
   const f = file(t, id, newThread(id));
   await t.readNow(f, true);
 
-  const [s] = t.listener.listSessions();
+  const [s] = t.listener.store.listSessions();
   assert.equal(s.id, id);
   assert.equal(s.harness, "codex");
   assert.equal(s.title, "fix the login bug");
@@ -128,7 +128,7 @@ test("a Codex thread end to end: prompt, reply, read, command, search, edits, MC
   assert.equal(new Set(ss.map((x) => x.id)).size, ss.length);
 
   // Read again from the start (a rebuilt database): the same steps, nothing doubled.
-  t.listener.saveOffset(f, 0);
+  t.listener.tailer.saveOffset(f, 0);
   await t.readNow(f, true);
   assert.equal(steps(t, id).length, ss.length);
   await t.close();
@@ -150,7 +150,7 @@ test("Codex Desktop's context around a prompt is set apart; Codex's injected tur
   assert.match(prompts[0].text, /^<files-mentioned-by-the-user>\n## a\.ts: \/work\/demo-repo\/a\.ts\n<\/files-mentioned-by-the-user>\n\nrename the helper/);
   assert.match(prompts[0].text, /\[Image: shot\.png\]$/);
   assert.ok(!prompts[0].text.includes("ABCDEFGHIJKLMNOP"), "secrets are masked");
-  assert.match(t.listener.listSessions()[0].title, /^rename the helper, key /);
+  assert.match(t.listener.store.listSessions()[0].title, /^rename the helper, key /);
   await t.close();
 });
 
@@ -161,14 +161,14 @@ test("resuming mid-file after a restart: the thread id comes from the file, not 
   const f = file(t, id, lines);
   // As if a run before had stored everything up to the first agent message.
   const cut = lines.findIndex((l) => l.payload?.item?.type === "AgentMessage");
-  t.listener.saveOffset(f, Buffer.byteLength(jsonl(lines.slice(0, cut))));
+  t.listener.tailer.saveOffset(f, Buffer.byteLength(jsonl(lines.slice(0, cut))));
   await t.readNow(f, true);
   const ss = steps(t, id);
   assert.ok(ss.length > 0);
   assert.ok(ss.every((s) => s.sessionId === id));
   assert.equal(ss.filter((s) => s.kind === "prompt").length, 0, "the prompt was before the offset");
   assert.deepEqual(calls(ss).map((x) => x.tool), ["Read", "Bash", "Grep", "Edit", "Write", "mcp__github__get_issue", "WebSearch"]);
-  assert.equal(t.listener.listSessions()[0].cwd, ROOT, "the thread's folder comes from the file's first line too");
+  assert.equal(t.listener.store.listSessions()[0].cwd, ROOT, "the thread's folder comes from the file's first line too");
   await t.close();
 });
 
@@ -195,7 +195,7 @@ test("scope: a thread in another folder isn't read; one in a Codex worktree of t
 
   for (const f of [fo, fw, fg]) await t.readNow(f, true);
   assert.equal(steps(t, other).length, 0, "another project's thread isn't read");
-  const listed = t.listener.listSessions();
+  const listed = t.listener.store.listSessions();
   assert.deepEqual(listed.map((s) => s.id).sort(), [inWt, gone].sort());
   assert.equal(listed.find((s) => s.id === inWt).cwd, ROOT);
   assert.equal(listed.find((s) => s.id === gone).cwd, ROOT);
@@ -280,7 +280,7 @@ test("before Codex logged commands as items: commands from its scripts and calls
   const t2 = await makeListener({ root: ROOT });
   const f2 = file(t2, id, lines);
   const at = lines.findIndex((l) => l.payload?.call_id === "call_x5");
-  t2.listener.saveOffset(f2, Buffer.byteLength(jsonl(lines.slice(0, at))));
+  t2.listener.tailer.saveOffset(f2, Buffer.byteLength(jsonl(lines.slice(0, at))));
   await t2.readNow(f2, true);
   assert.deepEqual(calls(steps(t2, id)).map((x) => x.input.command), ["npm test"]);
   await t2.close();
@@ -314,7 +314,7 @@ test("an old-format Codex file (no items): prompts, replies, reasoning, commands
   ]);
   assert.equal(calls(ss)[0].input.command, "ls");
   assert.equal(calls(ss)[1].filePath, "/work/demo-repo/README.md");
-  assert.equal(t.listener.listSessions()[0].title, "add a readme");
+  assert.equal(t.listener.store.listSessions()[0].title, "add a readme");
   await t.close();
 });
 
@@ -356,7 +356,7 @@ test("Claude Code and Codex threads side by side, each with its harness", async 
   const f = file(t, id, newThread(id));
   await t.readNow(cf, true);
   await t.readNow(f, true);
-  const byId = Object.fromEntries(t.listener.listSessions().map((s) => [s.id, s.harness]));
+  const byId = Object.fromEntries(t.listener.store.listSessions().map((s) => [s.id, s.harness]));
   assert.deepEqual(byId, { "claude-1": "claude", [id]: "codex" });
   await t.close();
 });
@@ -392,9 +392,9 @@ test("watching: a new Codex thread is read live; no Codex folder at all is fine"
     const lines = newThread(id);
     const f = join(day, `rollout-2026-10-01T12-00-00-${id}.jsonl`);
     writeFileSync(f, jsonl(lines.slice(0, 7))); // up to the prompt
-    await until(() => L.listSessions().length === 1);
+    await until(() => L.store.listSessions().length === 1);
     appendFileSync(f, jsonl(lines.slice(7)));
-    await until(() => L.listSteps(id).some((s) => s.tool === "WebSearch"));
+    await until(() => L.store.listSteps(id).some((s) => s.tool === "WebSearch"));
     assert.ok(sent.some((m) => m.type === "step" && m.step.tool === "Read"), "live steps are broadcast");
   } finally {
     await L.onModuleDestroy();
@@ -449,10 +449,10 @@ test("a subagent Codex starts is part of its parent's thread, as a subagent's st
   // The child first (newest first in history): it mustn't title the parent.
   await t.readNow(cf, true);
   await t.readNow(join(t.cfg.codexDir, "sessions", "2026", "10", "01", `rollout-2026-10-01T12-00-00-${parent}.jsonl`), true);
-  const threads = t.listener.listSessions();
+  const threads = t.listener.store.listSessions();
   assert.deepEqual(threads.map((s) => s.id), [parent]);
   assert.equal(threads[0].title, "audit the repo");
-  const subs = t.listener.listSteps(parent).filter((s) => s.isSubagent);
+  const subs = t.listener.store.listSteps(parent).filter((s) => s.isSubagent);
   assert.deepEqual(subs.map((s) => [s.kind, s.agentId]), [["prompt", child], ["text", child]]);
   assert.deepEqual([...t.listener.codexProjects().values()][0].map((x) => x.id), [parent, parent]);
   await t.close();
@@ -467,7 +467,7 @@ test("after a restart mid-call, a command's output still finds its call (one sca
   t.listener.codex.states.clear(); // as after a restart: nothing remembered of the file
   appendFileSync(f, jsonl([c.ri({ type: "function_call_output", call_id: "call_r1", output: "Exit code: 0\nWall time: 3 seconds\nOutput:\nbuilt\n" })]));
   await t.readNow(f, true);
-  const steps = t.listener.listSteps(id);
+  const steps = t.listener.store.listSteps(id);
   const call = steps.find((s) => s.kind === "tool_call" && s.tool === "Bash");
   assert.ok(call, "the command is stored");
   assert.equal(call.input.command, "npm run build");
@@ -483,13 +483,13 @@ test("when the Codex reader's version changes, its threads are read again from t
   await t.readNow(f, true);
   writeFileSync(join(t.projectDir, "s1.jsonl"), jsonl([line("prompt", { sessionId: "s1", cwd: ROOT, i: 0, text: "hello claude" })]));
   await t.readNow(join(t.projectDir, "s1.jsonl"), true);
-  assert.equal(t.listener.listSessions().length, 2);
+  assert.equal(t.listener.store.listSessions().length, 2);
   t.dbs.db.prepare("UPDATE source_versions SET version = 1 WHERE harness = 'codex'").run();
   t.listener.rereadChangedSources();
-  assert.deepEqual(t.listener.listSessions().map((s) => s.harness), ["claude"]);
+  assert.deepEqual(t.listener.store.listSessions().map((s) => s.harness), ["claude"]);
   assert.equal(t.dbs.db.prepare("SELECT COUNT(*) AS n FROM listener_offsets WHERE file = ?").get(f).n, 0, "read again from the start");
   await t.readNow(f, true);
-  assert.equal(t.listener.listSessions().length, 2);
+  assert.equal(t.listener.store.listSessions().length, 2);
   await t.close();
 });
 

@@ -1,4 +1,4 @@
-// POST /api/waitlist (form field `email`): keeps each email as one file, waitlist/<email>.json, in a private Vercel Blob
+// POST /api/waitlist (JSON `{email}`): keeps each email as one file, waitlist/<email>.json, in a private Vercel Blob
 // store connected to this project. No dependencies: it calls the same API as the @vercel/blob SDK (v2.4, API version 12).
 // Credentials, as the SDK resolves them: Vercel's OIDC token plus BLOB_STORE_ID, else BLOB_READ_WRITE_TOKEN.
 // Read the list with `vercel blob list --prefix waitlist/` from site/.
@@ -10,7 +10,8 @@ const EMAIL = /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/;
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
   if (!sameOrigin(req)) return res.status(403).json({ error: "Not from here." }); // another site posting through a visitor's browser
-  const body = req.body || {};
+  if (!/^application\/json\b/i.test(String(req.headers["content-type"] || ""))) return res.status(415).json({ error: "JSON only." }); // a cross-site form or text/plain post doesn't send it
+  const body = req.body && typeof req.body === "object" ? req.body : {};
   if (body.company) return res.status(200).json({ ok: true }); // honeypot: bots fill every field
   const email = String(body.email || "").trim().toLowerCase();
   if (email.length > 254 || !EMAIL.test(email)) return res.status(400).json({ error: "That doesn't look like an email address." });

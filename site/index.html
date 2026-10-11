@@ -758,7 +758,7 @@ const SITE = {
     award: "https://hackathon.gomycode.com/onboarding/winners",
     video: null,   // a film link, when there is one
   },
-  // Where the waitlist forms POST the email (form-encoded, field "email"). /api/waitlist is site/api/waitlist.js,
+  // Where the waitlist forms POST the email (JSON, field "email"). /api/waitlist is site/api/waitlist.js,
   // which keeps it in a private Vercel Blob store. null hides the forms; the band then only announces the release.
   waitlist: "/api/waitlist",
 };
@@ -786,7 +786,7 @@ if (SITE.waitlist) {
       e.preventDefault();
       const btn = form.querySelector("button"); btn.disabled = true;
       try {
-        const r = await fetch(SITE.waitlist, { method: "POST", body: new URLSearchParams(new FormData(form)) });
+        const r = await fetch(SITE.waitlist, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(Object.fromEntries(new FormData(form))) });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Couldn't save that. Try again in a minute.");
         const done = document.createElement("span"); done.className = "wl-done"; done.textContent = "You're in!";
         form.replaceWith(done);

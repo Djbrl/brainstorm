@@ -9,7 +9,7 @@ import { setShowFile, setStepWindow, STEP_WINDOWS, useShowFile, useStepWindow } 
 import { useNavActions, useNavState } from "../lib/nav";
 import { setFoldOn, useFoldOn } from "../map/fold";
 import { EDITORS, setEditor, useEditor } from "../lib/editor";
-import { PRIVACY_URL, useUsageSetting } from "../lib/usage";
+import { PRIVACY_URL, useUpdatesSetting, useUsageSetting } from "../lib/usage";
 import { tourStore } from "../lib/tour";
 import { useDialogFocus } from "../lib/useDialogFocus";
 import "./settings.css";
@@ -58,6 +58,7 @@ export function SettingsButton() {
             <EditorSetting />
             <FoldSetting />
             <NotifySetting />
+            <UpdatesSetting />
             <UsageSetting />
             <section className="set-sec">
               <h3>Tour</h3>
@@ -150,6 +151,23 @@ function NotifySetting() {
       <label className="notify-opt">
         <input type="checkbox" checked={on} disabled={blocked} onChange={toggle} />
         <span><b>Tell me when an agent needs me</b><small>{blocked ? "Blocked in this browser's site settings" : "A permission, a question, a plan to approve, or a finished turn, while this tab is in the background"}</small></span>
+      </label>
+    </section>
+  );
+}
+
+/** Update notifications (lib/usage.ts, server updates/updates.service.ts): on by default, separate from the usage stats. */
+function UpdatesSetting() {
+  const { status, toggle } = useUpdatesSetting();
+  if (!status || isReplay()) return null;
+  const note = status.locked ? `Off: ${status.locked}`
+    : "Rundown checks GitHub once a day for a new version number. It sends nothing about you.";
+  return (
+    <section className="set-sec">
+      <h3>Updates</h3>
+      <label className="notify-opt">
+        <input type="checkbox" checked={status.enabled} disabled={!!status.locked} onChange={toggle} />
+        <span><b>Tell me when there's a new version</b><small>{note}</small></span>
       </label>
     </section>
   );

@@ -15,7 +15,8 @@
 //   --share        save a thread as a replay file (.html) and a summary (.md), in Downloads: the thread named by
 //                  --session ID (never another one)
 // It always exits 0 and prints any problem on stdout, so a skill can run it as one plain command.
-// RUNDOWN_PORT: the first port to try (default 4747).
+// RUNDOWN_PORT: the first port to try (default 4747). RUNDOWN_UPDATE_CHECK=0: no daily update check, whatever the
+// setting (Settings in the app, kept in settings.json in the data folder) says.
 import { execFileSync, spawn } from "node:child_process";
 import { createHash, createHmac, randomBytes } from "node:crypto";
 import { appendFileSync, chmodSync, closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
@@ -46,6 +47,7 @@ const STATE = join(DATA, "server.json");
 const LOG = join(DATA, "server.log");
 const LOCK = join(DATA, "launch.lock");
 const NOTICES = join(DATA, "notices.json");
+const SETTINGS_FILE = join(DATA, "settings.json");
 const FIRST_PORT = /^\d{2,5}$/.test(process.env.RUNDOWN_PORT ?? "") ? Number(process.env.RUNDOWN_PORT) : 4747;
 const LATEST_URL = "https://raw.githubusercontent.com/Djbrl/brainstorm/main/plugin/.claude-plugin/plugin.json";
 const DAY = 24 * 60 * 60 * 1000;
@@ -230,7 +232,7 @@ async function notices(port, runningVersion) {
     out.push(String(n.failure));
     n.failureToldAt = Date.now();
   }
-  if (!n.checkedAt || Date.now() - n.checkedAt > DAY) {
+  if (updateCheck() && (!n.checkedAt || Date.now() - n.checkedAt > DAY)) {
     n.checkedAt = Date.now();
     try {
       const latest = (await (await fetch(LATEST_URL, { signal: AbortSignal.timeout(1500) })).json()).version;
@@ -241,6 +243,13 @@ async function notices(port, runningVersion) {
   }
   writeNotices(n);
   return out;
+}
+
+/** Whether to look for a new version: on unless the person turned it off in Settings, or RUNDOWN_UPDATE_CHECK=0. Its
+ * own setting, apart from the usage stats. When off, no request at all. */
+function updateCheck() {
+  if (process.env.RUNDOWN_UPDATE_CHECK === "0") return false;
+  try { return JSON.parse(readFileSync(SETTINGS_FILE, "utf8"))?.updateCheck !== false; } catch { return true; }
 }
 
 function tellUser(lines) {

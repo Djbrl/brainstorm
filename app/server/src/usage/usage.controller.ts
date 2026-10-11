@@ -4,7 +4,7 @@ import { THEMES, UsageService, WEB_KEYS, type UsageKey, type UsageStatus } from 
 
 // Owned by the lead. The usage-stats setting and the counts the web app reports (see usage.service.ts). Only from the app
 // itself: JSON with a local Origin, so no other site can flip the setting or add counts.
-function local(origin: string | undefined, type: string | undefined) {
+export function local(origin: string | undefined, type: string | undefined) {
   if (!type?.includes("application/json")) throw new BadRequestException("JSON only");
   if (origin) { let host = ""; try { host = new URL(origin).host; } catch { /* not a URL */ } if (!isLocalHost(host)) throw new ForbiddenException(); }
 }

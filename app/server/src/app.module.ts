@@ -18,6 +18,7 @@ import { ElsewhereModule } from "./elsewhere/elsewhere.module";
 
 // Owned by the lead. Agents: don't edit; ask in docs/build-log.md "Requests".
 import { UsageModule } from "./usage/usage.module";
+import { UpdatesModule } from "./updates/updates.module";
 import { OnboardingModule } from "./onboarding/onboarding.controller";
-@Module({ imports: [CoreModule, UsageModule, LlmModule, ListenerModule, MapperModule, ReaderModule, AskModule, ReplayModule, WorkspaceModule, AgentsModule, CoworkModule, ShotsModule, AttentionModule, OpenModule, ImageModule, ElsewhereModule, OnboardingModule], controllers: [HealthController] })
+@Module({ imports: [CoreModule, UsageModule, UpdatesModule, LlmModule, ListenerModule, MapperModule, ReaderModule, AskModule, ReplayModule, WorkspaceModule, AgentsModule, CoworkModule, ShotsModule, AttentionModule, OpenModule, ImageModule, ElsewhereModule, OnboardingModule], controllers: [HealthController] })
 export class AppModule {}

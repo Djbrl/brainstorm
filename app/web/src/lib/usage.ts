@@ -41,3 +41,20 @@ export function useUsageSetting() {
     .catch(() => false), []);
   return { status, set, toggle, forget };
 }
+
+export type UpdatesStatus = { enabled: boolean; locked: string | null };
+
+/** "Tell me when there's a new version" (server updates/updates.service.ts): on by default, apart from the usage stats. */
+export function useUpdatesSetting() {
+  const [status, setStatus] = useState<UpdatesStatus | null>(null);
+  useEffect(() => {
+    if (isReplay()) return;
+    fetch("/api/updates").then((r) => (r.ok ? r.json() : null)).then(setStatus).catch(() => setStatus(null));
+  }, []);
+  const toggle = useCallback(() => {
+    if (!status) return;
+    fetch("/api/updates", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled: !status.enabled }) })
+      .then((r) => (r.ok ? (r.json() as Promise<UpdatesStatus>) : null)).then((s) => s && setStatus(s)).catch(() => { /* keep what's shown */ });
+  }, [status]);
+  return { status, toggle };
+}

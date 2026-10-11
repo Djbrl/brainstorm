@@ -491,7 +491,7 @@ test("presence: deleting a file or switching project cancels its 60 s 'working o
     { broadcast() {} } as never,
     { claudeProjectsDir: projects } as never, { root: root } as never,
   );
-  const timers = () => (svc as unknown as { activeClearTimers: Map<string, unknown> }).activeClearTimers;
+  const timers = () => (svc as unknown as { presence: { activeClearTimers: Map<string, unknown> } }).presence.activeClearTimers;
   try {
     svc.onModuleInit();
     await svc.getMapAsync(root);

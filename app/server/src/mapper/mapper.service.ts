@@ -1,71 +1,29 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from "@nestjs/common";
-import { existsSync, lstatSync, readFileSync } from "node:fs";
-import { deflateRawSync, inflateRawSync } from "node:zlib";
-import { lstat, stat } from "node:fs/promises";
-import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
-import type { Edge, FileNode, ProjectMap } from "../shared/contract";
+import { existsSync } from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
+import type { FileNode, ProjectMap } from "../shared/contract";
 import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";
 import { WorkspaceState } from "../core/workspace-state";
 import { ConfigService } from "../core/config.service";
 import { DbService } from "../core/db.service";
 import { formerRoots } from "../listener/moved";
-import { liveHeadroom, maxFiles, mappableRel, moduleOf, skippedRel } from "./ignore";
-import { type Listing, gitIgnored, listFolder, listProjectFiles } from "./list-files";
+import { maxFiles, mappableRel, moduleOf } from "./ignore";
+import { type Listing, listProjectFiles } from "./list-files";
 import { type Signals, scoreFrom, selectFiles } from "./select";
 import { gitLastCommitTimes } from "./git-times";
-import { inside, relativeTo } from "../core/paths";
 import { readMapped } from "./read-file";
-import { Batcher, ProjectWatcher, foldersToWatch } from "./watch";
+import { ImportResolver, parseImports } from "./imports";
+import { type Cached, type Read, IO_CONCURRENCY, LiveMap, countFiles, fillSnapshots, flattenEdges, mapLimit, posix } from "./live";
+import { Presence } from "./presence";
 
-const JS_EXT = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]);
-/** Components whose <script> imports like JavaScript does. */
-const COMPONENT_EXT = new Set([".vue", ".svelte", ".astro"]);
-/** C and C++ (and CUDA, Arduino): their `#include`s. */
-const C_EXT = new Set([".c", ".h", ".cc", ".cpp", ".cxx", ".hh", ".hpp", ".hxx", ".ipp", ".inl", ".ino", ".cu", ".cuh", ".m", ".mm"]);
+export { jsImports, stripComments } from "./imports";
+
+// The project map: list the project's files (git, else a walk), read them, imports → edges (imports.ts), lastChangedAt
+// from mtime then git, then keep the open project's map live (live.ts) and show where agents work (presence.ts).
+
 /** Maps kept in memory, one per project root (the active one is never dropped). */
 const MAX_ROOTS = 4;
-/** Live changes are applied together, at most this long after the first one. */
-const BATCH_MS = 100;
-/**
- * A batch that changes more files than this (a branch switch, a codegen run) sends one "map" instead of a message per
- * file (each carries the file and its imports; 50 of them already weigh about as much as an 800-file map)…
- */
-const MAP_BROADCAST_OVER = 50;
-/** …and those "map" messages go out at most this often (a long burst sends a few, not one per batch). */
-const MAP_BROADCAST_GAP_MS = 750;
-/** Files read at once. */
-const IO_CONCURRENCY = 32;
-type Read = { abs: string; lines: number; content: string; mtimeMs: number };
-type Cached = {
-  map: ProjectMap;
-  /** Newest commit time (s) per mapped file, keyed by its path relative to the root with "/" separators. Filled in after the map is sent. */
-  gitTimes: Map<string, number>;
-  byPath: Map<string, FileNode>;
-  /** The mapped files (byPath's keys), updated in place: import resolution looks files up here. */
-  fileSet: Set<string>;
-  /** Import specifiers each file contains, kept so imports can be re-resolved when files come and go without re-reading them. */
-  specs: Map<string, string[]>;
-  /** Resolved imports by importing file: map.edges is this, flattened. */
-  out: Map<string, Set<string>>;
-  /** Mapped files git tracks (relative, "/" separators); undefined when not a git repo. */
-  tracked?: Set<string>;
-  /** A git repo: what to leave out comes from .gitignore. These are the folders it excludes (relative, "/" separators), grown as new ones appear. */
-  ignoredDirs?: Set<string>;
-  listing: Pick<Listing, "source" | "total"> & { ms: number };
-  /** Files the cap left out (absolute). A change to one doesn't put it on the map (a branch switch would flood it); an agent's edit does. */
-  unselected: Set<string>;
-  /** Mappable files never even listed (a giant repo past the candidate limit), for totalFiles. */
-  uncounted: number;
-  /** Files an agent edited while this map was live: they join the map whatever the cap. */
-  agentTouched: Set<string>;
-  /** Each file's content as last read (deflated; files up to MAX_PARSE_BYTES), so a change can say what it was before:
-   * how a file a command rewrote gets its diff (listener/command-edits.ts). A few MB for a 3,000-file map. */
-  snapshots: Map<string, Buffer>;
-};
-type Live = { root: string; watcher: ProjectWatcher; batch: Batcher<string>; pending: Set<string>; running: boolean; folders: Set<string> };
-
-const posix = (rel: string) => (sep === "/" ? rel : rel.split(sep).join("/"));
 
 /** How long one file may take to read before it's left out of the map. */
 const READ_MS = 2_000;
@@ -75,82 +33,8 @@ function within<T>(ms: number, p: Promise<T>): Promise<T | null> {
   return Promise.race([p, new Promise<null>((r) => { t = setTimeout(() => r(null), ms); })]).finally(() => clearTimeout(t));
 }
 
-async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const out = new Array<R>(items.length);
-  let next = 0;
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) { const i = next++; out[i] = await fn(items[i]); }
-  }));
-  return out;
-}
-
-/**
- * JS/TS imports and re-exports: `import x from`, `import type { a, b } from` (over several lines), `import x, * as y
- * from`, `export * as x from`, `export { a } from`, `import "x"`, `require("x")`, `import("x")`. Each pattern spells out
- * what may stand between its keyword and `from`, and a brace list stops at the next brace: a lazy scan to the next quote
- * after every `export` was quadratic (a 500 KB file of `export const` lines took seconds, at each save).
- */
-const JS_IMPORTS = [
-  /\bimport\s+(?:type\s+)?(?:[\w$]+\s*,\s*)?(?:[\w$]+\s+|\*\s*as\s+[\w$]+\s+|\{[^{}]*\}\s*)from\s*['"]([^'"]+)['"]/g,
-  /\bexport\s+(?:type\s+)?(?:\*\s*(?:as\s+[\w$]+\s+)?|\{[^{}]*\}\s*)from\s*['"]([^'"]+)['"]/g,
-  /import\s+['"]([^'"]+)['"]/g,
-  /require\(\s*['"]([^'"]+)['"]\s*\)/g,
-  /import\(\s*['"]([^'"]+)['"]\s*\)/g,
-];
-export function jsImports(content: string): string[] {
-  const specs: string[] = [];
-  const code = stripComments(content, "c");
-  for (const re of JS_IMPORTS) for (const m of code.matchAll(re)) specs.push(m[1]);
-  return specs;
-}
-
-/**
- * The text with its comments blanked out (newlines kept, so line-anchored patterns still work), strings left alone: an
- * import in a comment or a docstring isn't an edge. "c": // and /* *\/ (JS, TS, Go, Java, C); "rust": the same, with
- * ' left alone (lifetimes); "py": # and triple-quoted strings. One pass, linear. A quote never runs past its line
- * (except a backtick or a triple quote), so an apostrophe in JSX text can't hide the rest of the file.
- */
-export function stripComments(src: string, lang: "c" | "rust" | "py"): string {
-  let out = "";
-  let i = 0, from = 0;
-  const n = src.length;
-  const blank = (a: number, b: number) => { out += src.slice(from, a) + src.slice(a, b).replace(/[^\n]/g, " "); from = b; };
-  while (i < n) {
-    const ch = src[i];
-    if (lang === "py" && (src.startsWith('"""', i) || src.startsWith("'''", i))) {
-      const end = src.indexOf(src.slice(i, i + 3), i + 3);
-      const stop = end === -1 ? n : end + 3;
-      blank(i, stop); i = stop; continue;
-    }
-    if (lang === "py" ? ch === "#" : ch === "/" && src[i + 1] === "/") {
-      let end = src.indexOf("\n", i); if (end === -1) end = n;
-      blank(i, end); i = end; continue;
-    }
-    if (lang !== "py" && ch === "/" && src[i + 1] === "*") {
-      const end = src.indexOf("*/", i + 2);
-      const stop = end === -1 ? n : end + 2;
-      blank(i, stop); i = stop; continue;
-    }
-    if (ch === '"' || ch === "`" || (ch === "'" && lang !== "rust")) {
-      i++;
-      while (i < n && src[i] !== ch && (ch === "`" || src[i] !== "\n")) i += src[i] === "\\" ? 2 : 1;
-      i++; continue;
-    }
-    i++;
-  }
-  return out + src.slice(from);
-}
-
-/** A tsconfig's (or jsconfig's) import aliases: where its `paths` and `baseUrl` point. */
-type TsAliases = { base: string; paths: [prefix: string, suffix: string, targets: string[], exact: boolean][]; hasBaseUrl: boolean };
-const TS_EXT = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".vue", ".svelte"];
-/** `./x.js` written in TypeScript (NodeNext) means x.ts: the source a compiled name stands for. */
-const COMPILED_TO_SOURCE: Record<string, string[]> = { ".js": [".ts", ".tsx"], ".jsx": [".tsx"], ".mjs": [".mts"], ".cjs": [".cts"] };
-
 /** The map's ignore rule for a project: a git repo's .gitignore'd folders (plus .git and caches), else the name list. */
-const skipped = skippedRel, mappable = mappableRel;
-
-const sameSet = (a: Set<string> | undefined, b: Set<string>) => !!a && a.size === b.size && [...a].every((x) => b.has(x));
+const mappable = mappableRel;
 
 // List the project's files (git, else a walk), imports → edges, lastChangedAt from mtime then git, watch for changes.
 @Injectable()
@@ -159,49 +43,36 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
   /** Built maps by root, least recently used first (bounded by MAX_ROOTS). */
   private cache = new Map<string, Cached>();
   private inflight = new Map<string, Promise<Cached>>();
-  /** Per file set: Java files by package path ("com/acme/Foo.java" → abs paths), Go files by folder. Dropped when the set changes. */
-  private indexes = new WeakMap<Set<string>, { java: Map<string, string[]>; goDirs: Map<string, string[]>; headers: Map<string, string[]> }>();
-  private goModules = new Map<string, { dir: string; module: string } | null>(); // folder → nearest go.mod
-  private tsconfigs = new Map<string, TsAliases | null>(); // folder → nearest tsconfig's aliases
-  private live?: Live;
-  /** Files shown as being worked on, by path: the timer that clears it after 60 s, and the node it was set on. */
-  private activeClearTimers = new Map<string, { timer: NodeJS.Timeout; node: FileNode }>();
+  private imports = new ImportResolver();
   private building = new Set<string>();
   /** The workspace's active root: the one we keep a live watch on (owner: S). */
   private activeRoot?: string;
-  private mapBroadcast: { last: number; timer?: NodeJS.Timeout } = { last: 0 };
   buildMs = 0;
+  /** Where agents work now (marks on files). */
+  private presence: Presence;
+  /** The active root's map, kept live. */
+  private live: LiveMap;
 
-  /** An agent's edit to a file not on the map yet: the activity to show once the file joins. */
-  private pendingTouches = new Map<string, { sessionId: string; ts: string }>();
-
-  constructor(private bus: BusService, private gateway: EventsGateway, private cfg: ConfigService, private state: WorkspaceState, @Optional() private dbs?: DbService) {}
+  constructor(private bus: BusService, private gateway: EventsGateway, private cfg: ConfigService, private state: WorkspaceState, @Optional() private dbs?: DbService) {
+    const cached = (root: string) => this.cache.get(root);
+    const activeRoot = () => this.activeRoot;
+    this.presence = new Presence(gateway, { cached, activeRoot, liveRoot: () => this.live.root, addToBatch: (p) => this.live.add(p) });
+    this.live = new LiveMap({ cached, activeRoot }, this.imports, this.presence, bus, gateway, this.log);
+  }
 
   onModuleInit() {
     // Build + watch the default root right away (in the background) so live updates and the reader have something to work with.
     const root = resolve(this.state.root);
     this.activeRoot = root;
     // No project chosen yet (the plugin's placeholder doesn't exist): nothing to build or watch until one is.
-    if (existsSync(root)) this.ensure(root).then((c) => { if (this.activeRoot === root) this.startWatch(root, c); }).catch((e) => this.log.warn(`map build failed for ${root}: ${(e as Error).message}`));
-    this.bus.on("file-touched", ({ path, sessionId, ts }) => this.onFileTouched(this.state.root, path, sessionId, ts));
+    if (existsSync(root)) this.ensure(root).then((c) => { if (this.activeRoot === root) this.live.start(root, c); }).catch((e) => this.log.warn(`map build failed for ${root}: ${(e as Error).message}`));
+    this.bus.on("file-touched", ({ path, sessionId, ts }) => this.presence.touched(this.state.root, path, sessionId, ts));
     this.bus.on("workspace", ({ root }) => { this.switchRoot(root).catch((e) => this.log.warn(`switching the map to ${root} failed: ${(e as Error).message}`)); });
   }
 
   onModuleDestroy() {
-    this.stopWatch();
-    if (this.mapBroadcast.timer) clearTimeout(this.mapBroadcast.timer);
-    this.clearPresence();
-  }
-
-  /** Stop showing agents on files: every file, or the given ones (deleted). */
-  private clearPresence(paths?: Iterable<string>) {
-    for (const key of paths ?? [...this.activeClearTimers.keys()]) {
-      const p = this.activeClearTimers.get(key);
-      if (!p) continue;
-      clearTimeout(p.timer);
-      p.node.activeSessionId = undefined;
-      this.activeClearTimers.delete(key);
-    }
+    this.live.close();
+    this.presence.clear();
   }
 
   /** The map for a root, built in the background if needed (the event loop stays free while files are listed and read). */
@@ -224,12 +95,12 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
   /** React to the active workspace changing: watch the new root, build its map, broadcast it. */
   async switchRoot(root: string): Promise<ProjectMap> {
     const abs = resolve(root);
-    if (this.live && this.live.root !== abs) this.stopWatch();
-    if (this.activeRoot !== abs) this.clearPresence(); // the old project's "working on it" marks would otherwise linger in its cached map
+    if (this.live.root !== undefined && this.live.root !== abs) this.live.stop();
+    if (this.activeRoot !== abs) this.presence.clear(); // the old project's "working on it" marks would otherwise linger in its cached map
     this.activeRoot = abs;
     const c = await this.ensure(abs); // cache hit if something already built it (e.g. the reader)
     if (this.activeRoot === abs) {
-      this.startWatch(abs, c);
+      this.live.start(abs, c);
       this.gateway.broadcast({ type: "map", map: c.map });
       this.log.log(`switched active map root to ${abs}: ${c.map.files.length} files, ${c.map.edges.length} edges, ${c.map.modules.length} modules`);
     }
@@ -292,7 +163,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     const rels = pool.map((r) => {
       const rel = posix(relative(root, r.abs));
       lines.set(rel, r.lines);
-      for (const to of this.resolveSpecs(root, r.abs, this.parseImports(r.abs, r.content), poolSet)) {
+      for (const to of this.imports.resolveSpecs(root, r.abs, parseImports(r.abs, r.content), poolSet)) {
         const k = posix(relative(root, to));
         importedBy.set(k, (importedBy.get(k) ?? 0) + 1);
       }
@@ -337,10 +208,10 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
       const node: FileNode = { path: r.abs, module: moduleId, lines: r.lines, lastChangedAt: new Date(ms || Date.now()).toISOString() };
       nodes.push(node);
       byPath.set(r.abs, node);
-      specs.set(r.abs, this.parseImports(r.abs, r.content));
+      specs.set(r.abs, parseImports(r.abs, r.content));
     }
     const out = new Map<string, Set<string>>();
-    for (const [abs, s] of specs) out.set(abs, this.resolveSpecs(root, abs, s, fileSet));
+    for (const [abs, s] of specs) out.set(abs, this.imports.resolveSpecs(root, abs, s, fileSet));
     const unselected = new Set(listing.rels.filter((rel) => !chosen.has(rel)).map((rel) => join(root, rel)));
     const map: ProjectMap = { root, files: nodes, edges: [], modules: [...moduleIds.values()], formerRoots: formerRoots(this.cfg.claudeProjectsDir, root), ...(listing.stopped ? { scanStopped: true } : {}) };
     const c: Cached = {
@@ -350,21 +221,10 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
       listing: { source: listing.source, total: listing.total, ms: listMs },
       unselected, uncounted: Math.max(0, listing.total - listing.rels.length), agentTouched: new Set(), snapshots: new Map(),
     };
-    this.flattenEdges(c);
-    this.countFiles(c);
-    this.fillSnapshots(c, reads);
+    flattenEdges(c);
+    countFiles(c);
+    fillSnapshots(c, reads);
     return c;
-  }
-
-  /** map.totalFiles: the files shown plus the ones the cap left out. */
-  private countFiles(c: Cached) {
-    c.map.totalFiles = c.map.files.length + c.unselected.size + c.uncounted;
-  }
-
-  private flattenEdges(c: Cached) {
-    const edges: Edge[] = [];
-    for (const [from, tos] of c.out) for (const to of tos) edges.push({ from, to });
-    c.map.edges = edges;
   }
 
   /** Keep a built map, drop the least recently used ones past MAX_ROOTS, and start fetching commit times. */
@@ -384,277 +244,8 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
       if (this.cache.size <= MAX_ROOTS) break;
       if (key === abs || key === this.activeRoot) continue;
       this.cache.delete(key);
-      for (const dir of this.goModules.keys()) if (inside(dir, key)) this.goModules.delete(dir);
-      for (const dir of this.tsconfigs.keys()) if (inside(dir, key)) this.tsconfigs.delete(dir);
+      this.imports.forgetRoot(key);
     }
-  }
-
-  // ---- imports ----
-
-  private parseImports(file: string, content: string): string[] {
-    const specs: string[] = [];
-    if (!content) return specs;
-    const ext = extname(file);
-    if (ext === ".py") {
-      // from a.b import c, d  /  from . import x  /  from ..pkg import (x, y)  /  import a.b, c as d
-      // Each name after `import` may be a module too (from pkg import sub): tried as "<module>.<name>" as well.
-      const code = stripComments(content, "py");
-      let m: RegExpExecArray | null;
-      const reFrom = /^[ \t]*from[ \t]+(\.+[\w.]*|[A-Za-z_][\w.]*)[ \t]+import[ \t]+(\([^)]*\)|[^\n]*)/gm;
-      while ((m = reFrom.exec(code))) {
-        specs.push(m[1]);
-        for (const name of m[2].replace(/[()\\]/g, " ").split(",")) {
-          const n = name.trim().split(/\s+/)[0];
-          if (n && n !== "*" && /^\w+$/.test(n)) specs.push(m[1].endsWith(".") ? m[1] + n : `${m[1]}.${n}`);
-        }
-      }
-      const reImport = /^[ \t]*import[ \t]+([\w.]+(?:[ \t]+as[ \t]+\w+)?(?:[ \t]*,[ \t]*[\w.]+(?:[ \t]+as[ \t]+\w+)?)*)/gm;
-      while ((m = reImport.exec(code))) for (const part of m[1].split(",")) specs.push(part.trim().split(/\s+/)[0]);
-      return specs;
-    }
-    if (JS_EXT.has(ext) || COMPONENT_EXT.has(ext)) return jsImports(content);
-    content = stripComments(content, ext === ".rs" ? "rust" : "c");
-    if (ext === ".go") {
-      // import "x/y", or a block: import ( "x/y"; alias "x/z" )
-      const block = /^\s*import\s*\(([\s\S]*?)\)/gm;
-      const single = /^\s*import\s+(?:[\w.]+\s+)?"([^"]+)"/gm;
-      let m: RegExpExecArray | null;
-      while ((m = block.exec(content))) for (const q of m[1].matchAll(/"([^"]+)"/g)) specs.push(q[1]);
-      while ((m = single.exec(content))) specs.push(m[1]);
-      return specs;
-    }
-    if (ext === ".rs") {
-      // mod child;  use crate::a::b;  use super::x;  use self::y::{z, w};
-      let m: RegExpExecArray | null;
-      const mods = /^\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+(\w+)\s*;/gm;
-      while ((m = mods.exec(content))) specs.push(`mod:${m[1]}`);
-      const uses = /^\s*(?:pub(?:\([^)]*\))?\s+)?use\s+((?:crate|super|self)(?:::\w+)*)/gm;
-      while ((m = uses.exec(content))) specs.push(`use:${m[1]}`);
-      return specs;
-    }
-    if (ext === ".java") {
-      const re = /^\s*import\s+(?:static\s+)?([\w.]+(?:\.\*)?)\s*;/gm;
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(content))) specs.push(m[1]);
-      return specs;
-    }
-    if (C_EXT.has(ext)) {
-      // #include "local.h" (searched from this file's folder first); #include <lib/x.h> only when it names a folder,
-      // so <stdio.h> isn't matched to a project file by chance. #import (Objective-C) the same.
-      const re = /^\s*#\s*(?:include|import)\s*(?:"([^"]+)"|<([^>]+\/[^>]+)>)/gm;
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(content))) specs.push(m[1] !== undefined ? `q:${m[1]}` : `a:${m[2]}`);
-      return specs;
-    }
-    return specs;
-  }
-
-  /** The files `abs` imports, each once. */
-  private resolveSpecs(root: string, abs: string, specs: string[], fileSet: Set<string>): Set<string> {
-    const out = new Set<string>();
-    for (const spec of specs) for (const to of this.resolveImport(root, abs, spec, fileSet)) if (to !== abs) out.add(to);
-    return out;
-  }
-
-  /** Files an import points to: one for most languages, every file of the package for Go and Java wildcard imports. */
-  private resolveImport(root: string, fromFile: string, spec: string, fileSet: Set<string>): string[] {
-    const ext = extname(fromFile);
-    if (ext === ".go") return this.resolveGo(fromFile, spec, fileSet);
-    if (ext === ".rs") return this.resolveRust(fromFile, spec, fileSet);
-    if (ext === ".java") return this.resolveJava(spec, fileSet);
-    if (C_EXT.has(ext)) return this.resolveInclude(fromFile, spec, fileSet);
-    const one = this.resolveOne(root, fromFile, spec, fileSet);
-    return one ? [one] : [];
-  }
-
-  private resolveOne(root: string, fromFile: string, spec: string, fileSet: Set<string>): string | undefined {
-    const ext = extname(fromFile);
-    if (ext === ".py") {
-      const pyFile = (base: string) => [`${base}.py`, join(base, "__init__.py")].find((c) => fileSet.has(c));
-      if (!spec.startsWith(".")) {
-        // Absolute: a/b.py or a/b/__init__.py under the nearest folder above this file that has it (the project root,
-        // src/, a package's own root). The standard library and installed packages aren't project files: no match.
-        const rel = spec.replace(/\./g, sep);
-        for (let d = dirname(fromFile); ; d = dirname(d)) {
-          const hit = pyFile(join(d, rel));
-          if (hit) return hit;
-          if (dirname(d) === d) return undefined;
-        }
-      }
-      const dots = spec.match(/^\.+/)?.[0].length ?? 1;
-      const rest = spec.slice(dots).replace(/\./g, "/");
-      let base = dirname(fromFile);
-      for (let i = 1; i < dots; i++) base = dirname(base);
-      return pyFile(rest ? join(base, rest) : base);
-    }
-    if (spec.startsWith(".")) return this.jsFile(resolve(dirname(fromFile), spec), fileSet);
-    // A bare specifier: an alias from the nearest tsconfig (paths, baseUrl), else a package (not on the map).
-    const ts = this.tsAliasesFor(root, dirname(fromFile));
-    if (!ts) return undefined;
-    let best: [string, string, string[], boolean] | undefined;
-    for (const p of ts.paths) {
-      if (p[3] && spec !== p[0]) continue; // an alias without * means that name only
-      if (spec.length >= p[0].length + p[1].length && spec.startsWith(p[0]) && spec.endsWith(p[1]) && (!best || p[0].length > best[0].length)) best = p;
-    }
-    if (best) {
-      const star = spec.slice(best[0].length, spec.length - best[1].length);
-      for (const target of best[2]) {
-        const hit = this.jsFile(resolve(ts.base, target.replace("*", star)), fileSet);
-        if (hit) return hit;
-      }
-    }
-    return ts.hasBaseUrl ? this.jsFile(resolve(ts.base, spec), fileSet) : undefined;
-  }
-
-  /** The file a JS/TS import of `base` (absolute, maybe without extension) means: itself, with an extension, the TS source of a .js name, or a folder's index. */
-  private jsFile(base: string, fileSet: Set<string>): string | undefined {
-    if (fileSet.has(base)) return base;
-    for (const e of TS_EXT) if (fileSet.has(base + e)) return base + e;
-    const ext = extname(base);
-    for (const e of COMPILED_TO_SOURCE[ext] ?? []) { const c = base.slice(0, -ext.length) + e; if (fileSet.has(c)) return c; }
-    for (const e of [".ts", ".tsx", ".js", ".jsx"]) { const c = join(base, `index${e}`); if (fileSet.has(c)) return c; }
-    return undefined;
-  }
-
-  /** The nearest tsconfig.json (or jsconfig.json) above a folder and inside the project, with its aliases; null when
-   * none has any. `extends` is not followed. Only a regular file under 1 MB is read. */
-  private tsAliasesFor(root: string, dir: string): TsAliases | null {
-    if (this.tsconfigs.has(dir)) return this.tsconfigs.get(dir)!;
-    let found: TsAliases | null = null;
-    const file = ["tsconfig.json", "jsconfig.json"].map((f) => join(dir, f)).find((f) => existsSync(f));
-    if (file) {
-      try {
-        const st = lstatSync(file);
-        if (!st.isFile() || st.size > 1_000_000) throw new Error("not a small regular file");
-        const json = stripComments(readFileSync(file, "utf8"), "c").replace(/,(\s*[}\]])/g, "$1");
-        const opts = (JSON.parse(json) as { compilerOptions?: { baseUrl?: string; paths?: Record<string, string[]> } }).compilerOptions ?? {};
-        const base = resolve(dir, opts.baseUrl ?? ".");
-        const paths = Object.entries(opts.paths ?? {}).filter(([, t]) => Array.isArray(t)).map(([k, t]): [string, string, string[], boolean] => {
-          const star = k.indexOf("*");
-          return star === -1 ? [k, "", t.map((x) => x.replace("*", "")), true] : [k.slice(0, star), k.slice(star + 1), t, false];
-        });
-        found = paths.length || opts.baseUrl ? { base, paths, hasBaseUrl: !!opts.baseUrl } : null;
-      } catch { found = null; } // unreadable or not JSON: no aliases
-    } else if (relativeTo(dir, root)) found = this.tsAliasesFor(root, dirname(dir)); // never above the project
-    this.tsconfigs.set(dir, found);
-    return found;
-  }
-
-  private index(fileSet: Set<string>) {
-    let idx = this.indexes.get(fileSet);
-    if (idx) return idx;
-    idx = { java: new Map(), goDirs: new Map(), headers: new Map() };
-    for (const f of fileSet) {
-      if (C_EXT.has(extname(f))) {
-        // Every suffix path too: "net/socket.h" finds src/net/socket.h whatever the include folders are.
-        const parts = f.split(sep);
-        for (let i = parts.length - 1; i >= 1; i--) {
-          const key = parts.slice(i).join("/");
-          const list = idx.headers.get(key) ?? [];
-          list.push(f);
-          idx.headers.set(key, list);
-        }
-      } else if (f.endsWith(".java")) {
-        // Index every suffix path, so "com/acme/Foo.java" finds src/main/java/com/acme/Foo.java.
-        const parts = f.split(sep);
-        for (let i = parts.length - 1; i >= 1; i--) {
-          const key = parts.slice(i).join("/");
-          const list = idx.java.get(key) ?? [];
-          list.push(f);
-          idx.java.set(key, list);
-        }
-      } else if (f.endsWith(".go") && !f.endsWith("_test.go")) {
-        const list = idx.goDirs.get(dirname(f)) ?? [];
-        list.push(f);
-        idx.goDirs.set(dirname(f), list);
-      }
-    }
-    this.indexes.set(fileSet, idx);
-    return idx;
-  }
-
-  /** C/C++: next to the including file first, else a project file ending with that path (the nearest one). */
-  private resolveInclude(fromFile: string, spec: string, fileSet: Set<string>): string[] {
-    const quoted = spec.startsWith("q:");
-    const path = spec.slice(2);
-    if (quoted) {
-      const local = resolve(dirname(fromFile), path);
-      if (fileSet.has(local)) return [local];
-    }
-    const found = this.index(fileSet).headers.get(path.replace(/^(\.\.?\/)+/, ""));
-    if (!found?.length) return [];
-    if (found.length === 1) return [found[0]];
-    // Several (include/x.h and vendor/x.h): the one sharing the longest folder prefix with the includer.
-    const score = (f: string) => { let i = 0; while (i < f.length && f[i] === fromFile[i]) i++; return i; };
-    return [found.reduce((a, b) => (score(b) > score(a) ? b : a))];
-  }
-
-  /** Go: an import inside this module ("<module path>/pkg/x") links to every file of that package folder. */
-  private resolveGo(fromFile: string, spec: string, fileSet: Set<string>): string[] {
-    const mod = this.goModuleOf(dirname(fromFile));
-    if (!mod || (spec !== mod.module && !spec.startsWith(mod.module + "/"))) return []; // standard library or another module
-    const dir = join(mod.dir, spec.slice(mod.module.length));
-    return (this.index(fileSet).goDirs.get(resolve(dir)) ?? []).filter((f) => f !== fromFile);
-  }
-
-  private goModuleOf(dir: string): { dir: string; module: string } | null {
-    if (this.goModules.has(dir)) return this.goModules.get(dir)!;
-    let found: { dir: string; module: string } | null = null;
-    const gomod = join(dir, "go.mod");
-    if (existsSync(gomod)) {
-      const m = /^module\s+(\S+)/m.exec(readFileSync(gomod, "utf8"));
-      if (m) found = { dir, module: m[1] };
-    } else if (dirname(dir) !== dir) found = this.goModuleOf(dirname(dir));
-    this.goModules.set(dir, found);
-    return found;
-  }
-
-  /** Rust: `mod x;` is x.rs or x/mod.rs next to this module; `use crate::a::b` walks from the crate root (the folder of lib.rs or main.rs). */
-  private resolveRust(fromFile: string, spec: string, fileSet: Set<string>): string[] {
-    const name = basename(fromFile);
-    const isRoot = name === "lib.rs" || name === "main.rs" || name === "mod.rs";
-    // Where this file's child modules live: its own folder for lib.rs/main.rs/mod.rs, else a folder named after it.
-    const childDir = isRoot ? dirname(fromFile) : join(dirname(fromFile), basename(fromFile, ".rs"));
-    const moduleFile = (dir: string, seg: string) => [join(dir, `${seg}.rs`), join(dir, seg, "mod.rs")].find((c) => fileSet.has(c));
-    if (spec.startsWith("mod:")) { const f = moduleFile(childDir, spec.slice(4)); return f ? [f] : []; }
-
-    const segs = spec.slice(4).split("::");
-    let dir: string;
-    if (segs[0] === "crate") {
-      let d = dirname(fromFile);
-      while (!fileSet.has(join(d, "lib.rs")) && !fileSet.has(join(d, "main.rs")) && dirname(d) !== d) d = dirname(d);
-      dir = d;
-    } else if (segs[0] === "self") dir = childDir;
-    else { // super: one module up (the parent of this file's own module folder)
-      dir = dirname(childDir);
-      while (segs[1] === "super") { segs.shift(); dir = dirname(dir); }
-    }
-    // Longest path that is a module file: crate::a::b::Thing → a/b.rs (Thing is an item inside it).
-    let hit: string | undefined;
-    for (const seg of segs.slice(1)) {
-      const f = moduleFile(dir, seg);
-      if (!f) break;
-      hit = f;
-      dir = join(dir, seg);
-    }
-    return hit && hit !== fromFile ? [hit] : [];
-  }
-
-  /** Java: com.acme.Foo → …/com/acme/Foo.java; com.acme.* → every file of that package; static imports drop the member. */
-  private resolveJava(spec: string, fileSet: Set<string>): string[] {
-    const idx = this.index(fileSet).java;
-    const parts = spec.split(".");
-    if (parts[parts.length - 1] === "*") {
-      const pkg = parts.slice(0, -1).join("/") + "/";
-      const out = new Set<string>();
-      for (const [key, files] of idx) if (key.startsWith(pkg) && !key.slice(pkg.length).includes("/")) files.forEach((f) => out.add(f));
-      return [...out];
-    }
-    for (let n = parts.length; n >= 2; n--) { // Foo.Inner or a static member: drop trailing parts until a file matches
-      const files = idx.get(parts.slice(0, n).join("/") + ".java");
-      if (files?.length === 1) return files;
-    }
-    return [];
   }
 
   // ---- git + mtime ----
@@ -677,250 +268,5 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     }
     this.log.log(`git times for ${root}: ${r.times.size}/${wanted.size} files from ${r.commits} commits in ${Date.now() - t0}ms${r.complete ? "" : " (stopped at the limit; the rest keep their file times)"}, ${changed} updated`);
     if (changed && root === this.activeRoot) this.gateway.broadcast({ type: "map", map: c.map });
-  }
-
-  private lastChangedAt(c: Cached, root: string, abs: string, mtimeMs: number): string {
-    const gitSec = c.gitTimes.get(posix(relative(root, abs))) ?? 0;
-    const ms = Math.max(mtimeMs, gitSec * 1000);
-    return new Date(ms || Date.now()).toISOString();
-  }
-
-  // ---- live updates ----
-
-  private startWatch(root: string, c: Cached) {
-    if (this.live?.root === root) return;
-    this.stopWatch();
-    const folders = foldersToWatch(root, c.byPath.keys());
-    const live: Live = {
-      root, folders, pending: new Set(), running: false,
-      batch: new Batcher<string>(BATCH_MS, (paths) => { this.enqueue(live, paths); this.bus.emit("files-changed", { root }); }),
-      watcher: new ProjectWatcher(root, (p) => live.batch.add(p), (m) => this.log.warn(m), undefined, (rel) => skipped(rel, c.ignoredDirs)),
-    };
-    live.watcher.start(folders);
-    this.live = live;
-    this.log.log(`watching ${root} (${live.watcher.mode === "recursive" ? "one recursive watch" : `${live.watcher.handles} folders`})`);
-  }
-
-  private stopWatch() {
-    if (!this.live) return;
-    this.live.batch.cancel();
-    this.live.watcher.close();
-    this.live.pending.clear();
-    this.live = undefined;
-  }
-
-  /** Apply batches one at a time; whatever arrives meanwhile is merged into the next one. */
-  private enqueue(live: Live, paths: Set<string>) {
-    for (const p of paths) live.pending.add(p);
-    if (live.running) return;
-    live.running = true;
-    void (async () => {
-      try {
-        while (live.pending.size && this.live === live) {
-          const batch = live.pending;
-          live.pending = new Set();
-          await this.applyBatch(live, batch).catch((e) => this.log.warn(`live map update failed: ${(e as Error).message}`));
-        }
-      } finally { live.running = false; }
-    })();
-  }
-
-  /** One batch of changed paths: re-read changed files, add new ones (within the cap), drop deleted ones, then re-resolve imports once. */
-  private async applyBatch(live: Live, paths: Set<string>) {
-    const root = live.root;
-    const c = this.cache.get(root);
-    if (!c) return;
-    const removed = new Set<string>();
-    const files = new Map<string, number>(); // existing source files to (re)read → mtime
-    let newFolders: string[] = [];
-
-    await mapLimit([...paths], IO_CONCURRENCY, async (abs) => {
-      const rel = relative(root, abs);
-      let st;
-      try {
-        st = await lstat(abs);
-        // A link to a folder isn't a new folder to map (it can lead out of the project; git and the walk don't follow
-        // folder links either). A link to a file is read only if it stays inside (read-file.ts).
-        if (st.isSymbolicLink()) { st = await stat(abs); if (st.isDirectory()) return; }
-      } catch {
-        c.unselected.delete(abs);
-        if (c.byPath.has(abs)) removed.add(abs);
-        else { // a folder went away (moved or deleted): everything mapped under it goes too
-          const prefix = abs + sep;
-          for (const p of c.byPath.keys()) if (p.startsWith(prefix)) removed.add(p);
-          live.watcher.removeFolder(abs);
-          live.folders.delete(abs);
-        }
-        return;
-      }
-      if (st.isDirectory()) { if (!live.folders.has(abs) && !skipped(rel, c.ignoredDirs)) newFolders.push(abs); }
-      else if (st.isFile() && mappable(rel, c.ignoredDirs)) files.set(abs, st.mtimeMs);
-    });
-    if (newFolders.length && c.ignoredDirs) { // a git repo: a new folder .gitignore excludes (a fresh build/) is remembered and left alone
-      const ignored = await gitIgnored(root, newFolders.map((abs) => posix(relative(root, abs))));
-      for (const rel of ignored) c.ignoredDirs.add(rel.replace(/\/$/, ""));
-      if (ignored.size) newFolders = newFolders.filter((abs) => !ignored.has(posix(relative(root, abs))));
-    }
-
-    // New files, and the files of folders that appeared, while there is room for them.
-    let room = maxFiles() + liveHeadroom() - (c.byPath.size - removed.size);
-    for (const dir of newFolders) {
-      for (const abs of await listFolder(dir, Math.max(0, room), !!c.ignoredDirs)) if (!files.has(abs)) {
-        try { files.set(abs, (await stat(abs)).mtimeMs); } catch { /* gone */ }
-      }
-    }
-    // Files an agent edited always join. Other new files join while there's room, except ones the first listing chose
-    // to leave out (so a branch switch touching thousands of files doesn't refill a big repo's map at random).
-    const agents = [...files.keys()].filter((abs) => !c.byPath.has(abs) && c.agentTouched.has(abs));
-    let adds = [...files.keys()].filter((abs) => !c.byPath.has(abs) && !c.agentTouched.has(abs) && !c.unselected.has(abs)).sort();
-    if (adds.length && c.tracked) { // a git repo: new files follow .gitignore, like the first listing
-      const ignored = await gitIgnored(root, adds.map((abs) => posix(relative(root, abs))));
-      if (ignored.size) adds = adds.filter((abs) => !ignored.has(posix(relative(root, abs))));
-    }
-    const accepted = new Set([...agents, ...adds.slice(0, Math.max(0, room - agents.length))]);
-    for (const abs of adds) if (!accepted.has(abs)) c.unselected.add(abs); // no room: counted, not shown
-    for (const abs of files.keys()) if (!c.byPath.has(abs) && !accepted.has(abs)) files.delete(abs);
-
-    const reads = await mapLimit([...files.keys()], IO_CONCURRENCY, async (abs): Promise<Read | null> => {
-      const r = await readMapped(abs, root);
-      if (!r) { if (c.byPath.has(abs)) removed.add(abs); return null; }
-      return { abs, ...r };
-    });
-    if (this.cache.get(root) !== c || this.live !== live) return; // switched away meanwhile
-
-    // Apply: removals, then updates and additions. Each change goes on the bus with what the file was before.
-    const at = Date.now();
-    this.clearPresence(removed);
-    for (const abs of removed) {
-      this.bus.emit("file-content", { path: abs, before: this.snapshotOf(c, abs, true), after: null, at });
-      c.snapshots.delete(abs);
-      c.byPath.delete(abs); c.fileSet.delete(abs); c.specs.delete(abs); c.out.delete(abs);
-    }
-    if (removed.size) c.map.files = c.map.files.filter((f) => !removed.has(f.path));
-    const changed = new Set<string>();
-    let added = 0;
-    for (const r of reads) {
-      if (!r || removed.has(r.abs)) continue;
-      if (r.content) {
-        const before = this.snapshotOf(c, r.abs, c.byPath.has(r.abs) || c.unselected.has(r.abs));
-        if (before !== r.content) this.bus.emit("file-content", { path: r.abs, before, after: r.content, at });
-        c.snapshots.set(r.abs, deflateRawSync(r.content, { level: 1 }));
-      }
-      const lastChangedAt = this.lastChangedAt(c, root, r.abs, r.mtimeMs);
-      let node = c.byPath.get(r.abs);
-      if (!node) {
-        const moduleId = moduleOf(relative(root, r.abs));
-        node = { path: r.abs, module: moduleId, lines: r.lines, lastChangedAt };
-        c.byPath.set(r.abs, node); c.fileSet.add(r.abs); c.map.files.push(node); c.unselected.delete(r.abs);
-        if (!c.map.modules.some((m) => m.id === moduleId)) c.map.modules.push({ id: moduleId });
-        added++;
-      } else {
-        node.lines = r.lines;
-        node.lastChangedAt = lastChangedAt;
-      }
-      c.specs.set(r.abs, this.parseImports(r.abs, r.content));
-      changed.add(r.abs);
-    }
-
-    // Imports: when files came or went, every file's imports may resolve differently; otherwise only the changed files'.
-    // A tsconfig changed: its aliases are read again and every import is resolved again.
-    const configChanged = [...paths].some((p) => /^[tj]sconfig.*\.json$/.test(basename(p)));
-    if (configChanged) this.tsconfigs.clear();
-    const setChanged = added > 0 || removed.size > 0 || configChanged;
-    if (setChanged) this.indexes.delete(c.fileSet);
-    const edgesChanged = new Set<string>();
-    for (const abs of setChanged ? c.specs.keys() : changed) {
-      const next = this.resolveSpecs(root, abs, c.specs.get(abs) ?? [], c.fileSet);
-      if (!sameSet(c.out.get(abs), next)) { c.out.set(abs, next); edgesChanged.add(abs); }
-    }
-    if (edgesChanged.size || removed.size) this.flattenEdges(c);
-    this.countFiles(c);
-
-    // Keep watching where the map now has files (folder mode).
-    if (added) for (const d of foldersToWatch(root, [...changed].filter((p) => !live.folders.has(dirname(p))))) {
-      if (!live.folders.has(d)) { live.folders.add(d); live.watcher.addFolder(d); }
-    }
-    for (const d of newFolders) if (!live.folders.has(d)) { live.folders.add(d); live.watcher.addFolder(d); }
-
-    // Tell the web: one message per file, or the whole map when a lot changed at once.
-    const touched = new Set([...changed, ...edgesChanged]);
-    if (touched.size + removed.size > MAP_BROADCAST_OVER) {
-      this.broadcastMapSoon(root);
-    } else {
-      for (const abs of removed) this.gateway.broadcast({ type: "file-removed", path: abs });
-      for (const abs of touched) {
-        const node = c.byPath.get(abs);
-        if (node) this.gateway.broadcast({ type: "file", file: node, edges: [...(c.out.get(abs) ?? [])].map((to) => ({ from: abs, to })) });
-      }
-    }
-    // An agent's edit that arrived before its file was on the map: show it now.
-    for (const abs of changed) {
-      const touch = this.pendingTouches.get(abs);
-      if (touch) { this.pendingTouches.delete(abs); this.onFileTouched(root, abs, touch.sessionId, touch.ts); }
-    }
-  }
-
-  /** Keep each file's content, a slice at a time after the map is out (compressing 3,000 files takes ~100 ms). */
-  private fillSnapshots(c: Cached, reads: Read[]) {
-    let i = 0;
-    const step = () => {
-      for (const end = Math.min(reads.length, i + 300); i < end; i++) {
-        const r = reads[i];
-        if (r.content && c.byPath.has(r.abs) && !c.snapshots.has(r.abs)) c.snapshots.set(r.abs, deflateRawSync(r.content, { level: 1 }));
-      }
-      if (i < reads.length) setImmediate(step);
-    };
-    setImmediate(step);
-  }
-
-  /** What a file was when last read: "" for one that wasn't there, null when unknown (too big, or not kept yet). */
-  private snapshotOf(c: Cached, abs: string, known: boolean): string | null {
-    const z = c.snapshots.get(abs);
-    if (z) return inflateRawSync(z).toString("utf8");
-    return known ? null : "";
-  }
-
-  /** Send the active root's whole map now, or once MAP_BROADCAST_GAP_MS has passed since the last one (always the current map). */
-  private broadcastMapSoon(root: string) {
-    const b = this.mapBroadcast;
-    if (b.timer) return;
-    const send = () => {
-      b.timer = undefined;
-      b.last = Date.now();
-      const c = this.cache.get(root);
-      if (c && root === this.activeRoot) this.gateway.broadcast({ type: "map", map: c.map });
-    };
-    const wait = b.last + MAP_BROADCAST_GAP_MS - Date.now();
-    if (wait <= 0) send(); else b.timer = setTimeout(send, wait);
-  }
-
-  private onFileTouched(root: string, path: string, sessionId: string, ts: string) {
-    const abs = resolve(root);
-    const cached = this.cache.get(abs);
-    if (!cached) return;
-    const node = cached.byPath.get(path);
-    if (!node) {
-      // Not on the map (the cap left it out, or it's being created): it joins with the next batch, whatever the cap.
-      if (this.live?.root !== abs || !mappable(relative(abs, path), cached.ignoredDirs)) return;
-      cached.agentTouched.add(path);
-      if (this.pendingTouches.size > 1000) this.pendingTouches.clear();
-      this.pendingTouches.set(path, { sessionId, ts });
-      this.live.batch.add(path);
-      return;
-    }
-    node.activeSessionId = sessionId;
-    node.lastChangedAt = ts;
-    this.gateway.broadcast({ type: "file", file: node });
-
-    const key = path;
-    const existing = this.activeClearTimers.get(key);
-    if (existing) clearTimeout(existing.timer);
-    const timer = setTimeout(() => {
-      node.activeSessionId = undefined;
-      this.activeClearTimers.delete(key);
-      // Only if the file is still on the active map: a deleted file or another project's file must not come back.
-      if (abs === this.activeRoot && this.cache.get(abs)?.byPath.get(path) === node) this.gateway.broadcast({ type: "file", file: node });
-    }, 60_000);
-    this.activeClearTimers.set(key, { timer, node });
   }
 }

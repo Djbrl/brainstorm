@@ -177,6 +177,7 @@ type TrackProps = {
 const TrackList = memo(function TrackList({ thread, sessionId, whoOf, index, playing, full, setReplayIndex, setReplayPlaying, setReplayDetail, openStep }: TrackProps) {
   const threadRef = useRef(thread); threadRef.current = thread;
   const listRef = useRef<HTMLDivElement>(null);
+  const afterRef = useRef<HTMLSpanElement>(null);   // where Skip past the steps lands
   const userAt = useRef(0);
   const ownAt = useRef(0); // when the list last scrolled itself to the cursor
   const dragging = useRef(false);
@@ -279,6 +280,8 @@ const TrackList = memo(function TrackList({ thread, sessionId, whoOf, index, pla
 
   return (
     <div className="rp-steps">
+      {/* A long thread is hundreds of Tab stops: the first one jumps past them all (to the map, the open step). */}
+      <button className="skip-link" onClick={() => afterRef.current?.focus()}>Skip past the steps</button>
       <div className="rp-list rp-chapters" ref={listRef} onScroll={onScroll} onWheel={markUser} onTouchMove={markUser}
         onKeyDown={(e) => { if (["PageUp", "PageDown", "ArrowUp", "ArrowDown"].includes(e.key)) markUser(); }}
         onPointerDown={(e) => { if (e.target === e.currentTarget) { dragging.current = true; markUser(); } }}>
@@ -300,6 +303,7 @@ const TrackList = memo(function TrackList({ thread, sessionId, whoOf, index, pla
           {full ? "Group the steps into moments" : "Show every step"}
         </button>
       </div>
+      <span ref={afterRef} tabIndex={-1} className="skip-target" />
     </div>
   );
 });

@@ -49,10 +49,27 @@ export function StepPanel() {
     step = (call && steps.find((s) => s.id === call)) || steps.slice(0, at).reverse().find(isVisible) || step;
   }
 
+  // Keyboard: a step opened from the list (Enter on a row) takes the focus with it, so the next Tab is in the panel;
+  // closing it (Esc, Back) gives the focus back to the list's row for that step.
+  const panel = useRef<HTMLDivElement>(null);
+  const focusInside = useRef(false);
+  const isOpen = !!step;
+  useEffect(() => {
+    const el = panel.current, active = document.activeElement;
+    if (!el) return;
+    if (isOpen && active instanceof HTMLElement && active.closest(".rp-steps")) el.focus({ preventScroll: true });
+    if (!isOpen && focusInside.current) {
+      focusInside.current = false;
+      document.querySelector<HTMLElement>(".rp-steps .rp-m[aria-current='step']")?.focus({ preventScroll: true });
+    }
+  }, [isOpen]);
+
   // While it slides out, it keeps showing the step it had.
   const shown = useLastShown(step ? { step, result: results.get(step.id) } : null);
   return (
-    <div className={`map-panel pl-panel ${step ? "open" : ""}`} aria-hidden={!step} inert={!step}>
+    <div className={`map-panel pl-panel ${step ? "open" : ""}`} aria-hidden={!step} inert={!step} ref={panel} tabIndex={-1}
+      role="region" aria-label="Step" onFocus={() => { focusInside.current = true; }}
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null) && e.relatedTarget) focusInside.current = false; }}>
       {shown && <button className="pl-panel-back" onClick={closeStep}><i aria-hidden="true">‹</i>Back to the steps</button>}
       {shown && <StepDetail step={shown.step} result={shown.result} onClose={closeStep} />}
     </div>

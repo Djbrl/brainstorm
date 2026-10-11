@@ -80,3 +80,9 @@ button.wordmark { border: 0; background: none; padding: 0; cursor: pointer; bord
   .status .settings { margin-right: 2px; }
   .settings .settings-pop { width: min(340px, calc(100vw - 24px)); }
 }
+
+/* Skip links: out of sight until the keyboard reaches them. */
+.skip-link { position: absolute; left: 12px; top: 8px; z-index: 20; padding: 8px 14px; border: 0; border-radius: 999px; background: var(--accent);
+  color: var(--bg); font-size: 13.5px; font-weight: 600; transform: translateY(-200%); opacity: 0; pointer-events: none; }
+.skip-link:focus-visible { transform: none; opacity: 1; pointer-events: auto; outline: 2px solid var(--accent); outline-offset: 2px; }
+.skip-target:focus { outline: none; }

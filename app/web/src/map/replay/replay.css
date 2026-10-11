@@ -36,7 +36,7 @@
 }
 
 /* ---------- step list (fills the height the sidebar gives it) ---------- */
-.rp-steps { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.rp-steps { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .rp-list { position: relative; flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; overscroll-behavior: contain; }
 /* Rows fade out at the top edge as they scroll, instead of being cut (not the Track's chapters). No scroll bar: the list
    scrolls with the wheel or the trackpad, and the cursor keeps your place. */

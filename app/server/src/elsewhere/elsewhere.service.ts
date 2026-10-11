@@ -1,8 +1,9 @@
 import { Injectable } from "@nestjs/common";
-import { closeSync, openSync, readdirSync, readSync, realpathSync, statSync } from "node:fs";
+import { closeSync, openSync, readdirSync, readSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import type { ElsewhereThread } from "../shared/contract";
-import { inside, worktreeRepo } from "../shared/paths";
+import { worktreeRepo } from "../shared/paths";
+import { inside, real } from "../core/paths";
 import { ConfigService } from "../core/config.service";
 import { ListenerService } from "../listener/listener.service";
 import { AttentionService } from "../attention/attention.service";
@@ -22,7 +23,6 @@ const LIVE_MS = 2 * 60_000;
 const WAIT_MS = 2 * 60 * 60_000;
 const HEAD_BYTES = 64 * 1024;
 
-const real = (p: string) => { try { return realpathSync(p); } catch { return p; } };
 const repoOf = (p: string) => real(worktreeRepo(real(p)));
 
 function readAt(file: string, from: "head" | "tail", bytes = HEAD_BYTES): string {

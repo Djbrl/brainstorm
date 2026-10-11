@@ -15,11 +15,11 @@
 // sits open; a question waits for its answer.
 import chokidar, { type FSWatcher } from "chokidar";
 import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, statSync } from "node:fs";
-import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import type { StepKind } from "../shared/contract";
-import { inside } from "../shared/paths";
+import { inside, relativeTo } from "../core/paths";
 import type { LogFile, LogSource, NewStep, Scope, Sink, WatchEvents } from "./source";
 import { setAgentName } from "./agent-names";
 import { sanitizeDeep, sanitizeText, TEXT_LIMIT, TOOL_RESULT_LIMIT } from "./text";
@@ -162,8 +162,8 @@ export class CodexSource implements LogSource {
       if (!meta || meta.reviewer || !meta.cwd) continue;
       if (/\/Codex\/\d{4}-\d{2}-\d{2}(\/|$)/.test(meta.cwd)) continue;
       let root = meta.cwd;
-      const rel = relative(this.worktreesDir, root);
-      if (rel && !rel.startsWith("..") && !isAbsolute(rel)) {
+      const rel = relativeTo(root, this.worktreesDir);
+      if (rel) {
         const [id, repo] = rel.split(sep);
         const main = id && repo ? this.mainOf(join(this.worktreesDir, id, repo), repo, meta, false) : null;
         if (!main) continue; // a Codex worktree that's gone: its repo is unknown here
@@ -202,8 +202,7 @@ export class CodexSource implements LogSource {
   }
 
   owns(file: string) {
-    const rel = relative(this.dir, file);
-    return !!rel && !rel.startsWith("..") && !isAbsolute(rel);
+    return relativeTo(file, this.dir) !== null;
   }
 
   inScope(file: string, scope: Scope) {
@@ -272,8 +271,8 @@ export class CodexSource implements LogSource {
 
   /** The worktree checkout a path is in, and the repo it belongs to; null if it isn't in one (or the repo is unknown). */
   private worktreeOf(meta: Meta, p: string): { checkout: string; main: string } | null {
-    const rel = relative(this.worktreesDir, p);
-    if (!rel || rel.startsWith("..") || isAbsolute(rel)) return null;
+    const rel = relativeTo(p, this.worktreesDir);
+    if (!rel) return null;
     const [id, repo] = rel.split(sep);
     if (!id || !repo) return null;
     const checkout = join(this.worktreesDir, id, repo);

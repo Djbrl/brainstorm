@@ -13,6 +13,7 @@ import { liveHeadroom, maxFiles, mappableRel, moduleOf, skippedRel } from "./ign
 import { type Listing, gitIgnored, listFolder, listProjectFiles } from "./list-files";
 import { type Signals, scoreFrom, selectFiles } from "./select";
 import { gitLastCommitTimes } from "./git-times";
+import { inside, relativeTo } from "../core/paths";
 import { readMapped } from "./read-file";
 import { Batcher, ProjectWatcher, foldersToWatch } from "./watch";
 
@@ -376,8 +377,8 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
       if (this.cache.size <= MAX_ROOTS) break;
       if (key === abs || key === this.activeRoot) continue;
       this.cache.delete(key);
-      for (const dir of this.goModules.keys()) if (dir === key || dir.startsWith(key + sep)) this.goModules.delete(dir);
-      for (const dir of this.tsconfigs.keys()) if (dir === key || dir.startsWith(key + sep)) this.tsconfigs.delete(dir);
+      for (const dir of this.goModules.keys()) if (inside(dir, key)) this.goModules.delete(dir);
+      for (const dir of this.tsconfigs.keys()) if (inside(dir, key)) this.tsconfigs.delete(dir);
     }
   }
 
@@ -527,7 +528,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
         });
         found = paths.length || opts.baseUrl ? { base, paths, hasBaseUrl: !!opts.baseUrl } : null;
       } catch { found = null; } // unreadable or not JSON: no aliases
-    } else if (dir !== root && dir.startsWith(root + sep)) found = this.tsAliasesFor(root, dirname(dir)); // never above the project
+    } else if (relativeTo(dir, root)) found = this.tsAliasesFor(root, dirname(dir)); // never above the project
     this.tsconfigs.set(dir, found);
     return found;
   }

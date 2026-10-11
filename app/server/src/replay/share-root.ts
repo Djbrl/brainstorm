@@ -1,12 +1,13 @@
 // Which project's map a shared thread carries (share.controller.ts).
 import { existsSync } from "node:fs";
-import { dirname, join, resolve, sep } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { inside } from "../core/paths";
 import type { Session, Step } from "../shared/contract";
 import { outOfWorktree } from "../shared/paths";
 import { tooBroad } from "../workspace/workspace.service";
 
 /** A path inside a folder, or the folder itself. */
-export const within = (p: string, root: string) => { const a = resolve(p), r = resolve(root); return a === r || a.startsWith(r + sep); };
+export const within = (p: string, root: string) => inside(resolve(p), resolve(root));
 
 /** The project a folder belongs to: the repo it's in (up to the folder with .git), or the folder itself outside one. */
 function projectOf(dir: string): string {

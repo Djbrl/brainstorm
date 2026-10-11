@@ -8,6 +8,7 @@
 // Each edit comes with a result (so attention never sees it waiting) and says it came from a command (input.byCommand).
 import { statSync } from "node:fs";
 import { basename, relative, resolve, sep } from "node:path";
+import { relativeTo } from "../core/paths";
 import type { CommandEditInput, Step } from "../shared/contract";
 import { mappableRel, skippedRel } from "../mapper/ignore";
 import { MAX_PARSE_BYTES } from "../mapper/read-file";
@@ -173,4 +174,4 @@ function unchangedOnDisk(path: string): boolean {
 }
 
 const insideGit = (p: string) => p.split(sep).includes(".git");
-export const within = (p: string, root: string) => { const r = relative(root, p); return !!r && !r.startsWith("..") && !r.startsWith(sep); };
+export const within = (p: string, root: string) => relativeTo(p, root) !== null;

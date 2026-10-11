@@ -6,6 +6,7 @@ import { ConfigService } from "../core/config.service";
 import { WorkspaceService } from "../workspace/workspace.service";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { inside } from "../core/paths";
 import type { Replay, Session, Step } from "../shared/contract";
 import { CODE_SEARCH_TOOLS } from "../shared/tools";
 import { summarizePlaces } from "../cowork/cowork.service";
@@ -86,7 +87,7 @@ export class ReplayService {
     if (!preview) return base;
     // Post-deadline preview extras: recorded agent moves and a recorded setup run (only this workspace, no other projects).
     const status = this.workspace.status();
-    const suggestions = this.workspace.suggestions().filter((w) => w.root === status.root || (status.root ?? "").startsWith(w.root + "/"));
+    const suggestions = this.workspace.suggestions().filter((w) => inside(status.root ?? "", w.root));
     return { ...base, agentMoves: this.agentMoves(sessions, steps, new Set(map.files.map((f) => f.path)), movesFrom, movesTo ?? until), setupPreview: { status, suggestions } };
   }
 }

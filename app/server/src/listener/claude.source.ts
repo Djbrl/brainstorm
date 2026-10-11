@@ -6,6 +6,7 @@
 import chokidar, { type FSWatcher } from "chokidar";
 import { readdirSync, statSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
+import { relativeTo } from "../core/paths";
 import { homedir } from "node:os";
 import type { StepKind } from "../shared/contract";
 import { fileCwds, folderOf, within } from "./moved";
@@ -147,8 +148,7 @@ export class ClaudeSource implements LogSource {
   }
 
   owns(file: string) {
-    const rel = relative(this.dir, file);
-    return !!rel && !rel.startsWith("..") && !rel.startsWith(sep);
+    return relativeTo(file, this.dir) !== null;
   }
 
   threadOf(file: string) {

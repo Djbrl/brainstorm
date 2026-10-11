@@ -7,6 +7,7 @@
 // paths are handed over in batches.
 import { watch, type FSWatcher } from "node:fs";
 import { join, relative, sep } from "node:path";
+import { inside } from "../core/paths";
 import { isInIgnoredDir } from "./ignore";
 import { env } from "../core/local";
 
@@ -104,7 +105,7 @@ export class ProjectWatcher {
 
   /** "folders" mode: stop watching a folder (and everything under it), e.g. after it was deleted. */
   removeFolder(dir: string) {
-    for (const [d, w] of this.folders) if (d === dir || d.startsWith(dir + sep)) { w.close(); this.folders.delete(d); }
+    for (const [d, w] of this.folders) if (inside(d, dir)) { w.close(); this.folders.delete(d); }
   }
 
   private onFolderEvent(dir: string, name: string) {

@@ -5,7 +5,7 @@ import { basename, dirname, extname, isAbsolute, normalize } from "node:path";
 import { isLocalHost } from "../core/local";
 import { ListenerService } from "../listener/listener.service";
 import { tooBroad, WorkspaceService } from "../workspace/workspace.service";
-import { insideAny } from "../core/roots";
+import { insideAny } from "../core/paths";
 
 // "Open in your default app" for a file shown in the step panel: the computer opens it with whatever
 // app it uses for that kind of file. Only a text or code file (by extension: never a program, a script a double-click would run, or an app),

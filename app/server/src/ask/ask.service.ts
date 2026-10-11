@@ -9,7 +9,7 @@ import { ListenerService } from "../listener/listener.service";
 import { ClaudeService } from "../llm/claude.service";
 import { maskSecrets } from "../privacy/mask";
 import { UsageService } from "../usage/usage.service";
-import { insideAny } from "../core/roots";
+import { insideAny } from "../core/paths";
 import { tooBroad } from "../workspace/workspace.service";
 
 // Answers a question from a small, masked context (the step, its diff, the steps before, a file excerpt).

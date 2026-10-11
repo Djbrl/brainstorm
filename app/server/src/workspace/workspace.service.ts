@@ -6,6 +6,7 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { homedir } from "node:os";
 import type { SetupStatus, SetupStep, WorkspaceConflict, WorkspaceSuggestion } from "../shared/contract";
 import { worktreeRepo } from "../shared/paths";
+import { inside, real } from "../core/paths";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";
@@ -19,7 +20,6 @@ import { env } from "../core/local";
 import { safely } from "../core/safely";
 
 const execFileP = promisify(execFile);
-const real = (p: string) => { try { return realpathSync(p); } catch { return p; } };
 /** On a case-insensitive disk (macOS) "~/Proj" still opens after a rename to "~/proj": the name as the disk spells it now, when only the case differs. */
 export const caseOnDisk = (p: string): string | null => {
   try { const n = realpathSync.native(p); return n !== p && n.toLowerCase() === p.toLowerCase() ? n : null; } catch { return null; }
@@ -384,7 +384,7 @@ export class WorkspaceService implements OnModuleInit, OnModuleDestroy {
     const now = Date.now();
     const ids = new Set<string>();
     for (const [r, list] of this.listener.codexProjects()) {
-      if (r !== base && !r.startsWith(base + "/")) continue;
+      if (!inside(r, base)) continue;
       for (const t of list) if (now - t.mtimeMs <= ONE_DAY_MS) ids.add(t.id);
     }
     return ids.size;
@@ -478,7 +478,7 @@ const CONTAINERS = new Set(["Documents", "Desktop", "Downloads", "Library", "Pic
 export function tooBroad(root: string, homeDir = homedir()): boolean {
   const abs = resolve(root).replace(/\/+$/, "") || "/";
   const home = homeDir.replace(/\/+$/, "");
-  if (abs === "/" || home === abs || home.startsWith(abs + "/")) return true;   // the disk, a folder above home, home itself
+  if (abs === "/" || inside(home, abs)) return true;   // the disk, a folder above home, home itself
   const rest = abs.startsWith(home + "/") ? abs.slice(home.length + 1) : null;
   // ~/Documents, ~/Desktop, ~/Downloads…, unless it's a git project itself (some keep their Documents in git)
   return rest !== null && !rest.includes("/") && CONTAINERS.has(rest) && !existsSync(join(abs, ".git"));

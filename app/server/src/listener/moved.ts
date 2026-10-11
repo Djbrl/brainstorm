@@ -3,8 +3,9 @@
 // "-Users-dsy-Documents-brainstorm"). Move the repo to ~/brainstorm and its whole history stays under the old name,
 // so the app would open on an empty sidebar. A former home is a project folder whose threads ran in a folder with
 // the repo's name that no longer exists, or that now leads here (a symlink left behind by the move).
-import { closeSync, existsSync, openSync, readSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { closeSync, existsSync, openSync, readSync, readdirSync, statSync } from "node:fs";
 import { basename, join, resolve, sep } from "node:path";
+import { real } from "../core/paths";
 import { claudeProjectDir, MAX_NAME, repoBase as sharedRepoBase, sanitizeName } from "../shared/paths";
 
 export { claudeProjectDir, sanitizeName };
@@ -66,7 +67,6 @@ function cwdsOf(dir: string): string[] {
   return [...out];
 }
 
-const real = (p: string) => { try { return realpathSync(p); } catch { return p; } };
 
 /** The path a Claude Code project folder name spells ("-Users-me-old-name" → /Users/me/old-name), found by walking the disk
  * and following links (a rename leaves one behind). Null if no such path exists. */

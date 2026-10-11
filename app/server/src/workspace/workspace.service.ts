@@ -75,25 +75,28 @@ export class WorkspaceService implements OnModuleInit {
 
   onModuleInit() {
     this.dbs.db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
-    // Started by the plugin for a project: that project wins over the saved one.
+    // The saved project wins: a restart (an update, a crash) keeps the project the pages show. The project of the session
+    // that started the server counts only when none was ever chosen.
     const given = env("ROOT");
-    if (given && this.isValidDir(given) && !tooBroad(given)) {
+    const useGiven = () => {
+      if (!given || !this.isValidDir(given) || tooBroad(given)) return false;
       this.log.log(`boot: workspace from the launcher ${given}`);
       this.setSetting("workspace", resolve(given));
       this.activate(resolve(given));
-      return;
-    }
+      return true;
+    };
     const saved = this.getSetting("workspace");
     if (saved && tooBroad(saved)) {
       // Saved before this guard (an island named after ~/Documents): mapping it would hang the server. Pick again.
       this.log.warn(`boot: the saved workspace ${saved} is a folder of folders, not a project: showing the setup screen`);
       this.dbs.db.prepare(`DELETE FROM settings WHERE key = 'workspace'`).run();
+      if (useGiven()) return;
     } else if (saved && this.isValidDir(saved)) {
       this.log.log(`boot: applying saved workspace ${saved}`);
       this.activate(saved); // fire and forget: don't block startup
-    } else {
-      this.log.log(`boot: no saved workspace, the web will show the setup screen`);
-    }
+      return;
+    } else if (useGiven()) return;
+    this.log.log(`boot: no saved workspace, the web will show the setup screen`);
   }
 
   // ---- reads ----

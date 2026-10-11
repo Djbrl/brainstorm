@@ -89,6 +89,8 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
   private scope?: { at: number; visible: Set<string>; checked: Set<string> };
   private rechecked = new Set<string>(); // hidden threads that already forced a re-check by starting to work
   private stmts?: { recent: StatementSync; tail: StatementSync };
+  /** The last hook per thread, as stored (so "Needs you" survives a restart): read at boot, used when a tracker starts. */
+  private saved = new Map<string, HookSignal & { at: number }>();
 
   private log = new Logger("Attention");
   constructor(private bus: BusService, private gateway: EventsGateway, private listener: ListenerService, private dbs: DbService) {}
@@ -105,7 +107,18 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
     this.bus.on("step", (s) => { try { this.onStep(s); } catch { /* never break the listener */ } });
     // A turn an agent's log says is over (Codex's task_complete): what the plugin's Stop hook says for Claude Code.
     this.bus.on("turn-ended", ({ sessionId }) => { try { this.signal({ event: "Stop", session_id: sessionId }, false); } catch { /* never break the listener */ } });
-    this.bus.on("workspace", () => { this.trackers.clear(); this.last.clear(); this.scope = undefined; this.rechecked.clear(); });
+    // Another project: what pages were sent starts over, but what's known about each thread (its hooks above all, the
+    // only word that it waits on the person) stays: trackers are per thread, whatever project is open.
+    this.bus.on("workspace", () => { this.last.clear(); this.scope = undefined; this.rechecked.clear(); });
+    this.dbs.db.exec(`CREATE TABLE IF NOT EXISTS attention_hooks (session_id TEXT PRIMARY KEY, signal TEXT NOT NULL, at INTEGER NOT NULL)`);
+    safely(this.log, "reading the last hooks", () => {
+      const since = Date.now() - HOOKS_TRUSTED_MS;
+      this.dbs.db.prepare(`DELETE FROM attention_hooks WHERE at < ?`).run(since);
+      for (const r of this.dbs.db.prepare(`SELECT session_id, signal, at FROM attention_hooks`).all() as { session_id: string; signal: string; at: number }[]) {
+        try { this.saved.set(r.session_id, { ...JSON.parse(r.signal), at: r.at }); } catch { /* skip a bad row */ }
+        this.hooksAt = Math.max(this.hooksAt ?? 0, r.at);
+      }
+    });
     this.timer = setInterval(() => safely(this.log, "attention sweep", () => this.sweep()), 2_000);
     this.timer.unref?.();
   }
@@ -127,13 +140,23 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
     const t = this.tracker(sig.session_id);
     if (sig.event === "UserPromptSubmit") { t.hook = undefined; t.streak = null; }
     else t.hook = { ...sig, at: Date.now() };
+    if (fromHook) this.store(sig.session_id, t.hook);
     // Hooks come from every project's sessions: pages hear about the open workspace's (another's is in GET /api/elsewhere).
     if (this.inScope(new Set([sig.session_id]), Date.now()).has(sig.session_id)) this.publish(sig.session_id);
   }
 
   /** The last thing a hook said about a thread, any project's (for threads in other projects: GET /api/elsewhere). */
   hookOf(sid: string): (HookSignal & { at: number }) | undefined {
-    return this.trackers.get(sid)?.hook;
+    return (this.trackers.get(sid) ?? (this.saved.has(sid) ? this.tracker(sid) : undefined))?.hook;
+  }
+
+  /** Keeps a thread's last hook across restarts (none: a new prompt cleared it). */
+  private store(sid: string, hook: (HookSignal & { at: number }) | undefined) {
+    this.saved.delete(sid);
+    safely(this.log, "saving a hook", () => {
+      if (!hook) this.dbs.db.prepare(`DELETE FROM attention_hooks WHERE session_id = ?`).run(sid);
+      else { const { at, ...sig } = hook; this.dbs.db.prepare(`INSERT OR REPLACE INTO attention_hooks VALUES (?, ?, ?)`).run(sid, JSON.stringify(sig), at); }
+    });
   }
 
   // ---- tracking ----
@@ -146,6 +169,14 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
     // Catch up from the stored log (the bus only carries live steps): the recent tail is enough, oldest first.
     const rows = this.q.tail.all(sid, CATCH_UP) as TailRow[];
     for (let i = rows.length - 1; i >= 0; i--) this.apply(t, tailStep(rows[i]));
+    // The hook heard before a restart, if the log hasn't moved on since (the same test as a live step's, in apply).
+    const h = this.saved.get(sid);
+    if (h) {
+      this.saved.delete(sid);
+      const moved = (Date.parse(t.lastMain?.ts ?? "") || 0) > h.at + (h.event === "PermissionRequest" ? 1000 : 0);
+      const answered = h.event === "PermissionRequest" && !!h.tool_use_id && !t.pending.has(h.tool_use_id) && rows.some((r) => r.tool_use_id === h.tool_use_id);
+      if (!moved && !answered) t.hook = h;
+    }
     return t;
   }
 

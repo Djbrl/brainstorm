@@ -160,3 +160,21 @@ test("a permission prompt's command is shown and broadcast with its secrets mask
   assert.ok(!JSON.stringify(sent).includes("FAKEFAKE") && !JSON.stringify(att.list()).includes("FAKEFAKE"), JSON.stringify(att.list()));
   assert.match(att.list()[0]?.detail ?? "", /curl -H "x-api-key: \[redacted\]" https:\/\/api\.example\.com/);
 });
+
+test("a permission prompt survives a project switch and a restart, until the log moves on", () => {
+  const { att, store, session, bus } = setup();
+  session("a", iso(5_000));
+  store({ sessionId: "a", kind: "tool_call", tool: "Bash", toolUseId: "t1", input: { command: "rm -rf build" }, ts: iso(5_000) });
+  att.signal({ event: "PermissionRequest", session_id: "a", tool_name: "Bash", tool_use_id: "t1" });
+  bus.emit("workspace", { root: "/elsewhere" });
+  assert.equal(att.hookOf("a")?.event, "PermissionRequest");
+  // A new server on the same database: the hook was stored.
+  const again = new AttentionService(new BusService(), { broadcast: () => {} } as any, { listSessions: () => [{ id: "a" }] } as any, (att as any).dbs);
+  again.onModuleInit();
+  assert.equal(again.hookOf("a")?.event, "PermissionRequest");
+  // Answered before that restart (the call's result is in the log): not waiting any more.
+  store({ sessionId: "a", kind: "tool_result", toolUseId: "t1", ts: iso(0) });
+  const third = new AttentionService(new BusService(), { broadcast: () => {} } as any, { listSessions: () => [{ id: "a" }] } as any, (att as any).dbs);
+  third.onModuleInit();
+  assert.equal(third.hookOf("a"), undefined);
+});

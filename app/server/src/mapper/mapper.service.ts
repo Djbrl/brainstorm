@@ -81,6 +81,25 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
   return out;
 }
 
+/**
+ * JS/TS imports and re-exports: `import x from`, `import type { a, b } from` (over several lines), `import x, * as y
+ * from`, `export * as x from`, `export { a } from`, `import "x"`, `require("x")`, `import("x")`. Each pattern spells out
+ * what may stand between its keyword and `from`, and a brace list stops at the next brace: a lazy scan to the next quote
+ * after every `export` was quadratic (a 500 KB file of `export const` lines took seconds, at each save).
+ */
+const JS_IMPORTS = [
+  /\bimport\s+(?:type\s+)?(?:[\w$]+\s*,\s*)?(?:[\w$]+\s+|\*\s*as\s+[\w$]+\s+|\{[^{}]*\}\s*)from\s*['"]([^'"]+)['"]/g,
+  /\bexport\s+(?:type\s+)?(?:\*\s*(?:as\s+[\w$]+\s+)?|\{[^{}]*\}\s*)from\s*['"]([^'"]+)['"]/g,
+  /import\s+['"]([^'"]+)['"]/g,
+  /require\(\s*['"]([^'"]+)['"]\s*\)/g,
+  /import\(\s*['"]([^'"]+)['"]\s*\)/g,
+];
+export function jsImports(content: string): string[] {
+  const specs: string[] = [];
+  for (const re of JS_IMPORTS) for (const m of content.matchAll(re)) specs.push(m[1]);
+  return specs;
+}
+
 const sameSet = (a: Set<string> | undefined, b: Set<string>) => !!a && a.size === b.size && [...a].every((x) => b.has(x));
 
 // Owner: B. List the project's files (git, else a walk), imports → edges, lastChangedAt from mtime then git, watch for changes.
@@ -386,17 +405,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
       return specs;
     }
     if (JS_EXT.has(ext) || COMPONENT_EXT.has(ext)) {
-      const patterns = [
-        /import\s+[^'"]*?from\s+['"]([^'"]+)['"]/g,
-        /export\s+[^'"]*?from\s+['"]([^'"]+)['"]/g,
-        /import\s+['"]([^'"]+)['"]/g,
-        /require\(\s*['"]([^'"]+)['"]\s*\)/g,
-        /import\(\s*['"]([^'"]+)['"]\s*\)/g,
-      ];
-      for (const re of patterns) {
-        let m: RegExpExecArray | null;
-        while ((m = re.exec(content))) specs.push(m[1]);
-      }
+      specs.push(...jsImports(content));
     }
     return specs;
   }

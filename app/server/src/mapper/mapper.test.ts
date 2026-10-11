@@ -12,7 +12,7 @@ import { rankScale, scoreFrom, selectFiles } from "./select";
 import { Batcher, foldersToWatch } from "./watch";
 import { GitLogParser } from "./git-times";
 import { listProjectFiles, listProjectFilesSync, parseLsFiles } from "./list-files";
-import { MapperService } from "./mapper.service";
+import { MapperService, jsImports } from "./mapper.service";
 import { MAX_COUNT_BYTES, readMapped, readMappedSync } from "./read-file";
 import type { WsMessage } from "../types";
 
@@ -411,5 +411,47 @@ test("odd files a listing can name: a link to /dev/zero, a link out of the proje
   } finally {
     svc.onModuleDestroy();
     rmSync(root, { recursive: true, force: true }); rmSync(outside, { recursive: true, force: true }); rmSync(projects, { recursive: true, force: true });
+  }
+});
+
+test("JS/TS imports: every form, over several lines, and nothing from what only looks like one", () => {
+  const src = [
+    'import React from "react";',
+    "import type { A, B } from './types';",
+    'import type Def from "./def";',
+    'import type from "./named-type";',
+    "import x, { y } from './xy';",
+    "import z, * as zz from './z';",
+    'import * as ns from "./ns";',
+    "import {\n  a, // the first one\n  b,\n} from './multi';",
+    'import {c}from"./tight";',
+    'import "./side-effect.css";',
+    'export * from "./all";',
+    'export * as names from "./names";',
+    "export type { T } from './t';",
+    "export {\n  one,\n  two as three,\n} from './barrel';",
+    'export { default } from "./default";',
+    'const lazy = import("./lazy");',
+    'const old = require("./old");',
+    "export const notAnImport = 1;",
+    "export { local };",
+    "export interface I { a: string }",
+    "// a comment that says import things from here",
+  ].join("\n");
+  assert.deepEqual(jsImports(src).sort(), ["react", "./types", "./def", "./named-type", "./xy", "./z", "./ns", "./multi", "./tight",
+    "./all", "./names", "./t", "./barrel", "./default", "./side-effect.css", "./lazy", "./old"].sort());
+});
+
+test("JS/TS imports stay linear on export-heavy and unclosed files", () => {
+  const time = (content: string) => { const t = process.hrtime.bigint(); jsImports(content); return Number(process.hrtime.bigint() - t) / 1e6; };
+  const consts = Array.from({ length: 20_000 }, (_, i) => `export const X_${i} = ${i};`).join("\n"); // ~500 KB
+  assert.ok(consts.length >= 500_000);
+  time(consts); // warm up
+  const ms = time(consts);
+  assert.ok(ms < 50, `500 KB of export const lines: ${ms.toFixed(1)} ms`);
+  for (const line of ["export interface T { a: number; b: string }", "import {", "export {", "import ", "import x, ", "export * "]) {
+    const big = Array.from({ length: 20_000 }, () => line).join("\n");
+    const t = time(big);
+    assert.ok(t < 50, `${JSON.stringify(line)} x 20,000: ${t.toFixed(1)} ms`);
   }
 });

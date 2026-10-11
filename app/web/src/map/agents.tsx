@@ -1,9 +1,11 @@
 // Live agents on the Map: markers that glide between files, fading trails, lines of sight to the files they read.
 import type { AgentPresence } from "@contract";
 import { clock } from "../lib/live";
-import { along, casing, drawMarker, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs, type RGB } from "./themes";
+import { drawMarker, drawTrip, landings, mapStyle, platform, type RGB } from "./themes";
 import { css, hex, mixRGB, rgbOf, same } from "./color";
-import { ease, hashString } from "./util";
+import { hashString } from "./util";
+import { drawPulse, drawThinkRing, ERR_PULSE_MS, ERROR_RED, glide, PULSE_MS, setOff, trailPath } from "./tracer";
+export { ERROR_RED } from "./tracer";
 
 /** Main threads get the accent (Metro: their own ink line); subagents a colour from the theme's palette, by id. */
 export function agentColor(a: Pick<AgentPresence, "id" | "isSubagent">, accent: string): string {
@@ -73,15 +75,10 @@ export type AgentAnim = {
   col?: RGB; thinkA?: number; waitA?: number; easeT?: number; easing?: boolean;
 };
 type Pt = { x: number; y: number; r: number };
-const GLIDE_MS = 650;
 const READ_MS = 1500;
 const READS_SHOWN = 4;      // the files it read lately that keep a dotted line
-const PULSE_MS = 700;
-export const ERROR_RED = "#d93025";
 const ERR_MS = 2600;        // how long the marker stays red
-const ERR_PULSE_MS = 1100;  // one red ring
 const WAIT_MS = 1800;       // the amber ring's breath while an agent waits on you
-const THINK_MS = 2400;      // the slower ring while it thinks
 const STATE_EASE = 0.16;    // seconds for a marker to (nearly) take its new state's colour and rings
 const REST_GREY: RGB = [176, 180, 190];   // at rest, the marker's colour turns this much toward grey (REST_MIX)
 const REST_MIX = 0.55;
@@ -183,13 +180,8 @@ export function drawAgents(opts: {
         st = { x: tx, y: ty, fromX: tx, fromY: ty, t0: -1e9, file: key, alpha: 0, seen: new Set(), seeded: false, flashes: [], lastTs: a.ts, pulseT0: -1e9, errT0: -1e9, lastErr: a.errorAt };
         anim.set(a.id, st);
       }
-      if (st.file !== key) { st.fromX = st.x; st.fromY = st.y; st.t0 = t; st.file = key; }
-      const p = Math.min(1, (t - st.t0) / tripMs(style.route, GLIDE_MS));
-      const e = ease(p);
-      const trip = p < 1 && style.route !== "glide" ? routePoints(style.route, st.fromX, st.fromY, tx, ty) : null;
-      if (trip) { const q = along(trip, e); st.x = q.x; st.y = q.y; }  // ride the route
-      else { st.x = st.fromX + (tx - st.fromX) * e; st.y = st.fromY + (ty - st.fromY) * e; }
-      if (style.route === "hop" && p >= 1 && st.t0 > 0 && st.landedT0 !== st.t0) { st.landedT0 = st.t0; landings.set(key, t); }
+      if (st.file !== key) { setOff(st, t); st.file = key; }
+      const { p, e, trip } = glide(st, tx, ty, t, style.route, 1, () => landings.set(key, t));
       const thinks = !!thinking?.has(a.id) && !waiting?.has(a.id);
       const target = agentAlpha(a, now, !!waiting?.has(a.id) || thinks, !!keep) * (dimmed?.has(a.id) ? DIM : 1);
       st.alpha += (target - st.alpha) * 0.08;
@@ -242,14 +234,7 @@ export function drawAgents(opts: {
           ctx.globalAlpha = st.alpha * (0.1 + 0.55 * w);
           ctx.strokeStyle = color;
           ctx.lineWidth = ((1.2 + 1.6 * w) * (style.trackWidth ?? 1)) / scale;
-          const mx = (a0.x + a1.x) / 2, my = (a0.y + a1.y) / 2;
-          const dx = a1.x - a0.x, dy = a1.y - a0.y;
-          if (style.route !== "glide") { polyPath(ctx, routePoints(style.route, a0.x, a0.y, a1.x, a1.y)); if (style.route === "metro") casing(ctx, scale); } // the way it went
-          else {
-            ctx.beginPath();
-            ctx.moveTo(a0.x, a0.y);
-            ctx.quadraticCurveTo(mx - dy * 0.15, my + dx * 0.15, a1.x, a1.y);
-          }
+          trailPath(ctx, a0, a1, style.route, scale);
           if (style.glow) { ctx.shadowColor = color; ctx.shadowBlur = 8; }
           ctx.stroke();
           ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
@@ -295,20 +280,10 @@ export function drawAgents(opts: {
       }
 
       // A search or command without a file: one short pulse on the marker.
-      const q = (t - st.pulseT0) / PULSE_MS;
-      if (q >= 0 && q < 1) {
-        ctx.globalAlpha = st.alpha * (1 - q) * 0.55;
-        ctx.beginPath(); ctx.arc(st.x, st.y, (9 + q * 12) / scale, 0, Math.PI * 2);
-        ctx.strokeStyle = color; ctx.lineWidth = 1.6 / scale; ctx.stroke();
-      }
+      drawPulse(ctx, st.x, st.y, (t - st.pulseT0) / PULSE_MS, 9, 12, color, 1.6, st.alpha * 0.55, scale);
 
       // A failed tool call: one red ring, wider than the activity pulse.
-      const ep = (t - st.errT0) / ERR_PULSE_MS;
-      if (ep >= 0 && ep < 1) {
-        ctx.globalAlpha = st.alpha * (1 - ep) * 0.8;
-        ctx.beginPath(); ctx.arc(st.x, st.y, (10 + ep * 26) / scale, 0, Math.PI * 2);
-        ctx.strokeStyle = ERROR_RED; ctx.lineWidth = 2.4 / scale; ctx.stroke();
-      }
+      drawPulse(ctx, st.x, st.y, (t - st.errT0) / ERR_PULSE_MS, 10, 26, ERROR_RED, 2.4, st.alpha * 0.8, scale);
 
       // The trip under way: Prism's afterimages behind.
       if (trip) drawTrip(ctx, style.route, trip, p, e, color, 9 / scale, st.alpha, scale);
@@ -318,12 +293,7 @@ export function drawAgents(opts: {
       const at = rings && (st.thinkA > 0.01 || st.waitA > 0.01) ? onScreen(st.x, st.y) : null;
       if (st.thinkA > 0.01) {
         if (at) rings!.push({ id: a.id, kind: "think", x: at.x, y: at.y, color, alpha: st.alpha * st.thinkA });
-        else {
-          const b = (t % THINK_MS) / THINK_MS;
-          ctx.globalAlpha = st.alpha * st.thinkA * Math.sin(b * Math.PI) * 0.7;
-          ctx.beginPath(); ctx.arc(st.x, st.y, (11 + b * 9) / scale, 0, Math.PI * 2);
-          ctx.strokeStyle = color; ctx.lineWidth = 2 / scale; ctx.stroke();
-        }
+        else drawThinkRing(ctx, st.x, st.y, t, color, st.alpha * st.thinkA, scale);
         ctx.globalAlpha = st.alpha;
       }
 

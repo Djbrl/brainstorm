@@ -19,6 +19,7 @@ import { useTheme } from "../lib/theme";
 import { clock, isReplay } from "../lib/live";
 import { sinceMs } from "../lib/visit";
 import { useStepWindow } from "../map/prefs";
+import { glide, GLIDE_MS, setOff, trailPath, type Glider } from "../map/tracer";
 import { useSize } from "../lib/hooks";
 
 /** One circle of the places map. */
@@ -32,7 +33,6 @@ export type PNode = NodeObject & {
 type PlacesGraph = { id: number; nodes: PNode[]; folders: PNode[] };
 
 const HOT = "#ff6a3d", RISK = "#d93025";
-const GLIDE_MS = 650;
 const TRAIL = 6;          // the places before the marker's, its trail
 
 const leafR = (events: number) => Math.min(HOME_R, 3.2 + Math.sqrt(events) * 1.3);
@@ -145,13 +145,13 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
   }, [past, win, byId]);
 
   // The marker glides from place to place.
-  const mark = useRef<{ x: number; y: number; fx: number; fy: number; t0: number; at: string | null }>({ x: 0, y: 0, fx: 0, fy: 0, t0: -1e9, at: null });
+  const mark = useRef<Glider & { at: string | null }>({ x: 0, y: 0, fromX: 0, fromY: 0, t0: -1e9, at: null });
   useEffect(() => {
     const m = mark.current, n = here ? byId.get(here) : undefined;
     if (!n) { m.at = null; return; }
     const p = platform(n.x, n.y, n.r, 1);
-    if (m.at === null) { m.x = m.fx = p.x; m.y = m.fy = p.y; m.t0 = -1e9; }
-    else { m.fx = m.x; m.fy = m.y; m.t0 = performance.now(); }
+    if (m.at === null) { m.x = m.fromX = p.x; m.y = m.fromY = p.y; m.t0 = -1e9; }
+    else setOff(m, performance.now());
     m.at = here;
     redraw.kick(GLIDE_MS + 50);
   }, [here, byId, redraw]);
@@ -262,16 +262,16 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
 
     // The trail: through the places the thread went before this one, newest strongest.
     const pts = path.slice(-TRAIL - 1).map((x) => byId.get(x.place)).filter((n): n is PNode => !!n);
-    const m = mark.current, p = Math.min(1, (t - m.t0) / GLIDE_MS), e = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
-    const tn = here ? byId.get(here) : undefined;
-    if (tn) { const to = platform(tn.x, tn.y, tn.r, scale); m.x = m.fx + (to.x - m.fx) * e; m.y = m.fy + (to.y - m.fy) * e; }
+    // The marker glides as the map's do (map/tracer.ts), always on the soft curve: places have no theme routes.
+    const m = mark.current, tn = here ? byId.get(here) : undefined;
+    let p = Math.min(1, (t - m.t0) / GLIDE_MS);
+    if (tn) { const to = platform(tn.x, tn.y, tn.r, scale); p = glide(m, to.x, to.y, t, "glide").p; }
     if (pts.length > 1) {
       ctx.save(); ctx.lineCap = "round"; ctx.strokeStyle = tokens.accent;
       for (let k = 0; k < pts.length - 1; k++) {
         const a = pts[k], b = k === pts.length - 2 ? { x: m.x, y: m.y } : pts[k + 1], w = (k + 1) / (pts.length - 1);
         ctx.globalAlpha = (past ? 0.45 : 1) * (0.12 + 0.5 * w); ctx.lineWidth = (1.2 + 1.4 * w) / scale;
-        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, dx = b.x - a.x, dy = b.y - a.y;
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo(mx - dy * 0.15, my + dx * 0.15, b.x, b.y); ctx.stroke();
+        trailPath(ctx, a, b, "glide", scale); ctx.stroke();
       }
       ctx.restore();
     }

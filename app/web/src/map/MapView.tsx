@@ -117,7 +117,7 @@ export function MapView() {
   liveShown.current = !!replay && drawnAgents.some((a) => a.sessionId === replay.sessionId);
   // The replay's camera follow and the map's camera talk through this (useMapCamera fills it in, the layer reads it).
   const replayCam = useRef<ReplayCamera>({ onLost: null, margin: () => 24, pinned: false });
-  const replayLayer = useReplayLayer({ fg: fg as never, wrapRef, nodeIndexRef, accent: tokens.accent, font: tokens.body, camera: camRef, follow: replayCam, liveShown });
+  const replayLayer = useReplayLayer({ nodeIndexRef, accent: tokens.accent, font: tokens.body, camera: camRef, follow: replayCam, liveShown });
   const replayRef = useRef<ReplayLayerApi>(replayLayer); replayRef.current = replayLayer;
   const openRef = useRef(!!replay); openRef.current = !!replay;
 

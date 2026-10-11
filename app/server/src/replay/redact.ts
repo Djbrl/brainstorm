@@ -36,10 +36,12 @@ export function redactReplayJson(json: string): { json: string; count: number } 
     for (const [re, to] of rules) s = s.replace(re, () => { count++; return to; });
     return s;
   };
+  // Keys too, when they are text rather than a field name: a tool's input can be keyed by path, host or header.
+  const key = (k: string) => (/^[A-Za-z_$][\w$]*$/.test(k) ? k : str(k));
   const walk = (v: unknown): unknown => {
     if (typeof v === "string") return str(v);
     if (Array.isArray(v)) return v.map(walk);
-    if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)]));
+    if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [key(k), walk(x)]));
     return v;
   };
   return { json: JSON.stringify(walk(JSON.parse(json))), count };

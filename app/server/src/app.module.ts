@@ -13,12 +13,11 @@ import { CoworkModule } from "./cowork/cowork.module";
 import { ShotsModule } from "./shots/shots.module";
 import { AttentionModule } from "./attention/attention.module";
 import { OpenModule } from "./open/open.module";
-import { GitModule } from "./git/git.module";
 import { ImageModule } from "./image/image.module";
 import { ElsewhereModule } from "./elsewhere/elsewhere.module";
 
 // Owned by the lead. Agents: don't edit; ask in docs/build-log.md "Requests".
 import { UsageModule } from "./usage/usage.module";
 import { OnboardingModule } from "./onboarding/onboarding.controller";
-@Module({ imports: [CoreModule, UsageModule, LlmModule, ListenerModule, MapperModule, ReaderModule, AskModule, ReplayModule, WorkspaceModule, AgentsModule, CoworkModule, ShotsModule, AttentionModule, OpenModule, GitModule, ImageModule, ElsewhereModule, OnboardingModule], controllers: [HealthController] })
+@Module({ imports: [CoreModule, UsageModule, LlmModule, ListenerModule, MapperModule, ReaderModule, AskModule, ReplayModule, WorkspaceModule, AgentsModule, CoworkModule, ShotsModule, AttentionModule, OpenModule, ImageModule, ElsewhereModule, OnboardingModule], controllers: [HealthController] })
 export class AppModule {}

@@ -33,7 +33,6 @@ import { createRedraw, Motion } from "./redraw";
 import { css, readTokens } from "./color";
 import { hitAt, nodeReach, shownLinks, stepTween, useGraph, type GLink, type GNode } from "./graph";
 import { foldFrame, openAround, useFoldOn } from "./fold";
-import { GIT_COLOURS, gitFiles, useShowGit, worktreeOf } from "./gitFilter";
 import { drawFile, drawFocusLinks, drawFolderNames, FILE_LABELS_MAX, flushDots, labelFor, lookOf, moreMotion, newCaches, RIPPLE_MS, type Frame } from "./drawNode";
 import { useMapCamera } from "./useMapCamera";
 import { useLiveAgents } from "./useLiveAgents";
@@ -286,30 +285,11 @@ export function MapView() {
 
   // The folders that show open at any zoom: around the selected file, the one a link focuses, what the thread showed
   // and where a followed agent worked (agents at work are added per frame).
-  // ---- the dock's Show git (gitFilter.ts): the files it rings, by id, with their colours and folders ----
-  const gitState = state.git, showGit = useShowGit();
-  const gitWt = worktreeOf(gitState, replay?.sessionId);
-  const only = useMemo(() => {
-    if (!showGit || !gitState || !map) return { files: null, dirs: null, nodes: [] as GNode[] };
-    // A folder's ring, while it's closed: not committed inside it over committed (purple, blue).
-    const base = map.root.replace(/\/+$/, ""), files = new Map<string, string>(), dirs = new Map<string, string>(), nodes: GNode[] = [];
-    const quiet = new Set<string>([GIT_COLOURS.unpushed, GIT_COLOURS.branch]);
-    for (const [rel, colour] of gitFiles(gitState, gitWt)) {
-      const n = nodeIndex.get(`${base}/${rel}`);
-      if (!n) continue;
-      files.set(n.id, colour); nodes.push(n);
-      for (let u = n.up; u; u = u.up) { const had = dirs.get(u.id); if (!had || (quiet.has(had) && !quiet.has(colour))) dirs.set(u.id, colour); }
-    }
-    return { files, dirs, nodes };
-  }, [showGit, gitState, gitWt, map?.root, nodeIndex]);
-  const onlyRef = useRef(only); onlyRef.current = only;
-
   const pinned = useMemo(() => {
     const set = new Set<GNode>();
     for (const f of [selected, focusFile, ...watched.files]) if (f) openAround(nodeIndex.get(f), set);
-    if (only.nodes.length <= 400) for (const n of only.nodes) openAround(n, set);
     return set;
-  }, [nodeIndex, selected, focusFile, watched.files, only]);
+  }, [nodeIndex, selected, focusFile, watched.files]);
   const pinnedRef = useRef(pinned); pinnedRef.current = pinned;
 
   // ---- what drawing keeps between frames (drawNode.ts) ----
@@ -351,7 +331,7 @@ export function MapView() {
   // ---- the frame ----
   const frame = useRef<Frame>({ id: 0, scale: 1, x0: -Infinity, y0: -Infinity, x1: Infinity, y1: Infinity, now: 0, t: 0, st: style,
     sel: null, hover: null, coolCss: "", looks: true, anyLook: false, lookSum: 0, motion: Motion.None, labN: [], labP: [],
-    tokens, epoch: 0, recorded: recorded(), since: sinceMs, look: () => null, linkFocus: null, tracing: false, only: null, onlyDirs: null });
+    tokens, epoch: 0, recorded: recorded(), since: sinceMs, look: () => null, linkFocus: null, tracing: false });
   const lastLookSum = useRef(0);
   const vis = useRef({ sig: 0, ver: 0 });   // what's open (fold.ts), and a counter bumped when it or the positions change
   const linkCache = useRef<{ key: string; links: GLink[]; g: typeof graph | null }>({ key: "", links: [], g: null });
@@ -362,7 +342,6 @@ export function MapView() {
     F.sel = selectedRef.current; F.hover = hoverRef.current; F.coolCss = css(tokensRef.current.cool);
     F.tokens = tokensRef.current; F.epoch = epoch.current; F.look = replayRef.current.look;
     F.linkFocus = linkFocusRef.current; F.tracing = replayRef.current.tracing;
-    F.only = onlyRef.current.files; F.onlyDirs = onlyRef.current.dirs;
     spriteFrame();
     // Off-screen files aren't drawn: the part of the map the camera shows, in graph units.
     const a = g?.screen2GraphCoords(0, 0), b = g?.screen2GraphCoords(w, h);
@@ -475,7 +454,7 @@ export function MapView() {
   const footprintKey = fp ? `${fp.length}|${fp[0] ?? ""}|${fp[fp.length - 1] ?? ""}` : "";
   // Anything that changes the picture: one frame (the frame itself says if more must follow).
   useEffect(() => { redraw.kick(); }, [redraw, graph, map?.files, drawnAgents, waiting, followId, hover, selected, tokens, theme, replay,
-    replayLayer.active, replayLayer.tracing, replayLayer.footprintMode, showReads, stepWindow, footprintKey, size.w, size.h, only]);
+    replayLayer.active, replayLayer.tracing, replayLayer.footprintMode, showReads, stepWindow, footprintKey, size.w, size.h]);
   // A replay step: the tracer glides, a read flashes, an edit pulses (up to about a second).
   useEffect(() => { redraw.kick(1300); }, [redraw, replay?.index, replay?.sessionId, replay?.mode]);
   // A new agent position, error or activity: its glide, flash or pulse plays out (drawAgents), the frame keeps them coming.

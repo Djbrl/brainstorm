@@ -7,7 +7,6 @@ import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gitEnv } from "./git-safety";
-import { GitService } from "../git/git.service";
 import { gitLastCommitTimes, recentCommitTimes, recentCommitTimesSync } from "../mapper/git-times";
 import { gitIgnored, listProjectFiles, listProjectFilesSync } from "../mapper/list-files";
 
@@ -66,9 +65,8 @@ test("a copied repo's filters, diff drivers, includes, submodules and gpg progra
     for (const w of ["clean", "process", "included", "submodule", "gpg"]) assert.match(ran, new RegExp(w), `control ran ${w}`);
     rmSync(marker);
 
-    const svc = new GitService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { listSessions: () => [] } as never, { status: () => ({ root: null }) } as never);
-    const state = await svc.read(repo);
-    assert.equal(state?.branch, "main");
+    const reads = async () => { await gitLastCommitTimes(repo, new Set(["a.ts"])); await listProjectFiles(repo, 1); await gitIgnored(repo, ["a.ts"]); };
+    await reads();
     await gitLastCommitTimes(repo, new Set(["a.ts", "nothing.ts"]));
     await recentCommitTimes(repo); recentCommitTimesSync(repo);
     await listProjectFiles(repo, 1); listProjectFilesSync(repo, 1);
@@ -77,12 +75,12 @@ test("a copied repo's filters, diff drivers, includes, submodules and gpg progra
     git(repo, "config", "filter.later.clean", mark("later"));
     writeFileSync(join(repo, ".gitattributes"), "* filter=later\n");
     stale(repo);
-    await svc.read(repo);
+    await reads();
     // And one that arrives in an included file (a pull can change a tracked one).
     writeFileSync(join(tmp, "inc.cfg"), `[filter "inc2"]\n\tclean = ${mark("included2")}\n`);
     writeFileSync(join(repo, ".gitattributes"), "* filter=inc2\n");
     stale(repo);
-    await svc.read(repo);
+    await reads();
     assert.equal(existsSync(marker) ? readFileSync(marker, "utf8") : "", "");
   } finally { rmSync(tmp, { recursive: true, force: true }); }
 });
@@ -121,8 +119,6 @@ test("a config too big to read: no git runs there at all (fails closed)", async 
     appendFileSync(join(repo, ".git/config"), `[filter "x"]\n\tclean = ${prog}\n` + Array.from({ length: 75_000 }, (_, i) => `[filter "d${i}"]\n\tclean = ${pad}\n`).join(""));
     const t = new Date(Date.now() + 5000); utimesSync(join(repo, "src/a.ts"), t, t);
     assert.equal(gitEnv(repo), null);
-    const svc = new GitService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { listSessions: () => [] } as never, { status: () => ({ root: null }) } as never);
-    assert.equal(await svc.read(repo), null);                 // as if not a repo
     assert.equal((await listProjectFiles(repo, 100)).source, "walk");
     assert.equal(listProjectFilesSync(repo, 100).source, "walk");
     assert.equal((await gitLastCommitTimes(repo, new Set(["src/a.ts"]))).times.size, 0);

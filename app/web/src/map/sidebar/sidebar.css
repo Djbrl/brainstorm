@@ -317,8 +317,6 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .file-view-reveal:hover { background: #f4f4f7; }
 .file-view-reveal:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .file-view-meta { color: var(--ink-2); margin: 10px 0 0; font-size: 13.5px; line-height: 1.45; }
-.file-view-git { display: flex; align-items: center; gap: 10px; margin: 10px 0 0; color: var(--ink-2); font-size: 13.5px; }
-.file-view-git i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .file-view-live { display: flex; align-items: center; gap: 10px; margin: 14px 0 0; color: var(--accent); font-weight: 500; font-size: 14px; }
 .file-view-live i { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--accent); }
 .file-view section { margin-top: 28px; }

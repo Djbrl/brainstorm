@@ -10,6 +10,8 @@ import { LinkedLabel } from "./lib/links";
 import { SetupView } from "./setup/SetupView";
 import { Welcome } from "./map/Welcome";
 import { UsageAsk } from "./map/UsageAsk";
+import { Tour } from "./map/tour/Tour";
+import { useTour } from "./lib/tour";
 import { SettingsButton } from "./settings/Settings";
 import { Crashed, Offline, OfflineBanner, useOffline } from "./Trouble";
 import { useAttentionAlerts } from "./lib/attention";
@@ -167,8 +169,8 @@ function Shell() {
       {!state.replay && !state.shared && <Keys finding={finding} setFinding={setFinding} help={help} setHelp={setHelp} />}
       {state.shared && <OpenShared />}
       <LiveFollow />
-      {!replay && !state.shared && <Welcome />}
-      {!replay && !state.shared && <UsageAsk />}
+      {/* The hosted demo keeps its one welcome card; your own Rundown has the tour (its last step asks about usage stats). */}
+      {isReplay() ? !replay && !state.shared && <Welcome /> : !state.shared && !state.preview && <><Tour /><AfterTour /></>}
       <main className="view"><Crashed where="the map" key={`${replay?.sessionId ?? ""}|${lens}`}><Suspense fallback={<Loading />}>{
         offline && !state.hasMap ? <Offline />
           : replay && state.missing ? <MissingThread onBack={stopReplay} />
@@ -227,6 +229,13 @@ function OpenShared() {
  * starts following it. Nothing opens or plays by itself: running threads show as moving dots until you click one.
  * The parts that build the thread are mounted only while they're needed.
  */
+/** The usage question, for someone who skipped the tour (its last step asks it): once the tour is done, mounted then so
+ *  it reads the setting as it is now. */
+function AfterTour() {
+  const ready = useTour((t) => t.done === true && !t.step);
+  return ready ? <UsageAsk /> : null;
+}
+
 function LiveFollow() {
   const { replay } = useNavState();
   const sid = replay?.sessionId;

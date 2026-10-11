@@ -10,6 +10,7 @@ import type { FileNode, ProjectMap } from "@contract";
 import { useLive } from "../lib/live";
 import { mapPrefs, useNav } from "../lib/nav";
 import { drawAgents, type AgentRing } from "./agents";
+import { TOUR_AGENT, tourHidesExtras, useTour } from "../lib/tour";
 import { MapSidebar } from "./sidebar/MapSidebar";
 import { Dock } from "./replay/ReplayBar";
 import { Peek } from "./replay/Peek";
@@ -113,8 +114,11 @@ export function MapView() {
   useEffect(() => () => redraw.stop(), [redraw]);
 
   // ---- live agents ----
+  // The tour's example agent (lib/tour.ts) walks the map with the real ones while its step shows.
+  const tourAgent = useTour((t) => t.agent);
+  const liveAgents = useMemo(() => (tourAgent ? { ...state.agents, [tourAgent.id]: tourAgent } : state.agents), [state.agents, tourAgent]);
   const { agents, drawnAgents, waiting, waitingRef, thinkingRef, agentsRef, anim, moving: agentsMoving, dimmedRef } = useLiveAgents({
-    agents: state.agents, attention: state.attention, hiddenAgents, threadId: replay?.sessionId ?? null,
+    agents: liveAgents, attention: state.attention, hiddenAgents, threadId: replay?.sessionId ?? null,
   });
   const hoverRef = useRef(hover); hoverRef.current = hover;
   const selectedRef = useRef(selected); selectedRef.current = selected;
@@ -164,6 +168,12 @@ export function MapView() {
   // Looking back through the thread (its replay's marker on the map), the camera follows the marker, not an agent where
   // it is now: following stops (back at the newest moment, autoTrack follows the agent again).
   useEffect(() => { if (replay && !replay.live && replayLayer.tracing && followId) setFollowId(null); }, [replay?.live, replayLayer.tracing, followId, setFollowId]);
+  // The tour's example agent: the camera follows it while it walks (its trail and reads show), and lets go after.
+  const touring = !!tourAgent;
+  useEffect(() => {
+    if (touring) refollow(TOUR_AGENT);
+    else if (followRef.current === TOUR_AGENT) setFollowId(null);
+  }, [touring]);
   // A small map with a thread followed live: the camera follows its agent at work by itself (autoTrack.ts).
   useAutoTrack({ on: small && !!replay?.live && replayLayer.active, sessionId: replay?.sessionId ?? null, agents: drawnAgents, followId, setFollowId });
 
@@ -428,7 +438,7 @@ export function MapView() {
     replayRef.current.draw(ctx, scale);
     drawAgents({
       ctx, scale, agents: agentsRef.current, anim: anim.current, accent: tokens.accent, font: tokens.body,
-      hoverFile: hoverRef.current, followId: followRef.current, resolveId, showReads: mapPrefs.showReads, quiet: !openRef.current, waiting: waitingRef.current,
+      hoverFile: hoverRef.current, followId: followRef.current, resolveId, showReads: mapPrefs.showReads && !tourHidesExtras(), quiet: !openRef.current, waiting: waitingRef.current,
       thinking: thinkingRef.current, keep: openRef.current, dimmed: dimmedRef.current, rings: ringsOut.current = [],
       resolve: (id) => { const n = nodeIndexRef.current.get(id); return n && n.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y, r: n.r } : undefined; },
     });

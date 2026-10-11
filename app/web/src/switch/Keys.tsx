@@ -2,6 +2,7 @@
 // Readmap (on the map), P switches between the map and Places. (Reads show or hide in Settings.) A key that flips something you can't see says so for a moment.
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { tourStore } from "../lib/tour";
 import { useNavActions, useNavState } from "../lib/nav";
 import { getCameraLock, getReadmap, setCameraLock, setReadmap } from "../map/prefs";
 import { Picker } from "./Picker";
@@ -73,6 +74,7 @@ function Help({ onClose }: { onClose: () => void }) {
             </section>
           ))}
         </div>
+        <p className="keys-tour">New here? <button onClick={() => { onClose(); tourStore.start(); }}>Take the tour</button></p>
       </div>
     </div>,
     document.body,

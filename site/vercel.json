@@ -1,3 +1,9 @@
 {
-  "crons": [{ "path": "/api/usage-prune", "schedule": "17 4 * * *" }]
+  "cleanUrls": true,
+  "crons": [
+    {
+      "path": "/api/usage-prune",
+      "schedule": "17 4 * * *"
+    }
+  ]
 }

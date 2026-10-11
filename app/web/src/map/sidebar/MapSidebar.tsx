@@ -127,6 +127,17 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
     addEventListener("keydown", esc, true);
     return () => removeEventListener("keydown", esc, true);
   }, [over]);
+  // The tour (map/tour/Tour.tsx) opens it on a tab, or folds it: a "rundown-sidebar" event, {open?, tab?}.
+  const drive = useRef((_d: { open?: boolean; tab?: Tab }) => {});
+  drive.current = (d) => {
+    if (d.tab) { setTab(d.tab); setListing(false); }
+    if (d.open !== undefined) { if (narrow) setOver(d.open); else setFolded(!d.open); }
+  };
+  useEffect(() => {
+    const on = (e: Event) => drive.current((e as CustomEvent<{ open?: boolean; tab?: Tab }>).detail ?? {});
+    addEventListener("rundown-sidebar", on);
+    return () => removeEventListener("rundown-sidebar", on);
+  }, []);
   // T folds or unfolds it (not while typing, nor with a window open over the map).
   const toggle = useRef(() => {}); toggle.current = () => setCollapsed(!collapsed);
   useEffect(() => {

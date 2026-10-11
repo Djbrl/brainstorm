@@ -1,23 +1,16 @@
-// Owned by the lead. The one question about usage stats, asked once, after the welcome card: nothing is counted or sent
+// Owned by the lead. The one question about usage stats, asked once: the tour's last step (map/tour/Tour.tsx), or this
+// card after the tour for someone who skipped it (App's AfterTour): nothing is counted or sent
 // until the person answers yes (server usage/usage.service.ts). Saying no is as easy as saying yes, and Settings can
 // change it later. Not on a replay (the hosted demo, a shared file) or a development build, which never sends.
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { isReplay } from "../lib/live";
 import { PRIVACY_URL, useUsageSetting } from "../lib/usage";
-import { welcomed } from "../lib/visit";
 import "./usage-ask.css";
 
 export function UsageAsk() {
   const { status, set } = useUsageSetting();
-  const [ready, setReady] = useState(() => welcomed());
   const [done, setDone] = useState(false);
-  useEffect(() => {
-    if (ready) return;
-    const on = () => setReady(true);
-    window.addEventListener("rundown-welcomed", on);
-    return () => window.removeEventListener("rundown-welcomed", on);
-  }, [ready]);
-  if (isReplay() || !ready || done || !status || status.asked || status.locked || !status.sends) return null;
+  if (isReplay() || done || !status || status.asked || status.locked || !status.sends) return null;
   const answer = (yes: boolean) => { set(yes); setDone(true); };
   return (
     <section className="usage-ask" role="region" aria-labelledby="usage-ask-title">

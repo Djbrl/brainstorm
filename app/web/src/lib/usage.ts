@@ -18,7 +18,7 @@ export function track(name: WebEvent) {
 export type UsageStatus = { enabled: boolean; asked: boolean; id: string | null; locked: string | null; sends: boolean; lastSent: string | null; pending: Record<string, number> };
 
 /** Where the site says exactly what's sent, how long it's kept and how to have it deleted. */
-export const PRIVACY_URL = "https://brainstorm-landing.vercel.app/privacy#usage-stats";
+export const PRIVACY_URL = "https://brainstorm-landing.vercel.app/privacy.html#usage-stats";
 
 const put = (enabled: boolean) => fetch("/api/usage", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled }) })
   .then((r) => (r.ok ? (r.json() as Promise<UsageStatus>) : null));

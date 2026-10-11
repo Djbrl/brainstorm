@@ -10,6 +10,7 @@ import { useNavActions, useNavState } from "../lib/nav";
 import { setFoldOn, useFoldOn } from "../map/fold";
 import { EDITORS, setEditor, useEditor } from "../lib/editor";
 import { PRIVACY_URL, useUsageSetting } from "../lib/usage";
+import { tourStore } from "../lib/tour";
 import { useDialogFocus } from "../lib/useDialogFocus";
 import "./settings.css";
 
@@ -58,6 +59,10 @@ export function SettingsButton() {
             <FoldSetting />
             <NotifySetting />
             <UsageSetting />
+            <section className="set-sec">
+              <h3>Tour</h3>
+              <button className="usage-forget" onClick={() => { setOpen(false); tourStore.start(); }}>Take the tour again</button>
+            </section>
           </div>
         </div>,
         document.body,

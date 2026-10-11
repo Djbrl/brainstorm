@@ -314,10 +314,10 @@ export const replayCowork = (sessionId: string) => replayData?.cowork?.[sessionI
 let clockOffset = 0;
 export const clock = () => Date.now() - clockOffset;
 export async function replayAnswer(req: AskRequest): Promise<AskResponse> {
-  const hit = replayData?.answers.find((a) => a.request.question === req.question && a.request.stepId === req.stepId && a.request.filePath === req.filePath)
-    ?? replayData?.answers.find((a) => (req.stepId && a.request.stepId === req.stepId) || (req.filePath && a.request.filePath === req.filePath));
+  // The exact question only: an answer to another question is not an answer to this one. Shared files carry none.
+  const hit = replayData?.answers?.find((a) => a.request.question === req.question && a.request.stepId === req.stepId && a.request.filePath === req.filePath);
   if (hit) return hit.response;
-  return { answer: "This is a recorded demo. Run Rundown locally to ask new questions.", model: "replay", tokensIn: 0, tokensOut: 0, costUsd: 0, fallback: false };
+  return { answer: "This is a recording, so it can't answer new questions. Run Rundown on your own computer to ask.", model: "replay", tokensIn: 0, tokensOut: 0, costUsd: 0, fallback: false };
 }
 
 /** Load everything for the active workspace (on start, and again after the setup screen switches workspace). */

@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { config } from "../core/config";
 import { chmodSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { dataDir } from "../core/local";
@@ -30,7 +31,7 @@ export class UpdatesService {
   file = settingsFile();
 
   status(): UpdatesStatus {
-    if (process.env.RUNDOWN_UPDATE_CHECK === "0") return { enabled: false, locked: "RUNDOWN_UPDATE_CHECK=0 is set" };
+    if (config.updateCheckOff) return { enabled: false, locked: "RUNDOWN_UPDATE_CHECK=0 is set" };
     return { enabled: readSettings(this.file).updateCheck !== false, locked: null };
   }
 

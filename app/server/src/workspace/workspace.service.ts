@@ -16,7 +16,7 @@ import { claudeProjectDir, folderOf, sanitizeName } from "../listener/moved";
 import { MapperService } from "../mapper/mapper.service";
 import { isIdleTranscript } from "./threads";
 import { walkCandidates } from "../mapper/list-files";
-import { env } from "../core/local";
+import { config } from "../core/config";
 import { safely } from "../core/safely";
 
 const execFileP = promisify(execFile);
@@ -89,7 +89,7 @@ export class WorkspaceService implements OnModuleInit, OnModuleDestroy {
     this.folderTimer.unref?.();
     // The saved project wins: a restart (an update, a crash) keeps the project the pages show. The project of the session
     // that started the server counts only when none was ever chosen.
-    const given = env("ROOT");
+    const given = config.launchRoot;
     const useGiven = () => {
       if (!given || !this.isValidDir(given) || tooBroad(given)) return false;
       this.log.log(`boot: workspace from the launcher ${given}`);

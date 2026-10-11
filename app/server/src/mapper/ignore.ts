@@ -1,7 +1,7 @@
 // What belongs on the map. One rule, shared by the file listing (git or walk), the watcher and live updates,
 // so a folder the map never shows is also never read or watched.
 import { extname } from "node:path";
-import { env } from "../core/local";
+import { config } from "../core/config";
 
 /** Folders never looked into, by name. Every dot folder (.git, .idea, .venv, .next, .gradle, .yarn, .tox…) is skipped too. */
 export const IGNORE_DIRS = new Set([
@@ -41,7 +41,7 @@ export const SOURCE_NAMES = new Set([
  * liveHeadroom), and files an agent edits always join. RUNDOWN_MAX_FILES overrides it.
  */
 export function maxFiles(): number {
-  const n = Number(env("MAX_FILES"));
+  const n = config.maxFiles;
   return Number.isInteger(n) && n > 0 ? n : 3000; // the canvas stays smooth at 5,000 at 4× CPU (docs/performance.md)
 }
 /** New files that appear while the map is open may take it this far past maxFiles(). */

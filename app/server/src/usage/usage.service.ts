@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/commo
 import { randomUUID } from "node:crypto";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
-import { env } from "../core/local";
+import { config } from "../core/config";
 import { safely } from "../core/safely";
 import type { UsageStatus } from "../shared/contract";
 
@@ -26,7 +26,7 @@ export type UsageKey = (typeof USAGE_KEYS)[number];
 export const WEB_KEYS = new Set<string>(["op", "th", "rp", "lv"]);
 export const THEMES = new Set(["default", "metro", "prism", "hologram"]);
 
-const ENDPOINT = process.env.RUNDOWN_USAGE_URL ?? "https://brainstorm-landing.vercel.app/api/usage";
+const ENDPOINT = config.usageUrl;
 const FORGET = ENDPOINT.replace(/\/api\/usage$/, "/api/usage-forget");
 const FIRST_TRY_MS = 60_000;          // after start, so a crash loop doesn't report
 const EVERY_MS = 60 * 60_000;         // then hourly: one report per UTC day at most
@@ -115,16 +115,13 @@ export class UsageService implements OnModuleInit, OnModuleDestroy {
   private enabled() { return this.on && !this.locked(); }
 
   private locked(): string | null {
-    const dnt = process.env.DO_NOT_TRACK, off = process.env.RUNDOWN_USAGE?.toLowerCase();
-    if (dnt && dnt !== "0" && dnt.toLowerCase() !== "false") return "DO_NOT_TRACK is set";
-    if (off === "off" || off === "0" || off === "false") return "RUNDOWN_USAGE is off";
-    return null;
+    return config.usageLocked;
   }
 
   /** Only a released build reports (the plugin sets its version); a dev build never does, unless asked for testing. */
   private sends() {
-    const v = env("VERSION");
-    return (!!v && v !== "dev") || process.env.RUNDOWN_USAGE_DEV === "1";
+    const v = config.version;
+    return (!!v && v !== "dev") || config.usageDev;
   }
 
   private pending(): Partial<Record<UsageKey, number>> {
@@ -143,7 +140,7 @@ export class UsageService implements OnModuleInit, OnModuleDestroy {
     const sent = this.pending();
     const body = {
       id, kind: last ? "day" : "new",
-      v: /^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(env("VERSION") ?? "") ? env("VERSION") : "0.0.0",
+      v: /^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(config.version ?? "") ? config.version : "0.0.0",
       os: ["darwin", "linux", "win32"].includes(process.platform) ? process.platform : "other",
       tm: this.theme || "none",
       c: sent,

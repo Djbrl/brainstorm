@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { config } from "../core/config";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
@@ -95,8 +96,8 @@ export class AskService implements OnModuleInit {
       this.log.warn(`Claude failed: ${(e as Error).message}`);
       // Started by a skill (/rundown:open), which doesn't get the plugin's settings: a key may be set that this server didn't get.
       const answer = this.cfg.claude.key ? "Could not reach Claude right now. Try again in a moment."
-        : process.env.RUNDOWN_NO_SETTINGS === "1" ? `Ask needs a restart to pick up your key: start a new Claude Code session. If you haven't added a key yet, run /plugin configure ${process.env.RUNDOWN_PLUGIN_ID || "rundown@rundown"} in Claude Code first.`
-        : `To ask questions, add an Anthropic API key: run /plugin configure ${process.env.RUNDOWN_PLUGIN_ID || "rundown@rundown"} in Claude Code, then start a new session.`;
+        : config.noSettings ? `Ask needs a restart to pick up your key: start a new Claude Code session. If you haven't added a key yet, run /plugin configure ${config.pluginId} in Claude Code first.`
+        : `To ask questions, add an Anthropic API key: run /plugin configure ${config.pluginId} in Claude Code, then start a new session.`;
       return { answer, model: "none", tokensIn: 0, tokensOut: 0, costUsd: 0, fallback: true };
     }
 

@@ -3,6 +3,7 @@
 // `python3 - <<'PY' … Path('app.vue').write_text(…)`, Codex's `apply_patch`. This is the static half: what the command
 // says it writes. Only what can be known from the text is returned: a path built from a variable, a glob or a command
 // substitution is left out, and so is anything a script computes at run time. Never throws.
+import { config } from "../core/config";
 import { basename, isAbsolute, resolve } from "node:path";
 
 export type CommandWrite = {
@@ -74,7 +75,7 @@ export function commandReads(command: string, cwd: string): string[] {
 
 // ───────────────────────────── paths ─────────────────────────────
 
-const home = () => process.env.HOME || undefined;
+const home = () => config.home;
 
 /** An absolute path for text from the command or a script; undefined when it can't be known (or isn't a real file). */
 function absPath(text: string | undefined, dir: string | undefined): string | undefined {

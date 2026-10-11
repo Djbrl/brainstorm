@@ -9,7 +9,7 @@ import { watch, type FSWatcher } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { inside } from "../core/paths";
 import { isInIgnoredDir } from "./ignore";
-import { env } from "../core/local";
+import { config } from "../core/config";
 
 /** Collects items and hands them over together, at most `delayMs` after the first one arrived. */
 export class Batcher<T> {
@@ -40,7 +40,7 @@ export type WatchMode = "recursive" | "folders";
 
 /** The platform's cheap mode. RUNDOWN_MAP_WATCH=folders|recursive overrides it (for testing). */
 export function defaultWatchMode(): WatchMode {
-  const forced = env("MAP_WATCH");
+  const forced = config.mapWatch;
   if (forced === "folders" || forced === "recursive") return forced;
   return process.platform === "darwin" || process.platform === "win32" ? "recursive" : "folders";
 }

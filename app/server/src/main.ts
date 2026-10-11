@@ -1,14 +1,15 @@
 import "reflect-metadata";
 import { protectGit } from "./core/git-safety";
 protectGit(); // before anything runs git
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync, writeSync } from "node:fs";
 import { NestFactory } from "@nestjs/core";
 import { WsAdapter } from "@nestjs/platform-ws";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import type { NextFunction, Request, Response } from "express";
 import { AppModule } from "./app.module";
-import { dataDir, isLocalHost, isLocalWrite, pageCsp, env } from "./core/local";
+import { dataDir, isLocalHost, isLocalWrite, pageCsp } from "./core/local";
+import { config, loadDevEnv } from "./core/config";
 import { SECRET } from "./core/secrets";
 
 // An error nothing caught: written to the log (stderr, server.log under the plugin) before the server stops, so a crash
@@ -20,9 +21,7 @@ const fatal = (what: string) => (e: unknown) => {
 process.on("uncaughtException", fatal("uncaught exception"));
 process.on("unhandledRejection", fatal("unhandled rejection"));
 
-const envFile = resolve(__dirname, "../../.env");
-// Dev only: the plugin passes its settings in the environment, and must not pick up some .env above its install folder.
-if (!env("DATA_DIR") && existsSync(envFile)) process.loadEnvFile(envFile);
+loadDevEnv();
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger: ["log", "warn", "error"], bodyParser: false });
@@ -46,7 +45,7 @@ async function bootstrap() {
   });
 
   // Plugin build: the server also serves the web app, so it's one process on one port.
-  const web = env("WEB_DIR");
+  const web = config.webDir;
   if (web && existsSync(join(web, "index.html"))) {
     app.useStaticAssets(web);
     // A chunk this build doesn't have (a page loaded before an update asking for its old one): a plain 404, so the page
@@ -58,11 +57,11 @@ async function bootstrap() {
       req.method === "GET" && !req.path.startsWith("/api") && !req.path.startsWith("/ws") ? res.sendFile("index.html", { root: web }) : next());
   }
 
-  const version = env("VERSION") ?? "dev";
-  const first = Number(env("PORT") ?? process.env.PORT ?? 4000);
+  const version = config.version ?? "dev";
+  const first = config.port;
   // The plugin's server picks its own port: the one asked for if it's free, else the next ones (the launcher can't
   // reserve one for us: anything could take it before we bind). Dev keeps its fixed port.
-  const tries = env("DATA_DIR") ? 50 : 1;
+  const tries = config.pluginDataDir ? 50 : 1;
   let port = first;
   for (let i = 0; ; i++) {
     try { await app.listen(port, "127.0.0.1"); break; } catch (e) {
@@ -76,18 +75,18 @@ async function bootstrap() {
   const shutdown = (signal: string) => {
     console.log(`Rundown ${version} (pid ${process.pid}) stopping on ${signal}`);
     setTimeout(() => process.exit(0), 3000).unref();
-    try { if (env("DATA_DIR") && JSON.parse(readFileSync(state, "utf8")).pid === process.pid) rmSync(state, { force: true }); } catch { /* not there */ }
+    try { if (config.pluginDataDir && JSON.parse(readFileSync(state, "utf8")).pid === process.pid) rmSync(state, { force: true }); } catch { /* not there */ }
     void app.close().catch(() => {}).finally(() => process.exit(0));
   };
   process.once("SIGTERM", () => shutdown("SIGTERM"));
   process.once("SIGINT", () => shutdown("SIGINT"));
-  if (env("DATA_DIR")) {
+  if (config.pluginDataDir) {
     // 0600: the secret lets the launcher and the hooks check they talk to this server, not something else on the port.
     const mine = { pid: process.pid, port, version, startedAt: new Date().toISOString(), secret: SECRET };
     writeFileSync(state, JSON.stringify(mine), { mode: 0o600 });
     chmodSync(state, 0o600); // the mode above only applies to a new file
     // Up: the launcher that started us is done. Only its own lock (a token it gave us), never another launcher's.
-    const lock = join(dataDir(), "launch.lock"), token = env("LOCK_TOKEN");
+    const lock = join(dataDir(), "launch.lock"), token = config.lockToken;
     try { if (token && readFileSync(lock, "utf8") === token) rmSync(lock, { force: true }); } catch { /* gone */ }
     // One server per data folder. If server.json names another one that's alive, a launcher started it beside us
     // (we were too busy to answer it): it's the one everyone finds now, so we go, instead of running on untracked

@@ -1,10 +1,7 @@
-import { resolve } from "node:path";
-
-/** A setting from the environment: RUNDOWN_<name>. */
-export const env = (name: string): string | undefined => process.env[`RUNDOWN_${name}`];
+import { config } from "./config";
 
 /** Where Rundown keeps its database and private files. The plugin sets RUNDOWN_DATA_DIR; dev uses app/server/data. */
-export const dataDir = () => resolve(env("DATA_DIR") ?? resolve(__dirname, "../../data"));
+export const dataDir = () => config.dataDir;
 
 const LOCAL_NAMES = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
 // "*.localhost" names (a dev proxy's "web.rundown.localhost") always resolve to this machine (RFC 6761): no site can claim one.

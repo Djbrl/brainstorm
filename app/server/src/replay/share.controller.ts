@@ -9,7 +9,7 @@ import { threadMarkdown } from "./markdown";
 import { forSharing, slug } from "./privacy";
 import { slimMap } from "./slim";
 import { UsageService } from "../usage/usage.service";
-import { env } from "../core/local";
+import { config } from "../core/config";
 import { ConfigService } from "../core/config.service";
 import { shareMapRoot, within } from "./share-root";
 
@@ -17,9 +17,9 @@ const PLACEHOLDER = "<!--rundown:replay-->";
 
 /** The one-file web app a shared replay is poured into (built by app/web/scripts/build-share.mjs). */
 function shareTemplate(): string | null {
-  const web = env("WEB_DIR");
+  const web = config.webDir;
   const candidates = [
-    env("SHARE_TEMPLATE"),
+    config.shareTemplate,
     web && join(web, "..", "share.html"),            // plugin: build/web + build/share.html
     resolve(__dirname, "../../../web/dist-share/share.html"), // dev: app/server/dist/replay → app/web/dist-share
   ];
@@ -52,7 +52,7 @@ export class ShareController {
     const steps = this.listener.listSteps(session.id);
     const raw = await this.replays.build(session.id, undefined, undefined, undefined, undefined, undefined, { mapRoot: shareMapRoot(session, steps, this.cfg.defaultRoot) });
     const answers: Replay["answers"] = []; // a shared file carries no Ask answers: they were asked here, about this machine
-    const shared = { title: session.title || "Untitled thread", createdAt: new Date().toISOString(), version: env("VERSION") ?? "dev" };
+    const shared = { title: session.title || "Untitled thread", createdAt: new Date().toISOString(), version: config.version ?? "dev" };
     const map = raw.map && slimMap(raw.map, raw.steps);
     return forSharing({ ...raw, map, answers, shared });
   }

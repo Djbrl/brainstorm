@@ -38,11 +38,10 @@ export class ShotsService {
 
   /** Reads what's new in the session's logs and stores the screenshots in it. Cheap when nothing changed. */
   scan(sessionId: string) {
-    const db = this.dbs.db;
     for (const file of this.logFiles(sessionId)) {
       let size: number;
       try { size = statSync(file).size; } catch { continue; }
-      const row = db.prepare(`SELECT offset FROM task_shot_files WHERE file = ?`).get(file) as { offset: number } | undefined;
+      const row = this.dbs.stmt(`SELECT offset FROM task_shot_files WHERE file = ?`).get(file) as { offset: number } | undefined;
       let offset = row?.offset ?? 0;
       if (size < offset) offset = 0; // rewritten
       if (size === offset) continue;
@@ -51,7 +50,7 @@ export class ShotsService {
       try { readSync(fd, buf, 0, buf.length, offset); } finally { closeSync(fd); }
       const end = buf.lastIndexOf(0x0a) + 1; // complete lines only
       if (end === 0) continue;
-      const insert = db.prepare(`INSERT OR IGNORE INTO task_shots (step_id, idx, session_id, media, data) VALUES (?, ?, ?, ?, ?)`);
+      const insert = this.dbs.stmt(`INSERT OR IGNORE INTO task_shots (step_id, idx, session_id, media, data) VALUES (?, ?, ?, ?, ?)`);
       for (const line of buf.subarray(0, end).toString("utf8").split("\n")) {
         if (!line.includes('"image"') || !line.includes('"tool_result"')) continue;
         let o: any;
@@ -68,7 +67,7 @@ export class ShotsService {
             });
         });
       }
-      db.prepare(`INSERT INTO task_shot_files (file, offset) VALUES (?, ?) ON CONFLICT(file) DO UPDATE SET offset = excluded.offset`).run(file, offset + end);
+      this.dbs.stmt(`INSERT INTO task_shot_files (file, offset) VALUES (?, ?) ON CONFLICT(file) DO UPDATE SET offset = excluded.offset`).run(file, offset + end);
     }
   }
 
@@ -94,10 +93,10 @@ export class ShotsService {
 
   /** Whether any screenshot of this result step is stored (a step's screenshots are stored together). */
   has(stepId: string): boolean {
-    return !!this.dbs.db.prepare(`SELECT 1 FROM task_shots WHERE step_id = ? LIMIT 1`).get(stepId);
+    return !!this.dbs.stmt(`SELECT 1 FROM task_shots WHERE step_id = ? LIMIT 1`).get(stepId);
   }
 
   get(stepId: string, idx: number): { media: string; data: Uint8Array } | undefined {
-    return this.dbs.db.prepare(`SELECT media, data FROM task_shots WHERE step_id = ? AND idx = ?`).get(stepId, idx) as { media: string; data: Uint8Array } | undefined;
+    return this.dbs.stmt(`SELECT media, data FROM task_shots WHERE step_id = ? AND idx = ?`).get(stepId, idx) as { media: string; data: Uint8Array } | undefined;
   }
 }

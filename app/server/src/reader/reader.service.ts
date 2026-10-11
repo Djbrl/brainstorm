@@ -1,5 +1,4 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
-import type { StatementSync } from "node:sqlite";
 import type { Step } from "../shared/contract";
 import { BusService } from "../core/bus.service";
 import { DbService } from "../core/db.service";
@@ -16,17 +15,11 @@ const SECRET_RES = [
 @Injectable()
 export class ReaderService implements OnModuleInit {
   private log = new Logger("Reader");
-  private stmts?: { setRisk: StatementSync };
 
   constructor(private bus: BusService, private dbs: DbService) {}
 
-  /** Prepared on first use: the listener creates the steps table in its own init. */
-  private get q() {
-    return this.stmts ??= { setRisk: this.dbs.db.prepare(`UPDATE steps SET risk = ? WHERE id = ?`) };
-  }
-
   private storeRisk(id: string, risk: string[]) {
-    this.q.setRisk.run(JSON.stringify(risk), id);
+    this.dbs.stmt(`UPDATE steps SET risk = ? WHERE id = ?`).run(JSON.stringify(risk), id);
   }
 
   onModuleInit() {

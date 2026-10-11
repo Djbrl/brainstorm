@@ -1,9 +1,20 @@
 import { Injectable, Logger, OnApplicationShutdown } from "@nestjs/common";
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { dataDir } from "./local";
 import { migrate } from "./schema";
+
+const statements = new WeakMap<DatabaseSync, Map<string, StatementSync>>();
+
+/** A statement prepared once per database and kept: for queries a module runs again and again. */
+export function prepared(db: DatabaseSync, sql: string): StatementSync {
+  let byText = statements.get(db);
+  if (!byText) statements.set(db, byText = new Map());
+  let st = byText.get(sql);
+  if (!st) byText.set(sql, st = db.prepare(sql));
+  return st;
+}
 
 /**
  * One SQLite file (Node's built-in node:sqlite, no native build).
@@ -75,6 +86,9 @@ export class DbService implements OnApplicationShutdown {
       chmodSync(f, 0o600); // the mode above only applies to a new file
     } catch { /* the log has it */ }
   }
+
+  /** `prepared` for this database. */
+  stmt(sql: string): StatementSync { return prepared(this.db, sql); }
 
   onApplicationShutdown() {
     try { this.db.close(); } catch { /* already closed */ }

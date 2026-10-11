@@ -158,7 +158,8 @@ export async function frontRun({ chrome, base, cpu, expectedNodes, threadId, liv
     try {
       await page.send("Page.navigate", { url: `${base}/thread/${threadId}` });
       const t0 = Date.now();
-      const ready = await waitFor(() => page.eval(`(() => { const b = [...document.querySelectorAll("button.dock-replay")].find((x) => /Replay/.test(x.textContent)); return b && !b.disabled ? performance.now() : null; })()`), { timeoutMs: 120_000 * scale, everyMs: 250 });
+      // Ready: the thread's moments are in the sidebar's Track (the footer has no Replay button any more: Space plays).
+      const ready = await waitFor(() => page.eval(`document.querySelector(".map-sidebar .rp-m, .map-sidebar .rp-ch-head") ? performance.now() : null`), { timeoutMs: 120_000 * scale, everyMs: 250 });
       const api = (await apiResources(page).catch(() => [])).filter((r) => r.path.includes("/sessions/") || r.path.includes("/tasks/") || r.path.includes("/cowork"));
       const stepsCalls = api.filter((r) => r.path.endsWith("/steps"));
       out.threadOpen = { readyMs: ready ? round(ready) : null, wallMs: Date.now() - t0, stepsFetches: stepsCalls.length, stepsMb: round(stepsCalls.reduce((s, r) => s + r.kb, 0) / 1024), api };
@@ -167,7 +168,7 @@ export async function frontRun({ chrome, base, cpu, expectedNodes, threadId, liv
       if (openWindow) Object.assign(out.threadOpen, { longTasks: openWindow.longTasks, longTaskMs: openWindow.longTaskMs, longestTaskMs: openWindow.longestTaskMs });
       out.threadOpen.heapMb = await heapMb(page);
       await sleep(1000);
-      await page.eval(`[...document.querySelectorAll("button.dock-replay")].find((x) => /Replay/.test(x.textContent)).click()`);
+      await page.eval(`(document.activeElement instanceof HTMLElement && document.activeElement.blur(), window.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true })))`);
       await waitFor(() => page.eval(`!!document.querySelector(".rp-speed button")`), { timeoutMs: 10_000 * scale });
       await page.eval(`[...document.querySelectorAll(".rp-speed button")].find((b) => b.textContent.trim() === "4×")?.click()`);
       const pos = () => page.eval(`document.querySelector(".rp-slider input")?.value ?? null`).then(Number).catch(() => null);

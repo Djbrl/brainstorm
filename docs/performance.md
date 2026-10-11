@@ -122,6 +122,28 @@ Nothing timed out and every page rendered. These are the worst numbers, most imp
   scrolls the wheel in and out. Replay opens the thread's link, presses Replay and picks 4×.
 - **JS heap:** used heap from the DevTools protocol at the end of a window.
 
+## Check on `claude/small-canvas` (11 Oct 2026)
+
+Same machine, `node app/scripts/bench/run.mjs --files 1000,5000,20000 --cpu 1,4` on `b0bd87b` (load average 7–37 on 8
+cores: read wall times as rough), plus profiles of the production build on the 5k repo.
+
+- **Server:** answers in 0.9–1.5 s (cold or empty), the long thread listed in 1.5–1.9 s cold, 0.9 s warm. RSS
+  200–390 MB at its peak (5k and 20k: ~350 MB), 0.5–0.7% CPU at rest, 1–3% with the live writer. Live latency 3–4 ms
+  median, 18–33 ms p95. `/steps` for 10k steps is still 12 MB in 130–140 ms.
+- **Web, nothing moving:** 5% of the main thread at 4× CPU on 5k files, with or without the Readmap (its loop costs
+  about 1 ms a second). JS heap 9–18 MB at rest, 40–95 MB with the 10k thread open and replaying.
+- **Web, an agent "Thinking…":** the map repaints every frame for the ring, up to 5 minutes per pause
+  (`THINKING_MAX_MS`): 11% of the main thread at 1× on 5k–20k files, 35–42% at 4× (the benchmark's "rest" window, right
+  after its live writer stops mid-turn). Five minutes later it falls back to the 5% above. The biggest cost left.
+- **Opening and replaying the 10k thread** (the benchmark's replay step looked for the old Replay button; fixed in
+  `front.mjs`, measured separately): ready in 0.85 s at 1×, 1.6 s at 4×, one 12.6 MB download; a 4× replay plays
+  67–75 moments in 10 s at 29–30 fps (headless Chrome on this loaded machine held 30 fps in several windows), main thread
+  25% busy at 1×, 79% at 4×.
+- **Bundle:** 1,029 KB of JS (362 KB gzipped), first load 362 KB (112 KB gzipped): +106 KB since 5 Oct.
+- **Installed plugin:** three 0.6.0 servers were running at once (4747, 4748, 4749; 73–125 MB each, two on the same
+  database). The launcher waits 800 ms for `/api/health`; a busy server misses it, a second one starts on the next port,
+  `server.json` points at the new one and the old one runs on untracked.
+
 ## The overnight pass (5–6 Oct 2026)
 
 Three read-only audits (front end, server, code health) found where the time goes. The work was split into branches

@@ -33,8 +33,10 @@ export type ReplayLayerApi = {
   look: (id: string) => Look | null;
   /** True while the tracer is drawn (a replay or steps, not the footprint): Metro quiets the import lines then. */
   tracing: boolean;
-  /** At the thread's last step while its agent thinks: the marker breathes (MapView keeps drawing). */
+  /** At the thread's last step while its agent thinks. */
   thinking: boolean;
+  /** The last frame drew the replay marker's thinking ring: MapView keeps slow frames coming only then. */
+  ringing: () => boolean;
   /** The player is open (a replay, playing or paused): the arrow keys step through it, not move the map. */
   playable: boolean;
   /** The thread's footprint mode (its files lit, no tracer): MapView frames it. */
@@ -169,6 +171,10 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
   const thinking = useLiveSelector((s) => !!replay && s.attention[replay.sessionId]?.state === "thinking") && active && index >= last;
   const st = useRef<{ active: boolean; thread: Thread | null; index: number; len: number; mode: string; speed: number; live: boolean; thinking: boolean }>({ active, thread, index, len, mode, speed, live, thinking });
   st.current = { active, thread, index, len, mode, speed, live, thinking };
+  // Only a ring actually drawn needs frames: following a live thread, the agent's own marker (agents.tsx, CSS ring)
+  // stands there instead, and before its first move there is no marker at all.
+  const ringDrawn = useRef(false);
+  const ringing = useCallback(() => ringDrawn.current, []);
   const nowRef = useRef<{ x: number; y: number } | null>(null);
   const anim = useRef<Anim>({ x: 0, y: 0, fromX: 0, fromY: 0, t0: -1e9, file: null, lastIndex: -1, beatAt: -1e9, cam: null });
 
@@ -376,6 +382,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
     const s = st.current;
+    ringDrawn.current = false;
     if (!s.active || !s.thread || s.len === 0 || s.mode === "footprint") return;
     const { beats, moves } = s.thread;
     const beat = beats[s.index];
@@ -506,6 +513,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
       ctx.beginPath(); ctx.arc(a.x, a.y, 26 / scale, 0, Math.PI * 2); ctx.fill();
 
       if (s.thinking) { // a slow ring in its colour, swelling and fading, like a live agent's (agents.tsx)
+        ringDrawn.current = true;
         const b = (t % THINK_MS) / THINK_MS;
         ctx.globalAlpha = Math.sin(b * Math.PI) * 0.7 * past;
         ctx.beginPath(); ctx.arc(a.x, a.y, (11 + b * 9) / scale, 0, Math.PI * 2);
@@ -609,7 +617,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
   }, []);
 
   const nowAt = useCallback(() => nowRef.current, []);
-  return { active, thinking, tracing: active && mode !== "footprint", playable, footprintMode: active && mode === "footprint", footprint, touches, readsNow, nowAt, subject, nodeAlpha, look, draw, marks };
+  return { active, thinking, ringing, tracing: active && mode !== "footprint", playable, footprintMode: active && mode === "footprint", footprint, touches, readsNow, nowAt, subject, nodeAlpha, look, draw, marks };
 }
 
 /**

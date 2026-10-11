@@ -2,7 +2,7 @@
 import type { AgentPresence } from "@contract";
 import { clock } from "../lib/live";
 import { along, casing, drawMarker, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs, type RGB } from "./themes";
-import { css, hex, mixRGB } from "./color";
+import { css, hex, mixRGB, same } from "./color";
 
 /** Main threads get the accent (Metro: their own ink line); subagents a colour from the theme's palette, by id. */
 export function agentColor(a: Pick<AgentPresence, "id" | "isSubagent">, accent: string): string {
@@ -82,6 +82,8 @@ const REST_GREY: RGB = [176, 180, 190];   // at rest, the marker's colour turns 
 const REST_MIX = 0.55;
 const rgbOf = (c: string): RGB => (c.startsWith("#") ? hex(c) : ((c.match(/\d+/g) ?? ["0", "0", "0"]).slice(0, 3).map(Number) as RGB));
 const toward = (a: number, b: number, f: number) => (Math.abs(b - a) < 0.01 ? b : a + (b - a) * f);
+const easeRGB = (a: RGB, b: RGB, f: number): RGB =>
+  a.map((v, i) => (Math.abs(b[i] - v) < 0.5 ? b[i] : v + (b[i] - v) * f)) as RGB;
 const WAIT_AMBER = "#f59e0b";
 const WAIT_TEXT = "#9a5800";      // on a light outline
 const WAIT_TEXT_DARK = "#ffc56b"; // on a dark one (Prism, Hologram)
@@ -200,7 +202,7 @@ export function drawAgents(opts: {
       if (a.errorAt && a.errorAt !== st.lastErr) { st.lastErr = a.errorAt; if (Date.now() - Date.parse(a.errorAt) < 10_000) st.errT0 = t; }
       st.lastTs = a.ts; st.seeded = true;
       if (st.seen.size > 200) st.seen = new Set([...st.seen].slice(-60));
-      if (st.alpha < 0.01) return;
+      if (st.alpha < 0.01) { st.easing = false; return; }
 
       const erring = t - st.errT0 < ERR_MS;
       const color = erring ? ERROR_RED : agentColor(a, accent);
@@ -209,11 +211,13 @@ export function drawAgents(opts: {
       const want = resting ? mixRGB(rgbOf(color), REST_GREY, REST_MIX) : rgbOf(color);
       const f = 1 - Math.exp(-Math.min(0.1, Math.max(0, (t - (st.easeT ?? t)) / 1000)) / STATE_EASE);
       st.easeT = t;
-      st.col = st.col ? (mixRGB(st.col, want, f) as RGB) : want;
+      // Eased in fractions and rounded only for the CSS string: rounding each frame would stall a channel a few
+      // units short of its target (the step is ~0.1 at 60 fps), and the map would keep redrawing for nothing.
+      st.col = st.col ? easeRGB(st.col, want, f) : want;
       st.thinkA = toward(st.thinkA ?? (thinks ? 1 : 0), thinks ? 1 : 0, f);
       st.waitA = toward(st.waitA ?? (waiting?.has(a.id) ? 1 : 0), waiting?.has(a.id) ? 1 : 0, f);
-      st.easing = st.col.some((v, i) => Math.abs(v - want[i]) > 1) || (st.thinkA > 0 && st.thinkA < 1) || (st.waitA > 0 && st.waitA < 1);
-      const markCss = css(st.col);
+      st.easing = !same(st.col, want) || (st.thinkA > 0 && st.thinkA < 1) || (st.waitA > 0 && st.waitA < 1);
+      const markCss = css(st.col.map(Math.round) as RGB);
 
       // Trail through the last distinct files it wrote, newest strongest.
       const files: string[] = [];

@@ -465,7 +465,7 @@ export function MapView() {
     lastLookSum.current = F.lookSum;
     const am = agentsMoving(F.t);
     if (am === Motion.Smooth || (replayRef.current.tracing && replayRef.current.active && playingRef.current)) moreMotion(F, Motion.Smooth);
-    else if (replayRef.current.thinking && replayRef.current.tracing) moreMotion(F, Motion.Slow);   // the replay marker's thinking ring
+    else if (replayRef.current.ringing()) moreMotion(F, Motion.Slow);   // the replay marker's thinking ring, when it was drawn
     redraw.drew(F.motion);
   }, [drawModules, drawAgentLayer, redraw]);
 

@@ -1,7 +1,7 @@
 // Pick a workspace, then a loading checklist while Rundown reads the code and connects to Claude Code.
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { SetupStatus, SetupStep, WorkspaceConflict, WorkspaceSuggestion } from "@contract";
-import { clock, useLive } from "../lib/live";
+import { clock, useLiveSelector } from "../lib/live";
 import { ApiError, errorWords, get, post } from "../lib/api";
 import { relTime } from "../follow/format";
 import { Logo } from "../Logo";
@@ -45,7 +45,7 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const now = clock();
-  const missing = useLive().state.setup?.missing; // the open project's folder went away
+  const missing = useLiveSelector((s) => s.setup?.missing); // the open project's folder went away
 
   useEffect(() => { getSuggestions().then(setList).catch(() => setList([])); }, []);
   useEffect(() => { inputRef.current?.focus(); }, []);
@@ -220,7 +220,7 @@ function Loading({ status, root, onDone, onBack }: { status: SetupStatus | null;
 /** `onPicking`: told when the checklist starts and ends, so the app keeps this screen up through it (the server
  * announces the new project before the person presses "Open Rundown"). */
 export function SetupView({ onDone, onCancel, onPicking }: { onDone: () => void; onCancel?: () => void; onPicking?: (on: boolean) => void }) {
-  const { state } = useLive();
+  const setup = useLiveSelector((s) => s.setup);
   const [phase, setPhase] = useState<"pick" | "loading">("pick");
   const [root, setRoot] = useState("");
   const [status, setStatus] = useState<SetupStatus | null>(null);
@@ -232,7 +232,7 @@ export function SetupView({ onDone, onCancel, onPicking }: { onDone: () => void;
     const t = setInterval(() => { getStatus().then((s) => { if (alive && s) setStatus(s); }); }, 700);
     return () => { alive = false; clearInterval(t); };
   }, [phase]);
-  useEffect(() => { if (phase === "loading" && state.setup?.root && state.setup.root === status?.root) setStatus(state.setup); }, [state.setup, phase, status?.root]);
+  useEffect(() => { if (phase === "loading" && setup?.root && setup.root === status?.root) setStatus(setup); }, [setup, phase, status?.root]);
 
   return (
     <div className="su-root">

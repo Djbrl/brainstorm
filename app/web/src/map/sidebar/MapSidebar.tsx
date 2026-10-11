@@ -15,7 +15,7 @@
 // state and the step it's on (NowCard), except on a phone.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { AgentPresence, FileNode, ProjectMap } from "@contract";
-import { useNav } from "../../lib/nav";
+import { useNavActions, useNavState } from "../../lib/nav";
 import { ThreadsPanel } from "./ThreadsPanel";
 import { TrackPanel } from "./TrackPanel";
 import { FilesPanel } from "./FilesPanel";
@@ -56,7 +56,8 @@ const pipRange = (h: number) => ({ lo: Math.max(PIP_MIN, (TOP_PX / Math.max(1, h
 const PIP_START = 50;   // each page load starts the sheet at the middle (its height isn't remembered)
 
 export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, map, file, picked, onCloseFile }: MapSidebarProps) {
-  const { replay, file: fileLink, step: openStep, closeStep } = useNav();
+  const { replay, file: fileLink, step: openStep } = useNavState();
+  const { closeStep } = useNavActions();
   // A file link opens on Files, a thread link on the thread.
   const [tab, setTab] = useState<Tab>(() => (fileLink ? "files" : replay ? "threads" : loadTab()));
   // Threads with a thread open: the thread, or (after its back arrow) the list.

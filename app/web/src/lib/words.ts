@@ -7,7 +7,7 @@
 // - "worked X": active time, pauses over 30 minutes left out (lib/chapters activeMs).
 import { useEffect, useMemo } from "react";
 import type { ProjectMap, Step } from "@contract";
-import { useLive } from "./live";
+import { useLiveActions, useLiveSelector } from "./live";
 import { isVisible } from "../follow/format";
 import { BREAK_MS, stepTime, worked } from "./chapters";
 import { actionOf, onlyRelabelled } from "./thread";
@@ -147,10 +147,11 @@ export function threadNumbers(steps: Step[], map: ProjectMap | null): ThreadNumb
 
 /** A thread's numbers, from its steps (loaded if needed). Null until the steps are in. */
 export function useThreadNumbers(sessionId: string | null): ThreadNumbers | null {
-  const { state, loadSteps } = useLive();
-  const steps = sessionId ? state.steps[sessionId] : undefined;
+  const { loadSteps } = useLiveActions();
+  const steps = useLiveSelector((s) => (sessionId ? s.steps[sessionId] : undefined));
+  const map = useLiveSelector((s) => s.map);
   useEffect(() => { if (sessionId && !steps) loadSteps(sessionId); }, [sessionId, steps, loadSteps]);
-  return useMemo(() => (steps ? threadNumbers(steps, state.map) : null), [steps, state.map]);
+  return useMemo(() => (steps ? threadNumbers(steps, map) : null), [steps, map]);
 }
 
 /** "Changed 16 files (15 new)", "Changed no files". */

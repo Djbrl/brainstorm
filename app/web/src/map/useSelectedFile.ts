@@ -2,7 +2,7 @@
 // thread is open), so a reload or a shared link opens it with the camera on it. Its details show in the sidebar's
 // Files tab (sidebar/FileView.tsx).
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNav } from "../lib/nav";
+import { useNavActions, useNavSelector } from "../lib/nav";
 
 export const relPath = (p: string, root: string) => (root && p.startsWith(root) ? p.slice(root.length).replace(/^\/+/, "") : p);
 
@@ -13,7 +13,8 @@ export const relPath = (p: string, root: string) => (root && p.startsWith(root) 
  * doesn't move it.
  */
 export function useSelectedFile(root: string): [string | null, (path: string | null) => void, number] {
-  const { file, selectFile, setFocusFile } = useNav();
+  const file = useNavSelector((d) => d.file);
+  const { selectFile, setFocusFile } = useNavActions();
   const full = file && (file.startsWith("/") ? file : root ? `${root.replace(/\/+$/, "")}/${file}` : null);
   const shown = useRef<string | null>(null); // the file the map already shows (selected there)
   const [picks, setPicks] = useState(0);

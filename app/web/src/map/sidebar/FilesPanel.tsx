@@ -3,7 +3,7 @@
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from "react";
 import type { ProjectMap } from "@contract";
 import { clock, useLiveSelector } from "../../lib/live";
-import { useNav } from "../../lib/nav";
+import { useNavState } from "../../lib/nav";
 import { useThread } from "../../lib/thread";
 import { repoBase } from "../../lib/paths";
 import { buildTree, filterTree, flattenTree, refreshLeaves, samePaths, type BuiltTree } from "./fileTree";
@@ -38,7 +38,7 @@ export function FilesPanel({ map, onFocusFile, hidden = false }: {
 }) {
   useNow(20000);
   const now = clock();
-  const { replay } = useNav();
+  const { replay } = useNavState();
   const shared = useLiveSelector((s) => !!s.shared);
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
   const [search, setSearch] = useState("");

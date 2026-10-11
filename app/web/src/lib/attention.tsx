@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Attention, AttentionState } from "@contract";
 import { EDIT_TOOLS } from "@shared/tools";
-import { useLive } from "./live";
+import { useLiveSelector } from "./live";
 import { isCodex } from "./harness";
 import { readStored, writeStored } from "./store";
 
@@ -58,19 +58,20 @@ export function useNotifyPref() {
  * (or finishes its turn) while this tab isn't in front.
  */
 export function useAttentionAlerts(onOpen: (sessionId: string) => void) {
-  const { state } = useLive();
+  const attention = useLiveSelector((s) => s.attention);
+  const sessions = useLiveSelector((s) => s.sessions);
   const seen = useRef(new Map<string, string>());
   const openRef = useRef(onOpen); openRef.current = onOpen;
 
-  const waiting = Object.values(state.attention).filter(needsYou);
+  const waiting = Object.values(attention).filter(needsYou);
   useEffect(() => {
     const base = document.title.replace(/^\(\d+\) /, "");
     document.title = waiting.length ? `(${waiting.length}) ${base}` : base;
   }, [waiting.length]);
 
   useEffect(() => {
-    const titles = new Map(state.sessions.map((s) => [s.id, `${s.title || "A thread"}${isCodex(s) ? " (Codex)" : ""}`]));
-    for (const a of Object.values(state.attention)) {
+    const titles = new Map(sessions.map((s) => [s.id, `${s.title || "A thread"}${isCodex(s) ? " (Codex)" : ""}`]));
+    for (const a of Object.values(attention)) {
       const key = `${a.state}|${a.since}`;
       if (seen.current.get(a.sessionId) === key) continue;
       seen.current.set(a.sessionId, key);
@@ -81,5 +82,5 @@ export function useAttentionAlerts(onOpen: (sessionId: string) => void) {
       const n = new Notification(`${titles.get(a.sessionId)}: ${t.title}`, { body: a.detail ? `${t.line}\n${a.detail}` : t.line, tag: `rundown-${a.sessionId}` });
       n.onclick = () => { window.focus(); openRef.current(a.sessionId); n.close(); };
     }
-  }, [state.attention, state.sessions]);
+  }, [attention, sessions]);
 }

@@ -8,7 +8,7 @@ import { useEffect, useMemo } from "react";
 import type { Step } from "@contract";
 import { isErrorResult } from "@shared/failed";
 import { READ_TOOLS, SEARCH_TOOLS, SUBAGENT_TOOLS } from "@shared/tools";
-import { useLive } from "./live";
+import { useLiveActions, useLiveSelector } from "./live";
 import { stepsOf, useAgentFocus } from "./agentFocus";
 import { makeFileResolver, type FileResolver } from "./paths";
 import { islandPath, isOutside, knownRoots, projectOf, visitorHome } from "./islands";
@@ -432,17 +432,17 @@ const structureVersion = (state: object) => (state as { structureVersion?: numbe
 
 /** The thread for a session, built against the current map. Loads the session's steps if needed (live app). */
 export function useThread(sessionId: string | null, detail: ReplayDetail = "light"): Thread | null {
-  const { state, loadSteps } = useLive();
-  const all = sessionId ? state.steps[sessionId] : undefined;
+  const { loadSteps } = useLiveActions();
+  const all = useLiveSelector((s) => (sessionId ? s.steps[sessionId] : undefined));
   // One agent on its own (lib/agentFocus.ts): the thread of its steps only, in every view.
   const agent = useAgentFocus(sessionId);
   const steps = all && agent ? stepsOf(all, sessionId!, agent) : all;
   useEffect(() => { if (sessionId && !all) loadSteps(sessionId); }, [sessionId, all, loadSteps]);
   // No session: no resolver (it would index every file of the map for nothing).
-  const map = sessionId ? state.map : null;
-  const version = structureVersion(state);
+  const map = useLiveSelector((s) => (sessionId ? s.map : null));
+  const version = useLiveSelector(structureVersion);
   // A file outside the project resolves to itself: the map shows it on an island (lib/islands.ts, graph.ts).
-  const cwd = sessionId ? state.sessions.find((x) => x.id === sessionId)?.cwd : undefined;
+  const cwd = useLiveSelector((s) => (sessionId ? s.sessions.find((x) => x.id === sessionId)?.cwd : undefined));
   const home = visitorHome(cwd, map);
   const resolve = useMemo(() => withOutside(makeFileResolver(map, version), map, home), [map, version, home]);
   return useMemo(() => (sessionId && steps ? buildThread(sessionId, steps, resolve, detail, agent) : null), [sessionId, steps, resolve, detail, agent]);

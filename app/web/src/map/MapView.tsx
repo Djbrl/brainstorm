@@ -7,8 +7,7 @@ import { sinceMs } from "../lib/visit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-force-graph-2d";
 import type { FileNode, ProjectMap } from "@contract";
-import { useLive } from "../lib/live";
-import { mapPrefs, useNav } from "../lib/nav";
+import { mapPrefs, useNavState, useReplay } from "../lib/nav";
 import { drawAgents, PARK, visibleAgents, type AgentRing } from "./agents";
 import { TOUR_AGENT, tourHidesExtras, useTour } from "../lib/tour";
 import { MapSidebar } from "./sidebar/MapSidebar";
@@ -22,7 +21,7 @@ import { makeFileResolver } from "../lib/paths";
 import { islandPath, isPlaceRoot, useIslands } from "../lib/islands";
 import { enterProject } from "../lib/switcher";
 import { focusAgent, setAgentFocus, useAgentFocus } from "../lib/agentFocus";
-import { useLiveActions } from "../lib/live";
+import { useLiveActions, useLiveSelector } from "../lib/live";
 import { useNavActions } from "../lib/nav";
 import { clearTextWidths, drawQueuedLabels, LabelSpace, type QueuedLabel } from "./labels";
 import { useCamera, type Camera } from "./camera";
@@ -64,24 +63,28 @@ export function relTime(iso: string | undefined, now = clock()): string {
 
 // ---------- view ----------
 export function MapView() {
-  const { state } = useLive();
-  const { focusFile, setFocusFile, hiddenAgents, replay, step, showReads } = useNav();
-  const map = state.map;
+  const map = useLiveSelector((s) => s.map);
+  const sessions = useLiveSelector((s) => s.sessions);
+  const liveAgentsById = useLiveSelector((s) => s.agents);
+  const attention = useLiveSelector((s) => s.attention);
+  const { focusFile, hiddenAgents, step, showReads } = useNavState();
+  const { setFocusFile } = useNavActions();
+  const replay = useReplay();
   const theme = useTheme();
   // ---- the layout (graph.ts): files placed once by folder; laid out again only when files come or go ----
   // perf/web-store's structure counter when the store has it (files or imports added, removed or moved).
-  const sv = (state as unknown as { structureVersion?: number }).structureVersion;
+  const sv = useLiveSelector((s) => s.structureVersion);
   // Files outside the project (another repo an orchestrator edits, a visitor's own project): islands beside the map.
-  const islandSteps = replay ? state.steps[replay.sessionId] : undefined;
+  const islandSteps = useLiveSelector((s) => (replay ? s.steps[replay.sessionId] : undefined));
   // On the overview, only the agents still on the map (working, or seen in the last 10 minutes) keep an island: looked
   // at again every minute, so an agent that went quiet hours ago no longer leaves one beside the map.
   const islandMinute = useNow(60_000);
   const islandAgents = useMemo(() => {
-    const all = Object.values(state.agents ?? {});
+    const all = Object.values(liveAgentsById ?? {});
     return replay ? all.filter((a) => a.sessionId === replay.sessionId) : visibleAgents(all);
-  }, [state.agents, replay?.sessionId, islandMinute]); // eslint-disable-line react-hooks/exhaustive-deps
-  const islandThread = replay ? state.sessions.find((x) => x.id === replay.sessionId) : undefined;
-  const islands = useIslands(map, islandThread, islandSteps, islandAgents, state.sessions);
+  }, [liveAgentsById, replay?.sessionId, islandMinute]); // eslint-disable-line react-hooks/exhaustive-deps
+  const islandThread = replay ? sessions.find((x) => x.id === replay.sessionId) : undefined;
+  const islands = useIslands(map, islandThread, islandSteps, islandAgents, sessions);
   const { graph, tween } = useGraph(map, theme, sv, islands);
   const graphRef = useRef(graph); graphRef.current = graph;
   // ---- folders (fold.ts): open as you zoom; the files you look at, a thread's, an agent's open theirs at any zoom ----
@@ -111,9 +114,9 @@ export function MapView() {
   // ---- live agents ----
   // The tour's example agent (lib/tour.ts) walks the map with the real ones while its step shows.
   const tourAgent = useTour((t) => t.agent);
-  const liveAgents = useMemo(() => (tourAgent ? { ...state.agents, [tourAgent.id]: tourAgent } : state.agents), [state.agents, tourAgent]);
+  const liveAgents = useMemo(() => (tourAgent ? { ...liveAgentsById, [tourAgent.id]: tourAgent } : liveAgentsById), [liveAgentsById, tourAgent]);
   const { agents, drawnAgents, waiting, waitingRef, thinkingRef, agentsRef, anim, moving: agentsMoving, dimmedRef } = useLiveAgents({
-    agents: liveAgents, attention: state.attention, hiddenAgents, threadId: replay?.sessionId ?? null,
+    agents: liveAgents, attention, hiddenAgents, threadId: replay?.sessionId ?? null,
   });
   const hoverRef = useRef(hover); hoverRef.current = hover;
   const selectedRef = useRef(selected); selectedRef.current = selected;
@@ -197,9 +200,9 @@ export function MapView() {
     if (!replay) return;
     const a = id ? agents.find((x) => x.id === id) : undefined;
     if (id && a?.sessionId !== replay.sessionId) return;
-    focusAgent(nav0, { ...replay, live: true }, state.steps[replay.sessionId], id && a?.isSubagent ? id : null);
+    focusAgent(nav0, { ...replay, live: true }, islandSteps, id && a?.isSubagent ? id : null);
     if (id && !replay.live) nav0.setReplayLive(true);
-  }, [replay, agents, state.steps, setFollowId, refollow, nav0]);
+  }, [replay, agents, islandSteps, setFollowId, refollow, nav0]);
 
   // ---- the Readmap (Readmap.tsx; M, in switch/Keys.tsx, shows or hides it) and A: follow the next agent (Shift A, the one before) ----
   const readmap = useReadmap();
@@ -454,7 +457,7 @@ export function MapView() {
   // A replay step: the tracer glides, a read flashes, an edit pulses (up to about a second).
   useEffect(() => { redraw.kick(1300); }, [redraw, replay?.index, replay?.sessionId, replay?.mode]);
   // A new agent position, error or activity: its glide, flash or pulse plays out (drawAgents), the frame keeps them coming.
-  useEffect(() => { redraw.kick(100); }, [redraw, state.agents]);
+  useEffect(() => { redraw.kick(100); }, [redraw, liveAgentsById]);
 
   // Files came or went: the frame keeps coming while the circles that moved glide (stepTween).
   useEffect(() => { if (tween.current) redraw.kick(700); }, [graph, redraw, tween]);
@@ -469,7 +472,7 @@ export function MapView() {
     // (the Files tab shows where it is, with Show in Finder), a folder zoomed into.
     if (isle && !isPlaceRoot(isle.dir!.island!)) {
       const root = isle.dir!.island!;
-      const list = replay ? state.steps[replay.sessionId] ?? [] : [];
+      const list = replay ? islandSteps ?? [] : [];
       let land: string | undefined;
       for (let i = list.length - 1; i >= 0 && !land; i--) { const f = list[i].filePath; if (f && islandPath(f).startsWith(root + "/")) land = list[i].id; }
       enterProject(root, nav, reload, replay?.sessionId, land).catch(() => {});
@@ -478,7 +481,7 @@ export function MapView() {
     if (!g.dir) { setSelected(selectedRef.current === g.id ? null : g.id); return; }   // the selected file again: let go of it
     const x = g.x ?? 0, y = g.y ?? 0, r = g.r;
     camRef.current.frame({ x0: x - r, x1: x + r, y0: y - r, y1: y + r }, { pad: 24, maxZoom: 12 }, 750);
-  }, [setSelected, nav, reload, replay?.sessionId, state.steps]);
+  }, [setSelected, nav, reload, replay?.sessionId, islandSteps]);
   // Pointing and clicking, worked out against where the circles are this frame (graph.ts hitAt), not force-graph's hit
   // map (repainted at most every 0.8 s). A click is a press and release less than 5 px apart: a trackpad's wobble
   // still clicks, a pan doesn't.

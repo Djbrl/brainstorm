@@ -4,7 +4,7 @@
 // newest step until you move off it (then a footer offers the way back), and follows again once you're back on it
 // (App's LiveFollow). Space replays.
 import { useEffect, useRef, useState } from "react";
-import { useNav } from "../../lib/nav";
+import { useNavActions, useNavState } from "../../lib/nav";
 import { useLiveSelector } from "../../lib/live";
 import { focusAgent, useAgentFocus, useThreadAgents } from "../../lib/agentFocus";
 import { useTheme } from "../../lib/theme";
@@ -16,8 +16,8 @@ import { isReplay } from "../../lib/live";
 import { PlaceSteps } from "../../cowork/PlaceSteps";
 
 export function TrackPanel({ onBack }: { onBack?: () => void }) {
-  const nav = useNav();
-  const { replay, lens } = nav;
+  const nav = useNavActions();
+  const { replay, lens } = useNavState();
   const sid = replay?.sessionId;
   const session = useLiveSelector((s) => (sid ? s.sessions.find((x) => x.id === sid) : undefined));
   if (!replay) return null;
@@ -54,8 +54,8 @@ function BackToLive({ onBack }: { onBack: () => void }) {
 
 /** Everyone, or one agent's steps on their own (the map then shows only that agent's files). Only with subagents. */
 function AgentPicker({ title }: { title?: string }) {
-  const nav = useNav();
-  const { replay } = nav;
+  const nav = useNavActions();
+  const { replay } = useNavState();
   const sid = replay?.sessionId ?? null;
   const agents = useThreadAgents(sid);
   const focus = useAgentFocus(sid);

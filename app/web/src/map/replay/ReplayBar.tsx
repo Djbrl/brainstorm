@@ -3,7 +3,7 @@
 // timeline cut by chapter (red where one failed), speed and hide. The step panel follows the cursor (no "Open step"),
 // the camera recenters itself, "Every step" is under the step list.
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { useNav, useNavState, type ReplaySpeed } from "../../lib/nav";
+import { useNavActions, useNavState, useReplay, type ReplaySpeed } from "../../lib/nav";
 import { useThread, type Thread } from "../../lib/thread";
 import { chaptersOf } from "../../lib/chapters";
 import { togglePlay } from "./layer";
@@ -71,7 +71,8 @@ export function ShareMenu({ sessionId, className = "track-share" }: { sessionId:
 type Steps = { at: number; count: number; go: (i: number) => void; noun: string };
 
 function Player({ steps }: { steps?: Steps }) {
-  const { replay, setReplayIndex, setReplayPlaying, setReplaySpeed, setThreadMode } = useNav();
+  const replay = useReplay();
+  const { setReplayIndex, setReplayPlaying, setReplaySpeed, setThreadMode } = useNavActions();
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
   if (!replay) return null;
   const hide = <button className="rp-icon" onClick={() => setThreadMode("steps")} aria-label="Hide the player" title="Hide the player (Esc)">{Icon.close}</button>;

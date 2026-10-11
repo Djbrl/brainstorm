@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import type { AgentPresence, Step } from "@contract";
 import { useLiveSelector } from "./live";
 import { createAtom, useStoreSelector } from "./store";
-import { END, replayCursor, type NavActions, type ThreadReplay } from "./nav";
+import { END, replayCursor, type NavActions, type OpenThread } from "./nav";
 
 type Focus = { sessionId: string; agent: string } | null;
 const focus = createAtom<Focus>(null);
@@ -80,7 +80,7 @@ export function useThreadAgents(sessionId: string | null): ThreadAgent[] {
  * last one. A thread followed live keeps following (now their newest step).
  */
 export function focusAgent(
-  nav: Pick<NavActions, "setReplayDetail" | "landReplay">, replay: ThreadReplay | null, steps: Step[] | undefined, agent: string | null,
+  nav: Pick<NavActions, "setReplayDetail" | "landReplay">, replay: Pick<OpenThread, "sessionId" | "live" | "detail"> | null, steps: Step[] | undefined, agent: string | null,
 ) {
   if (!replay) return;
   const sid = replay.sessionId;

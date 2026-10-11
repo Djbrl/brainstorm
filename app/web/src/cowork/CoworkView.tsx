@@ -4,8 +4,8 @@
 // camera already follows.
 // Clicking a place opens its step in the side panel, the same step view as on the Map and the Track (and the same link: …/places/step/<id>).
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useLive } from "../lib/live";
-import { useNav, useReplayCursor } from "../lib/nav";
+import { useLiveSelector } from "../lib/live";
+import { useNavActions, useNavState, useReplayCursor } from "../lib/nav";
 import { initial } from "../map/agents";
 import { MapSidebar } from "../map/sidebar/MapSidebar";
 import { LensSwitch } from "../map/LensSwitch";
@@ -25,10 +25,13 @@ import "./cowork.css";
 const PLACE_MS = 1100;   // a place's time on the player, at 1×
 
 export function PlacesView() {
-  const { state } = useLive();
-  const { replay, setLens, step: navStep, openStep, closeStep } = useNav();
-  const session = state.sessions.find((s) => s.id === replay?.sessionId);
-  const { data, error } = useCowork(replay?.sessionId ?? null, session?.status === "running", state.connected); // a recording is "connected" once loaded
+  const { replay, step: navStep } = useNavState();
+  const { setLens, openStep, closeStep, setReplayPlaying, setThreadMode } = useNavActions();
+  const session = useLiveSelector((s) => s.sessions.find((x) => x.id === replay?.sessionId));
+  const running = session?.status === "running";
+  const connected = useLiveSelector((s) => s.connected);
+  const agents = useLiveSelector((s) => s.agents), map = useLiveSelector((s) => s.map);
+  const { data, error } = useCowork(replay?.sessionId ?? null, running, connected); // a recording is "connected" once loaded
   const { selected, stepId, highlight, row: pickedRow } = usePlaces();
 
   // The step in the panel is the app's open step, so its link, Back and Esc work as everywhere else. Two one-way
@@ -37,7 +40,6 @@ export function PlacesView() {
   // (…/places/step/<id>), until React gave up ("Maximum update depth exceeded").
   const fromApp = useRef(false);
   const mirror = (p: Parameters<typeof placesStore.set>[0]) => { fromApp.current = true; try { placesStore.set(p); } finally { fromApp.current = false; } };
-  const { setReplayPlaying, setThreadMode } = useNav();
   const navRef = useRef({ replay, openStep, closeStep, setReplayPlaying, setThreadMode });
   navRef.current = { replay, openStep, closeStep, setReplayPlaying, setThreadMode };
   useEffect(() => {
@@ -64,7 +66,7 @@ export function PlacesView() {
   }, [navStep, !!data]);
 
   // The step in the panel, its result, and the other steps in the same place (to step through them).
-  const steps = replay ? state.steps[replay.sessionId] : undefined;
+  const steps = useLiveSelector((s) => (replay ? s.steps[replay.sessionId] : undefined));
   const results = useMemo(() => pairResults(steps ?? []), [steps]);
   const step = stepId ? steps?.find((s) => s.id === stepId) : undefined;
   const here = data && selected ? [...new Set(eventsAt(data, selected).map((e) => e.stepId))] : [];
@@ -122,7 +124,7 @@ export function PlacesView() {
           until={pickedRow && pickedRow.beat === timeline.index ? pickedRow.event : undefined} live={!!replay?.live}
           letter={initial({ name: session?.title ?? "", isSubagent: false })} />
       )}
-      <MapSidebar agents={Object.values(state.agents)} accent="#2563eb" followId={null} onFollow={() => setLens("map")} onFocusFile={() => setLens("map")} map={state.map} />
+      <MapSidebar agents={Object.values(agents)} accent="#2563eb" followId={null} onFollow={() => setLens("map")} onFocusFile={() => setLens("map")} map={map} />
       <LensSwitch />
       {data && rows.length > 0 && <Dock steps={{ at, count: rows.length, go, noun: "place" }} />}
       {!replay && <p className="cw-note">Pick a thread to see where it went outside the code.</p>}

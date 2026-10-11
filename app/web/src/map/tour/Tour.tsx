@@ -6,8 +6,8 @@
 // The usage-stats question is its last step. A step with nothing to show (no thread yet, no Readmap on a phone) is left out.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { AgentPresence, FileNode, Step } from "@contract";
-import { useLive } from "../../lib/live";
-import { END, useNav } from "../../lib/nav";
+import { useLiveActions, useLiveSelector } from "../../lib/live";
+import { END, useNavActions, useNavState } from "../../lib/nav";
 import { PRIVACY_URL, useUsageSetting } from "../../lib/usage";
 import { TOUR_AGENT, tourStore, useTour, type TourStep } from "../../lib/tour";
 import { getReadmap } from "../prefs";
@@ -20,13 +20,16 @@ const WALK_MS = 1500;    // the example agent's pace
 
 export function Tour() {
   const step = useTour((t) => t.step);
-  const { state, loadSteps } = useLive();
-  const nav = useNav();
+  const { loadSteps } = useLiveActions();
+  const sessions = useLiveSelector((s) => s.sessions);
+  const actions = useNavActions();
+  const { replay, lens } = useNavState();
+  const nav = { ...actions, replay, lens };
   const usage = useUsageSetting();
   useEffect(() => { tourStore.load(); }, []);
 
-  const latest = useMemo(() => [...state.sessions].sort((a, b) => b.lastEventAt.localeCompare(a.lastEventAt))[0], [state.sessions]);
-  const steps = latest ? state.steps[latest.id] : undefined;
+  const latest = useMemo(() => [...sessions].sort((a, b) => b.lastEventAt.localeCompare(a.lastEventAt))[0], [sessions]);
+  const steps = useLiveSelector((s) => (latest ? s.steps[latest.id] : undefined));
   useEffect(() => { if (step && latest && !steps) loadSteps(latest.id); }, [step, latest?.id, !!steps]);
   // The step to open: its newest edit, else its newest call.
   const shown: Step | undefined = useMemo(() => {
@@ -83,7 +86,7 @@ export function Tour() {
   }, [step]);
 
   // ---- the example agent, on the map step: reads one file, edits two, again and again ----
-  const files = state.map?.files;
+  const files = useLiveSelector((s) => s.map?.files);
   useEffect(() => {
     if (step !== "map" || !files?.length) { if (tourStore.get().agent) tourStore.setAgent(null); return; }
     const walk = pickWalk(files);
@@ -118,7 +121,7 @@ export function Tour() {
   }, [!!step]);
 
   if (!step) return null;
-  const card = cardFor(step, { threads: state.sessions.length, title: latest?.title });
+  const card = cardFor(step, { threads: sessions.length, title: latest?.title });
   const last = at === order.length - 1;
   return (
     <TourCard key={step} card={card} index={at} count={order.length}

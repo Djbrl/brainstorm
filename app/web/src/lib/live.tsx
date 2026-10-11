@@ -12,13 +12,11 @@
 // A thread's steps are fetched once, then kept up to date by "step" messages; history the server stores without
 // sending it step by step ("steps-stored", and every loaded thread after a reconnect) is fetched with ?afterSeq=.
 //   useLiveStep(stepId)                       one step by id, without scanning a thread.
-//   useLive()                                 { state, loadSteps, reload }: the whole state, renders on every change.
-// Migrating a component: replace `const { state } = useLive()` with one useLiveSelector per thing it reads (or one
-// shallowEqual object). Selectors must not build new arrays/objects each call unless eq handles it. `state.map` is a
+// Selectors must not build new arrays/objects each call unless eq handles it. `state.map` is a
 // new object whenever any file changes (recency, active thread); for work that only depends on which files exist
 // (layout, path resolvers, the file tree) key memos on `state.structureVersion` instead.
 import { installSetupShim, startAgentPlayback } from "./preview";
-import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AgentPresence, Attention, AskRequest, AskResponse, Edge, Harness, LiveToken, SetupStatus, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
 import { harnessOf, withHarness } from "./harness";
 import { listeners, shallowEqual, useStoreSelector } from "./store";
@@ -505,9 +503,3 @@ export function useLiveStep(stepId: string | null | undefined): Step | undefined
   return useStoreSelector(store, () => (stepId ? store.stepOf(stepId) : undefined));
 }
 
-/** The whole state: renders on every change. Prefer useLiveSelector in new code. */
-export function useLive() {
-  const store = useStore();
-  const state = useSyncExternalStore(store.subscribe, store.get, store.get);
-  return useMemo(() => ({ state, loadSteps: store.loadSteps, reload: store.reload }), [state, store]);
-}

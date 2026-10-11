@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Step } from "@contract";
 import { Markdown } from "../../ask/Markdown";
-import { useNav } from "../../lib/nav";
+import { useNavActions } from "../../lib/nav";
 import { highlightLines, langOf, renderPieces, useGrammar, usePalette } from "../../lib/highlight";
 import { basename, displayLabel } from "../format";
 import { JsonView } from "./JsonView";
@@ -165,7 +165,7 @@ export function Code({ start, lines, path }: { start: number; lines: string[]; p
 }
 
 function ReadView({ input, result }: { input: Input; result?: Step }) {
-  const { openFile } = useNav();
+  const { openFile } = useNavActions();
   const path = str(input.file_path) ?? str(input.path) ?? "";
   const text = cleanResult(result?.text ?? "");
   const numbered = parseNumbered(text);
@@ -188,7 +188,7 @@ function ReadView({ input, result }: { input: Input; result?: Step }) {
 }
 
 function SearchFiles({ input, result }: { input: Input; result?: Step }) {
-  const { openFile } = useNav();
+  const { openFile } = useNavActions();
   const text = cleanResult(result?.text ?? "");
   const lines = text.split("\n").filter(Boolean);
   const head = /^Found \d+ (files?|matches?|lines?)/.test(lines[0] ?? "") ? lines.shift() : undefined;

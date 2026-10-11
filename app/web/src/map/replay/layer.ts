@@ -3,7 +3,7 @@
 // tab's scroll, the arrow keys and the player's slider.
 import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react";
 import type { ForceGraphMethods } from "react-force-graph-2d";
-import { mapPrefs, replayCursor, useNav } from "../../lib/nav";
+import { mapPrefs, replayCursor, useNavActions, useReplay } from "../../lib/nav";
 import { useThread, type Thread } from "../../lib/thread";
 import { useLiveSelector } from "../../lib/live";
 import { replayCamera } from "./store";
@@ -144,7 +144,8 @@ export function useReplayLayer({ fg, nodeIndexRef, accent, font, camera, liveSho
    *  beside it (the past, under the agent now), at full strength only without it. */
   liveShown?: RefObject<boolean>;
 }): ReplayLayerApi {
-  const { replay, setReplayIndex, setReplayPlaying, landReplay } = useNav();
+  const replay = useReplay();
+  const { setReplayIndex, setReplayPlaying, landReplay } = useNavActions();
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
   const active = !!replay && !!thread && thread.sessionId === replay.sessionId && thread.detail === replay.detail;
   // A thread opens on its steps. The keys and the wheel drive the replay only once it plays.

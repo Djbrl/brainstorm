@@ -6,8 +6,8 @@
 // The eye in the title row shows or hides all its agents.
 import { useState } from "react";
 import type { AgentPresence, Session } from "@contract";
-import { clock, useLive } from "../../lib/live";
-import { END, useNav } from "../../lib/nav";
+import { clock, useLiveSelector } from "../../lib/live";
+import { END, useNavActions, useNavState } from "../../lib/nav";
 import { track } from "../../lib/usage";
 import { relTime } from "../../follow/format";
 import { agentColor, baseName, initial, inkOn, shortName, verbIng } from "../agents";
@@ -41,8 +41,10 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
 }) {
   useNow(5000);
   const now = clock();
-  const { state } = useLive();
-  const { replay, hiddenAgents, toggleAgent, setHiddenAgents, startReplay } = useNav();
+  const allSessions = useLiveSelector((s) => s.sessions);
+  const map = useLiveSelector((s) => s.map);
+  const { replay, hiddenAgents } = useNavState();
+  const { toggleAgent, setHiddenAgents, startReplay } = useNavActions();
   const [all, setAll] = useState(false);
   // Sections you folded, remembered in this browser.
   const [closed, setClosed] = useState<ReadonlySet<string>>(() => new Set(readStoredJson<string[]>(FOLDED_KEY, [])));
@@ -52,7 +54,7 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
     return n;
   });
 
-  const sessions = [...state.sessions].sort((a, b) => {
+  const sessions = [...allSessions].sort((a, b) => {
     const running = (a.status === "running" ? 0 : 1) - (b.status === "running" ? 0 : 1);
     return running !== 0 ? running : b.lastEventAt.localeCompare(a.lastEventAt);
   });
@@ -77,7 +79,7 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
   // Threads of other projects share one group; each row names its project where the time would be.
   const projectOf = new Map<string, string>();
   for (const x of sessions) {
-    const home = visitorHome(x.home ?? x.cwd, state.map);
+    const home = visitorHome(x.home ?? x.cwd, map);
     if (home) { projectOf.set(x.id, home.slice(home.lastIndexOf("/") + 1)); add("other", "Other projects", x); }
     else add(harnessOf(x), "", x);
   }
@@ -148,7 +150,7 @@ function ThreadRow({ session, selected, agents, accent, followId, onFollow, onFo
   const ids = sorted.map((a) => a.id);
   const allHidden = ids.length > 0 && ids.every((id) => hiddenAgents.has(id));
   const toggleAll = () => setHiddenAgents(allHidden ? [...hiddenAgents].filter((id) => !ids.includes(id)) : [...hiddenAgents, ...ids]);
-  const attention = useLive().state.attention[session.id];
+  const attention = useLiveSelector((s) => s.attention[session.id]);
   const blocked = needsYou(attention), turn = yourTurn(attention);
   const say = attention && (blocked || turn) ? attentionText(attention) : null;
   return (

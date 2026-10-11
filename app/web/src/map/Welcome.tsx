@@ -1,22 +1,23 @@
 // The first visit: one card that says what you're looking at, and one choice. Nothing plays until you
 // ask for it. Shown once per browser (and on the hosted demo, once per visitor).
 import { useRef, useState } from "react";
-import { isReplay, useLive } from "../lib/live";
-import { useNav } from "../lib/nav";
+import { isReplay, useLiveSelector } from "../lib/live";
+import { useNavActions } from "../lib/nav";
 import { useDialogFocus } from "../lib/useDialogFocus";
 import { markWelcomed, welcomed } from "../lib/visit";
 import "./welcome.css";
 
 export function Welcome() {
-  const { state } = useLive();
-  const { startReplay, setReplayPlaying } = useNav();
+  const sessions = useLiveSelector((s) => s.sessions);
+  const hasMap = useLiveSelector((s) => !!s.map);
+  const { startReplay, setReplayPlaying } = useNavActions();
   const [open, setOpen] = useState(() => !welcomed());
-  const latest = [...state.sessions].sort((a, b) => b.lastEventAt.localeCompare(a.lastEventAt))[0];
+  const latest = [...sessions].sort((a, b) => b.lastEventAt.localeCompare(a.lastEventAt))[0];
   const close = () => { markWelcomed(); setOpen(false); };
   // The card has the keyboard while it shows: its first button has the focus, Tab stays on its buttons, Esc looks around.
   const card = useRef<HTMLDivElement>(null);
-  useDialogFocus(card, close, open && !!state.map);
-  if (!open || !state.map) return null;
+  useDialogFocus(card, close, open && hasMap);
+  if (!open || !hasMap) return null;
   const watch = () => {
     close();
     if (!latest) return;

@@ -17,10 +17,8 @@
 //                             its `replay` has no `index`/`playing`. Moving through a replay doesn't re-render you.
 //   useReplayCursor(sel?)     the cursor { index, playing }, or a slice of it (e.g. c => c.index === 0).
 //   useNavSelector(sel, eq?)  any slice of the raw state.
-//   useNav()                  all of it in the old shape: renders again on every change, the cursor included.
-// Migrating a component: split `const { replay, startReplay } = useNav()` into useNavState() + useNavActions(), and
-// read `index`/`playing` with useReplayCursor only where they're drawn (ideally a small child component).
-import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+//   useReplay()               the open thread with its cursor: renders again as the cursor moves (the views that draw it).
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { ReplayDetail } from "./thread";
 import { listeners, readStored, readStoredJson, shallowEqual, useStoreSelector, writeStored } from "./store";
 
@@ -348,13 +346,12 @@ export function useReplayCursor<T>(select: (c: ReplayCursor) => T = wholeCursor 
   return useStoreSelector(useStore(), (d) => select(d.cursor), eq);
 }
 
-/** Everything, in one object: renders again on every change, the replay cursor included. Prefer the narrower hooks above. */
-export function useNav(): Nav {
+/** The open thread with its cursor (index, playing), or null: renders again as the cursor moves. For the views that
+ * draw the cursor (the map's replay layer, the player). */
+export function useReplay(): ThreadReplay | null {
   const store = useStore();
-  const d = useSyncExternalStore(store.subscribe, store.get, store.get);
-  const replay = useMemo(() => joinReplay(d.thread, d.cursor), [d.thread, d.cursor]);
-  return useMemo(() => ({
-    ...store.actions,
-    focusFile: d.focusFile, file: d.file, step: d.step, lens: d.lens, hiddenAgents: d.hiddenAgents, showReads: d.showReads, replay,
-  }), [store, d, replay]);
+  const thread = useStoreSelector(store, (d) => d.thread);
+  const cursor = useStoreSelector(store, (d) => d.cursor);
+  return useMemo(() => joinReplay(thread, cursor), [thread, cursor]);
 }
+

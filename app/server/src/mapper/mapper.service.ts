@@ -129,7 +129,8 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     // Build + watch the default root right away (in the background) so live updates and the reader have something to work with.
     const root = resolve(this.cfg.defaultRoot);
     this.activeRoot = root;
-    this.ensure(root).then((c) => { if (this.activeRoot === root) this.startWatch(root, c); }).catch((e) => this.log.warn(`map build failed for ${root}: ${(e as Error).message}`));
+    // No project chosen yet (the plugin's placeholder doesn't exist): nothing to build or watch until one is.
+    if (existsSync(root)) this.ensure(root).then((c) => { if (this.activeRoot === root) this.startWatch(root, c); }).catch((e) => this.log.warn(`map build failed for ${root}: ${(e as Error).message}`));
     this.bus.on("file-touched", ({ path, sessionId, ts }) => this.onFileTouched(this.cfg.defaultRoot, path, sessionId, ts));
     this.bus.on("workspace", ({ root }) => { this.switchRoot(root).catch((e) => this.log.warn(`switching the map to ${root} failed: ${(e as Error).message}`)); });
   }

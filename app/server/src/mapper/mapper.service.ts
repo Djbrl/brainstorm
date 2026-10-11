@@ -98,9 +98,53 @@ const JS_IMPORTS = [
 ];
 export function jsImports(content: string): string[] {
   const specs: string[] = [];
-  for (const re of JS_IMPORTS) for (const m of content.matchAll(re)) specs.push(m[1]);
+  const code = stripComments(content, "c");
+  for (const re of JS_IMPORTS) for (const m of code.matchAll(re)) specs.push(m[1]);
   return specs;
 }
+
+/**
+ * The text with its comments blanked out (newlines kept, so line-anchored patterns still work), strings left alone: an
+ * import in a comment or a docstring isn't an edge. "c": // and /* *\/ (JS, TS, Go, Java, C); "rust": the same, with
+ * ' left alone (lifetimes); "py": # and triple-quoted strings. One pass, linear. A quote never runs past its line
+ * (except a backtick or a triple quote), so an apostrophe in JSX text can't hide the rest of the file.
+ */
+export function stripComments(src: string, lang: "c" | "rust" | "py"): string {
+  let out = "";
+  let i = 0, from = 0;
+  const n = src.length;
+  const blank = (a: number, b: number) => { out += src.slice(from, a) + src.slice(a, b).replace(/[^\n]/g, " "); from = b; };
+  while (i < n) {
+    const ch = src[i];
+    if (lang === "py" && (src.startsWith('"""', i) || src.startsWith("'''", i))) {
+      const end = src.indexOf(src.slice(i, i + 3), i + 3);
+      const stop = end === -1 ? n : end + 3;
+      blank(i, stop); i = stop; continue;
+    }
+    if (lang === "py" ? ch === "#" : ch === "/" && src[i + 1] === "/") {
+      let end = src.indexOf("\n", i); if (end === -1) end = n;
+      blank(i, end); i = end; continue;
+    }
+    if (lang !== "py" && ch === "/" && src[i + 1] === "*") {
+      const end = src.indexOf("*/", i + 2);
+      const stop = end === -1 ? n : end + 2;
+      blank(i, stop); i = stop; continue;
+    }
+    if (ch === '"' || ch === "`" || (ch === "'" && lang !== "rust")) {
+      i++;
+      while (i < n && src[i] !== ch && (ch === "`" || src[i] !== "\n")) i += src[i] === "\\" ? 2 : 1;
+      i++; continue;
+    }
+    i++;
+  }
+  return out + src.slice(from);
+}
+
+/** A tsconfig's (or jsconfig's) import aliases: where its `paths` and `baseUrl` point. */
+type TsAliases = { base: string; paths: [prefix: string, suffix: string, targets: string[]][]; hasBaseUrl: boolean };
+const TS_EXT = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".vue", ".svelte"];
+/** `./x.js` written in TypeScript (NodeNext) means x.ts: the source a compiled name stands for. */
+const COMPILED_TO_SOURCE: Record<string, string[]> = { ".js": [".ts", ".tsx"], ".jsx": [".tsx"], ".mjs": [".mts"], ".cjs": [".cts"] };
 
 /** The map's ignore rule for a project: a git repo's .gitignore'd folders (plus .git and caches), else the name list. */
 const skipped = (rel: string, ignoredDirs?: Set<string>) => (ignoredDirs ? isInIgnoredDir(rel, true) || inIgnoredFolder(rel, ignoredDirs) : isInIgnoredDir(rel));
@@ -118,6 +162,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
   /** Per file set: Java files by package path ("com/acme/Foo.java" → abs paths), Go files by folder. Dropped when the set changes. */
   private indexes = new WeakMap<Set<string>, { java: Map<string, string[]>; goDirs: Map<string, string[]>; headers: Map<string, string[]> }>();
   private goModules = new Map<string, { dir: string; module: string } | null>(); // folder → nearest go.mod
+  private tsconfigs = new Map<string, TsAliases | null>(); // folder → nearest tsconfig's aliases
   private live?: Live;
   /** Files shown as being worked on, by path: the timer that clears it after 60 s, and the node it was set on. */
   private activeClearTimers = new Map<string, { timer: NodeJS.Timeout; node: FileNode }>();
@@ -337,6 +382,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
       if (key === abs || key === this.activeRoot) continue;
       this.cache.delete(key);
       for (const dir of this.goModules.keys()) if (dir === key || dir.startsWith(key + sep)) this.goModules.delete(dir);
+      for (const dir of this.tsconfigs.keys()) if (dir === key || dir.startsWith(key + sep)) this.tsconfigs.delete(dir);
     }
   }
 
@@ -347,11 +393,24 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     if (!content) return specs;
     const ext = extname(file);
     if (ext === ".py") {
-      const reFrom = /^\s*from\s+(\.+[\w.]*)\s+import\b/gm;
+      // from a.b import c, d  /  from . import x  /  from ..pkg import (x, y)  /  import a.b, c as d
+      // Each name after `import` may be a module too (from pkg import sub): tried as "<module>.<name>" as well.
+      const code = stripComments(content, "py");
       let m: RegExpExecArray | null;
-      while ((m = reFrom.exec(content))) specs.push(m[1]);
+      const reFrom = /^[ \t]*from[ \t]+(\.+[\w.]*|[A-Za-z_][\w.]*)[ \t]+import[ \t]+(\([^)]*\)|[^\n]*)/gm;
+      while ((m = reFrom.exec(code))) {
+        specs.push(m[1]);
+        for (const name of m[2].replace(/[()\\]/g, " ").split(",")) {
+          const n = name.trim().split(/\s+/)[0];
+          if (n && n !== "*" && /^\w+$/.test(n)) specs.push(m[1].endsWith(".") ? m[1] + n : `${m[1]}.${n}`);
+        }
+      }
+      const reImport = /^[ \t]*import[ \t]+([\w.]+(?:[ \t]+as[ \t]+\w+)?(?:[ \t]*,[ \t]*[\w.]+(?:[ \t]+as[ \t]+\w+)?)*)/gm;
+      while ((m = reImport.exec(code))) for (const part of m[1].split(",")) specs.push(part.trim().split(/\s+/)[0]);
       return specs;
     }
+    if (JS_EXT.has(ext) || COMPONENT_EXT.has(ext)) return jsImports(content);
+    content = stripComments(content, ext === ".rs" ? "rust" : "c");
     if (ext === ".go") {
       // import "x/y", or a block: import ( "x/y"; alias "x/z" )
       const block = /^\s*import\s*\(([\s\S]*?)\)/gm;
@@ -384,9 +443,6 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
       while ((m = re.exec(content))) specs.push(m[1] !== undefined ? `q:${m[1]}` : `a:${m[2]}`);
       return specs;
     }
-    if (JS_EXT.has(ext) || COMPONENT_EXT.has(ext)) {
-      specs.push(...jsImports(content));
-    }
     return specs;
   }
 
@@ -411,26 +467,70 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
   private resolveOne(fromFile: string, spec: string, fileSet: Set<string>): string | undefined {
     const ext = extname(fromFile);
     if (ext === ".py") {
-      if (!spec.startsWith(".")) return undefined; // package import, ignore
+      const pyFile = (base: string) => [`${base}.py`, join(base, "__init__.py")].find((c) => fileSet.has(c));
+      if (!spec.startsWith(".")) {
+        // Absolute: a/b.py or a/b/__init__.py under the nearest folder above this file that has it (the project root,
+        // src/, a package's own root). The standard library and installed packages aren't project files: no match.
+        const rel = spec.replace(/\./g, sep);
+        for (let d = dirname(fromFile); ; d = dirname(d)) {
+          const hit = pyFile(join(d, rel));
+          if (hit) return hit;
+          if (dirname(d) === d) return undefined;
+        }
+      }
       const dots = spec.match(/^\.+/)?.[0].length ?? 1;
       const rest = spec.slice(dots).replace(/\./g, "/");
       let base = dirname(fromFile);
       for (let i = 1; i < dots; i++) base = dirname(base);
-      const candidateBase = rest ? join(base, rest) : base;
-      for (const cand of [`${candidateBase}.py`, join(candidateBase, "__init__.py")]) {
-        if (fileSet.has(cand)) return cand;
-      }
-      return undefined;
+      return pyFile(rest ? join(base, rest) : base);
     }
-    if (!spec.startsWith(".")) return undefined; // bare package specifier, ignore
-    const base = resolve(dirname(fromFile), spec);
-    const candidates = [
-      base,
-      `${base}.ts`, `${base}.tsx`, `${base}.js`, `${base}.jsx`, `${base}.mjs`, `${base}.cjs`, `${base}.vue`, `${base}.svelte`,
-      join(base, "index.ts"), join(base, "index.tsx"), join(base, "index.js"), join(base, "index.jsx"),
-    ];
-    for (const cand of candidates) if (fileSet.has(cand)) return cand;
+    if (spec.startsWith(".")) return this.jsFile(resolve(dirname(fromFile), spec), fileSet);
+    // A bare specifier: an alias from the nearest tsconfig (paths, baseUrl), else a package (not on the map).
+    const ts = this.tsAliasesFor(dirname(fromFile));
+    if (!ts) return undefined;
+    let best: [string, string, string[]] | undefined;
+    for (const p of ts.paths) {
+      if (spec.length >= p[0].length + p[1].length && spec.startsWith(p[0]) && spec.endsWith(p[1]) && (!best || p[0].length > best[0].length)) best = p;
+    }
+    if (best) {
+      const star = spec.slice(best[0].length, spec.length - best[1].length);
+      for (const target of best[2]) {
+        const hit = this.jsFile(resolve(ts.base, target.replace("*", star)), fileSet);
+        if (hit) return hit;
+      }
+    }
+    return ts.hasBaseUrl ? this.jsFile(resolve(ts.base, spec), fileSet) : undefined;
+  }
+
+  /** The file a JS/TS import of `base` (absolute, maybe without extension) means: itself, with an extension, the TS source of a .js name, or a folder's index. */
+  private jsFile(base: string, fileSet: Set<string>): string | undefined {
+    if (fileSet.has(base)) return base;
+    for (const e of TS_EXT) if (fileSet.has(base + e)) return base + e;
+    const ext = extname(base);
+    for (const e of COMPILED_TO_SOURCE[ext] ?? []) { const c = base.slice(0, -ext.length) + e; if (fileSet.has(c)) return c; }
+    for (const e of [".ts", ".tsx", ".js", ".jsx"]) { const c = join(base, `index${e}`); if (fileSet.has(c)) return c; }
     return undefined;
+  }
+
+  /** The nearest tsconfig.json (or jsconfig.json) above a folder, with its aliases; null when none has any. `extends` is not followed. */
+  private tsAliasesFor(dir: string): TsAliases | null {
+    if (this.tsconfigs.has(dir)) return this.tsconfigs.get(dir)!;
+    let found: TsAliases | null = null;
+    const file = ["tsconfig.json", "jsconfig.json"].map((f) => join(dir, f)).find((f) => existsSync(f));
+    if (file) {
+      try {
+        const json = stripComments(readFileSync(file, "utf8"), "c").replace(/,(\s*[}\]])/g, "$1");
+        const opts = (JSON.parse(json) as { compilerOptions?: { baseUrl?: string; paths?: Record<string, string[]> } }).compilerOptions ?? {};
+        const base = resolve(dir, opts.baseUrl ?? ".");
+        const paths = Object.entries(opts.paths ?? {}).filter(([, t]) => Array.isArray(t)).map(([k, t]): [string, string, string[]] => {
+          const star = k.indexOf("*");
+          return star === -1 ? [k, "", t.map((x) => x.replace("*", ""))] : [k.slice(0, star), k.slice(star + 1), t];
+        });
+        found = paths.length || opts.baseUrl ? { base, paths, hasBaseUrl: !!opts.baseUrl } : null;
+      } catch { found = null; } // unreadable or not JSON: no aliases
+    } else if (dirname(dir) !== dir) found = this.tsAliasesFor(dirname(dir));
+    this.tsconfigs.set(dir, found);
+    return found;
   }
 
   private index(fileSet: Set<string>) {
@@ -717,7 +817,10 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Imports: when files came or went, every file's imports may resolve differently; otherwise only the changed files'.
-    const setChanged = added > 0 || removed.size > 0;
+    // A tsconfig changed: its aliases are read again and every import is resolved again.
+    const configChanged = [...paths].some((p) => /^[tj]sconfig.*\.json$/.test(basename(p)));
+    if (configChanged) this.tsconfigs.clear();
+    const setChanged = added > 0 || removed.size > 0 || configChanged;
     if (setChanged) this.indexes.delete(c.fileSet);
     const edgesChanged = new Set<string>();
     for (const abs of setChanged ? c.specs.keys() : changed) {

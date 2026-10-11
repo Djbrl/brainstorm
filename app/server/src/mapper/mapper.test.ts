@@ -548,3 +548,30 @@ test("a git repo follows .gitignore alone (plus .git and caches): .github, build
   const plain = tempRepo({ "src/a.ts": "", ".github/workflows/ci.yml": "", "build/tool.ts": "" }, false);
   try { assert.deepEqual((await listProjectFiles(plain, 800)).rels, ["src/a.ts"]); } finally { rmSync(plain, { recursive: true, force: true }); }
 });
+
+test("imports: .js names for .ts files, tsconfig paths and baseUrl, Python absolute and package imports, nothing from comments", async () => {
+  const root = tempRepo({
+    "tsconfig.json": '{\n  // aliases\n  "compilerOptions": { "baseUrl": ".", "paths": { "@/*": ["src/*"], "~lib": ["lib/index.ts"], }, },\n}\n',
+    "src/a.ts": "import { b } from './b.js';\nimport { c } from '@/c';\nimport l from '~lib';\nimport u from 'src/util';\nimport r from 'react';\n// import { gone } from './gone';\n/* import { old } from './old'; */\n",
+    "src/b.ts": "export const b = 1;\n", "src/c.tsx": "export const c = 1;\n", "src/util.ts": "", "src/gone.ts": "", "src/old.ts": "",
+    "lib/index.ts": "export default 1;\n",
+    "src/n.tsx": "import { b } from './b.jsx';\nimport { c } from './c.js';\n",
+    "pkg/__init__.py": "", "pkg/core.py": "", "pkg/sub/__init__.py": "", "pkg/sub/tool.py": "",
+    "app.py": 'import pkg.core\nfrom pkg.sub import tool\nimport os, json\n# from pkg import gone\n"""\nfrom pkg import old\n"""\n',
+    "pkg/sub/rel.py": "from .. import core\nfrom . import tool\n",
+    "main.go": "package main\n// import \"x/y\"\n",
+  }, false);
+  const projects = mkdtempSync(join(tmpdir(), "bs-projects-"));
+  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { defaultRoot: root, claudeProjectsDir: projects } as never);
+  try {
+    const map = await svc.getMapAsync(root);
+    const from = (f: string) => map.edges.filter((e) => e.from === join(root, f)).map((e) => e.to.slice(root.length + 1)).sort();
+    assert.deepEqual(from("src/a.ts"), ["lib/index.ts", "src/b.ts", "src/c.tsx", "src/util.ts"]);
+    assert.deepEqual(from("src/n.tsx"), ["src/c.tsx"]); // b.jsx means b.tsx only
+    assert.deepEqual(from("app.py"), ["pkg/core.py", "pkg/sub/__init__.py", "pkg/sub/tool.py"]);
+    assert.deepEqual(from("pkg/sub/rel.py"), ["pkg/__init__.py", "pkg/core.py", "pkg/sub/__init__.py", "pkg/sub/tool.py"]);
+  } finally {
+    svc.onModuleDestroy();
+    rmSync(root, { recursive: true, force: true }); rmSync(projects, { recursive: true, force: true });
+  }
+});

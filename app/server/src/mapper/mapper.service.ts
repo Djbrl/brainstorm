@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from "@nestjs/common";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { deflateRawSync, inflateRawSync } from "node:zlib";
-import { readFile, stat } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import type { Edge, FileNode, ProjectMap, Snapshot } from "../types";
 import { BusService } from "../core/bus.service";
@@ -13,6 +13,7 @@ import { isInIgnoredDir, liveHeadroom, maxFiles, isMappableRel, moduleOf } from 
 import { type Listing, gitIgnored, listFolder, listProjectFiles, listProjectFilesSync } from "./list-files";
 import { type Signals, scoreFrom, selectFiles } from "./select";
 import { gitLastCommitTimes } from "./git-times";
+import { readMapped, readMappedSync } from "./read-file";
 import { Batcher, ProjectWatcher, foldersToWatch } from "./watch";
 
 const JS_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
@@ -33,9 +34,6 @@ const MAP_BROADCAST_OVER = 50;
 const MAP_BROADCAST_GAP_MS = 750;
 /** Files read at once. */
 const IO_CONCURRENCY = 32;
-/** Bigger files are counted (lines) but not searched for imports. */
-const MAX_PARSE_BYTES = 1024 * 1024;
-
 type Read = { abs: string; lines: number; content: string; mtimeMs: number };
 type Cached = {
   map: ProjectMap;
@@ -65,17 +63,6 @@ type Cached = {
 type Live = { root: string; watcher: ProjectWatcher; batch: Batcher<string>; pending: Set<string>; running: boolean; folders: Set<string> };
 
 const posix = (rel: string) => (sep === "/" ? rel : rel.split(sep).join("/"));
-
-function countLines(buf: Buffer): number {
-  if (!buf.length) return 0;
-  let n = 1;
-  for (let i = buf.indexOf(10); i !== -1; i = buf.indexOf(10, i + 1)) n++;
-  return n;
-}
-
-function toRead(abs: string, buf: Buffer, mtimeMs: number): Read {
-  return { abs, lines: countLines(buf), content: buf.length <= MAX_PARSE_BYTES ? buf.toString("utf8") : "", mtimeMs };
-}
 
 /** How long one file may take to read before it's left out of the map. */
 const READ_MS = 2_000;
@@ -212,11 +199,9 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     let unread = 0;
     const readAll = async (rels: string[]) => (await mapLimit(rels, IO_CONCURRENCY, async (rel): Promise<Read | null> => {
       const abs = join(root, rel);
-      try {
-        const got = await within(READ_MS, Promise.all([readFile(abs), stat(abs)]));
-        if (!got) { unread++; return null; }
-        return toRead(abs, got[0], got[1].mtimeMs);
-      } catch { return null; }
+      const got = await within(READ_MS, readMapped(abs, root).then((r) => ({ r })));
+      if (!got) { unread++; return null; }
+      return got.r && { abs, ...got.r };
     })).filter((r): r is Read => !!r);
     const done = (c: Cached) => { if (unread) c.map.unread = unread; return c; };
     if (listing.rels.length <= maxFiles()) return done(this.assemble(root, listing, await readAll(listing.rels), listMs));
@@ -233,7 +218,8 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
       const reads: Read[] = [];
       for (const rel of rels) {
         const abs = join(root, rel);
-        try { reads.push(toRead(abs, readFileSync(abs), statSync(abs).mtimeMs)); } catch { /* gone or unreadable */ }
+        const r = readMappedSync(abs, root); // null: gone, unreadable, too big, or not a file in the project
+        if (r) reads.push({ abs, ...r });
       }
       return reads;
     };
@@ -689,8 +675,10 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     for (const abs of adds) if (!accepted.has(abs)) c.unselected.add(abs); // no room: counted, not shown
     for (const abs of files.keys()) if (!c.byPath.has(abs) && !accepted.has(abs)) files.delete(abs);
 
-    const reads = await mapLimit([...files], IO_CONCURRENCY, async ([abs, mtimeMs]): Promise<Read | null> => {
-      try { return toRead(abs, await readFile(abs), mtimeMs); } catch { if (c.byPath.has(abs)) removed.add(abs); return null; }
+    const reads = await mapLimit([...files.keys()], IO_CONCURRENCY, async (abs): Promise<Read | null> => {
+      const r = await readMapped(abs, root);
+      if (!r) { if (c.byPath.has(abs)) removed.add(abs); return null; }
+      return { abs, ...r };
     });
     if (this.cache.get(root) !== c || this.live !== live) return; // switched away meanwhile
 

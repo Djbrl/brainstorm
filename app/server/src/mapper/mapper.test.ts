@@ -3,7 +3,7 @@
 import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { appendFileSync, mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, closeSync, ftruncateSync, mkdirSync, mkdtempSync, openSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Logger } from "@nestjs/common";
@@ -13,6 +13,7 @@ import { Batcher, foldersToWatch } from "./watch";
 import { GitLogParser } from "./git-times";
 import { listProjectFiles, listProjectFilesSync, parseLsFiles } from "./list-files";
 import { MapperService } from "./mapper.service";
+import { MAX_COUNT_BYTES, readMapped, readMappedSync } from "./read-file";
 import type { WsMessage } from "../types";
 
 Logger.overrideLogger(false);
@@ -370,5 +371,45 @@ test("imports: C/C++ includes (next to the file, then by path suffix, not system
     svc.onModuleDestroy?.();
     rmSync(root, { recursive: true, force: true });
     rmSync(projects, { recursive: true, force: true });
+  }
+});
+
+test("odd files a listing can name: a link to /dev/zero, a link out of the project, a FIFO, a huge sparse dump", { skip: !hasGit || process.platform === "win32" }, async () => {
+  const outside = mkdtempSync(join(tmpdir(), "bs-outside-"));
+  writeFileSync(join(outside, "secret.md"), "# not yours\n");
+  const root = tempRepo({ "src/a.ts": 'import { b } from "./b";\n', "src/b.ts": "export const b = 1;\n", "big.md": "x\n".repeat(600_000) }, false);
+  symlinkSync("/dev/zero", join(root, "src/zero.json"));
+  symlinkSync("/dev/urandom", join(root, "src/rand.md"));
+  symlinkSync(join(outside, "secret.md"), join(root, "src/secret.md"));
+  symlinkSync(join(root, "src/b.ts"), join(root, "src/b-link.ts"));       // stays inside: kept
+  execFileSync("mkfifo", [join(root, "src/pipe.md")]);
+  const fd = openSync(join(root, "dump.sql"), "w"); ftruncateSync(fd, 1536 * 1024 * 1024); closeSync(fd); // 1.5 GB, sparse
+  const g = (...a: string[]) => execFileSync("git", ["-C", root, ...a], { stdio: "ignore", env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
+  g("init", "-q"); g("add", "src", "big.md"); g("commit", "-q", "-m", "init"); // the links committed, as a clone would bring them
+  const projects = mkdtempSync(join(tmpdir(), "bs-projects-"));
+  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { defaultRoot: root, claudeProjectsDir: projects } as never);
+  try {
+    const rss = process.memoryUsage().rss, t0 = Date.now();
+    const map = await svc.getMapAsync(root);
+    const names = map.files.map((f) => f.path.slice(root.length + 1)).sort();
+    assert.deepEqual(names, ["big.md", "src/a.ts", "src/b-link.ts", "src/b.ts"]);
+    assert.equal(map.files.find((f) => f.path.endsWith("big.md"))!.lines, 600_001); // 1.2 MB: counted, not parsed
+    assert.ok(map.edges.some((e) => e.from.endsWith("src/a.ts") && e.to.endsWith("src/b.ts")));
+    assert.ok(Date.now() - t0 < 10_000, "the build finishes");
+    assert.ok(process.memoryUsage().rss - rss < 200 * 1024 * 1024, "memory stays bounded");
+    // The same through the synchronous build and the live path's reader.
+    svc.onModuleDestroy();
+    const sync = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { defaultRoot: root, claudeProjectsDir: projects } as never);
+    try { assert.deepEqual(sync.getMap(root).files.map((f) => f.path.slice(root.length + 1)).sort(), names); } finally { sync.onModuleDestroy(); }
+    for (const f of ["src/zero.json", "src/rand.md", "src/secret.md", "src/pipe.md", "dump.sql", "src/missing.ts"]) {
+      assert.equal(await readMapped(join(root, f), root), null, f);
+      assert.equal(readMappedSync(join(root, f), root), null, f);
+    }
+    assert.ok(MAX_COUNT_BYTES < 1536 * 1024 * 1024);
+    assert.deepEqual(await readMapped(join(root, "src/b-link.ts"), root), readMappedSync(join(root, "src/b-link.ts"), root));
+    assert.equal((await readMapped(join(root, "src/b.ts"), root))!.content, "export const b = 1;\n");
+  } finally {
+    svc.onModuleDestroy();
+    rmSync(root, { recursive: true, force: true }); rmSync(outside, { recursive: true, force: true }); rmSync(projects, { recursive: true, force: true });
   }
 });

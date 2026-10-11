@@ -2,7 +2,7 @@
 
 A live map and replay of what your agents do: every session, every file and place they touch, what broke. Everything runs on your machine.
 
-Preview release (0.4). The full release is planned for late October 2026.
+Preview release (0.8.1). The full release is planned for late October 2026.
 
 - **Map:** your project's files as a graph, with what changed since you last looked. Each agent is a marker that moves to the file it's working on. Open a thread to see what it touched first, then its steps or its replay; a running one can be followed live.
 - **Places:** where the thread went outside the code: websites, your local apps, services like GitHub and Vercel, and what it changed there (pushes, deploys, sent forms). Click a place to read its step.
@@ -57,16 +57,16 @@ Rundown starts in the background when a Claude Code session starts, and reads Cl
 
 ## Settings
 
-- **Anthropic API key (optional):** lets you ask Claude questions about your code. Set it with `/plugin configure rundown@rundown`, then start a new session. Claude Code keeps it in your system's secure credential store. Leave it empty and everything else still works.
+- **Anthropic API key (optional):** lets you ask Claude questions about your code. Set it with `/plugin configure rundown@rundown` (`rundown@brainstorm` if you had it before the rename), then start a new session. Claude Code keeps it in your system's secure credential store. Leave it empty and everything else still works.
 
 Summaries of files and labels written by a model are off in this release. They'll use the Claude Code you already have in a later version.
 
 ## What it stores, and where
 
-- Data: `~/.claude/plugins/data/rundown-rundown/` (a SQLite database, the server log, `server.json`, `notices.json`). Uninstalling the plugin deletes it.
+- Data: `~/.claude/plugins/data/rundown-rundown/` (`rundown-brainstorm` if you installed `rundown@brainstorm`): a SQLite database, the server log, `server.json`, `notices.json`. Uninstalling the plugin deletes it. If Claude Code doesn't set a plugin data folder, Rundown uses `~/.rundown` instead, and that folder stays after you uninstall (delete it yourself to remove your history).
 - Once a day, Rundown fetches its own version number from GitHub to tell you about updates. That request carries nothing about you or your code.
 - Anonymous usage stats, only if you say yes: the app asks once, and until then sends nothing. With a yes, once a day: a random install id, version, OS, map theme and counts of what you used; never code, paths, prompts or names. Kept 13 months. Change it, or delete what was sent, in Settings; `DO_NOT_TRACK=1` keeps it off for good. Details: [Usage stats](../README.md#usage-stats) and the [privacy page](https://brainstorm-landing.vercel.app/privacy.html).
-- The server listens on `127.0.0.1` only (port 4747, or the next free one). It refuses requests addressed to other host names, changes that don't come from its own page, and live-feed connections without a token only its own page can read (other websites and other apps on your computer can't listen in). Its page can't load anything from elsewhere (a Content Security Policy), and other sites can't frame it.
+- The server listens on `127.0.0.1` only (port 4747, or the next free one), so other computers can't reach it. It refuses requests addressed to other host names, and its live feed needs a token only its own page can read, so other websites can't reach it. Other programs running on this computer can, like with any local server. Its page can't load anything from elsewhere (a Content Security Policy), and other sites can't frame it.
 - `server.json` (readable only by you) holds a random secret. The launcher and the hooks only talk to a server that proves it knows it, so nothing else that takes the port gets your data.
 - To show when a thread is waiting for you, the plugin's hooks tell the local server when Claude Code asks for a permission, shows a notification, finishes a turn or gets a new message (the tool's name and input, never the conversation). They only talk to `127.0.0.1`.
 - Nothing else is sent anywhere, except your questions to Claude if you set a key. Sharing only saves files on your computer; you decide where they go.
@@ -91,4 +91,6 @@ Summaries of files and labels written by a model are off in this release. They'l
 /plugin marketplace remove rundown
 ```
 
-Run `/rundown:stop` first to stop the server. Uninstalling deletes Rundown's data folder.
+If you installed it as `rundown@brainstorm`, use `/plugin uninstall rundown@brainstorm` and `/plugin marketplace remove brainstorm`.
+
+Run `/rundown:stop` first to stop the server. Uninstalling deletes Rundown's data folder, unless it is `~/.rundown` (see above), which stays.

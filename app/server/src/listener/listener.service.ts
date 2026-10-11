@@ -22,7 +22,7 @@ import { backfillAgentIds } from "./agent-ids";
 // Tail the coding agents' session logs (log sources: claude.source.ts for ~/.claude/projects, codex.source.ts
 // for ~/.codex/sessions), store the Steps they parse, emit them on the bus and broadcast them over ws.
 
-export { sanitizeText, promptTitle, withoutPastes } from "./text";
+export { sanitizeText, promptTitle } from "./text";
 
 // All of a project's history is loaded: the last two weeks first (the first screen), then older threads a file at a time.
 const RECENT_MS = 14 * 24 * 60 * 60 * 1000;

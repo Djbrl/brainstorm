@@ -3,7 +3,7 @@ import { clock } from "../lib/live";
 import type { Step } from "@contract";
 import { CallPairer } from "@shared/pairing";
 import { commandLabel, toolLabel } from "@shared/labels";
-import { parsePrompt } from "./prompt";
+import { parsePrompt } from "@shared/prompt";
 
 export const basename = (p?: string) => (p ? p.split(/[\\/]/).filter(Boolean).pop() ?? p : "");
 

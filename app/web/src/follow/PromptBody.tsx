@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Markdown } from "../ask/Markdown";
 import { parseJson } from "./content/parse";
 import { JsonView } from "./content/JsonView";
-import { childTags, parsePrompt, type Block } from "./prompt";
+import { childTags, parsePrompt, type Block } from "@shared/prompt";
 import "./prompt.css";
 
 const Chev = () => (

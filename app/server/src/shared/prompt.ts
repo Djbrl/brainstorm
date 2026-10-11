@@ -165,7 +165,8 @@ function build(text: string): Prompt {
       i = j - 1;
       const name = group.get("command-name") || (group.get("command-message") ? `/${group.get("command-message")}` : "");
       const args = group.get("command-args") ?? "";
-      blocks.push(block("command", {}, args, name ? oneLine(`Command: ${name}${args ? ` ${args}` : ""}`) : "Command"));
+      const slash = group.get("command-name");
+      blocks.push(block("command", slash ? { slash } : {}, args, name ? oneLine(`Command: ${name}${args ? ` ${args}` : ""}`) : "Command"));
       continue;
     }
     // A command run with ! in Claude Code: its input, then what it printed.
@@ -197,4 +198,23 @@ export function parsePrompt(text = ""): Prompt {
     seen.set(text, (p = build(text)));
   }
   return p;
+}
+
+/** Blocks that never title a thread: notes, and what a command printed. */
+const UNTITLED_BLOCKS = new Set([...QUIET, "local-command-stdout", "local-command-stderr", "bash-stdout", "bash-stderr"]);
+
+/**
+ * A thread's title from a prompt: the person's words (a paste only when nothing was typed around it), or the slash
+ * command it runs ("/compact focus on tests"). A prompt that is only a block (a message from another session, a
+ * background task's notification) is titled by what that block says. Undefined when nothing readable is left (only
+ * notes or a command's output), so a later prompt can title the thread.
+ */
+export function promptTitle(text: string, max = 80): string | undefined {
+  const p = parsePrompt(text);
+  const cmd = p.blocks.find((b) => b.tag === "command" && b.attrs.slash);
+  if (cmd) return `${cmd.attrs.slash}${cmd.body ? ` ${cmd.body}` : ""}`.slice(0, max);
+  if (p.words) return p.words.slice(0, max);
+  const lead = p.blocks.find((b) => !UNTITLED_BLOCKS.has(b.tag));
+  const said = lead?.body.replace(/<\/?[a-z_-]+(\s[^>]*)?>/g, "").trim();
+  return said ? said.slice(0, max) : undefined;
 }

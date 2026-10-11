@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import type { GitFileState, GitState, GitWorktree, Step } from "../types";
 import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";
+import { gitEnv } from "../core/git-safety";
 import { ListenerService } from "../listener/listener.service";
 import { WorkspaceService } from "../workspace/workspace.service";
 
@@ -14,7 +15,8 @@ import { WorkspaceService } from "../workspace/workspace.service";
 // commands (a status is 20–40 ms on this repo), worked out again a moment after something changes: the mapper's batch
 // of changed files (your edits), a step (an agent edits or commits), the repo's refs (a commit, a branch switch, a push
 // from a terminal). Never on a timer, except a slow check for what none of those see (edits in a worktree by hand).
-// `git status` runs without optional locks, so it never rewrites the index and wakes the watch itself.
+// `git status` runs without optional locks, so it never rewrites the index and wakes the watch itself, and never looks
+// inside submodules (each has its own config, with drivers gitEnv hasn't pinned). Every git runs with gitEnv.
 
 const run = promisify(execFile);
 const SETTLE_MS = 600;          // changes come in bursts: work it out once they settle
@@ -98,7 +100,7 @@ export class GitService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async git(args: string[], cwd: string): Promise<string> {
-    const { stdout } = await run("git", ["--no-optional-locks", ...args], { cwd, maxBuffer: 64 * 1024 * 1024, timeout: 15_000, env: { ...process.env, GIT_OPTIONAL_LOCKS: "0", LC_ALL: "C" } });
+    const { stdout } = await run("git", ["--no-optional-locks", ...args], { cwd, maxBuffer: 64 * 1024 * 1024, timeout: 15_000, env: gitEnv(cwd, { GIT_OPTIONAL_LOCKS: "0", LC_ALL: "C" }) });
     return stdout;
   }
 
@@ -110,7 +112,7 @@ export class GitService implements OnModuleInit, OnModuleDestroy {
     const prefix = relative(top, root).split(sep).join("/");
     const toMap = (p: string): string | null => (!prefix ? p : p.startsWith(prefix + "/") ? p.slice(prefix.length + 1) : null);
 
-    const status = parseStatus(await this.git(["status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all"], top));
+    const status = parseStatus(await this.git(["status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all", "--ignore-submodules=dirty"], top));
     const uncommitted = remap(status.files, toMap);
     let unpushed: string[] | null = null;
     if (status.upstream) {
@@ -137,7 +139,7 @@ export class GitService implements OnModuleInit, OnModuleDestroy {
       const ahead = Number((await this.git(["rev-list", "--count", `HEAD..${w.head}`], top)).trim()) || 0;
       const committed = ahead ? names(await this.git(["diff", "--name-only", "-z", `HEAD...${w.head}`], top)).map(toMap).filter((p): p is string => !!p) : [];
       let wUncommitted: Record<string, GitFileState> = {};
-      try { wUncommitted = remap(parseStatus(await this.git(["status", "--porcelain=v2", "-z", "--untracked-files=all"], w.path)).files, toMap); } catch { /* gone meanwhile */ }
+      try { wUncommitted = remap(parseStatus(await this.git(["status", "--porcelain=v2", "-z", "--untracked-files=all", "--ignore-submodules=dirty"], w.path)).files, toMap); } catch { /* gone meanwhile */ }
       const dir = resolve(w.path) + sep;
       const threads = sessions.filter((s) => s.cwd && (resolve(s.cwd) + sep).startsWith(dir)).map((s) => s.id).slice(0, 5);
       worktrees.push({ path: w.path, branch: w.branch ?? `detached at ${w.head.slice(0, 7)}`, ahead, merged: ahead === 0, committed, uncommitted: wUncommitted, threads,

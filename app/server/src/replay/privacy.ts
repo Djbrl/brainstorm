@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { homedir, hostname, userInfo } from "node:os";
+import { gitEnv } from "../core/git-safety";
 import { maskSecrets } from "../privacy/mask";
 import { redactReplayJson } from "./redact";
 
@@ -20,7 +21,7 @@ export function computerNames(): string[] {
 /** "ana.lee" from git's user.email "ana.lee@example.com", when it's distinctive enough to mask on its own. */
 function gitEmailName(): string | null {
   try {
-    const email = execFileSync("git", ["config", "--global", "--get", "user.email"], { encoding: "utf8", timeout: 2000 }).trim();
+    const email = execFileSync("git", ["config", "--global", "--get", "user.email"], { encoding: "utf8", timeout: 2000, env: gitEnv() }).trim();
     const [name, domain = ""] = email.split("@");
     if (/noreply|no-reply/i.test(domain)) return null; // a public handle (GitHub's no-reply address), not private
     return name.length >= 4 && !/^(git|noreply|no-reply|admin|info|contact|hello|dev|me)$/i.test(name) ? name : null;

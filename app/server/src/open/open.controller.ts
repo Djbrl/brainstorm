@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Headers, HttpCode, Post } from "@nestjs/common";
 import { execFile } from "node:child_process";
-import { statSync } from "node:fs";
-import { dirname, extname, isAbsolute, normalize, sep } from "node:path";
+import { realpathSync, statSync } from "node:fs";
+import { basename, dirname, extname, isAbsolute, normalize } from "node:path";
 import { isLocalHost } from "../core/local";
 import { ListenerService } from "../listener/listener.service";
 import { tooBroad, WorkspaceService } from "../workspace/workspace.service";
@@ -17,6 +17,19 @@ const OPENABLE = new Set(("ts tsx js jsx mjs cjs mts cts json jsonc md mdx txt c
 // Left out on purpose: shell scripts (a Terminal may be their app), Python (python.org's Launcher runs a .py), Ruby,
 // PHP, Lua, HTML (a browser runs its scripts); and on Windows JavaScript, which Windows Script Host runs.
 const RUN_ON_WINDOWS = new Set("js jsx mjs cjs".split(" "));
+/** Dotfiles by their name (.env, .env.local, .gitignore) and text files that have no extension. */
+const DOTFILES = new Set("env gitignore gitattributes dockerignore editorconfig prettierrc eslintrc nvmrc npmrc".split(" "));
+const PLAIN_NAMES = new Set("readme license licence makefile dockerfile changelog contributing authors notice copying procfile".split(" "));
+
+/** Whether a file opens from here, by its name: a text or code extension, a known dotfile, or a known plain name. An
+ *  extensionless file must also not be executable (the computer would run it in a terminal). */
+export function openable(path: string, mode = 0): boolean {
+  const name = basename(path).toLowerCase();
+  if (name.startsWith(".")) return DOTFILES.has(name.slice(1).split(".")[0]);
+  const ext = extname(name).slice(1);
+  if (!ext) return PLAIN_NAMES.has(name) && (mode & 0o111) === 0;
+  return OPENABLE.has(ext) && !(process.platform === "win32" && RUN_ON_WINDOWS.has(ext));
+}
 
 @Controller()
 export class OpenController {
@@ -28,14 +41,16 @@ export class OpenController {
     if (origin) { let host = ""; try { host = new URL(origin).host; } catch { /* not a URL */ } if (!isLocalHost(host)) throw new ForbiddenException(); }
     const path = typeof body?.path === "string" ? normalize(body.path) : "";
     if (!isAbsolute(path)) throw new BadRequestException("A full path is needed");
-    const ext = extname(path).slice(1).toLowerCase() || path.split(sep).pop()!.toLowerCase();
-    if (!OPENABLE.has(ext) || (process.platform === "win32" && RUN_ON_WINDOWS.has(ext))) throw new ForbiddenException("Only text and code files open from here");
-    let st; try { st = statSync(path); } catch { throw new BadRequestException("No such file"); }
+    // The link and what it leads to both have to be openable: the computer picks the app by the real file
+    // (notes.md -> run.command would open Terminal).
+    let real, st;
+    try { real = realpathSync(path); st = statSync(real); } catch { throw new BadRequestException("No such file"); }
     if (!st.isFile()) throw new BadRequestException("Not a file");
+    if (!openable(path, st.mode) || !openable(real, st.mode)) throw new ForbiddenException("Only text and code files open from here");
     // A thread started in the home folder (or /) doesn't make every file on the disk "a thread's folder".
     const roots = [this.ws.status().root, ...this.listener.listSessions().map((s) => s.cwd)].filter((r): r is string => !!r && !tooBroad(r));
-    if (!insideAny(path, roots)) throw new ForbiddenException("Outside the project and the threads' folders");
-    const [cmd, args] = process.platform === "darwin" ? ["open", [path]] : process.platform === "win32" ? ["explorer.exe", [path]] : ["xdg-open", [path]];
+    if (!insideAny(real, roots)) throw new ForbiddenException("Outside the project and the threads' folders");
+    const [cmd, args] = process.platform === "darwin" ? ["open", [real]] : process.platform === "win32" ? ["explorer.exe", [real]] : ["xdg-open", [real]];
     execFile(cmd, args, () => { /* the app opens on its own; nothing to report */ });
   }
 

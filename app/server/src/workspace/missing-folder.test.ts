@@ -23,7 +23,7 @@ function service(dir: string) {
     cfg as never,
     { root: "", set() {} } as never,
     { codexProjects: () => new Map(), bringGuest() {} } as never,
-    { getCached: () => undefined, isBuilding: () => false } as never,
+    { stats: () => undefined, isBuilding: () => false } as never,
     settings as never,
   );
   const check = () => (svc as unknown as { checkFolder(): void }).checkFolder();

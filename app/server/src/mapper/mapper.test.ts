@@ -241,6 +241,7 @@ test("past the cap (RUNDOWN_MAX_FILES): a spread of files, totalFiles counts the
     const node = await waitFor(() => svc.getCached(root)!.byPath.get(join(root, left)));
     await waitFor(() => node.activeSessionId === "s1" || undefined);
     assert.equal(svc.getCached(root)!.map.totalFiles, 20);
+    assert.equal(svc.stats(root)!.totalFiles, 20);
   } finally {
     if (before === undefined) delete process.env.RUNDOWN_MAX_FILES; else process.env.RUNDOWN_MAX_FILES = before;
     svc.onModuleDestroy();

@@ -322,10 +322,10 @@ export class WorkspaceService implements OnModuleInit, OnModuleDestroy {
 
   private scanStep(root: string): SetupStep {
     const label = "Reading your code";
-    const cached = this.mapper.getCached(root);
-    if (cached) {
+    const stats = this.mapper.stats(root);
+    if (stats) {
       // Past the file cap (mapper/ignore.ts), say so: "3,000 of 18,913 files", not a bare "3000 files".
-      const shown = cached.map.files.length, total = cached.map.totalFiles ?? shown;
+      const shown = stats.files, total = stats.totalFiles;
       const detail = total > shown ? `${shown.toLocaleString("en-US")} of ${total.toLocaleString("en-US")} files on the map, the ones that matter most` : `${shown.toLocaleString("en-US")} files`;
       return { id: "scan", label, state: "done", detail };
     }
@@ -335,11 +335,11 @@ export class WorkspaceService implements OnModuleInit, OnModuleDestroy {
 
   private importsStep(root: string): SetupStep {
     const label = "Mapping imports";
-    const cached = this.mapper.getCached(root);
-    if (cached) {
+    const stats = this.mapper.stats(root);
+    if (stats) {
       return {
         id: "imports", label, state: "done",
-        detail: `${cached.map.edges.length} imports across ${cached.map.modules.length} modules`,
+        detail: `${stats.edges} imports across ${stats.modules} modules`,
       };
     }
     if (this.mapper.isBuilding(root)) return { id: "imports", label, state: "running" };

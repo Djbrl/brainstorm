@@ -209,8 +209,14 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     return (await this.ensure(resolve(root))).map;
   }
 
-  /** Internal: cached ProjectMap for a root, if it has been built. Used by the reader to attach summaries. */
+  /** For tests: the built map's internals for a root, if it has been built. Other modules ask stats(). */
   getCached(root: string): Cached | undefined { return this.cache.get(resolve(root)); }
+
+  /** The map's size for a root once it's built (the setup checklist): files shown and in the project, imports, modules. */
+  stats(root: string): { files: number; totalFiles: number; edges: number; modules: number } | undefined {
+    const m = this.cache.get(resolve(root))?.map;
+    return m && { files: m.files.length, totalFiles: m.totalFiles ?? m.files.length, edges: m.edges.length, modules: m.modules.length };
+  }
 
   /** True while the map for `root` is being built for the first time (used by the setup checklist). */
   isBuilding(root: string): boolean { return this.building.has(resolve(root)); }

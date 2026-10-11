@@ -62,7 +62,7 @@ const LEAVE_MS = 220;                 // the sheet sliding away as it folds (sid
 const PIP_MIN = 25, PIP_MAX = 72, TOP_PX = 96, BOTTOM_PX = 170, FOLD_PAST = 6;
 const pipRange = (h: number) => ({ lo: Math.max(PIP_MIN, (TOP_PX / Math.max(1, h)) * 100), hi: Math.max(PIP_MIN + 5, Math.min(PIP_MAX, ((h - BOTTOM_PX) / Math.max(1, h)) * 100)) });
 const PIP_START = 50;   // each page load starts the sheet at the middle (its height isn't remembered)
-const PHONE = "(max-width: 600px)";
+const PHONE = "(max-width: 440px)";
 
 export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, map, file, picked, onCloseFile }: MapSidebarProps) {
   const { replay, file: fileLink, step: openStep, closeStep } = useNav();

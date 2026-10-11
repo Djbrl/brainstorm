@@ -8,7 +8,7 @@
   -webkit-mask-image: linear-gradient(to bottom, transparent, rgba(0,0,0,.4) calc(var(--fade-top) * .45), #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), rgba(0,0,0,.4) calc(100% - var(--fade-bottom) * .45), transparent);
   mask-image: linear-gradient(to bottom, transparent, rgba(0,0,0,.4) calc(var(--fade-top) * .45), #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), rgba(0,0,0,.4) calc(100% - var(--fade-bottom) * .45), transparent);
 }
-@media (max-width: 600px) { .map-wrap { --fade-top: 104px; } }
+@media (max-width: 440px) { .map-wrap { --fade-top: 104px; } }
 
 .map-empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 10px; color: var(--ink-3); }
 .map-empty h2 { font-size: 34px; font-weight: 700; color: var(--ink); }
@@ -48,7 +48,7 @@
 @media (max-width: 1100px) {
   .map-panel { z-index: 7; } /* over the lens pill, which reaches into it on a narrow screen */
 }
-@media (max-width: 600px) {
+@media (max-width: 440px) {
   /* Side panels fill the width, with room at the bottom for the footer that floats over them. */
   /* A step opens where the thread's sheet is (the map stays in view above it), and Back goes back to its steps. */
   .map-panel { top: var(--pip-top, 50%); width: 100%; border-left: 0; border-top: 1px solid var(--line); border-radius: 18px 18px 0 0;

@@ -23,7 +23,7 @@
 /* A side panel covers the right side: the Readmap steps aside. */
 .map-wrap:has(.map-panel.open) .readmap { display: none; }
 /* Phone: the map is too small for a picture in it. */
-@media (max-width: 600px) { .readmap { display: none; } }
+@media (max-width: 440px) { .readmap { display: none; } }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .readmap { background: var(--sheet); box-shadow: 0 18px 50px rgba(0,0,0,.35); }
 /* A big map: the file window sits right under the Readmap, one column on the right (the Readmap is 41 px of header, 196
    of picture and its border). */

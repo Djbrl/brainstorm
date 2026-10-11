@@ -56,7 +56,7 @@
 .rp-share-menu strong { display: block; font-size: 14px; font-weight: 600; }
 .rp-share-menu span { display: block; font-size: 13px; color: var(--ink-2); line-height: 1.4; margin-top: 2px; }
 .rp-share-note { margin: 6px 12px 6px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-3); line-height: 1.45; }
-@media (max-width: 600px) { .rp-share-menu { width: min(330px, calc(100vw - 32px)); } }
+@media (max-width: 440px) { .rp-share-menu { width: min(330px, calc(100vw - 32px)); } }
 
 
 /* ---------- chapters: one section per message you typed (ReplaySteps) ---------- */
@@ -167,7 +167,7 @@
   .map-wrap:has(.map-panel.open) .rp-player .rp-slider { order: 5; flex-basis: 100%; margin: 0; }
 }
 /* Phone: the footer wraps; the share menu opens centred over it. */
-@media (max-width: 600px) {
+@media (max-width: 440px) {
   .dock { bottom: 12px; max-width: calc(100% - 24px); }
   .map-wrap:has(.map-panel.open) .dock { left: 50%; right: auto; transform: translateX(-50%); max-width: calc(100% - 24px); }
   .rp-player, .map-wrap:has(.map-panel.open) .rp-player { width: calc(100vw - 24px); flex-wrap: wrap; gap: 4px 6px; }

@@ -15,7 +15,7 @@ import "./tour.css";
 
 type Card = { title: string; body: string; anchor?: string };
 
-const PHONE = "(max-width: 600px)";
+const PHONE = "(max-width: 440px)";
 const WALK_MS = 1500;    // the example agent's pace
 
 export function Tour() {

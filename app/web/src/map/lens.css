@@ -3,11 +3,11 @@
 .lens-switch button { border: 0; background: transparent; padding: 6px 18px; border-radius: 999px; font-size: 13.5px; font-weight: 600; color: var(--ink-2); }
 .lens-switch button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 /* Tablet: a side panel open on the right would cut the pill; it centres in the space left of the panel instead. */
-@media (min-width: 601px) and (max-width: 1100px) {
+@media (min-width: 441px) and (max-width: 1100px) {
   .map-wrap:has(.map-panel.open) .lens-switch { left: calc((100% - 440px) / 2); }
 }
 /* Phone: the pill at the right of the top row (the folded sidebar is a strip along the bottom). */
-@media (max-width: 600px) {
+@media (max-width: 440px) {
   .lens-switch { top: 16px; left: auto; right: 12px; transform: none; }
   .lens-switch button { padding: 6px 13px; }
 }

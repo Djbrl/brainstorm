@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DbService } from "./db.service";
@@ -15,4 +15,17 @@ test("the data folder and the database are readable by this account only", { ski
   assert.equal(statSync(dir).mode & 0o777, 0o700);
   for (const f of ["rundown.db", "rundown.db-wal", "rundown.db-shm"]) assert.equal(statSync(join(dir, f)).mode & 0o777, 0o600, f);
   dbs.db.close();
+});
+
+test("a damaged database is moved aside, never deleted, and a fresh one starts with a notice", () => {
+  const dir = mkdtempSync(join(tmpdir(), "rd-db-"));
+  process.env.RUNDOWN_DATA_DIR = dir;
+  writeFileSync(join(dir, "rundown.db"), "this is not a database, just text that happens to be here".repeat(100));
+  const dbs = new DbService();
+  assert.equal((dbs.db.prepare("SELECT 1 AS one").get() as { one: number }).one, 1);
+  const broken = readdirSync(dir).filter((f) => f.startsWith("rundown.db.broken-"));
+  assert.equal(broken.length, 1);
+  assert.match(readFileSync(join(dir, broken[0]), "utf8"), /^this is not a database/);
+  assert.match(JSON.parse(readFileSync(join(dir, "notices.json"), "utf8")).failure, /damaged/);
+  dbs.onApplicationShutdown();
 });

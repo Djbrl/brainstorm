@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger, OnApplicationShutdown } from "@nestjs/common";
 import { DatabaseSync } from "node:sqlite";
-import { chmodSync, existsSync, mkdirSync, renameSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { dataDir } from "./local";
 
@@ -10,8 +10,9 @@ import { dataDir } from "./local";
  * Store complex fields as JSON text.
  */
 @Injectable()
-export class DbService {
+export class DbService implements OnApplicationShutdown {
   readonly db: DatabaseSync;
+  private log = new Logger("Database");
   constructor() {
     const dir = dataDir();
     // Every prompt, diff and tool output is in here: readable by this account only (the folder too, if it existed).
@@ -20,7 +21,7 @@ export class DbService {
     // Named brainstorm.db before the rename (0.4 and older): take it over, with its write-ahead log.
     const file = resolve(dir, "rundown.db"), old = resolve(dir, "brainstorm.db");
     if (!existsSync(file) && existsSync(old)) for (const ext of ["", "-wal", "-shm"]) if (existsSync(old + ext)) renameSync(old + ext, file + ext);
-    this.db = new DatabaseSync(file);
+    this.db = this.open(file);
     for (const f of [file, file + "-wal", file + "-shm"]) try { chmodSync(f, 0o600); } catch { /* not created yet */ }
     // busy_timeout: when another program (sqlite3, a backup, a second server on this folder) holds the write lock, a
     // write waits up to 5 s for it instead of failing at once.
@@ -30,5 +31,44 @@ export class DbService {
       PRAGMA cache_size = -32768; PRAGMA mmap_size = 268435456;`);
     // WAL mode creates the -wal and -shm files now: with the main file's mode, set again in case they predate it.
     for (const f of [file + "-wal", file + "-shm"]) try { chmodSync(f, 0o600); } catch { /* not there */ }
+  }
+
+  /**
+   * Opens the database. One that isn't a database any more (corrupt, overwritten) is moved aside, never deleted, and a
+   * fresh one starts: the history is read again from the agents' logs. A read-only one gets one clear line in the log.
+   */
+  private open(file: string): DatabaseSync {
+    try {
+      const db = new DatabaseSync(file);
+      db.prepare("SELECT count(*) FROM sqlite_master").get(); // reads the header: a broken file fails here
+      return db;
+    } catch (e) {
+      const msg = (e as Error).message ?? String(e);
+      if (/not a database|malformed|corrupt/i.test(msg)) {
+        const aside = `${file}.broken-${new Date().toISOString().replace(/[:.]/g, "-")}`;
+        for (const ext of ["", "-wal", "-shm"]) if (existsSync(file + ext)) renameSync(file + ext, aside + ext);
+        this.log.error(`${file} is damaged (${msg}): moved it to ${aside} and started a fresh one; your threads are read again from the agents' logs`);
+        this.notice(`Rundown's database was damaged, so it started a fresh one and read your threads again. The old file is ${aside}.`);
+        return new DatabaseSync(file);
+      }
+      if (/readonly|read-only|unable to open/i.test(msg)) {
+        this.log.error(`can't write ${file} (${msg}): check that the folder and the file are yours and writable`);
+      }
+      throw e;
+    }
+  }
+
+  /** A line for the next session start (the launcher shows notices.json's `failure` once a day). */
+  private notice(text: string) {
+    const f = resolve(dataDir(), "notices.json");
+    try {
+      let n: Record<string, unknown> = {};
+      try { n = JSON.parse(readFileSync(f, "utf8")); } catch { /* none yet */ }
+      writeFileSync(f, JSON.stringify({ ...n, failure: text, failureToldAt: 0 }), { mode: 0o600 });
+    } catch { /* the log has it */ }
+  }
+
+  onApplicationShutdown() {
+    try { this.db.close(); } catch { /* already closed */ }
   }
 }

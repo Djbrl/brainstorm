@@ -14,8 +14,8 @@ import { actionOf, onlyRelabelled } from "./thread";
 import { CallPairer } from "@shared/pairing";
 import { repoBase, repoRelative } from "./paths";
 
-/** "1 step", "962 steps", "1,204 files". */
-export const plural = (k: number, one: string, many = `${one}s`) => `${k.toLocaleString()} ${k === 1 ? one : many}`;
+export { plural } from "@shared/text";
+import { plural } from "@shared/text";
 
 export type ThreadNumbers = {
   steps: number;     // steps as the step list shows them

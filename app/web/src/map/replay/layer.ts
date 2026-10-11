@@ -117,7 +117,7 @@ const badgeAt = (n: { x: number; y: number; r: number }, scale: number) => {
   return { x: n.x + Math.cos(ang) * d, y: n.y + Math.sin(ang) * d };
 };
 const BADGE_FONT = 9.5, MARK_R = 10, NAME_FONT = 12;
-const baseName = (p: string) => p.split("/").pop() || p;
+import { basename as baseName } from "@shared/text";
 const INK = "#1d1d1f";
 
 type Anim = { x: number; y: number; fromX: number; fromY: number; t0: number; file: string | null; lastIndex: number; beatAt: number;

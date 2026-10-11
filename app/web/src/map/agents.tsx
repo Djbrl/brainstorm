@@ -35,7 +35,7 @@ const VERB_ING: Record<string, string> = {
 };
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export const verbIng = (a?: string) => (a ? VERB_ING[a] ?? cap(a) : "Working");
-export const baseName = (p: string) => p.split("/").pop() || p;
+export { basename as baseName } from "@shared/text";
 
 /** Agents worth drawing: active, or inactive for up to 10 minutes (faded). */
 export function visibleAgents(agents: AgentPresence[], now = clock()): AgentPresence[] {

@@ -10,7 +10,7 @@ import { relPath } from "../useSelectedFile";
 import { placeName } from "../../lib/islands";
 
 const modName = (m: string) => (!m || m === "." ? "root" : m);
-const baseName = (p: string) => p.split("/").pop() || p;
+import { basename as baseName } from "@shared/text";
 
 /** "changed just now" (under 45 s), "changed 5 min ago", "changed 3 h ago", "changed 2 days ago" (rounded). */
 function changedAgo(iso: string | undefined, now: number): string {

@@ -17,7 +17,7 @@ const TAU = Math.PI * 2;
 /** A stable starting angle per file, so cubes don't all turn in step. */
 const STILL = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 const spin = (id: string) => { let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0; return (h % 628) / 100; };
-const baseName = (p: string) => p.split("/").pop() || p;
+import { basename as baseName } from "@shared/text";
 
 /**
  * Metro: a file's or folder's colour, the one of the folder two levels down it sits in (one level for a small project),

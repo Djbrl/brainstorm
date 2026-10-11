@@ -8,6 +8,8 @@
 // in the name, like `user-prompt-submit-hook`), and never when they're HTML: a person who pastes `<div>` or writes
 // `<context>…</context>` keeps their words. Nothing inside ``` fences is read.
 
+import { basename, oneLine } from "./text";
+
 export type Block = {
   tag: string;
   attrs: Record<string, string>;
@@ -42,9 +44,7 @@ const ATTR = /([\w:.-]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>"']+)))?/g;
 
 const isBlockTag = (tag: string) => KNOWN.has(tag) || (/[-_]/.test(tag) && !HTML.has(tag));
 
-const basename = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p;
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-const oneLine = (s: string, max = 90) => { const l = s.replace(/\s+/g, " ").trim(); return l.length > max ? `${l.slice(0, max - 1).trimEnd()}…` : l; };
 const lines = (s: string) => s.trim().split("\n").length;
 
 /** The child tags of a block (`<summary>…</summary>` inside a task notification), first one per name. */
@@ -66,7 +66,7 @@ function nameOf(tag: string, attrs: Record<string, string>, body: string): strin
     case "ide_diagnostics": return "Problems your editor found";
     case "user-prompt-submit-hook": return "Added by a hook";
     case "pasted_content": { const n = lines(b); return n > 1 ? `Pasted text · ${n} lines` : "Pasted text"; }
-    case "task-notification": { const s = childTags(b).get("summary"); return s ? oneLine(s) : "A background task finished"; }
+    case "task-notification": { const s = childTags(b).get("summary"); return s ? oneLine(s, 90) : "A background task finished"; }
     case "cross-session-message": return `Message from ${attrs["from-name"] || "another session"}`;
     case "agent-message": return /Subagent hand-back/i.test(b) ? "A subagent reported back" : "Message from an agent";
     case "scheduled-task": return attrs.name ? `Scheduled task: ${attrs.name}` : "Scheduled task";
@@ -166,7 +166,7 @@ function build(text: string): Prompt {
       const name = group.get("command-name") || (group.get("command-message") ? `/${group.get("command-message")}` : "");
       const args = group.get("command-args") ?? "";
       const slash = group.get("command-name");
-      blocks.push(block("command", slash ? { slash } : {}, args, name ? oneLine(`Command: ${name}${args ? ` ${args}` : ""}`) : "Command"));
+      blocks.push(block("command", slash ? { slash } : {}, args, name ? oneLine(`Command: ${name}${args ? ` ${args}` : ""}`, 90) : "Command"));
       continue;
     }
     // A command run with ! in Claude Code: its input, then what it printed.
@@ -174,7 +174,7 @@ function build(text: string): Prompt {
       const cmd = r.body.trim();
       let out = "";
       while (raw[i + 1]?.t === "block" && /^bash-std(out|err)$/.test((raw[i + 1] as { tag: string }).tag)) out += (raw[++i] as { body: string }).body;
-      blocks.push(block("bash", { command: cmd }, out.trim(), oneLine(`You ran: ${cmd}`)));
+      blocks.push(block("bash", { command: cmd }, out.trim(), oneLine(`You ran: ${cmd}`, 90)));
       words.push(`$ ${cmd}`); // a command you ran is something you did: it names its chapter
       continue;
     }

@@ -3,6 +3,7 @@
 // timeline are cut there. Messages Claude Code puts in the person's place (a subagent handing back, a hook's context,
 // a background task finishing) are steps inside a chapter, not chapters.
 import type { Step } from "@contract";
+import { oneLine } from "@shared/text";
 import type { Beat, Thread } from "./thread";
 import { stripInjected } from "../follow/format";
 
@@ -41,7 +42,6 @@ export function injectedLabel(s: Step): string | undefined {
   return "A note from Claude Code";
 }
 
-const oneLine = (t: string, max = 160) => { const l = t.replace(/\s+/g, " ").trim(); return l.length > max ? `${l.slice(0, max - 1).trimEnd()}…` : l; };
 
 const chaptersSeen = new WeakMap<Thread, Chapter[]>();
 
@@ -55,7 +55,7 @@ export function chaptersOf(thread: Thread): Chapter[] {
 function cutChapters(thread: Thread): Chapter[] {
   const out: Chapter[] = [];
   const add = (b: Beat, hasPrompt: boolean) => out.push({
-    index: out.length, title: hasPrompt ? oneLine(stripInjected(b.step.text)) : "Beginning of the thread",
+    index: out.length, title: hasPrompt ? oneLine(stripInjected(b.step.text), 160) : "Beginning of the thread",
     first: b.index, last: b.index, hasPrompt, at: b.step.ts, end: b.step.ts, ms: 0, files: 0, failed: 0,
   });
   // Working time: activeMs over the chapter's steps in beat order, added up as they come.

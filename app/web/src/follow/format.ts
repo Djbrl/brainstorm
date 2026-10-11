@@ -5,7 +5,8 @@ import { CallPairer } from "@shared/pairing";
 import { commandLabel, toolLabel } from "@shared/labels";
 import { parsePrompt } from "@shared/prompt";
 
-export const basename = (p?: string) => (p ? p.split(/[\\/]/).filter(Boolean).pop() ?? p : "");
+export { basename } from "@shared/text";
+import { basename } from "@shared/text";
 
 // ---- Times: one way to say when, everywhere ----
 

@@ -81,7 +81,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   private sources: LogSource[] = [];
   private codex?: CodexSource;
   /** Files changed through shell commands, made edits of their thread (command-edits.ts). */
-  private commandEdits = new CommandEdits((p) => this.isWithinRoot(p));
+  private commandEdits = new CommandEdits((p) => this.isWithinRoot(p), () => this.activeRoot);
   /** Live command edits waiting for the mapper to see their files change. */
   private commandTimers = new Set<NodeJS.Timeout>();
   private retryTimers = new Map<string, NodeJS.Timeout>();

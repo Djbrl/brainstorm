@@ -382,3 +382,33 @@ test("scripts are found in the order they appear, across shell and script", () =
   const cmd = "echo a > first.txt\npython3 - <<'PY'\nopen('second.txt', 'w')\nos.remove('third.txt')\nPY\ntouch fourth.txt";
   assert.deepEqual(run(cmd), ["write /work/site/first.txt", "write /work/site/second.txt", "delete /work/site/third.txt", "write /work/site/fourth.txt"]);
 });
+
+// ── options that take a value, tests, popd, modes ──
+
+test("sed -l takes a value; the script is not a file", () => {
+  assert.deepEqual(run("sed -l 80 -i 's/a/b/' f"), w("/work/site/f"));
+  assert.deepEqual(run("sed -l80 -i 's/a/b/' f"), w("/work/site/f"));
+  assert.deepEqual(run("sed --line-length 80 -i 's/a/b/' f"), w("/work/site/f"));
+});
+
+test("wrapper options with values: sudo -u, nice -n, env -u", () => {
+  assert.deepEqual(run("sudo -u www rm /srv/x"), ["delete /srv/x"]);
+  assert.deepEqual(run("nice -n 10 touch a"), w("/work/site/a"));
+  assert.deepEqual(run("env -u HOME touch a"), w("/work/site/a"));
+  assert.deepEqual(run("sudo touch a"), w("/work/site/a"));
+  assert.deepEqual(run("nohup touch a"), w("/work/site/a"));
+});
+
+test("[[ ]] compares, it does not redirect", () => {
+  assert.deepEqual(run("[[ a > b ]] && echo yes"), []);
+  assert.deepEqual(run("[[ -f x ]] && touch made"), w("/work/site/made"));
+});
+
+test("popd goes back to the folder pushd left", () => {
+  assert.deepEqual(run("pushd sub && touch a && popd && touch b"), w("/work/site/sub/a", "/work/site/b"));
+});
+
+test("an encoding in the mode is not a write mode", () => {
+  assert.deepEqual(run(`ruby -e "File.open('a.txt', 'r:windows-1252') { |f| f.read }"`), []);
+  assert.deepEqual(run(`ruby -e "File.open('a.txt', 'w:UTF-8') { |f| f << 1 }"`), w("/work/site/a.txt"));
+});

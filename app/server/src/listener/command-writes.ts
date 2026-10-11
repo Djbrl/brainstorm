@@ -45,6 +45,8 @@ export function shellArgv(command: string): string[][] {
 class Out {
   private m = new Map<string, CommandWrite>();
   private r = new Set<string>();
+  /** The folders `pushd` left, for `popd`. */
+  dirs: (string | undefined)[] = [];
   add(w: CommandWrite) { this.m.set(w.path, w); } // an existing path keeps its place and takes the new kind
   list() { return [...this.m.values()]; }
   read(p: string | undefined) { if (p && this.r.size < READS_MAX) this.r.add(p); }
@@ -252,6 +254,12 @@ function parseShell(s: string): Seg[] {
         else if (op[0] === "<") expect = { kind: "skip" };
         else expect = { kind: "redir", writes: true, amp: op === ">&", fd };
       } else if (c === "&") { flush(); i++; }
+      else if (!cur.words.length && !expect && s.startsWith("[[", i) && /\s/.test(s[i + 2] ?? "")) {
+        // [[ a > b ]]: a test, whose < and > compare, not redirect. Its words are not files.
+        const e = s.indexOf("]]", i + 2);
+        if (e < 0) { const r = readWord(s, i); take(r.w); i = r.end; }
+        else { take(word("[[", false, true)); i = e + 2; }
+      }
       else { const r = readWord(s, i); take(r.w); i = r.end; }
     }
   }
@@ -264,6 +272,11 @@ function parseShell(s: string): Seg[] {
 const MAX_DEPTH = 3; // bash -c "bash -c '…'" and so on
 const RESERVED = new Set(["if", "then", "else", "elif", "do", "while", "until", "{", "}", "!"]);
 const WRAPPERS = new Set(["sudo", "env", "command", "nohup", "time", "exec", "nice", "builtin"]);
+/** The options of a wrapper that take a value (`sudo -u www rm x`: www is not the command). */
+const WRAPPER_VALUES: Record<string, string[]> = {
+  sudo: ["-u", "-g", "-h", "-p", "-C", "-D", "-R", "-T", "-U", "-r", "-t"],
+  nice: ["-n", "--adjustment"], env: ["-u", "-C", "--unset", "--chdir"], time: ["-f", "-o", "--format", "--output"], exec: ["-a"],
+};
 const ASSIGNMENT = /^[A-Za-z_]\w*=/;
 
 function runShell(src: string, cwd: string | undefined, out: Out, depth: number): void {
@@ -324,8 +337,12 @@ function runCommand(cmd: Cmd, dir: string | undefined, out: Out, depth: number):
     if (!w) break;
     if (!w.quoted && (RESERVED.has(w.text) || ASSIGNMENT.test(w.text))) words.shift();
     else if (WRAPPERS.has(basename(w.text))) {
+      const values = WRAPPER_VALUES[basename(w.text)] ?? [];
       words.shift();
-      while (words.length > 1 && words[0].text.startsWith("-")) words.shift();
+      while (words.length > 1 && words[0].text.startsWith("-")) {
+        const flag = words.shift()!.text;
+        if (values.includes(flag) && words.length > 1) words.shift();
+      }
     } else break;
   }
   if (!words.length) return dir;
@@ -337,7 +354,9 @@ function runCommand(cmd: Cmd, dir: string | undefined, out: Out, depth: number):
   if (reads) for (const w of reads(args)) if (w.text !== "-") out.read(pathOf(w, dir));
 
   switch (name) {
+    case "popd": return out.dirs.length ? out.dirs.pop() : dir;
     case "cd": case "pushd": {
+      if (name === "pushd") out.dirs.push(dir);
       const t = parseArgs(args).operands[0];
       if (t?.text === "-") return undefined; // the folder before: not known
       return t ? pathOf(t, dir) : name === "cd" && !args.length ? absPath("~", dir) : dir;
@@ -407,6 +426,7 @@ function sedFiles(args: Word[]): Word[] {
     if (t.startsWith("--")) {
       if (/^--in-place(=|$)/.test(t)) inPlace = true;
       else if (/^--(expression|file)(=|$)/.test(t)) { hasScript = true; if (!t.includes("=")) k++; }
+      else if (t === "--line-length") k++;
     } else if (t.length > 1 && t[0] === "-") {
       for (let j = 1; j < t.length; j++) {
         if (t[j] === "i") {
@@ -416,6 +436,7 @@ function sedFiles(args: Word[]): Word[] {
           break;
         }
         if (t[j] === "e" || t[j] === "f") { hasScript = true; if (j === t.length - 1) k++; break; }
+        if (t[j] === "l") { if (j === t.length - 1) k++; break; }   // -l N: the line length, not the script
       }
     } else operands.push(args[k]);
   }
@@ -816,7 +837,7 @@ const PL_OPEN_RE = /(?<![\w$>.:])open\s*(?:\(\s*)?(?:(?:my|our|local)\s+)?(?:\$\
 const PL_CALL_RE = /(?<![\w$>.:])(unlink|rename)\b/g;
 const ASSIGN_RE = /(?:^|[;\n{])[ \t]*(?:(?:const|let|var|my|our|local)\s+)?([A-Za-z_$][\w$]*)[ \t]*=(?![=~>])[ \t]*/g;
 
-const writeMode = (m: Val) => typeof m === "string" && /[wax+]/.test(m);
+const writeMode = (m: Val) => typeof m === "string" && /^[^:]*[wax+]/.test(m);   // before any ":encoding" ('r:windows-1252' reads)
 const perlWriteMode = (m: string) => /^\s*(\+<|\+?>)/.test(m);
 
 /** Where the receiver of a method call starts, going left from the dot at `end`: `Path('a').resolve()`, `p`, `(a / b)`. */

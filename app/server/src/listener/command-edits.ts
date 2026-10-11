@@ -6,9 +6,12 @@
 // - The change itself: live, the mapper's copy of the file from before (bus "file-content") against what it is after;
 //   in history only the command is known, so the edit has no diff.
 // Each edit comes with a result (so attention never sees it waiting) and says it came from a command (input.byCommand).
+import { statSync } from "node:fs";
 import { basename, relative, resolve, sep } from "node:path";
 import type { Step } from "../types";
-import { commandWrites } from "./command-writes";
+import { isInIgnoredDir, isMappableRel } from "../mapper/ignore";
+import { MAX_PARSE_BYTES } from "../mapper/read-file";
+import { commandWrites, shellArgv } from "./command-writes";
 import { lineHunks } from "./line-diff";
 import type { NewStep } from "./source";
 import { sanitizeText, TEXT_LIMIT } from "./text";
@@ -30,10 +33,13 @@ export class CommandEdits {
   private lastAt = new Map<string, number>();
   /** Files an agent's edit tool changed, per thread and path, when: a command's write of the same file isn't counted twice. */
   private toolEdits = new Map<string, number>();
+  /** Every thread's last edit of a path (tool or command): a file another thread edited isn't credited to this one. */
+  private edited = new Map<string, Map<string, number>>();
   private changes: Change[] = [];
 
-  /** `inProject`: whether a path is part of the open project (writes elsewhere, like /tmp, aren't the project's). */
-  constructor(private inProject: (path: string) => boolean) {}
+  /** `inProject`: whether a path is part of the open project (writes elsewhere, like /tmp, aren't the project's).
+   * `root`: the open project's folder (to tell the folders the map ignores, and what it can show). */
+  constructor(private inProject: (path: string) => boolean, private root: () => string | null = () => null) {}
 
   /** A change on disk, from the mapper. */
   fileChanged(c: Change) {
@@ -48,9 +54,16 @@ export class CommandEdits {
     const at = Date.parse(s.ts) || Date.now();
     const prev = this.lastAt.get(s.sessionId);
     this.lastAt.set(s.sessionId, at);
-    if (s.kind === "edit" && s.filePath && !(s.input as { byCommand?: boolean } | undefined)?.byCommand) {
-      this.toolEdits.set(`${s.sessionId}\n${s.filePath}`, at);
-      if (this.toolEdits.size > 5_000) this.toolEdits.delete(this.toolEdits.keys().next().value!);
+    if (s.kind === "edit" && s.filePath) {
+      if (!(s.input as { byCommand?: boolean } | undefined)?.byCommand) {
+        this.toolEdits.set(`${s.sessionId}\n${s.filePath}`, at);
+        if (this.toolEdits.size > 5_000) this.toolEdits.delete(this.toolEdits.keys().next().value!);
+      }
+      const by = this.edited.get(s.filePath) ?? new Map<string, number>();
+      by.set(s.sessionId, at);
+      this.edited.delete(s.filePath);
+      this.edited.set(s.filePath, by); // most recent last
+      if (this.edited.size > 5_000) this.edited.delete(this.edited.keys().next().value!);
     }
     if (s.kind === "tool_call" && s.tool === "Bash" && s.toolUseId) {
       const input = (s.input ?? {}) as { command?: unknown; workdir?: unknown; cwd?: unknown };
@@ -76,9 +89,13 @@ export class CommandEdits {
    * matched, so the edits have their diff. */
   editsFor(call: Call & { id: string; end: number }, ts: string, live: boolean): NewStep[] {
     const writes = new Map<string, { kind: "write" | "delete"; from?: string }>();
+    const root = this.root();
+    const rel = (p: string) => (root ? relative(root, p) : "");
+    // Not the map's: inside a folder it ignores (node_modules, dist, dot folders), or a folder itself.
+    const ignored = (p: string) => !!root && isInIgnoredDir(rel(p));
     for (const w of commandWrites(call.command, call.cwd)) {
       const p = resolve(w.path);
-      if (this.inProject(p) && !insideGit(p)) writes.set(p, { kind: w.kind, ...(w.from ? { from: w.from } : {}) });
+      if (this.inProject(p) && !insideGit(p) && !ignored(p)) writes.set(p, { kind: w.kind, ...(w.from ? { from: w.from } : {}) });
     }
     // Live: what changed on disk while it ran, first and last state per file.
     const seen = new Map<string, { before: string | null; after: string | null }>();
@@ -90,9 +107,11 @@ export class CommandEdits {
         seen.set(c.path, { before: had ? had.before : c.before, after: c.after });
       }
       // A file the command names that changed while it ran (a formatter, a codegen script given the file): counted too.
+      // Matched by whole words (`.env.example` does not name `.env`; `build` in `npm run build` names no file).
+      const words = shellArgv(call.command).flat();
       for (const [path, ch] of seen) {
-        if (writes.has(path) || !this.inProject(path) || insideGit(path)) continue;
-        if (call.command.includes(basename(path))) writes.set(path, { kind: ch.after === null ? "delete" : "write" });
+        if (writes.has(path) || !this.inProject(path) || insideGit(path) || ignored(path)) continue;
+        if (namedBy(path, words)) writes.set(path, { kind: ch.after === null ? "delete" : "write" });
       }
     }
     const out: NewStep[] = [];
@@ -101,8 +120,16 @@ export class CommandEdits {
       // The agent's edit tool changed it in this thread around then: that edit already says it.
       const tool = this.toolEdits.get(`${call.sessionId}\n${path}`);
       if (tool !== undefined && tool >= call.start - SLACK_BEFORE_MS) continue;
+      // Another thread edited it around then: its change is not this command's.
+      if (this.editedByOther(call, path)) continue;
       const ch = seen.get(path);
-      if (live && w.kind === "write" && ch && ch.after !== null && ch.before === ch.after) continue; // rewritten, unchanged
+      if (live && !ch && root) {
+        // The mapper saw nothing change. For a file it follows, that means nothing did (`touch`, a `sed -i` that matched
+        // nothing, a copy of the same content): no edit. A folder removed, or a file the map can't show, stays unknown.
+        if (w.kind === "write" && unchangedOnDisk(path, rel(path))) continue;
+        if (w.kind === "delete" && !isMappableRel(rel(path))) continue;
+      }
+      if (!live && w.kind === "delete" && root && !isMappableRel(rel(path))) continue; // `rm -rf src/old`: a folder, not a file
       const id = `${call.id}:wrote:${k++}`;
       const created = ch ? ch.before === "" : false;
       const deleted = w.kind === "delete" || (ch !== undefined && ch.after === null);
@@ -120,6 +147,26 @@ export class CommandEdits {
     }
     return out;
   }
+
+  private editedByOther(call: Call & { end: number }, path: string): boolean {
+    const by = this.edited.get(path);
+    if (!by) return false;
+    const from = call.start - SLACK_BEFORE_MS, to = call.end + SLACK_AFTER_MS;
+    for (const [sid, at] of by) if (sid !== call.sessionId && at >= from && at <= to) return true;
+    return false;
+  }
+}
+
+/** Whether the command's words name the file: its name, or its path from a folder (`src/login.ts`, `./login.ts`). */
+function namedBy(path: string, words: string[]): boolean {
+  const base = basename(path);
+  return words.some((w) => w === base || (w.includes("/") && (w === path || path.endsWith("/" + w.replace(/^\.\//, "")))));
+}
+
+/** A file the map follows (a source file up to the size it reads) that is on disk: if no change was seen, none happened. */
+function unchangedOnDisk(path: string, rel: string): boolean {
+  if (!isMappableRel(rel)) return false;
+  try { const st = statSync(path); return st.isFile() && st.size <= MAX_PARSE_BYTES; } catch { return false; }
 }
 
 const insideGit = (p: string) => p.split(sep).includes(".git");

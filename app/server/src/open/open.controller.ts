@@ -1,8 +1,7 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Headers, HttpCode, Post } from "@nestjs/common";
+import { BadRequestException, Body, Controller, ForbiddenException, HttpCode, Post } from "@nestjs/common";
 import { execFile } from "node:child_process";
 import { realpathSync, statSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, normalize } from "node:path";
-import { isLocalHost } from "../core/local";
 import { ListenerService } from "../listener/listener.service";
 import { tooBroad, WorkspaceService } from "../workspace/workspace.service";
 import { insideAny } from "../core/paths";
@@ -36,9 +35,7 @@ export class OpenController {
   constructor(private ws: WorkspaceService, private listener: ListenerService) {}
 
   @Post("open") @HttpCode(204)
-  open(@Body() body: { path?: unknown }, @Headers("origin") origin?: string, @Headers("content-type") type?: string) {
-    if (!type?.includes("application/json")) throw new BadRequestException("JSON only");
-    if (origin) { let host = ""; try { host = new URL(origin).host; } catch { /* not a URL */ } if (!isLocalHost(host)) throw new ForbiddenException(); }
+  open(@Body() body: { path?: unknown }) {
     const path = typeof body?.path === "string" ? normalize(body.path) : "";
     if (!isAbsolute(path)) throw new BadRequestException("A full path is needed");
     // The link and what it leads to both have to be openable: the computer picks the app by the real file
@@ -57,9 +54,7 @@ export class OpenController {
   /** "Show in Finder" (Explorer, the file manager) for a file shown on the map, an island's too (a temp folder, Claude
    *  Code's own): the folder opens with the file selected. Nothing is opened or run, so any existing path will do. */
   @Post("reveal") @HttpCode(204)
-  reveal(@Body() body: { path?: unknown }, @Headers("origin") origin?: string, @Headers("content-type") type?: string) {
-    if (!type?.includes("application/json")) throw new BadRequestException("JSON only");
-    if (origin) { let host = ""; try { host = new URL(origin).host; } catch { /* not a URL */ } if (!isLocalHost(host)) throw new ForbiddenException(); }
+  reveal(@Body() body: { path?: unknown }) {
     const path = typeof body?.path === "string" ? normalize(body.path) : "";
     if (!isAbsolute(path)) throw new BadRequestException("A full path is needed");
     try { statSync(path); } catch { throw new BadRequestException("No such file"); }

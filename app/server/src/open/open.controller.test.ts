@@ -20,7 +20,7 @@ test("a link is opened by what it leads to: a script behind a .md name is refuse
   for (const f of [".env", ".env.local", ".gitignore", "README", "Makefile", "src/a.ts"]) writeFileSync(join(root, f), "x");
   writeFileSync(join(root, "LICENSE"), "x"); chmodSync(join(root, "LICENSE"), 0o755); // executable: a terminal would run it
   const ctl = new OpenController({ status: () => ({ root }) } as any, { listSessions: () => [] } as any);
-  const open = (p: string) => { try { ctl.open({ path: join(root, p) }, undefined, "application/json"); return "ok"; } catch (e: any) { return e.getStatus?.() ?? String(e); } };
+  const open = (p: string) => { try { ctl.open({ path: join(root, p) }); return "ok"; } catch (e: any) { return e.getStatus?.() ?? String(e); } };
   assert.equal(open("notes.md"), 403);
   assert.equal(open("run.command"), 403);
   assert.equal(open("LICENSE"), 403);

@@ -1,5 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Headers, Put } from "@nestjs/common";
-import { local } from "../usage/usage.controller";
+import { BadRequestException, Body, Controller, Get, Put } from "@nestjs/common";
 import { UpdatesService, type UpdatesStatus } from "./updates.service";
 
 // The "tell me when there's a new version" setting (updates.service.ts). Only from the app itself.
@@ -9,8 +8,7 @@ export class UpdatesController {
 
   @Get("updates") status(): UpdatesStatus { return this.updates.status(); }
 
-  @Put("updates") set(@Body() body: { enabled?: unknown }, @Headers("origin") origin?: string, @Headers("content-type") type?: string): UpdatesStatus {
-    local(origin, type);
+  @Put("updates") set(@Body() body: { enabled?: unknown }): UpdatesStatus {
     if (typeof body?.enabled !== "boolean") throw new BadRequestException("enabled: true or false");
     return this.updates.setEnabled(body.enabled);
   }

@@ -1,5 +1,4 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Get, Headers, Module, Put } from "@nestjs/common";
-import { isLocalHost } from "../core/local";
+import { BadRequestException, Body, Controller, Get, Module, Put } from "@nestjs/common";
 import { SettingsService } from "../core/settings.service";
 
 // Whether this install has had the tour (web lib/tour.ts): kept here, not in a browser, so the
@@ -15,9 +14,7 @@ export class OnboardingController {
   }
 
   /** {done: boolean}: only from the app itself (JSON with a local Origin), like the usage setting. */
-  @Put("onboarding") set(@Body() body: { done?: unknown }, @Headers("origin") origin?: string, @Headers("content-type") type?: string): { done: boolean } {
-    if (!type?.includes("application/json")) throw new BadRequestException("JSON only");
-    if (origin) { let host = ""; try { host = new URL(origin).host; } catch { /* not a URL */ } if (!isLocalHost(host)) throw new ForbiddenException(); }
+  @Put("onboarding") set(@Body() body: { done?: unknown }): { done: boolean } {
     if (typeof body?.done !== "boolean") throw new BadRequestException("done: true or false");
     this.settings.set(KEY, body.done ? "1" : "0");
     return { done: body.done };

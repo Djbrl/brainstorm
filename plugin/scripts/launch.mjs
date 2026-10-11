@@ -24,11 +24,18 @@ import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const argv = process.argv.slice(2);
-const flag = (f) => argv.includes(f);
-const opt = (f) => { const i = argv.indexOf(f); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith("--") ? argv[i + 1] : undefined; };
+/** The command line (see above), read once. A value is the word after its flag, unless that is another flag. */
+export function parseFlags(argv) {
+  const has = (f) => argv.includes(f);
+  const value = (f) => { const i = argv.indexOf(f); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith("--") ? argv[i + 1] : undefined; };
+  return {
+    background: has("--background"), open: has("--open"), browser: has("--browser"), switch: has("--switch"),
+    settings: has("--settings"), stop: has("--stop"), share: has("--share"), project: value("--project"), session: value("--session"),
+  };
+}
+const FLAGS = parseFlags(process.argv.slice(2));
 
-const BACKGROUND = flag("--background");
+const BACKGROUND = FLAGS.background;
 const say = (msg) => { if (!BACKGROUND) console.log(msg); };
 
 const PLUGIN = process.env.CLAUDE_PLUGIN_ROOT || resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -36,10 +43,10 @@ const DATA = process.env.CLAUDE_PLUGIN_DATA || join(homedir(), ".rundown");
 // The marketplace it came from, as Claude Code named it here (…/plugins/cache/<marketplace>/<plugin>/<version>): "rundown",
 // or "brainstorm" for someone who installed before the rename. The update command needs that name.
 const MARKET = /[\\/]plugins[\\/]cache[\\/]([^\\/]+)[\\/]/.exec(PLUGIN)?.[1] ?? "rundown";
-const PROJECT = resolve(opt("--project") || process.env.CLAUDE_PROJECT_DIR || process.cwd());
+const PROJECT = resolve(FLAGS.project || process.env.CLAUDE_PROJECT_DIR || process.cwd());
 // The Anthropic key comes only from the plugin's setting, never from the shell: the person gave Rundown that one.
 const KEY = process.env.CLAUDE_PLUGIN_OPTION_ANTHROPIC_API_KEY || "";
-const SETTINGS = flag("--settings");
+const SETTINGS = FLAGS.settings;
 const VERSION = JSON.parse(readFileSync(join(PLUGIN, ".claude-plugin", "plugin.json"), "utf8")).version;
 const SERVER = join(PLUGIN, "build", "server.js");
 const WEB = join(PLUGIN, "build", "web");
@@ -311,38 +318,55 @@ async function adoptOldData() {
 async function main() {
   mkdirSync(DATA, { recursive: true });
   await adoptOldData();
-  if (!nodeOk()) {
-    const msg = `Rundown needs Node.js 22.13 or later (you have ${process.versions.node}). Update Node, then start a new session.`;
-    if (!BACKGROUND) return say(msg);
-    const n = readNotices(); // once a day, not every session
-    if (!n.nodeWarnedAt || Date.now() - n.nodeWarnedAt > DAY) { n.nodeWarnedAt = Date.now(); writeNotices(n); tellUser([msg]); }
-    return;
-  }
-
-  if (flag("--stop")) {
-    const run = await running();
-    if (!run) return say("Rundown isn't running.");
-    if (!(await stop(run))) return say(`Rundown isn't running (process ${run.pid} on port ${run.port} isn't Rundown, so it was left alone).`);
-    return say(`Rundown stopped (it was on port ${run.port}).`);
-  }
-
-  let run = await ensureRunning();
-  if (BACKGROUND) return tellUser(await notices(run && !run.busy ? run.port : undefined, run?.health?.version));
+  if (!nodeOk()) return tooOldNode();
+  if (FLAGS.stop) return stopCommand();
+  if (BACKGROUND) return sessionStartCommand();
+  const run = await ensureRunning();
   if (!run) return;
   if (run.busy) return say(`Rundown is busy (still reading, it doesn't answer yet) on http://127.0.0.1:${run.port}/. Try again in a moment, or run /rundown:stop and open it again.`);
-  const port = run.port;
-  // Someone who opens Rundown themselves doesn't need the welcome.
+  welcomed(run);
+  if (FLAGS.share) return shareCommand(run.port);
+  return openCommand(run);
+}
+
+/** Node is too old for the server: say so (the hook: once a day, not every session). */
+function tooOldNode() {
+  const msg = `Rundown needs Node.js 22.13 or later (you have ${process.versions.node}). Update Node, then start a new session.`;
+  if (!BACKGROUND) return say(msg);
+  const n = readNotices();
+  if (!n.nodeWarnedAt || Date.now() - n.nodeWarnedAt > DAY) { n.nodeWarnedAt = Date.now(); writeNotices(n); tellUser([msg]); }
+}
+
+/** --stop: stop the running server, only if it's ours. */
+async function stopCommand() {
+  const run = await running();
+  if (!run) return say("Rundown isn't running.");
+  if (!(await stop(run))) return say(`Rundown isn't running (process ${run.pid} on port ${run.port} isn't Rundown, so it was left alone).`);
+  return say(`Rundown stopped (it was on port ${run.port}).`);
+}
+
+/** --background (the SessionStart hook): start the server if needed and tell the user what's new, without waiting. */
+async function sessionStartCommand() {
+  const run = await ensureRunning();
+  return tellUser(await notices(run && !run.busy ? run.port : undefined, run?.health?.version));
+}
+
+/** Someone who opens Rundown themselves doesn't need the welcome (nor the "updated" notice for this version). */
+function welcomed(run) {
   const n = readNotices();
   if (!n.welcomed || (run.health.version === VERSION && n.lastVersion !== VERSION && newer(VERSION, n.lastVersion ?? "0.0.0"))) {
     writeNotices({ ...n, welcomed: true, ...(run.health.version === VERSION ? { lastVersion: VERSION } : {}) });
   }
+}
 
-  if (flag("--share")) return share(port);
-
+/** /rundown:open (and a plain run): with --switch, make this project the shown one; with --open, open the map; say
+ * where it runs. */
+async function openCommand(run) {
+  const port = run.port;
   // The project the server shows (a restart keeps the saved one): this one only after --switch.
   const ws = await fetch(`http://127.0.0.1:${port}/api/workspace`).then((r) => r.json()).catch(() => null);
   let root = ws?.root ?? null;
-  if (flag("--switch")) {
+  if (FLAGS.switch) {
     root = PROJECT;
     if (ws?.root !== PROJECT) {
       const r = await fetch(`http://127.0.0.1:${port}/api/workspace`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ root: PROJECT }) }).catch(() => null);
@@ -356,8 +380,8 @@ async function main() {
   }
 
   const url = `http://127.0.0.1:${port}/`;
-  const pane = flag("--open") && DESKTOP && !flag("--browser");
-  if (flag("--open") && !pane) openBrowser(url);
+  const pane = FLAGS.open && DESKTOP && !FLAGS.browser;
+  if (FLAGS.open && !pane) openBrowser(url);
   say(root ? `Rundown ${run.health.version} is running for ${root}: ${url}` : `Rundown ${run.health.version} is running: ${url}`);
   if (pane) say(`Open it in the browser pane: ${url}`);
 }
@@ -414,9 +438,9 @@ async function ensureRunning() {
   }
 }
 
-/** Saves the thread as a replay file and a Markdown summary, and says where. */
-async function share(port) {
-  const sid = opt("--session");
+/** --share: saves the thread (--session) as a replay file and a Markdown summary, and says where. */
+async function shareCommand(port) {
+  const sid = FLAGS.session;
   const dir = existsSync(join(homedir(), "Downloads")) ? join(homedir(), "Downloads") : join(DATA, "shares");
   mkdirSync(dir, { recursive: true });
   const get = async (path, id) => fetch(`http://127.0.0.1:${port}${path}${id ? `?sessionId=${encodeURIComponent(id)}` : ""}`);

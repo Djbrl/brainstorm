@@ -4,6 +4,7 @@
 // the replay tracer) centres its content in what's left, measured from the DOM, not hard-coded.
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { reducedMotion } from "../lib/breakpoints";
+import { ease } from "./util";
 
 /** Canvas size, and how much of each side is covered, in CSS pixels. */
 export type Safe = { w: number; h: number; left: number; top: number; right: number; bottom: number };
@@ -82,7 +83,6 @@ export function boxOf(pts: Iterable<{ x?: number; y?: number; r?: number }>): Bo
   return x0 === Infinity ? null : { x0, y0, x1, y1 };
 }
 
-const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 export type Camera = {
   /** The safe area, kept up to date (for per-frame follows). */

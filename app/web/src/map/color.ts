@@ -10,6 +10,15 @@ export function hex(c: string): [number, number, number] {
   const n = parseInt(h.length === 3 ? h.split("").map((x) => x + x).join("") : h, 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
+/** Any colour the themes use, "#rgb", "#rrggbb" or "rgb(…)"/"rgba(…)", as RGB. */
+export const rgbOf = (c: string): RGB => (c.startsWith("#") ? hex(c) : ((c.match(/\d+/g) ?? ["0", "0", "0"]).slice(0, 3).map(Number) as RGB));
+/** A hex colour at an alpha, as rgba() (not a hex colour: the accent blue). */
+export function hexA(c: string, alpha: number): string {
+  const h = c.trim().replace("#", "");
+  if (!/^[0-9a-f]{3}([0-9a-f]{3})?$/i.test(h)) return `rgba(37,99,235,${alpha})`;
+  const [r, g, b] = hex(h);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 export const mixRGB = (a: RGB, b: RGB, t: number): RGB => {
   const k = Math.max(0, Math.min(1, t));
   return a.map((v, i) => Math.round(v + (b[i] - v) * k)) as RGB;

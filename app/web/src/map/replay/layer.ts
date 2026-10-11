@@ -11,6 +11,10 @@ import { centerFor, type Camera } from "../camera";
 import { getCameraLock, getStepWindow, type StepWindow } from "../prefs";
 import { along, casing, drawMarker, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs } from "../themes";
 import { PARK } from "../agents";
+import { reducedMotion } from "../../lib/breakpoints";
+import { useShortcut } from "../../switch/shortcuts";
+import { ease } from "../util";
+import { hexA } from "../color";
 
 export type NodePos = { x?: number; y?: number; r: number };
 /**
@@ -79,7 +83,6 @@ const SUMMARY_MS = 380;     // playback pace for summary beats (light detail)
 const READ_MS = 520;        // playback pace for reads
 const STEP_MS = 700;        // playback pace for edits and your prompts (at 1×)
 
-const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const STILL = reducedMotion();
 /**
  * The numbered stops: each file visited within the window, by its latest stop (the marker's own file has none), in the
@@ -118,8 +121,6 @@ const badgeAt = (n: { x: number; y: number; r: number }, scale: number) => {
 };
 const BADGE_FONT = 9.5, MARK_R = 10, NAME_FONT = 12;
 import { basename as baseName } from "@shared/text";
-import { reducedMotion } from "../../lib/breakpoints";
-import { useShortcut } from "../../switch/shortcuts";
 const INK = "#1d1d1f";
 
 type Anim = { x: number; y: number; fromX: number; fromY: number; t0: number; file: string | null; lastIndex: number; beatAt: number;
@@ -615,9 +616,3 @@ export function togglePlay(playing: boolean, setPlaying: (p: boolean) => void, a
   setPlaying(!playing);
 }
 
-function hexA(c: string, alpha: number) {
-  const h = c.trim().replace("#", "");
-  if (!/^[0-9a-f]{3}([0-9a-f]{3})?$/i.test(h)) return `rgba(37,99,235,${alpha})`;
-  const n = parseInt(h.length === 3 ? h.split("").map((x) => x + x).join("") : h, 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
-}

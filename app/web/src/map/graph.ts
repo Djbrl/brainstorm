@@ -11,6 +11,7 @@ import { isPlaceRoot, type Island } from "../lib/islands";
 import type { Look } from "./replay/layer";
 import type { StampMemo } from "./sprites";
 import { mapStyle, reachOf, type MapStyle, type RGB } from "./themes";
+import { ease } from "./util";
 
 /** A folder on the map: its path from the root ("app/web/src"), the name it shows, and what's inside it. */
 export type Dir = { rel: string; name: string; depth: number; files: FileNode[]; kids: GNode[];
@@ -246,7 +247,6 @@ function refresh(g: Graph, map: ProjectMap, base: string, islands: Island[]) {
 
 /** Circles gliding from where they were to where the new layout puts them. */
 export type Tween = { t0: number; moves: [GNode, number, number, number, number][] };
-const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 /** Moves the gliding circles for this frame; true while some are still on their way. */
 export function stepTween(tw: { current: Tween | null }, now: number) {
   const t = tw.current;

@@ -10,15 +10,16 @@ import {
 } from "./themes";
 import { css, mixRGB, recencyRGB, same, steps, type Tokens } from "./color";
 import type { GLink, GNode } from "./graph";
+import { reducedMotion } from "../lib/breakpoints";
+import { easeOut, hashString } from "./util";
 
 export const RIPPLE_MS = 700; // one ripple per edit
 const TAU = Math.PI * 2;
 
 /** A stable starting angle per file, so cubes don't all turn in step. */
 const STILL = reducedMotion();
-const spin = (id: string) => { let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0; return (h % 628) / 100; };
+const spin = (id: string) => (hashString(id) % 628) / 100;
 import { basename as baseName } from "@shared/text";
-import { reducedMotion } from "../lib/breakpoints";
 
 /**
  * Metro: a file's or folder's colour, the one of the folder two levels down it sits in (one level for a small project),
@@ -31,7 +32,7 @@ function lineOf(n: GNode, st: MapStyle): string | undefined {
   if (v === undefined) {
     let d: GNode | undefined = n.dir ? n : n.up, pick: GNode | undefined;
     for (; d?.dir; d = d.up) if (d.dir.depth <= 2 && !d.dir.island && !d.dir.more) { pick = d; if (d.dir.depth === 2) break; }
-    if (pick) { let h = 0; for (let i = 0; i < pick.id.length; i++) h = (h * 31 + pick.id.charCodeAt(i)) >>> 0; v = st.lines[h % st.lines.length]; }
+    if (pick) v = st.lines[hashString(pick.id) % st.lines.length];
     else v = null;
     lineCache.set(n, v);
   }
@@ -145,7 +146,6 @@ const focusColour = (edited: string | undefined, F: Frame, m: Caches["focusColou
 const LINES_GROW_MS = 320;   // lines growing out of the file, or a stub running out to the whole line
 const LINES_BACK_MS = 260;   // lines drawing back: a whole line to its stub, a stub into the file
 const STUB_PX = 26;          // pointed at: each line shows this far past the file's edge, enough to count them
-const easeOut = (k: number) => 1 - (1 - k) ** 3;
 /** How far a file's lines are drawn: 0 not at all, 1 stubs, 2 whole lines, easing from `from` to `to` since `at`. */
 export type LineLevel = { from: number; to: number; at: number };
 const levelNow = (l: LineLevel, t: number) => {

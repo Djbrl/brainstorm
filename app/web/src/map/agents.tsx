@@ -2,15 +2,14 @@
 import type { AgentPresence } from "@contract";
 import { clock } from "../lib/live";
 import { along, casing, drawMarker, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs, type RGB } from "./themes";
-import { css, hex, mixRGB, same } from "./color";
+import { css, hex, mixRGB, rgbOf, same } from "./color";
+import { ease, hashString } from "./util";
 
 /** Main threads get the accent (Metro: their own ink line); subagents a colour from the theme's palette, by id. */
 export function agentColor(a: Pick<AgentPresence, "id" | "isSubagent">, accent: string): string {
   if (!a.isSubagent) return mapStyle().track ?? accent;
-  let h = 0;
-  for (let i = 0; i < a.id.length; i++) h = (h * 31 + a.id.charCodeAt(i)) >>> 0;
   const palette = mapStyle().palette;
-  return palette[h % palette.length];
+  return palette[hashString(a.id) % palette.length];
 }
 
 /** The letter's colour on an agent's colour: white on a dark one, near-black on a light one (the dark themes' pastels). */
@@ -74,7 +73,6 @@ export type AgentAnim = {
   col?: RGB; thinkA?: number; waitA?: number; easeT?: number; easing?: boolean;
 };
 type Pt = { x: number; y: number; r: number };
-const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const GLIDE_MS = 650;
 const READ_MS = 1500;
 const READS_SHOWN = 4;      // the files it read lately that keep a dotted line
@@ -87,7 +85,6 @@ const THINK_MS = 2400;      // the slower ring while it thinks
 const STATE_EASE = 0.16;    // seconds for a marker to (nearly) take its new state's colour and rings
 const REST_GREY: RGB = [176, 180, 190];   // at rest, the marker's colour turns this much toward grey (REST_MIX)
 const REST_MIX = 0.55;
-const rgbOf = (c: string): RGB => (c.startsWith("#") ? hex(c) : ((c.match(/\d+/g) ?? ["0", "0", "0"]).slice(0, 3).map(Number) as RGB));
 const toward = (a: number, b: number, f: number) => (Math.abs(b - a) < 0.01 ? b : a + (b - a) * f);
 const easeRGB = (a: RGB, b: RGB, f: number): RGB =>
   a.map((v, i) => (Math.abs(b[i] - v) < 0.5 ? b[i] : v + (b[i] - v) * f)) as RGB;

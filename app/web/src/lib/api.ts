@@ -43,7 +43,9 @@ async function request<T>(method: string, path: string, body?: unknown, o: Optio
     const b: unknown = await r.json().catch(() => null);
     throw new ApiError(r.status, path, b, said(b));
   }
-  return r.json() as Promise<T>;
+  // 204 or an empty body (open, reveal, usage events): nothing to read, and not a failure.
+  const text = await r.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 /** GET a JSON answer. Throws ApiError when the request fails. */

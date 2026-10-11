@@ -20,9 +20,9 @@ import { useTheme } from "../../lib/theme";
 import { agentColor, initial, inkOn } from "../agents";
 import { readTokens } from "../color";
 import { useNow } from "../../lib/hooks";
+import { MomentRow, useCursorScroll, useRowWindow } from "./moments";
 import "./replay.css";
 
-const USER_MS = 400;       // the list stops following the cursor this long after the user scrolls it
 const ROW_H = 30;          // a moment's row height until one is measured (.rp-m: one line)
 const OVERSCAN = 40;       // rows drawn past each edge of the view, and around the cursor
 
@@ -51,12 +51,10 @@ export type Who = { name: string; color: string; letter: string };
 const Moment = memo(function Moment({ index, label, tone, failed, state, onPick, who, whoColor, whoLetter }:
   { index: number; label: string; tone: string; failed: boolean; state: RowState; onPick: (i: number) => void; who?: string; whoColor?: string; whoLetter?: string }) {
   return (
-    <button className={`rp-m ${tone} ${state}${who ? " by-sub" : ""}`} data-beat={index} onClick={() => onPick(index)}
-      aria-current={state === "current" ? "step" : undefined} title={who ? `${who}: ${label}` : label}>
-      {who ? <i className="rp-who" style={{ background: whoColor, color: whoColor && inkOn(whoColor) }} aria-hidden="true">{whoLetter}</i> : <b aria-hidden="true" />}
-      <span><LinkedLabel text={label} max={40} /></span>
-      {failed && <em>failed</em>}
-    </button>
+    <MomentRow className={`rp-m ${tone} ${state}${who ? " by-sub" : ""}`} data-beat={index} onClick={() => onPick(index)}
+      aria-current={state === "current" ? "step" : undefined} title={who ? `${who}: ${label}` : label}
+      mark={who ? <i className="rp-who" style={{ background: whoColor, color: whoColor && inkOn(whoColor) }} aria-hidden="true">{whoLetter}</i> : undefined}
+      label={<LinkedLabel text={label} max={40} />} failed={failed} />
   );
 });
 
@@ -75,8 +73,6 @@ const ChapterHead = memo(function ChapterHead({ c, open, at, multiDay, onToggle 
   );
 });
 
-type Range = [number, number]; // rows [start, end) of a chapter, as beat indexes
-
 /**
  * An open chapter's moments, beats `from`..`last`: the rows in view and around the cursor, with spacers for the rest.
  * Each spacer says which rows it stands for (data-from), so the center line can find a moment there too.
@@ -85,29 +81,8 @@ const Moments = memo(function Moments({ beats, from, last, index, rowH, onPick, 
   { beats: Beat[]; from: number; last: number; index: number; rowH: number; onPick: (i: number) => void; onRowH: (h: number) => void; whoOf: (b: Beat) => Who | undefined }) {
   const box = useRef<HTMLDivElement>(null);
   const end = last + 1;
-  const clamp = (r: Range): Range => [Math.max(from, r[0]), Math.min(end, r[1])];
-  // The rows in view, from where this chapter sits in the list's scroll.
-  const inView = useCallback((): Range | null => {
-    const el = box.current, list = el?.closest(".rp-list");
-    if (!el || !list) return null;
-    const top = el.getBoundingClientRect().top - list.getBoundingClientRect().top;
-    const a = from + Math.floor(-top / rowH), b = from + Math.ceil((list.clientHeight - top) / rowH);
-    return [a, b];
-  }, [from, rowH]);
-  const [view, setView] = useState<Range>(() => [index - OVERSCAN, index + OVERSCAN]);
-  // Follow the list's scroll: draw again only once the view nears the edge of what is drawn.
-  useLayoutEffect(() => {
-    const list = box.current?.closest(".rp-list");
-    if (!list) return;
-    const update = () => {
-      const v = inView();
-      if (v) setView((cur) => (v[0] - OVERSCAN / 2 < cur[0] && cur[0] > from) || (v[1] + OVERSCAN / 2 > cur[1] && cur[1] < end) || v[1] < cur[0] || v[0] > cur[1]
-        ? [v[0] - OVERSCAN, v[1] + OVERSCAN] : cur);
-    };
-    update();
-    list.addEventListener("scroll", update, { passive: true });
-    return () => list.removeEventListener("scroll", update);
-  }, [inView, from, end]);
+  // What to draw: the view, and the cursor's neighbourhood (the list scrolls to it right after this render).
+  const merged = useRowWindow({ from, end, at: index, before: OVERSCAN, size: 2 * OVERSCAN, view: { box, scroller: ".rp-list", rowH, overscan: OVERSCAN } });
   // Measure a row: the spacers are rows' worth of height.
   useLayoutEffect(() => {
     const row = box.current?.querySelector<HTMLElement>(".rp-m");
@@ -115,16 +90,6 @@ const Moments = memo(function Moments({ beats, from, last, index, rowH, onPick, 
     if (h && Math.abs(h - rowH) > 0.05) onRowH(h);
   });
 
-  // What to draw: the view, and the cursor's neighbourhood (the list scrolls to it right after this render).
-  const ranges: Range[] = [clamp(view)];
-  if (index >= from && index <= last) ranges.push(clamp([index - OVERSCAN, index + OVERSCAN]));
-  ranges.sort((p, q) => p[0] - q[0]);
-  const merged: Range[] = [];
-  for (const r of ranges) {
-    if (r[1] <= r[0]) continue;
-    const m = merged[merged.length - 1];
-    if (m && r[0] <= m[1]) m[1] = Math.max(m[1], r[1]); else merged.push([r[0], r[1]]);
-  }
   const out: ReactNode[] = [];
   const spacer = (a: number, b: number) => out.push(<div key={`s${a}`} className="rp-m-gap" data-from={a} style={{ height: (b - a) * rowH }} aria-hidden="true" />);
   let at = from;
@@ -179,11 +144,7 @@ type TrackProps = {
 /** The list itself. Memoised: a live message that doesn't change this thread or its cursor leaves it alone. */
 const TrackList = memo(function TrackList({ thread, sessionId, whoOf, index, playing, full, setReplayIndex, setReplayPlaying, setReplayDetail, openStep }: TrackProps) {
   const threadRef = useRef(thread); threadRef.current = thread;
-  const listRef = useRef<HTMLDivElement>(null);
   const afterRef = useRef<HTMLSpanElement>(null);   // where Skip past the steps lands
-  const userAt = useRef(0);
-  const ownAt = useRef(0); // when the list last scrolled itself to the cursor
-  const dragging = useRef(false);
   const [rowH, setRowH] = useState(ROW_H);
 
   const len = thread.beats.length;
@@ -197,38 +158,14 @@ const TrackList = memo(function TrackList({ thread, sessionId, whoOf, index, pla
   const toggle = useCallback((i: number) => setOpen((o) => { const n = new Set(o); if (n.has(i)) n.delete(i); else n.add(i); return n; }), []);
 
   const playingRef = useRef(playing); playingRef.current = playing;
-  const indexRef = useRef(index); indexRef.current = index;
 
-  // A moment opens in the side panel (a summary, on the agent's own words).
-  const onPick = useCallback((i: number) => {
-    setReplayPlaying(false); setReplayIndex(i); userAt.current = 0;
-    const beat = threadRef.current?.beats[i];
-    if (!beat) return;
-    const words = beat.kind === "summary" ? [...beat.steps].reverse().find((s) => s.kind === "text" && s.text?.trim()) : undefined;
-    openStep(sessionId, (words ?? beat.step).id);
-  }, [setReplayIndex, setReplayPlaying, openStep, sessionId]);
-
-  // Any real scroll input from the user (wheel, touch, scrollbar drag, keys).
-  const markUser = useCallback(() => { userAt.current = performance.now(); }, []);
-  useEffect(() => {
-    const up = () => { if (dragging.current) { dragging.current = false; markUser(); } };
-    window.addEventListener("pointerup", up);
-    window.addEventListener("pointercancel", up);
-    return () => { window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up); };
-  }, [markUser]);
-
-  // The list's scroll moves the cursor to the moment nearest the center line (a spacer stands for rows of moments).
-  const raf = useRef(0);
-  const rowHRef = useRef(rowH); rowHRef.current = rowH;
-  const onScroll = useCallback(() => {
-    // Our own scroll (following the cursor) or a layout shift: only a scroll you started counts, and one you started
-    // before the list last moved by itself doesn't (a trackpad's glide would otherwise pick a moment mid-way and
-    // flip a live thread back and forth).
-    if (!dragging.current && (performance.now() - userAt.current > USER_MS || userAt.current < ownAt.current)) return;
-    cancelAnimationFrame(raf.current);
-    raf.current = requestAnimationFrame(() => {
-      const el = listRef.current;
-      if (!el) return;
+  // The list and the cursor move each other. The list's scroll moves the cursor to the moment nearest the center line
+  // (a spacer stands for rows of moments); the cursor scrolls the list to its moment, one that isn't drawn yet found by
+  // its place in its chapter (every row is one line).
+  const scroll = useCursorScroll<HTMLDivElement>({
+    at: index, count: len, user: "input", deps: [here, open, chapters, rowH], resetKey: sessionId,
+    go: (i) => { if (playingRef.current) setReplayPlaying(false); setReplayIndex(i); },
+    rowAtCenter: (el) => {
       const r = el.getBoundingClientRect();
       const cy = r.top + r.height / 2;
       let i = NaN;
@@ -237,47 +174,37 @@ const TrackList = memo(function TrackList({ thread, sessionId, whoOf, index, pla
         const row = hit?.closest<HTMLElement>("[data-beat], .rp-m-gap");
         if (!row || !el.contains(row)) continue;
         i = row.dataset.beat !== undefined ? Number(row.dataset.beat)
-          : Number(row.dataset.from) + Math.floor((cy + dy - row.getBoundingClientRect().top) / rowHRef.current);
+          : Number(row.dataset.from) + Math.floor((cy + dy - row.getBoundingClientRect().top) / rowH);
         break;
       }
       // Scrolled to the bottom: the newest moment, which the center line can't reach (a running thread follows live
       // again from there, App's LiveFollow).
       if (el.scrollTop + el.clientHeight >= el.scrollHeight - 4) i = threadRef.current.beats.length - 1;
-      if (Number.isFinite(i) && i !== indexRef.current) {
-        if (playingRef.current) setReplayPlaying(false);
-        setReplayIndex(i);
+      return i;
+    },
+    cursorBox: (el) => {
+      const row = el.querySelector<HTMLElement>(`[data-beat="${index}"]`);
+      if (row) return { top: row.offsetTop, height: row.offsetHeight };
+      if (here >= 0 && open.has(here)) {
+        const c = chapters[here], from = c.hasPrompt ? c.first + 1 : c.first;
+        const box = el.querySelector<HTMLElement>(`[data-chapter="${here}"] .rp-ch-moments`);
+        if (box && index >= from && index <= c.last) return { top: box.offsetTop + (index - from) * rowH, height: rowH };
       }
-    });
-  }, [setReplayIndex, setReplayPlaying]);
-
-  // The cursor scrolls the list, unless the user scrolled it just now. A moment that isn't drawn yet is found by its
-  // place in its chapter (every row is one line).
-  const first = useRef(true);
-  useLayoutEffect(() => {
-    const el = listRef.current;
-    if (!el || !len) return;
-    if (dragging.current || performance.now() - userAt.current < USER_MS) return;
-    let rowTop: number | null = null, rowHeight = 0;
-    const row = el.querySelector<HTMLElement>(`[data-beat="${index}"]`);
-    if (row) { rowTop = row.offsetTop; rowHeight = row.offsetHeight; }
-    else if (here >= 0 && open.has(here)) {
-      const c = chapters[here], from = c.hasPrompt ? c.first + 1 : c.first;
-      const box = el.querySelector<HTMLElement>(`[data-chapter="${here}"] .rp-ch-moments`);
-      if (box && index >= from && index <= c.last) { rowTop = box.offsetTop + (index - from) * rowH; rowHeight = rowH; }
-    }
-    if (rowTop === null) {
       const head = el.querySelector<HTMLElement>(`[data-chapter="${here}"] .rp-ch-head`);
-      if (!head) return;
-      rowTop = head.offsetTop; rowHeight = head.offsetHeight;
-    }
-    const top = Math.max(0, rowTop - el.clientHeight / 2 + rowHeight / 2);
-    const delta = Math.abs(el.scrollTop - top);
-    if (delta < 2) return;
-    ownAt.current = performance.now();
-    el.scrollTo({ top, behavior: first.current || delta > 1600 ? "auto" : "smooth" });
-    first.current = false;
-  }, [index, len, here, open, chapters, rowH]);
-  useEffect(() => { first.current = true; }, [sessionId]);
+      return head ? { top: head.offsetTop, height: head.offsetHeight } : null;
+    },
+    instant: (delta, first) => first || delta > 1600,
+  });
+  const { release } = scroll;
+
+  // A moment opens in the side panel (a summary, on the agent's own words).
+  const onPick = useCallback((i: number) => {
+    setReplayPlaying(false); setReplayIndex(i); release();
+    const beat = threadRef.current?.beats[i];
+    if (!beat) return;
+    const words = beat.kind === "summary" ? [...beat.steps].reverse().find((s) => s.kind === "text" && s.text?.trim()) : undefined;
+    openStep(sessionId, (words ?? beat.step).id);
+  }, [setReplayIndex, setReplayPlaying, openStep, sessionId, release]);
 
   const onRowH = useCallback((h: number) => setRowH(h), []);
 
@@ -285,9 +212,8 @@ const TrackList = memo(function TrackList({ thread, sessionId, whoOf, index, pla
     <div className="rp-steps">
       {/* A long thread is hundreds of Tab stops: the first one jumps past them all (to the map, the open step). */}
       <button className="skip-link" onClick={() => afterRef.current?.focus()}>Skip past the steps</button>
-      <div className="rp-list rp-chapters" ref={listRef} onScroll={onScroll} onWheel={markUser} onTouchMove={markUser}
-        onKeyDown={(e) => { if (["PageUp", "PageDown", "ArrowUp", "ArrowDown"].includes(e.key)) markUser(); }}
-        onPointerDown={(e) => { if (e.target === e.currentTarget) { dragging.current = true; markUser(); } }}>
+      <div className="rp-list rp-chapters" ref={scroll.ref} onScroll={scroll.onScroll} onWheel={scroll.onWheel} onTouchMove={scroll.onTouchMove}
+        onKeyDown={scroll.onKeyDown} onPointerDown={scroll.onPointerDown}>
         {chapters.map((c) => {
           const isOpen = open.has(c.index);
           const from = c.hasPrompt ? c.first + 1 : c.first; // the message itself is the heading

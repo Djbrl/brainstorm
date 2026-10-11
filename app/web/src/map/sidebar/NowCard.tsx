@@ -14,6 +14,7 @@ import { useThread } from "../../lib/thread";
 import { needsYou, yourTurn } from "../../lib/attention";
 import { textOf } from "../replay/ReplaySteps";
 import { reducedMotion } from "../../lib/breakpoints";
+import { MomentRow, useRowWindow } from "../replay/moments";
 
 const NOTCH = 40;   // px of wheel per moment (a mouse notch, or a stretch of a trackpad's glide)
 const ROWS = 4;     // moments on the card
@@ -63,7 +64,8 @@ export function NowCard({ onOpen }: { onOpen: () => void }) {
   const at = Math.min(index, beats.length - 1);
   // Always the same four rows (fewer only in a thread that short), so the card keeps its height as you scroll: the
   // moment you're on third, with one after it, or last at the newest (three before it).
-  const start = Math.max(0, Math.min(at - 2, beats.length - ROWS));
+  const [shown] = useRowWindow({ end: beats.length, at, before: 2, size: ROWS });
+  const start = shown?.[0] ?? 0;
   // Moving a moment, the rows slide by one, as the Track's list scrolls, instead of jumping (a fast scroll that moves
   // several at once slides by up to three).
   // Only when the window of rows moves: at the thread's ends it stays put and the highlight moves instead.
@@ -77,7 +79,7 @@ export function NowCard({ onOpen }: { onOpen: () => void }) {
   }, [start]);
   if (!replay) return null;
 
-  const rows = beats.length ? Array.from({ length: Math.min(ROWS, beats.length) }, (_, k) => start + k) : [];
+  const rows = shown ? Array.from({ length: shown[1] - shown[0] }, (_, k) => start + k) : [];
   const working = running && !needsYou(attn) && !yourTurn(attn);
   const cur = beats[at];
 
@@ -87,14 +89,13 @@ export function NowCard({ onOpen }: { onOpen: () => void }) {
       <button className="sn-rows" onClick={onOpen} aria-expanded={false}
         aria-label={`Open the thread's steps (T). ${cur ? `On: ${textOf(cur).label}` : "Loading its steps"}`} title="Open the thread's steps (T)">
         <span className="sn-list" ref={list}>
-          {!rows.length && <span className="sn-m current"><b /><span>Loading its steps…</span></span>}
+          {!rows.length && <MomentRow as="span" className="sn-m current" mark={<b />} label="Loading its steps…" />}
           {rows.map((i) => {
             const { label, tone } = textOf(beats[i]);
             const state = i === at ? "current" : i < at ? `done d${at - i}` : "todo";
             return (
-              <span key={beats[i].step.id} className={`sn-m ${tone} ${state}${i === beats.length - 1 && working ? " working" : ""}`} aria-hidden="true">
-                <b /><span>{label}</span>{beats[i].failed > 0 && <em>failed</em>}
-              </span>
+              <MomentRow as="span" key={beats[i].step.id} className={`sn-m ${tone} ${state}${i === beats.length - 1 && working ? " working" : ""}`} aria-hidden="true"
+                mark={<b />} label={label} failed={beats[i].failed > 0} />
             );
           })}
         </span>

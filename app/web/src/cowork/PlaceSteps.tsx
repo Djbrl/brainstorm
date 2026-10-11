@@ -5,7 +5,7 @@
 // list's middle; the map's marker goes with it), and the list follows the replay. A row selects its place on the map,
 // takes the thread there and opens its newest step in the side panel. Between its trips out, a row for Your computer:
 // the thread back in the code (its first row too, where it starts).
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { useNavState } from "../lib/nav";
 import { usePlaceRows } from "./rows";
 import { displayLabel } from "../follow/format";
@@ -13,10 +13,9 @@ import { injectedLabel } from "../lib/chapters";
 import { useLiveSelector } from "../lib/live";
 import { LinkedLabel } from "../lib/links";
 import { HOME_NAME, placesStore, runWords, usePlaces, useSelectPlace, type PlaceRun } from "./data";
+import { MomentRow, useCursorScroll } from "../map/replay/moments";
 import "../map/replay/replay.css"; // the row styles (.rp-list, .rp-m) it shares with the replay
 
-
-const USER_MS = 400;   // the list stops following the thread this long after you scroll it (as the Track's does)
 
 export function PlaceSteps() {
   const { data, selected } = usePlaces();
@@ -26,43 +25,26 @@ export function PlaceSteps() {
   const stepById = useMemo(() => new Map((steps ?? []).map((x) => [x.id, x])), [steps]);
   const { rows, at, go } = usePlaceRows();
   const runs = rows.flatMap((r) => (r.run ? [r.run] : []));
-  const goRef = useRef(go); goRef.current = go;
-  const atRef = useRef(at); atRef.current = at;
 
   // Scrolling: the row at the list's middle is where the thread goes. The thread moving (playing, the card, a link):
   // the list brings its row to the middle, unless you scrolled it just now.
-  const list = useRef<HTMLDivElement>(null), userAt = useRef(0), ownAt = useRef(0), raf = useRef(0);
-  useEffect(() => {
-    const el = list.current;
-    if (!el) return;
-    const onScroll = () => {
-      // Its own glide to the thread's row isn't you: only a scroll that starts away from one counts (a wheel's coast too).
-      if (performance.now() - ownAt.current < 700) return;
-      userAt.current = performance.now();
-      cancelAnimationFrame(raf.current);
-      raf.current = requestAnimationFrame(() => {
-        const rowsEl = [...el.querySelectorAll<HTMLElement>("[data-run]")];
-        if (!rowsEl.length) return;
-        let best = -1;
-        if (el.scrollTop <= 4) best = 0;                                                     // at the top: the first
-        else if (el.scrollTop + el.clientHeight >= el.scrollHeight - 4) best = rowsEl.length - 1;   // at the bottom: the last
-        else {
-          const r = el.getBoundingClientRect(), mid = r.top + r.height / 2;
-          let d = Infinity;
-          for (const row of rowsEl) { const b = row.getBoundingClientRect(), dd = Math.abs(b.top + b.height / 2 - mid); if (dd < d) { d = dd; best = Number(row.dataset.run); } }
-        }
-        if (best >= 0 && best !== atRef.current) goRef.current(best);
-      });
-    };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, [!!data]);
-  useEffect(() => {
-    const el = list.current, row = el?.querySelector<HTMLElement>(`[data-run="${at}"]`);
-    if (!el || !row || performance.now() - userAt.current < USER_MS) return;
-    ownAt.current = performance.now();
-    el.scrollTo({ top: row.offsetTop - el.clientHeight / 2 + row.offsetHeight / 2, behavior: "smooth" });
-  }, [at]);
+  const scroll = useCursorScroll<HTMLDivElement>({
+    at, count: rows.length, go, user: "any", deps: [],
+    rowAtCenter: (el) => {
+      const rowsEl = [...el.querySelectorAll<HTMLElement>("[data-run]")];
+      if (!rowsEl.length) return -1;
+      if (el.scrollTop <= 4) return 0;                                                          // at the top: the first
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 4) return rowsEl.length - 1;      // at the bottom: the last
+      const r = el.getBoundingClientRect(), mid = r.top + r.height / 2;
+      let best = -1, d = Infinity;
+      for (const row of rowsEl) { const b = row.getBoundingClientRect(), dd = Math.abs(b.top + b.height / 2 - mid); if (dd < d) { d = dd; best = Number(row.dataset.run); } }
+      return best;
+    },
+    cursorBox: (el) => {
+      const row = el.querySelector<HTMLElement>(`[data-run="${at}"]`);
+      return row ? { top: row.offsetTop, height: row.offsetHeight } : null;
+    },
+  });
 
   if (!data) return <p className="sidebar-empty">Reading the thread…</p>;
   if (!data.events.length) return <p className="sidebar-empty">This thread stayed in the code.</p>;
@@ -75,29 +57,25 @@ export function PlaceSteps() {
   /** What a stretch in a place was: its most telling event's words; else its first step's, as the Track says it. */
   const said = (r: PlaceRun) => { const w = runWords(r); if (w) return w; const st = stepById.get(r.first.stepId); return st ? injectedLabel(st) ?? displayLabel(st) : ""; };
   return (
-    <div className="rp-list pl-list" ref={list}>
+    <div className="rp-list pl-list" ref={scroll.ref} onScroll={scroll.onScroll}>
       {rows.map((row, i) => {
         const state = i === at ? "current" : i > at ? "todo" : "done";
         const r = row.run;
         if (!r) {
           return (
-            <button key={`home-${row.start}`} data-run={i} className={`rp-m pl-m pl-home ${state}`} onClick={() => go(i)}
-              title={`${HOME_NAME}: ${i === 0 ? "the thread starts in the code" : "back in the code"}${row.moments > 1 ? `, ${row.moments} moments` : ""}`}>
-              <b aria-hidden="true" /><span>{i === 0 ? "Starts in the code" : "Back in the code"}</span><small>{HOME_NAME}</small>
-            </button>
+            <MomentRow key={`home-${row.start}`} data-run={i} className={`rp-m pl-m pl-home ${state}`} onClick={() => go(i)}
+              title={`${HOME_NAME}: ${i === 0 ? "the thread starts in the code" : "back in the code"}${row.moments > 1 ? `, ${row.moments} moments` : ""}`}
+              label={i === 0 ? "Starts in the code" : "Back in the code"} aside={<small>{HOME_NAME}</small>} />
           );
         }
         const e = r.last, picked = isSel(r), tone = r.failed > 0 ? "fl" : r.verbs.size > 0 ? "edit" : "";
         const label = said(r), where = e.site;
         return (
-          <button key={r.key} data-run={i} className={`rp-m pl-m ${tone} ${picked ? "current" : state}`}
+          <MomentRow key={r.key} data-run={i} className={`rp-m pl-m ${tone} ${picked ? "current" : state}`}
             onClick={() => { if (picked) { selectPlace(null); return; } selectPlace(r.place, e.stepId); go(i); }}
             onMouseEnter={() => placesStore.set({ highlight: r.place })} onMouseLeave={() => placesStore.set({ highlight: null })}
-            title={`${label}\n${where}${r.count > 1 ? ` · ${r.count} steps` : ""}`}>
-            <b aria-hidden="true" /><span><LinkedLabel text={label} max={40} /></span>
-            {r.failed > 0 && <em>failed</em>}
-            <small>{where}</small>
-          </button>
+            title={`${label}\n${where}${r.count > 1 ? ` · ${r.count} steps` : ""}`}
+            label={<LinkedLabel text={label} max={40} />} failed={r.failed > 0} aside={<small>{where}</small>} />
         );
       })}
     </div>

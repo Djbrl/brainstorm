@@ -4,7 +4,7 @@
 import { isReplay, shallowEqual, useLiveActions, useLiveSelector, useHarness, useLiveStep } from "./lib/live";
 import { harnessName } from "./lib/harness";
 import { END, NavProvider, useNavActions, useNavState, useReplayCursor } from "./lib/nav";
-import { useThread, type ReplayDetail } from "./lib/thread";
+import { useThread, type ReplayDetail, type Thread } from "./lib/thread";
 import { displayLabel } from "./follow/format";
 import { LinkedLabel } from "./lib/links";
 import { SetupView } from "./setup/SetupView";
@@ -246,7 +246,36 @@ function LiveFollow() {
   if (replay.live) return <FollowNewest sessionId={replay.sessionId} detail={replay.detail} />;
   // Live is a state, not a switch: a running thread you bring back to its newest step (scrolling, stepping, playing)
   // follows it live again; moving off it is looking back.
-  if (running) return <FollowAtEnd sessionId={replay.sessionId} detail={replay.detail} />;
+  return (
+    <>
+      <KeepCursor sessionId={replay.sessionId} detail={replay.detail} />
+      {running && <FollowAtEnd sessionId={replay.sessionId} detail={replay.detail} />}
+    </>
+  );
+}
+
+/** Looking back at a growing thread, the cursor stays on its step, not on its number: when the thread is built again and
+ *  its moments renumber (an edit takes in the talk before it), the cursor moves to the moment that now holds the step it
+ *  was on, as LandStep does. */
+function KeepCursor({ sessionId, detail }: { sessionId: string; detail: ReplayDetail }) {
+  const { landReplay } = useNavActions();
+  const thread = useThread(sessionId, detail);
+  const index = useReplayCursor((c) => c.index);
+  const was = useRef<{ thread: Thread; index: number; stepId?: string } | null>(null);
+  useEffect(() => {
+    const prev = was.current;
+    if (!thread || thread.sessionId !== sessionId || thread.detail !== detail || !thread.beats.length) { was.current = null; return; }
+    const at = Math.min(index, thread.beats.length - 1);
+    if (prev && prev.thread !== thread && prev.index === index && prev.stepId && thread.beats[at]?.step.id !== prev.stepId) {
+      const moved = thread.stepBeat.get(prev.stepId);
+      if (moved !== undefined && moved !== at) {
+        was.current = { thread, index: moved, stepId: prev.stepId };
+        landReplay(moved);
+        return;
+      }
+    }
+    was.current = { thread, index, stepId: thread.beats[at]?.step.id };
+  }, [thread, index, sessionId, detail, landReplay]);
   return null;
 }
 

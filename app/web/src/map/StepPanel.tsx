@@ -25,8 +25,14 @@ export function StepPanel() {
   const index = replay?.index;
   const pending = !!replay?.atStep; // a step was just opened: the cursor is on its way there
   const stepRef = useRef(stepId); stepRef.current = stepId;
+  const lastIndex = useRef(index);
   useEffect(() => {
     const cur = stepRef.current;
+    const moved = lastIndex.current !== index;
+    lastIndex.current = index;
+    // The thread was built again under a cursor that didn't move: its moments may have renumbered, and the cursor is
+    // put back on its step (App's KeepCursor). The open step stays.
+    if (!moved) return;
     if (!cur || pending || !thread || index === undefined) return;
     const beat = thread.beats[Math.min(index, thread.beats.length - 1)];
     if (beat && thread.stepBeat.get(cur) !== beat.index) showStep(beat.step.id);

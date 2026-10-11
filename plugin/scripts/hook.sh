@@ -1,7 +1,7 @@
 #!/bin/sh
 # SessionStart hook: start Rundown in the background. Prints nothing, or one JSON line with a message for the user.
 if command -v node >/dev/null 2>&1; then
-  exec node "$CLAUDE_PLUGIN_ROOT/scripts/launch.mjs" --background
+  exec node "$CLAUDE_PLUGIN_ROOT/scripts/launch.mjs" --background --settings
 fi
 # No Node: say so, at most once a day.
 mark="${CLAUDE_PLUGIN_DATA:-$HOME/.rundown}/.node-missing"

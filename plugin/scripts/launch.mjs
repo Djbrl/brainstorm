@@ -8,15 +8,17 @@
 //                  browser pane beside the thread; elsewhere (terminal, IDE), in the default browser
 //   --browser      with --open: always the default browser, in the desktop app too
 //   --switch       make the project the active workspace
+//   --settings     the caller has the plugin's settings (the hook does, the skills don't): restart when the key changed,
+//                  also to none
 //   --project DIR  the project (default: CLAUDE_PROJECT_DIR, then the current folder)
 //   --stop         stop the running server
 //   --share        save a thread as a replay file (.html) and a summary (.md), in Downloads: the thread named by
 //                  --session ID, else the project's newest one
 // It always exits 0 and prints any problem on stdout, so a skill can run it as one plain command.
-import { spawn } from "node:child_process";
+// RUNDOWN_PORT: the first port to try (default 4747).
+import { execFileSync, spawn } from "node:child_process";
 import { createHash, createHmac, randomBytes } from "node:crypto";
-import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
-import { createServer } from "node:net";
+import { appendFileSync, chmodSync, closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -34,7 +36,9 @@ const DATA = process.env.CLAUDE_PLUGIN_DATA || join(homedir(), ".rundown");
 // or "brainstorm" for someone who installed before the rename. The update command needs that name.
 const MARKET = /[\\/]plugins[\\/]cache[\\/]([^\\/]+)[\\/]/.exec(PLUGIN)?.[1] ?? "rundown";
 const PROJECT = resolve(opt("--project") || process.env.CLAUDE_PROJECT_DIR || process.cwd());
+// The Anthropic key comes only from the plugin's setting, never from the shell: the person gave Rundown that one.
 const KEY = process.env.CLAUDE_PLUGIN_OPTION_ANTHROPIC_API_KEY || "";
+const SETTINGS = flag("--settings");
 const VERSION = JSON.parse(readFileSync(join(PLUGIN, ".claude-plugin", "plugin.json"), "utf8")).version;
 const SERVER = join(PLUGIN, "build", "server.js");
 const WEB = join(PLUGIN, "build", "web");
@@ -42,7 +46,7 @@ const STATE = join(DATA, "server.json");
 const LOG = join(DATA, "server.log");
 const LOCK = join(DATA, "launch.lock");
 const NOTICES = join(DATA, "notices.json");
-const FIRST_PORT = 4747;
+const FIRST_PORT = /^\d{2,5}$/.test(process.env.RUNDOWN_PORT ?? "") ? Number(process.env.RUNDOWN_PORT) : 4747;
 const LATEST_URL = "https://raw.githubusercontent.com/Djbrl/brainstorm/main/plugin/.claude-plugin/plugin.json";
 const DAY = 24 * 60 * 60 * 1000;
 // Claude Code inside the Claude desktop app, which has a browser pane only Claude's tools can open.
@@ -60,17 +64,23 @@ function nodeOk() {
 }
 
 /** What answers on `port`. With the server's secret, `verified` says it proved it knows it: it's the Rundown we
- * started, not some other program that took the port after it stopped. */
+ * started, not some other program that took the port after it stopped. `{ timeout: true }`: something holds the port
+ * but didn't answer in time; `{ other: true }`: something answered, but not as Rundown; null: nothing there. */
 async function health(port, secret, ms = 800) {
+  const challenge = randomBytes(16).toString("hex");
+  let r;
+  try { r = await fetch(`http://127.0.0.1:${port}/api/health?challenge=${challenge}`, { signal: AbortSignal.timeout(ms) }); } catch (e) {
+    return e?.name === "TimeoutError" || e?.name === "AbortError" ? { timeout: true } : null;
+  }
   try {
-    const challenge = randomBytes(16).toString("hex");
-    const r = await fetch(`http://127.0.0.1:${port}/api/health?challenge=${challenge}`, { signal: AbortSignal.timeout(ms) });
-    if (!r.ok) return null;
+    if (!r.ok) return { other: true };
     const h = await r.json();
+    if (!h || typeof h !== "object" || h.ok !== true) return { other: true };
     if (secret) h.verified = h.proof === createHmac("sha256", secret).update(`health:${challenge}`).digest("hex");
     return h;
-  } catch { return null; }
+  } catch { return { other: true }; }
 }
+const answered = (h) => h && !h.timeout && !h.other;
 
 function readState() {
   try { return JSON.parse(readFileSync(STATE, "utf8")); } catch { return null; }
@@ -83,90 +93,143 @@ async function running() {
   const st = readState();
   if (!st?.port) return null;
   let h = await health(st.port, st.secret);
-  // No answer in 800 ms, but its process is alive and its port taken: most likely busy (reading a long history, mapping
+  // No answer in 800 ms, but its process is alive and is our server: most likely busy (reading a long history, mapping
   // a big project), not gone. Ask again with more patience before anyone starts a second server beside it: that used to
   // happen, the new one took over server.json and the old one ran on untracked, on the same database.
-  if (!h && (await busy(st))) for (let t = 0; !h && t < (BACKGROUND ? 3_000 : 12_000); t += 3_000) h = await health(st.port, st.secret, 3_000);
-  if (!h) return (await busy(st)) ? { port: st.port, health: null, secret: st.secret, pid: st.pid, busy: true } : null;
+  if (h?.timeout && ours(st.pid)) {
+    const deadline = Date.now() + (BACKGROUND ? 1_500 : 12_000);
+    while (h?.timeout && Date.now() < deadline) h = await health(st.port, st.secret, Math.min(3_000, Math.max(200, deadline - Date.now())));
+  }
+  // Only a timeout from our own live process means busy. An answer that isn't Rundown's (or doesn't prove the
+  // secret) means the port is someone else's now: not ours, a new server starts.
+  if (h?.timeout) return ours(st.pid) ? { port: st.port, health: null, secret: st.secret, pid: st.pid, busy: true } : null;
+  if (!answered(h)) return null;
   if (st.secret ? !h.verified : h.pid !== st.pid) return null;
-  return { port: st.port, health: h, secret: st.secret };
+  return { port: st.port, health: h, secret: st.secret, pid: h.pid };
 }
 
 /** Whether a process is alive (signal 0 only checks). */
 const alive = (pid) => { if (!pid) return false; try { process.kill(pid, 0); return true; } catch (e) { return e.code === "EPERM"; } };
-/** server.json's process is alive and something holds its port: a server too busy to answer, most likely ours. */
-const busy = async (st) => alive(st.pid) && !(await portFree(st.port));
+/** Whether `pid` is a Rundown server (its command runs build/server.js). Where `ps` can't tell (Windows), never. */
+function ours(pid) {
+  if (!Number.isInteger(pid) || pid <= 0 || !alive(pid)) return false;
+  try { return /build[\\/]server\.js/.test(execFileSync("ps", ["-o", "command=", "-p", String(pid)], { encoding: "utf8", timeout: 2_000, windowsHide: true })); } catch { return false; }
+}
 
+/** Stops a server: only one that proved it's ours, or whose process runs our server. server.json is removed only if it
+ * still names that server. */
 async function stop(run) {
-  try { process.kill(run.health?.pid ?? run.pid, "SIGTERM"); } catch { /* already gone */ }
-  for (let i = 0; i < 30 && (await health(run.port)); i++) await sleep(100);
-  rmSync(STATE, { force: true });
-  rmSync(LOCK, { force: true }); // whatever start it guarded is over
-}
-
-function portFree(port) {
-  return new Promise((res) => {
-    const s = createServer().once("error", () => res(false)).once("listening", () => s.close(() => res(true)));
-    s.listen(port, "127.0.0.1");
-  });
-}
-async function pickPort() {
-  for (let p = FIRST_PORT; p < FIRST_PORT + 50; p++) if (await portFree(p)) return p;
-  throw new Error(`no free port between ${FIRST_PORT} and ${FIRST_PORT + 49}`);
-}
-
-/** Only one launcher starts a server at a time (two sessions opening together). Returns false if another one is starting. */
-function takeLock() {
-  try { closeSync(openSync(LOCK, "wx")); return true; } catch {
-    try { if (Date.now() - statSync(LOCK).mtimeMs > 20_000) { rmSync(LOCK, { force: true }); closeSync(openSync(LOCK, "wx")); return true; } } catch { /* raced */ }
+  const pid = run.health?.pid ?? run.pid;
+  if (!run.health?.verified && !ours(pid)) {
+    log(`not stopping pid ${pid}: it isn't a Rundown server`);
+    if (readState()?.pid === run.pid) rmSync(STATE, { force: true });
     return false;
   }
+  try { process.kill(pid, "SIGTERM"); } catch { /* already gone */ }
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline && alive(pid)) await sleep(100);
+  if (readState()?.pid === pid) rmSync(STATE, { force: true });
+  return true;
 }
 
-async function start() {
-  if (existsSync(LOG) && statSync(LOG).size > 5_000_000) renameSync(LOG, LOG + ".1");
-  const port = await pickPort();
-  const out = openSync(LOG, "a");
-  writeSync(out, `\n--- ${new Date().toISOString()} starting Rundown ${VERSION} on ${port} for ${PROJECT}\n`);
-  const env = {
-    ...process.env,
-    RUNDOWN_VERSION: VERSION, RUNDOWN_PORT: String(port), RUNDOWN_DATA_DIR: DATA,
-    RUNDOWN_WEB_DIR: WEB, RUNDOWN_ROOT: PROJECT, RUNDOWN_PLUGIN_ID: `rundown@${MARKET}`, NODE_NO_WARNINGS: "1",
-  };
+/** Only one launcher starts a server at a time (two sessions opening together). The lock holds a token, so a launcher
+ * (or the server it starts) removes only its own. Returns the token, or null if another one is starting. */
+function takeLock() {
+  const token = `${process.pid}-${randomBytes(6).toString("hex")}`;
+  const make = () => { const fd = openSync(LOCK, "wx", 0o600); try { writeSync(fd, token); } finally { closeSync(fd); } return token; };
+  try { return make(); } catch {
+    try {
+      if (Date.now() - statSync(LOCK).mtimeMs > 20_000) {
+        rmSync(LOCK, { force: true }); // its launcher is long gone
+        return make();
+      }
+    } catch { /* raced */ }
+    return null;
+  }
+}
+function dropLock(token) {
+  try { if (token && readFileSync(LOCK, "utf8") === token) rmSync(LOCK, { force: true }); } catch { /* gone */ }
+}
+
+// What the server gets from this session's environment: what it needs to run, find the agents' logs and stay quiet.
+// Nothing else (tokens, cloud credentials, the session's own variables), and the Anthropic key only from the setting.
+const KEEP_ENV = /^(PATH|HOME|USER|LOGNAME|LANG|LC_\w+|TMPDIR|TEMP|TMP|SHELL|DO_NOT_TRACK|RUNDOWN_\w+|CLAUDE_CONFIG_DIR|CODEX_HOME|SystemRoot|SYSTEMROOT|USERPROFILE|APPDATA|LOCALAPPDATA)$/;
+export function serverEnv(from, extra) {
+  const env = {};
+  for (const [k, v] of Object.entries(from)) if (KEEP_ENV.test(k) && v !== undefined) env[k] = v;
+  return { ...env, NO_COLOR: "1", NODE_NO_WARNINGS: "1", ...extra };
+}
+
+/** Starts a server. It picks its own port, from `port` (the last one it used, so open pages find it again) upwards,
+ * and writes the real one to server.json. Returns the child, or null when it died at once (logged). */
+async function start(port, lockToken) {
+  try { if (existsSync(LOG) && statSync(LOG).size > 5_000_000) renameSync(LOG, LOG + ".1"); } catch { /* keep appending */ }
+  const out = openSync(LOG, "a", 0o600);
+  try { chmodSync(LOG, 0o600); } catch { /* not ours to change */ }
+  writeSync(out, `\n--- ${new Date().toISOString()} starting Rundown ${VERSION} from port ${port} for ${PROJECT}\n`);
+  const env = serverEnv(process.env, {
+    RUNDOWN_VERSION: VERSION, RUNDOWN_PORT: String(port), RUNDOWN_DATA_DIR: DATA, RUNDOWN_WEB_DIR: WEB, RUNDOWN_ROOT: PROJECT,
+    RUNDOWN_PLUGIN_ID: `rundown@${MARKET}`, RUNDOWN_LOCK_TOKEN: lockToken ?? "",
+  });
   if (KEY) env.ANTHROPIC_API_KEY = KEY;
-  const child = spawn(process.execPath, [SERVER], { cwd: DATA, env, detached: true, stdio: ["ignore", out, out] });
-  child.unref();
+  let died = null;
+  const child = spawn(process.execPath, [SERVER], { cwd: DATA, env, detached: true, windowsHide: true, stdio: ["ignore", out, out] });
+  child.on("error", (e) => { died = e.message; });
+  child.on("exit", (code) => { died ??= `exited with code ${code}`; });
   closeSync(out);
-  return port;
+  await sleep(300); // a server that can't even start (bad build, old Node) dies within this
+  child.unref();
+  if (died) { log(`the server didn't start: ${died}`); return null; }
+  return child;
 }
 
-async function waitUp(port, ms) {
-  for (let t = 0; t < ms; t += 250) { const h = await health(port); if (h) return h; await sleep(250); }
+/** Waits for the server we started (`pid`) to write server.json and prove it's ours. */
+async function waitUp(pid, ms) {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    if (readState()?.pid === pid) { const run = await running(); if (run && !run.busy) return run; }
+    if (!alive(pid)) return null;
+    await sleep(250);
+  }
   return null;
+}
+
+/** One line for the launcher in server.log (the background launcher prints nothing, so this is where its problems go). */
+function log(msg) {
+  try { appendFileSync(LOG, `${new Date().toISOString()} launcher: ${msg}\n`, { mode: 0o600 }); } catch { /* no log */ }
 }
 
 // ---- what the hook tells the user ----
 
 function readNotices() { try { return JSON.parse(readFileSync(NOTICES, "utf8")); } catch { return {}; } }
-function writeNotices(n) { try { writeFileSync(NOTICES, JSON.stringify(n)); } catch { /* next time */ } }
+function writeNotices(n) { try { writeFileSync(NOTICES, JSON.stringify(n), { mode: 0o600 }); } catch { /* next time */ } }
 
-const newer = (a, b) => { // a > b, for x.y.z versions
-  const pa = String(a).split(/[.-]/).map(Number), pb = String(b).split(/[.-]/).map(Number);
-  for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+/** a > b, for x.y.z versions. Anything that isn't one (a dev server) is never newer nor older. */
+export const newer = (a, b) => {
+  const re = /^(\d+)\.(\d+)\.(\d+)/;
+  const pa = re.exec(String(a)), pb = re.exec(String(b));
+  if (!pa || !pb) return false;
+  for (let i = 1; i <= 3; i++) if (Number(pa[i]) !== Number(pb[i])) return Number(pa[i]) > Number(pb[i]);
   return false;
 };
 
-/** Messages for the user at session start: first run, just updated, a newer version on GitHub (checked at most once a day). */
-async function notices(port) {
+/** Messages for the user at session start: first run, just updated, a launcher failure (once a day), a newer version
+ * on GitHub (checked at most once a day). `runningVersion`: the version the server runs, when known. */
+async function notices(port, runningVersion) {
   const n = readNotices();
   const out = [];
   if (!n.welcomed) {
-    out.push(port ? `Rundown is running for this project at http://localhost:${port}. Run /rundown:open to see the map.` : "Rundown is starting. Run /rundown:open to see the map.");
+    out.push(port ? `Rundown is running for this project at http://127.0.0.1:${port}. Run /rundown:open to see the map.` : "Rundown is starting. Run /rundown:open to see the map.");
     n.welcomed = true;
-  } else if (n.lastVersion && n.lastVersion !== VERSION) {
+  } else if (runningVersion === VERSION && n.lastVersion && newer(VERSION, n.lastVersion)) {
     out.push(`Rundown was updated to ${VERSION}.`);
   }
-  n.lastVersion = VERSION;
+  // Moves on only once this version really runs: a server too busy to restart says "updated" in a later session.
+  if (runningVersion === VERSION && (!n.lastVersion || newer(VERSION, n.lastVersion))) n.lastVersion = VERSION;
+  if (n.failure && (!n.failureToldAt || Date.now() - n.failureToldAt > DAY)) {
+    out.push(String(n.failure));
+    n.failureToldAt = Date.now();
+  }
   if (!n.checkedAt || Date.now() - n.checkedAt > DAY) {
     n.checkedAt = Date.now();
     try {
@@ -186,7 +249,16 @@ function tellUser(lines) {
 
 function openBrowser(url) {
   const [cmd, args] = process.platform === "darwin" ? ["open", [url]] : process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : ["xdg-open", [url]];
-  try { spawn(cmd, args, { detached: true, stdio: "ignore" }).unref(); } catch { /* the URL is printed anyway */ }
+  try { spawn(cmd, args, { detached: true, windowsHide: true, stdio: "ignore" }).on("error", () => {}).unref(); } catch { /* the URL is printed anyway */ }
+}
+
+/** Remembers a failure for the hook to tell once a day, or clears it once a server runs. */
+function noteFailure(msg) {
+  const n = readNotices();
+  if (msg) { log(msg); n.failure = `Rundown couldn't start: ${msg}. Details in ${LOG}. Run /rundown:open to try again.`; n.failureFrom = "launcher"; }
+  else if (n.failureFrom !== "launcher") return; // none, or the server's own (a damaged database): it stays until told
+  else { delete n.failure; delete n.failureToldAt; delete n.failureFrom; }
+  writeNotices(n);
 }
 
 /**
@@ -201,9 +273,10 @@ async function adoptOldData() {
     try {
       const st = JSON.parse(readFileSync(join(old, "server.json"), "utf8"));
       const h = await health(st.port);
-      if (h?.pid && h.pid === st.pid) { // the old server itself, not whatever took its port
+      if (answered(h) && h.pid === st.pid && ours(h.pid)) { // the old server itself, not whatever took its port
         process.kill(h.pid, "SIGTERM");
-        for (let i = 0; i < 30 && (await health(st.port)); i++) await sleep(100);
+        const deadline = Date.now() + 3_000;
+        while (Date.now() < deadline && alive(h.pid)) await sleep(100);
       }
     } catch { /* not running */ }
     for (const f of ["brainstorm.db", "brainstorm.db-wal", "brainstorm.db-shm", "notices.json"]) {
@@ -224,62 +297,97 @@ async function main() {
     return;
   }
 
-  let run = await running();
-
   if (flag("--stop")) {
+    const run = await running();
     if (!run) return say("Rundown isn't running.");
-    await stop(run);
+    if (!(await stop(run))) return say(`Rundown isn't running (process ${run.pid} on port ${run.port} isn't Rundown, so it was left alone).`);
     return say(`Rundown stopped (it was on port ${run.port}).`);
   }
 
-  // A different plugin version (after an update) or a new API key: restart so the running server matches.
-  // Only a launcher that has a key compares keys (the skills don't receive plugin settings, the hook does).
-  // A server too busy to answer is left alone: it's up, and it will answer (a restart for a new version waits for the next session).
-  if (run?.busy) {
-    if (BACKGROUND) return tellUser(await notices(run.port));
-    return say(`Rundown is busy (still reading, it doesn't answer yet) on http://localhost:${run.port}/. Try again in a moment, or run /rundown:stop and open it again.`);
-  }
-  if (run && (run.health.version !== VERSION || (KEY && run.health.anthropicKey !== keyHash(KEY, run.secret)))) {
-    await stop(run);
-    run = null;
-  }
-
-  let port = run?.port;
-  if (!run) {
-    if (takeLock()) {
-      port = await start();
-      // The hook doesn't make the session wait: it leaves the lock, which goes stale after 20 s, by when the server is up.
-      if (BACKGROUND) return tellUser(await notices(port));
-      const up = await waitUp(port, 20_000);
-      rmSync(LOCK, { force: true });
-      if (!up) { console.log(`Rundown didn't start. Last lines of ${LOG}:`); console.log(tail(LOG)); return; }
-    } else {
-      if (BACKGROUND) return tellUser(await notices()); // another session is starting it
-      for (let t = 0; t < 20_000 && !(run = await running()); t += 250) await sleep(250);
-      if (!run) { console.log(`Rundown didn't start. See ${LOG}`); return; }
-      port = run.port;
-    }
-  }
-  if (BACKGROUND) return tellUser(await notices(port));
+  let run = await ensureRunning();
+  if (BACKGROUND) return tellUser(await notices(run && !run.busy ? run.port : undefined, run?.health?.version));
+  if (!run) return;
+  if (run.busy) return say(`Rundown is busy (still reading, it doesn't answer yet) on http://127.0.0.1:${run.port}/. Try again in a moment, or run /rundown:stop and open it again.`);
+  const port = run.port;
   // Someone who opens Rundown themselves doesn't need the welcome.
   const n = readNotices();
-  if (!n.welcomed || n.lastVersion !== VERSION) writeNotices({ ...n, welcomed: true, lastVersion: VERSION });
-
-  if (flag("--switch") || flag("--share")) {
-    const ws = await fetch(`http://127.0.0.1:${port}/api/workspace`).then((r) => r.json()).catch(() => null);
-    if (ws?.root !== PROJECT) {
-      const r = await fetch(`http://127.0.0.1:${port}/api/workspace`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ root: PROJECT }) });
-      if (!r.ok) say(`Couldn't switch Rundown to ${PROJECT}: ${await r.text()}`);
-    }
+  if (!n.welcomed || (run.health.version === VERSION && n.lastVersion !== VERSION && newer(VERSION, n.lastVersion ?? "0.0.0"))) {
+    writeNotices({ ...n, welcomed: true, ...(run.health.version === VERSION ? { lastVersion: VERSION } : {}) });
   }
 
   if (flag("--share")) return share(port);
 
-  const url = `http://localhost:${port}/`;
+  // The project the server shows (a restart keeps the saved one): this one only after --switch.
+  const ws = await fetch(`http://127.0.0.1:${port}/api/workspace`).then((r) => r.json()).catch(() => null);
+  let root = ws?.root ?? null;
+  if (flag("--switch")) {
+    root = PROJECT;
+    if (ws?.root !== PROJECT) {
+      const r = await fetch(`http://127.0.0.1:${port}/api/workspace`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ root: PROJECT }) }).catch(() => null);
+      if (!r?.ok) {
+        const body = r ? await r.text() : "no answer";
+        let msg = body; try { msg = JSON.parse(body).message ?? body; } catch { /* plain text */ }
+        say(`Couldn't switch Rundown to ${PROJECT}: ${msg}`);
+        root = ws?.root ?? null;
+      }
+    }
+  }
+
+  const url = `http://127.0.0.1:${port}/`;
   const pane = flag("--open") && DESKTOP && !flag("--browser");
   if (flag("--open") && !pane) openBrowser(url);
-  say(`Rundown ${VERSION} is running for ${PROJECT}: ${url}`);
+  say(root ? `Rundown ${run.health.version} is running for ${root}: ${url}` : `Rundown ${run.health.version} is running: ${url}`);
   if (pane) say(`Open it in the browser pane: ${url}`);
+}
+
+/** Whether the running server should be replaced by this launcher's: only by a newer version (an older launcher, still
+ * loaded in another session, never restarts it), or, from the hook (which has the settings), for another key. */
+const needsRestart = (run) => newer(VERSION, run.health.version) ||
+  (SETTINGS && run.health.version === VERSION && (keyHash(KEY, run.secret) ?? null) !== (run.health.anthropicKey ?? null));
+
+/** The running server, started or restarted as needed: {port, health, secret} or {busy: true, port}, or null. */
+async function ensureRunning() {
+  let run = await running();
+  // A server too busy to answer is left alone: it's up, and it will answer (a restart for a new version waits).
+  if (run?.busy || (run && !needsRestart(run))) return run;
+  const token = takeLock();
+  if (!token) { // another launcher is starting or restarting it
+    if (BACKGROUND) return run;
+    const deadline = Date.now() + 20_000;
+    while (Date.now() < deadline) {
+      await sleep(250);
+      const r = await running();
+      if (r && (r.busy || !needsRestart(r))) return r;
+    }
+    say(`Rundown didn't start. See ${LOG}`);
+    return null;
+  }
+  let handedOver = false;
+  try {
+    // With the lock: someone else may have just started or restarted it.
+    run = await running();
+    if (run?.busy || (run && !needsRestart(run))) return run;
+    const prevPort = run?.port ?? readState()?.port;
+    if (run && !(await stop(run))) run = null;
+    const child = await start(Number.isInteger(prevPort) ? prevPort : FIRST_PORT, token);
+    if (!child) {
+      noteFailure("the server stopped as it started");
+      if (!BACKGROUND) { console.log(`Rundown didn't start. Last lines of ${LOG}:`); console.log(tail(LOG)); }
+      return null;
+    }
+    // The hook doesn't make the session wait: the server removes the lock once it's up (it goes stale after 20 s).
+    if (BACKGROUND) { handedOver = true; noteFailure(null); return null; }
+    const up = await waitUp(child.pid, 20_000);
+    if (!up) {
+      noteFailure("the server didn't answer within 20 seconds");
+      console.log(`Rundown didn't start. Last lines of ${LOG}:`); console.log(tail(LOG));
+      return null;
+    }
+    noteFailure(null);
+    return up;
+  } finally {
+    if (!handedOver) dropLock(token);
+  }
 }
 
 /** Saves the thread as a replay file and a Markdown summary, and says where. */
@@ -309,4 +417,7 @@ function tail(file, n = 15) {
   try { return readFileSync(file, "utf8").trimEnd().split("\n").slice(-n).join("\n"); } catch { return "(no log)"; }
 }
 
-main().catch((e) => say(`Rundown launcher error: ${e.message}`));
+if (!process.env.RUNDOWN_LAUNCH_NO_MAIN) main().catch((e) => {
+  try { mkdirSync(DATA, { recursive: true }); noteFailure(`launcher error: ${e.message}`); } catch { /* nowhere to write */ }
+  say(`Rundown launcher error: ${e.message}`);
+});

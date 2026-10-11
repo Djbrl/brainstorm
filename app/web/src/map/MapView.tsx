@@ -21,7 +21,7 @@ import { enterProject } from "../lib/switcher";
 import { focusAgent, setAgentFocus, useAgentFocus } from "../lib/agentFocus";
 import { useLiveActions, useLiveSelector } from "../lib/live";
 import { useNavActions } from "../lib/nav";
-import { useCamera, type Camera } from "./camera";
+import { useCamera, type Camera, type ReplayCamera } from "./camera";
 import { useTheme } from "../lib/theme";
 import { createRedraw } from "./redraw";
 import { readTokens } from "./color";
@@ -115,14 +115,16 @@ export function MapView() {
   const { nodeIndex, nodeIndexRef, resolveId } = useNodeResolver(map, graph);
   const liveShown = useRef(false);
   liveShown.current = !!replay && drawnAgents.some((a) => a.sessionId === replay.sessionId);
-  const replayLayer = useReplayLayer({ fg: fg as never, wrapRef, nodeIndexRef, accent: tokens.accent, font: tokens.body, camera: camRef, liveShown });
+  // The replay's camera follow and the map's camera talk through this (useMapCamera fills it in, the layer reads it).
+  const replayCam = useRef<ReplayCamera>({ onLost: null, margin: () => 24, pinned: false });
+  const replayLayer = useReplayLayer({ fg: fg as never, wrapRef, nodeIndexRef, accent: tokens.accent, font: tokens.body, camera: camRef, follow: replayCam, liveShown });
   const replayRef = useRef<ReplayLayerApi>(replayLayer); replayRef.current = replayLayer;
   const openRef = useRef(!!replay); openRef.current = !!replay;
 
   // ---- the camera (useMapCamera.ts) ----
   const hasNodes = graph.nodes.length > 0;
   const { followId, setFollowId, refollow, followRef, focusOnFile } = useMapCamera({
-    cam, camRef, nodeIndex, nodeIndexRef, replayRef, replayActive: replayLayer.active, replay, step, selected, selectedRef, setSelected,
+    cam, camRef, replayCam, nodeIndex, nodeIndexRef, replayRef, replayActive: replayLayer.active, replay, step, selected, selectedRef, setSelected,
     resolveId, anim, hasNodes, focusFile, setFocusFile, smallRef,
   });
   // Looking back through the thread (its replay's marker on the map), the camera follows the marker, not an agent where

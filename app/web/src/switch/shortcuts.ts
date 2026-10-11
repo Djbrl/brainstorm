@@ -117,5 +117,12 @@ export function useShortcut(id: ShortcutId, handler: ShortcutHandler) {
   }, [id]);
 }
 
+/** Where the arrow keys and + − stay with the page, not the map's camera (map/useCameraKeys.ts): any field (a slider
+ *  too: its arrows move it), a list that scrolls with them (the Track's, a listbox), a window over the page. */
+const keepsArrows = (t: EventTarget | null) => {
+  const el = t instanceof HTMLElement ? t : null;
+  return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable || !!el.closest(".rp-list, [role=listbox], [aria-modal=true]"));
+};
+
 /** For raw handlers: Esc and the camera's keys follow these rules themselves. */
-export const keyRules = { inField };
+export const keyRules = { inField, keepsArrows };

@@ -116,6 +116,17 @@ export type Camera = {
   touch: () => void;
 };
 
+/** What the replay layer's camera follow (replay/layer.ts) asks of the map's camera (useMapCamera.ts fills it in). */
+export type ReplayCamera = {
+  /** Unlocked camera: the tracer left the view. The map frames the recent window again, unless you moved the camera. */
+  onLost: (() => void) | null;
+  /** How far inside the view's edges the tracer counts as in view (px): more on a small map, where the camera follows
+   *  it before it reaches the edge. */
+  margin: () => number;
+  /** A file's panel is open: the camera stays on that file instead of following the tracer. */
+  pinned: boolean;
+};
+
 /**
  * The camera of one force-graph canvas. `fg` is its ref, `hostRef` the element the canvas fills
  * (looked up inside its .map-wrap for the panels that cover it).

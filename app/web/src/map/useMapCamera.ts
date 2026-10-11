@@ -2,21 +2,37 @@
 // files, the open file, a followed agent; again when a panel opens or the window resizes, unless you moved it yourself.
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { ThreadReplay } from "../lib/nav";
-import { getCameraLock, setCameraLock } from "./prefs";
-import { keyRules, useShortcut, windowOpen } from "../switch/shortcuts";
-import { replayCamera } from "./replay/store";
+import { getCameraLock } from "./prefs";
 import type { ReplayLayerApi } from "./replay/layer";
-import { boxOf, fitView, type Camera, type View } from "./camera";
+import { boxOf, fitView, type Camera, type ReplayCamera, type View } from "./camera";
+import { useCameraKeys } from "./useCameraKeys";
 import type { AgentAnim } from "./agents";
 import type { GNode } from "./graph";
 
 // ---- camera intent: what the camera is framing, so it can frame it again when a panel opens or the window resizes ----
 // "fit": the whole project (or the open thread's footprint); "file": the open file; "free": the user's own view.
-type Intent = { kind: "fit" } | { kind: "file"; id: string; zoom: boolean } | { kind: "free" };
+export type Intent = { kind: "fit" } | { kind: "file"; id: string; zoom: boolean } | { kind: "free" };
+/** What the camera is doing, in one place. */
+type CameraState = {
+  intent: Intent;
+  /** When the intent was set: a hand move after it means the camera is yours (no automatic re-frame). */
+  intentAt: number;
+  /** The camera has framed the map at least once. */
+  framed: boolean;
+  /** Where the camera was before a file was selected (it goes back there when the file lets go). */
+  before: { view: View | null; intent: Intent } | null;
+  /** A file to zoom to once it's selected (the selected file's effect does the move). */
+  zoomTo: string | null;
+  /** A thread was open: closing it frames the whole project again. */
+  hadThread: boolean;
+};
 
-export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, replayActive, replay, step, selected, selectedRef, setSelected,
+export function useMapCamera({ cam, camRef, replayCam, nodeIndex, nodeIndexRef, replayRef, replayActive, replay, step, selected, selectedRef, setSelected,
   resolveId, anim, hasNodes, focusFile, setFocusFile, smallRef }: {
-  cam: Camera; camRef: RefObject<Camera>; nodeIndex: Map<string, GNode>; nodeIndexRef: RefObject<Map<string, GNode>>;
+  cam: Camera; camRef: RefObject<Camera>;
+  /** What the replay layer's camera follow asks of this camera (replay/layer.ts): filled in here. */
+  replayCam: RefObject<ReplayCamera>;
+  nodeIndex: Map<string, GNode>; nodeIndexRef: RefObject<Map<string, GNode>>;
   replayRef: RefObject<ReplayLayerApi>; replayActive: boolean; replay: ThreadReplay | null; step: string | null;
   selected: string | null; selectedRef: RefObject<string | null>; setSelected: (id: string | null) => void;
   resolveId: (file: string) => string | undefined; anim: RefObject<Map<string, AgentAnim>>; hasNodes: boolean;
@@ -32,10 +48,9 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
   useEffect(() => { if (replay) setFollowId(null); }, [replay?.sessionId]);
   const followRef = useRef(followId); followRef.current = followId;
 
-  const intent = useRef<Intent>({ kind: "fit" });
-  const intentAt = useRef(0);
-  const setIntent = useCallback((i: Intent) => { intent.current = i; intentAt.current = performance.now(); }, []);
-  const framed = useRef(false);   // the camera has framed the map at least once
+  const state = useRef<CameraState>({ intent: { kind: "fit" }, intentAt: 0, framed: false, before: null, zoomTo: null, hadThread: false });
+  const S = state.current;
+  const setIntent = useCallback((i: Intent) => { S.intent = i; S.intentAt = performance.now(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   /** Locked onto something that moves (the tracer, a followed agent): the follow owns the centre, so no automatic re-frame. */
   const lockedOn = useCallback(() => getCameraLock() && (replayRef.current.tracing || !!followRef.current), []);
   /** Frame the open thread's focus (its recent window, or all its files), or the whole project. */
@@ -48,130 +63,45 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
     // Folder names sit above each group: leave them room at the top. A footprint of one or two files doesn't fill the screen.
     box.y0 -= 24;
     camRef.current.frame(box, { pad: 44, maxZoom: touched.length ? 2.4 : 4 }, ms);
-    framed.current = true;
+    S.framed = true;
   }, []);
   /** Frame what the intent says, unless the user has moved the camera since. */
   const applyIntent = useCallback((ms = 600) => {
-    const i = intent.current, c = camRef.current;
-    if (i.kind === "free" || c.userAt() > intentAt.current) return;
+    const i = S.intent, c = camRef.current;
+    if (i.kind === "free" || c.userAt() > S.intentAt) return;
     // Following an agent, the follow owns the camera (F lets go of it first): no fit takes it back.
     if (i.kind === "fit") { if (!lockedOn() && !followRef.current) fitAll(ms); return; }
     const n = nodeIndexRef.current.get(i.id);
     if (!n || n.x === undefined || n.y === undefined) return;
     if (i.zoom) c.lookAt(n.x, n.y, 3, ms);
     else c.reveal(n.x, n.y, n.r + 14, ms);   // room for its name under it
-    framed.current = true;
+    S.framed = true;
   }, [fitAll, lockedOn]);
   // Unlocked, the tracer left the view: frame the recent window again (applyIntent: unless you moved the camera since).
   // On a small map it follows the marker instead, as it follows an agent (the frame it's in, not the recent window: that
   // can span the whole project), unless you moved the camera since.
   useEffect(() => {
-    replayCamera.lost = () => {
+    const r = replayCam.current;
+    r.onLost = () => {
       const c = camRef.current, m = replayRef.current.subject();
       if (!smallRef.current || !m) { applyIntent(700); return; }
-      if (c.userAt() > intentAt.current) return;
+      if (c.userAt() > S.intentAt) return;
       c.lookAt(m.x, m.y, undefined, 600);
     };
-    replayCamera.margin = () => {
+    r.margin = () => {
       if (!smallRef.current) return 24;
       const s = camRef.current.safe.current;
       return Math.max(24, Math.min(s.w - s.left - s.right, s.h - s.top - s.bottom) * 0.2);
     };
-    return () => { replayCamera.lost = null; replayCamera.margin = () => 24; };
+    return () => { r.onLost = null; r.margin = () => 24; };
   }, [applyIntent]);
   // The safe area changed (a panel opened, the sidebar collapsed, the window resized): frame the same thing in it.
   useEffect(() => {
     const t = setTimeout(() => applyIntent(450), 60);
     return () => clearTimeout(t);
   }, [cam.version, applyIntent]);
-  // The arrow keys glide the map while they're held (two at once go diagonally); with Shift, ↑ and ↓ zoom in and out
-  // instead (+ and − too, = and _ without Shift); all easing in and out: the map without a mouse or trackpad. In the
-  // replay player ← → step through it, so only Shift ↑ ↓ zoom there; none in the Track's list (there they scroll it).
-  // One loop, only while a key is held or a glide eases out. Moving the map stops following an agent and unlocks the
-  // camera, like a drag would want.
-  const keyDown = useRef<(e: KeyboardEvent) => boolean>(() => false);
-  useEffect(() => {
-    const DIR: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
-    const ZOOM: Record<string, number> = { "+": 1, "=": 1, "-": -1, "_": -1 };
-    const SPEED = 700, EASE = 0.09; // screen px per second; seconds to (nearly) reach the speed or stop
-    const ZOOM_RATE = 1.5;          // held: the zoom grows or shrinks by e^1.5 (4.5×) a second
-    const held = new Set<string>();
-    const vel = { x: 0, y: 0, z: 0 };
-    let shift = false, raf = 0, last = 0;
-    const tick = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000); last = now;
-      let dx = 0, dy = 0, dz = 0;
-      for (const k of held) {
-        if (shift && (k === "ArrowUp" || k === "ArrowDown")) dz += k === "ArrowUp" ? 1 : -1;
-        else if (DIR[k]) { dx += DIR[k][0]; dy += DIR[k][1]; }
-        else dz += ZOOM[k] ?? 0;
-      }
-      const n = Math.hypot(dx, dy) || 1;
-      const f = 1 - Math.exp(-dt / EASE);
-      vel.x += ((dx / n) * SPEED - vel.x) * f;
-      vel.y += ((dy / n) * SPEED - vel.y) * f;
-      vel.z += (Math.sign(dz) * ZOOM_RATE - vel.z) * f;
-      if (!held.size && Math.hypot(vel.x, vel.y) < 8 && Math.abs(vel.z) < 0.02) { raf = 0; vel.x = vel.y = vel.z = 0; return; }
-      if (vel.x || vel.y) camRef.current.nudge(vel.x * dt, vel.y * dt);
-      if (vel.z) camRef.current.zoomBy(Math.exp(vel.z * dt));
-      raf = requestAnimationFrame(tick);
-    };
-    keyDown.current = (e: KeyboardEvent) => {
-      if (e.key === "Shift") { shift = true; return false; }
-      const d = DIR[e.key];
-      const z = e.shiftKey && (e.key === "ArrowUp" || e.key === "ArrowDown") ? (e.key === "ArrowUp" ? 1 : -1) : ZOOM[e.key];
-      if ((!d && !z) || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || (!z && replayRef.current.playable)) return false;
-      const t = e.target instanceof HTMLElement ? e.target : null;
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable || t.closest(".rp-list, [role=listbox], [aria-modal=true]"))) return false;
-      e.preventDefault();
-      shift = e.shiftKey;
-      if (held.has(e.key)) return true; // the key's own repeats: the loop is already gliding
-      held.add(e.key);
-      setIntent({ kind: "free" });
-      // A tap still moves a little: start at half speed rather than from rest (a zoom at full speed: a tap is a step).
-      if (z) { if (Math.abs(vel.z) < ZOOM_RATE) vel.z = z * ZOOM_RATE; }
-      else {
-        if (followRef.current) setFollowId(null);
-        if (getCameraLock() && replayRef.current.tracing) setCameraLock(false);
-        if (Math.abs(vel.x) < SPEED / 2 && d[0]) vel.x = d[0] * SPEED / 2;
-        if (Math.abs(vel.y) < SPEED / 2 && d[1]) vel.y = d[1] * SPEED / 2;
-      }
-      if (!raf) { last = performance.now(); raf = requestAnimationFrame(tick); }
-      return true;
-    };
-    const onUp = (e: KeyboardEvent) => {
-      if (e.key === "Shift") { shift = false; held.delete("+"); held.delete("_"); } // + and _ need Shift: no key-up of their own may come
-      held.delete(e.key);
-      if (e.key === "=") held.delete("+"); if (e.key === "-") held.delete("_");
-    };
-    const release = () => { held.clear(); shift = false; }; // the window lost focus: no key-up will come
-    addEventListener("keyup", onUp);
-    addEventListener("blur", release);
-    return () => { keyDown.current = () => false; removeEventListener("keyup", onUp); removeEventListener("blur", release); cancelAnimationFrame(raf); };
-  }, [setIntent]);
-  useShortcut("map.move", (e) => !!e && keyDown.current(e));
-  useShortcut("map.zoom", (e) => !!e && keyDown.current(e));
-  // C centres the camera on the agent once, without locking: the replay's marker, the agent you follow, the open thread's
-  // agent, or else the agent that moved last. Zoomed far out, it comes in a little so the agent reads.
-  useShortcut("center", () => {
-    const agents = anim.current;
-    const newest = () => { let best: AgentAnim | undefined; for (const a of agents.values()) if (!best || a.lastTs > best.lastTs) best = a; return best; };
-    const at = replayRef.current.subject()
-      ?? (followRef.current ? agents.get(followRef.current) : undefined)
-      ?? (replay ? agents.get(replay.sessionId) : undefined)
-      ?? (replay ? undefined : newest());
-    if (!at) return false;
-    setIntent({ kind: "free" });
-    const k = camRef.current.view()?.k ?? 1;
-    camRef.current.lookAt(at.x, at.y, Math.max(k, 1.6), 600);
-  });
-  // Esc stops following an agent before it steps back out of anything else (the registry tries it before "back"). A window
-  // open over the map (Settings, Find a thread, a picture) takes that Esc for itself.
-  useShortcut("follow.stop", (e) => {
-    if ((e && (e.defaultPrevented || keyRules.inField(e.target))) || !followRef.current || windowOpen()) return false;
-    e?.preventDefault();
-    setFollowId(null);
-  });
+  // The arrow keys, + and −, C and Esc (useCameraKeys.ts): moving the map by hand is a free intent.
+  useCameraKeys({ camRef, replayRef, followRef, setFollowId, anim, replay, free: () => setIntent({ kind: "free" }) });
 
   // Follow an agent (from the sidebar), like the tracer: the camera frames it once; locked, it keeps it centred (easing,
   // every frame, no stacked tweens) at whatever zoom you pick; unlocked, it stays where you put it, and frames the agent
@@ -208,14 +138,12 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [followId, followAt, setIntent]);
-  /** A file to zoom to once it's selected (the selected file's effect below does the move). */
-  const zoomTo = useRef<string | null>(null);
   const focusOnFile = useCallback((file: string) => {
     setFollowId(null);
     const id = resolveId(file);
     const n = id ? nodeIndexRef.current.get(id) : undefined;
     if (!n) return;
-    zoomTo.current = n.id;
+    S.zoomTo = n.id;
     if (selectedRef.current === n.id) { setIntent({ kind: "file", id: n.id, zoom: true }); applyIntent(800); }
     setSelected(n.id);
   }, [resolveId, setIntent, applyIntent]);
@@ -231,13 +159,12 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
   // thread that loads before the map is framed by the hasNodes effect above). Closing the thread frames the whole project again.
   const openThread = replayActive ? replay?.sessionId : undefined;
   const playing = replay?.mode === "play";
-  const hadThread = useRef(false);
   useEffect(() => {
-    if (openThread) hadThread.current = true;
-    else if (!hadThread.current) return;
-    if (!openThread) hadThread.current = false;
+    if (openThread) S.hadThread = true;
+    else if (!S.hadThread) return;
+    if (!openThread) S.hadThread = false;
     setIntent({ kind: "fit" });
-    if (replayCamera.pinned) return; // a file is selected: the camera stays on the file
+    if (replayCam.current.pinned) return; // a file is selected: the camera stays on the file
     fitAll(700);
   }, [openThread, playing, setIntent, fitAll]);
 
@@ -246,7 +173,7 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
     if (!focusFile) return;
     const n = nodeIndex.get(focusFile);
     if (!n) return;
-    zoomTo.current = n.id;
+    S.zoomTo = n.id;
     setSelected(n.id);
     setFocusFile(null);
     if (selectedRef.current === n.id) { setIntent({ kind: "file", id: n.id, zoom: true }); applyIntent(900); }
@@ -256,26 +183,25 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
   // (zoomed in when it came from a list or a link); letting go of it puts the camera back where it was before (or frames
   // the map, if it had never been framed). An open step takes the camera back (the tracer shows the step).
   const panelFile = step ? null : selected;
-  const before = useRef<{ view: View | null; intent: Intent } | null>(null);
-  useEffect(() => () => { replayCamera.pinned = false; }, []);
+  useEffect(() => () => { replayCam.current.pinned = false; }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const c = camRef.current;
-    replayCamera.pinned = !!panelFile; // the tracer's camera leaves the selected file alone (it picks up again on close)
+    replayCam.current.pinned = !!panelFile; // the tracer's camera leaves the selected file alone (it picks up again on close)
     if (panelFile) {
-      if (!before.current) {
-        const auto = c.userAt() <= intentAt.current ? intent.current : { kind: "free" as const };
-        before.current = { view: framed.current ? c.view() : null, intent: auto.kind === "file" ? { kind: "fit" } : auto };
+      if (!S.before) {
+        const auto = c.userAt() <= S.intentAt ? S.intent : { kind: "free" as const };
+        S.before = { view: S.framed ? c.view() : null, intent: auto.kind === "file" ? { kind: "fit" } : auto };
       }
-      setIntent({ kind: "file", id: panelFile, zoom: zoomTo.current === panelFile });
-      zoomTo.current = null;
+      setIntent({ kind: "file", id: panelFile, zoom: S.zoomTo === panelFile });
+      S.zoomTo = null;
       // A file with no position yet (a link that opened with the map): the intent frames it once the layout runs.
       const n = nodeIndexRef.current.get(panelFile);
       if (n?.x === undefined) { const t = setTimeout(() => applyIntent(900), 800); return () => clearTimeout(t); }
       applyIntent(800);
       return;
     }
-    const b = before.current;
-    before.current = null;
+    const b = S.before;
+    S.before = null;
     if (!b) return;
     if (b.view && b.intent.kind !== "fit") { setIntent(b.intent); c.moveTo(b.view, 700); }
     else { setIntent({ kind: "fit" }); applyIntent(700); }

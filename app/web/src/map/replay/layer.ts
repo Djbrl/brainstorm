@@ -6,8 +6,7 @@ import type { ForceGraphMethods } from "react-force-graph-2d";
 import { mapPrefs, useNavActions, useReplay } from "../../lib/nav";
 import { useThread, type Thread } from "../../lib/thread";
 import { useLiveSelector } from "../../lib/live";
-import { replayCamera } from "./store";
-import { centerFor, type Camera } from "../camera";
+import { centerFor, type Camera, type ReplayCamera } from "../camera";
 import { getCameraLock, getStepWindow, type StepWindow } from "../prefs";
 import { along, casing, drawMarker, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs } from "../themes";
 import { PARK } from "../agents";
@@ -127,7 +126,7 @@ type Anim = { x: number; y: number; fromX: number; fromY: number; t0: number; fi
   cam: { x: number; y: number } | null; landedT0?: number };
 
 
-export function useReplayLayer({ fg, nodeIndexRef, accent, font, camera, liveShown }: {
+export function useReplayLayer({ fg, nodeIndexRef, accent, font, camera, follow, liveShown }: {
   fg: RefObject<ForceGraphMethods | undefined>;
   wrapRef: RefObject<HTMLDivElement | null>;
   nodeIndexRef: RefObject<Map<string, NodePos>>;
@@ -135,6 +134,8 @@ export function useReplayLayer({ fg, nodeIndexRef, accent, font, camera, liveSho
   font: string;
   /** MapView's camera: the follow keeps the marker in the middle of the part of the map no panel covers. */
   camera: RefObject<Camera>;
+  /** What the follow asks of the map's camera: where it gave up on the tracer, how far in counts as in view, a pinned file. */
+  follow: RefObject<ReplayCamera>;
   /** Whether the live layer draws the thread's agent where it is now. Following live, the replay's marker stands in for
    *  it only if it's gone (the server forgets an agent after half an hour); looking back, the marker is drawn faint
    *  beside it (the past, under the agent now), at full strength only without it. */
@@ -156,9 +157,6 @@ export function useReplayLayer({ fg, nodeIndexRef, accent, font, camera, liveSho
   useEffect(() => { if (cursorStep !== undefined) setCursorStep(cursorStep); });
 
   // Landing on a step id (links, Follow, switching detail) is App's LandStep: on every lens, before live-follow.
-
-  replayCamera.fg = fg;
-  replayCamera.safe = camera.current.safe;
 
   const speed = replay?.speed ?? 1;
   // Following live, the thread's own agents are drawn by the live layer (each in its colour): no single cursor marker.
@@ -232,15 +230,15 @@ export function useReplayLayer({ fg, nodeIndexRef, accent, font, camera, liveSho
       L.raf = 0;
       const a = anim.current, cam = camera.current;
       let busy = false;
-      if (a.cam && !replayCamera.pinned) {
+      if (a.cam && !follow.current.pinned) {
         if (getCameraLock()) {
           // The same test easeToward makes before it moves (over 1.5 px off): once it's under, the camera has arrived.
           const v = cam.view();
           if (v) { const t = centerFor(cam.safe.current, a.cam.x, a.cam.y, v.k); busy = Math.hypot(t.x - v.x, t.y - v.y) * v.k > 1.5; }
           if (busy) cam.easeToward(a.cam.x, a.cam.y, 0.08);
         } else {
-          busy = !cam.sees(a.cam.x, a.cam.y, replayCamera.margin());
-          if (busy && performance.now() - L.lostAt > 1200) { L.lostAt = performance.now(); replayCamera.lost?.(); }
+          busy = !cam.sees(a.cam.x, a.cam.y, follow.current.margin());
+          if (busy && performance.now() - L.lostAt > 1200) { L.lostAt = performance.now(); follow.current.onLost?.(); }
         }
       }
       if (busy) L.raf = requestAnimationFrame(L.tick);
@@ -252,7 +250,7 @@ export function useReplayLayer({ fg, nodeIndexRef, accent, font, camera, liveSho
   /** From draw(), every frame: start the camera loop again when something it follows changed since the last frame. */
   const kickCamera = useCallback((ctx: CanvasRenderingContext2D) => {
     const L = camLoop.current, s = L.seen, c = anim.current.cam, m = ctx.getTransform();
-    const x = c?.x ?? null, y = c?.y ?? null, lock = getCameraLock(), pinned = replayCamera.pinned, safe = camera.current.safe.current;
+    const x = c?.x ?? null, y = c?.y ?? null, lock = getCameraLock(), pinned = follow.current.pinned, safe = camera.current.safe.current;
     if (x === s.x && y === s.y && lock === s.lock && pinned === s.pinned && safe === s.safe && m.a === s.a && m.e === s.e && m.f === s.f) return;
     s.x = x; s.y = y; s.lock = lock; s.pinned = pinned; s.safe = safe; s.a = m.a; s.e = m.e; s.f = m.f;
     if (L.enabled && !L.raf) L.raf = requestAnimationFrame(L.tick);

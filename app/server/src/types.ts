@@ -98,29 +98,6 @@ export type AgentPresence = {
   away?: string;              // what it does now that the map can't show (a command, a file outside every project), in words
 };
 
-/** Recurring failures in agent tool calls, grouped (GET /api/failures). Added 15:35 for the "Find the Hidden Failures" award. */
-export type FailureEvidence = {
-  stepId: string;          // the failing tool_result step
-  callStepId?: string;     // the tool_call it answers
-  sessionId: string; ts: string;
-  tool: string; filePath?: string;
-  input?: string;          // short summary of the call input (command, pattern, path)
-  error: string;           // first lines of the error text
-};
-export type FailureGroup = {
-  key: string;             // tool + normalized error
-  tool: string;
-  error: string;           // normalized error
-  title: string;           // Nemotron, at most 8 words (fallback "<tool>: <error>")
-  advice: string;          // Nemotron, one line: why it matters / what to fix
-  count: number; firstSeen: string; lastSeen: string;
-  sessions: string[];
-  retried: boolean;        // same failure repeated inside one session
-  touchesEdits: boolean;
-  priority: number;        // higher = needs attention first
-  evidence: FailureEvidence[]; // newest first, at most 12
-};
-
 /** Static export for the hosted demo (GET /api/replay). The web loads it with ?replay=/replay.json */
 export type Replay = {
   /** Places per thread (sessionId → summary), so the hosted demo can show the Places view without a server. */
@@ -130,7 +107,6 @@ export type Replay = {
   steps: Step[];
   map: ProjectMap | null;
   answers: { request: AskRequest; response: AskResponse }[];
-  failures?: FailureGroup[];
   /** Post-deadline preview: recorded agent moves (chronological), played back on the Map. */
   agentMoves?: { id: string; name: string; isSubagent: boolean; sessionId: string; file: string; action: string; ts: string }[];
   /** Post-deadline preview: a recorded setup run, played back by the setup screen. */

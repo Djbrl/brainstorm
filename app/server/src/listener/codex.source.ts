@@ -639,7 +639,7 @@ export class CodexSource implements LogSource {
   private result(at: At, callId: string, res: { text: string; failed: boolean }) {
     this.emit(at, {
       id: `${callId}:result`, kind: "tool_result", text: sanitizeText(res.text, TOOL_RESULT_LIMIT), toolUseId: callId,
-      ...(res.failed ? { input: { isError: true, toolUseId: callId } } : {}), // read by the failures module
+      ...(res.failed ? { input: { isError: true, toolUseId: callId } } : {}), // read by isErrorResult (shared/failed.ts)
     });
   }
 

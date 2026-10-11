@@ -1,5 +1,6 @@
 // Owner: cowork. Turns non-code tool calls (browser, web, connectors, outward CLIs) into places and actions.
 // Pure: no Nest, no db. One tracker per session, fed call/result pairs in order. See docs/cowork.md.
+import { isErrorResult } from "../shared/failed";
 import type { CoworkArea, CoworkConfidence, CoworkEvent, CoworkVerb, Step } from "../types";
 
 type Tab = { url?: string; title?: string };
@@ -17,7 +18,6 @@ export const CODE_TOOLS = new Set(["Read", "Edit", "Write", "MultiEdit", "Grep",
 /** Buttons whose click most likely changes something outside the computer. English and French (the Google Form says "Envoyer"). */
 const COMMIT = /\b(send|submit|publish|post|reply|confirm|delete|remove|pay|buy|order|checkout|deploy|create|save|apply|book|sign up|register|upload|share|invite|envoyer|soumettre|publier|valider|supprimer|confirmer|enregistrer|créer|partager|payer|commander)\b/i;
 const MESSAGING = /whatsapp|slack|messenger|discord|telegram|mail\.|outlook|teams\./i;
-const FAILED = /^\s*(<tool_use_error>|error\b)|was denied or failed|is not allowed|not allowed|permission_required|timed out after|^\s*exit code [1-9]/i;
 
 const short = (s: string, n = 48) => { const t = s.replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
 const str = (v: unknown) => (typeof v === "string" ? v : undefined);
@@ -78,7 +78,7 @@ export class CoworkTracker {
     const tool = call.tool ?? "";
     const input = (call.input ?? {}) as Record<string, any>;
     const text = result?.text ?? "";
-    const resultFailed = !!(result?.input as { isError?: boolean } | undefined)?.isError || FAILED.test(text.slice(0, 300));
+    const resultFailed = !!result && isErrorResult(result, tool);
     const drafts: Draft[] = [];
 
     const mcp = /^mcp__(.+?)__(.+)$/.exec(tool);

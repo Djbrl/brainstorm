@@ -6,7 +6,7 @@ import { DbService } from "../core/db.service";
 import { EventsGateway } from "../core/events.gateway";
 import { safely } from "../core/safely";
 import { ListenerService } from "../listener/listener.service";
-import { isErrorResult } from "../failures/failures.service";
+import { isErrorResult } from "../shared/failed";
 import { maskSecrets } from "../privacy/mask";
 
 // Owner: attention. Does a thread need you? Worked out from the log (calls with no result, failures in a row, a finished
@@ -172,7 +172,7 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
       if (t.hook?.event === "PermissionRequest" && t.hook.tool_use_id && t.hook.tool_use_id === s.toolUseId) t.hook = undefined;
       if (!s.isSubagent) {
         const tool = call?.tool ?? "a tool";
-        if (isErrorResult(s)) {
+        if (isErrorResult(s, call?.tool)) {
           const error = one((s.text ?? "").replace(/^\s*Exit code \d+\s*/i, "")) ?? "error";
           t.streak = t.streak && t.streak.tool === tool ? { tool, n: t.streak.n + 1, error, stepId: call?.id ?? s.id } : { tool, n: 1, error, stepId: call?.id ?? s.id };
         } else t.streak = null;

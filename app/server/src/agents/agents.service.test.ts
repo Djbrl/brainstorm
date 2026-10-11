@@ -81,7 +81,7 @@ test("a command's reads go in the trail without moving the agent", () => {
 test("errors are sent at once", () => {
   const { bus, sent, step } = setup();
   bus.emit("step", step({ tool: "Read", filePath: "/r/a.ts" }));
-  bus.emit("step", step({ kind: "tool_result", text: "<tool_use_error>File does not exist</tool_use_error>" }));
+  bus.emit("step", step({ kind: "tool_result", text: "<tool_use_error>File does not exist</tool_use_error>", input: { isError: true } }));
   assert.equal(sent.length, 2);
   assert.equal(sent[1].error, "File does not exist");
 });

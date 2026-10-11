@@ -11,6 +11,7 @@ import { safeHref, UrlLink } from "../../lib/links";
 import { HtmlPreview, isHtml, PAGE_MARKUP, ViewSwitch } from "./HtmlPreview";
 import { Lightbox } from "./Lightbox";
 import { cleanResult, formatCommand, hostOf, humanKey, parseJson, parseNumbered, parseSearch, parseShell, splitBatch, splitTabContext, type Tab } from "./parse";
+import { isErrorResult } from "@shared/failed";
 import "./content.css";
 
 type Input = Record<string, unknown>;
@@ -368,7 +369,7 @@ function BrowserView({ tool, input, result }: { tool: string; input: Input; resu
     ? (input.actions as unknown[]).map((a) => ({ name: String(obj(a).name ?? ""), input: obj(obj(a).input) }))
     : [{ name, input }];
   const text = result?.text ?? "";
-  const isError = !!obj(result?.input).isError || /^(navigation to \S+ was denied|Navigation to this domain is not allowed)/i.test(text);
+  const isError = !!result && isErrorResult(result, tool);
   const parts = batch ? splitBatch(text) : [{ label: name, text, failed: isError || undefined }];
   const lastTab = splitTabContext(text.slice(Math.max(0, text.lastIndexOf("\nTab Context:")))).tab;
   return (

@@ -3,7 +3,6 @@ import { ListenerService } from "../listener/listener.service";
 import { MapperService } from "../mapper/mapper.service";
 import { AskService } from "../ask/ask.service";
 import { ConfigService } from "../core/config.service";
-import { FailuresService } from "../failures/failures.service";
 import { WorkspaceService } from "../workspace/workspace.service";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -24,7 +23,7 @@ function actionOf(step: Step): string | undefined {
 // Owned by the lead. Builds replays: the hosted demo's export (GET /api/replay) and shared replays (GET /api/share).
 @Injectable()
 export class ReplayService {
-  constructor(private listener: ListenerService, private mapper: MapperService, private askService: AskService, private cfg: ConfigService, private failures: FailuresService, private workspace: WorkspaceService) {}
+  constructor(private listener: ListenerService, private mapper: MapperService, private askService: AskService, private cfg: ConfigService, private workspace: WorkspaceService) {}
 
   /** Which subagent wrote each log line: uuid → {agentId, name}, from Claude Code's subagents/agent-<id>.jsonl (+ .meta.json). */
   private subagentIndex(sessionId: string): Map<string, { id: string; name: string }> {
@@ -67,7 +66,7 @@ export class ReplayService {
   }
 
   /**
-   * `until` (ISO time): the recording stops there (steps, agent moves, failures, answers).
+   * `until` (ISO time): the recording stops there (steps, agent moves, answers).
    * `share`: a thread being shared (share.controller.ts), found by id even from another project, with the map of the
    * project the server worked out for it (share-root.ts), never one a link names.
    */
@@ -81,9 +80,8 @@ export class ReplayService {
     // The open project only (or the same folder written another way): never a walk of any folder a link names.
     const map = this.mapper.getMap(share ? share.mapRoot : root && resolve(root) === resolve(this.cfg.defaultRoot) ? root : this.cfg.defaultRoot);
     const answers = this.askService.listAnswers();
-    const failures = this.failures.list(sessions.map((s) => s.id).join(","), until);
     const cowork = Object.fromEntries(sessions.map((s) => [s.id, summarizePlaces([s.id], (id) => steps.filter((st) => st.sessionId === id))])); // Places, for the hosted demo
-    const base: Replay = { exportedAt: until ?? new Date().toISOString(), sessions: sessions.map((s) => ({ ...s, status: "idle" })), steps, map: { ...map, files: map.files.map(({ activeSessionId: _a, ...f }) => f) }, answers, failures, cowork };
+    const base: Replay = { exportedAt: until ?? new Date().toISOString(), sessions: sessions.map((s) => ({ ...s, status: "idle" })), steps, map: { ...map, files: map.files.map(({ activeSessionId: _a, ...f }) => f) }, answers, cowork };
     if (!preview) return base;
     // Post-deadline preview extras: recorded agent moves and a recorded setup run (only this workspace, no other projects).
     const status = this.workspace.status();

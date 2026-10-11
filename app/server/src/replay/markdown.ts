@@ -1,5 +1,7 @@
 import { relative } from "node:path";
-import type { FailureGroup, ProjectMap, Session, Step } from "../types";
+import type { ProjectMap, Session, Step } from "../types";
+import { isErrorResult } from "../shared/failed";
+import { groupFailed } from "./failure-text";
 import { CallPairer } from "../listener/pairing";
 import { promptTitle } from "../listener/listener.service";
 
@@ -15,7 +17,6 @@ const request = (st: Step): string | undefined => {
   const text = promptTitle(st.text ?? "", 2000);
   return text && !/^\[Image[ :#]|^Base directory for this skill:/.test(text) ? text : undefined;
 };
-const failedResult = (st: Step) => !!(st.input as { isError?: boolean } | undefined)?.isError;
 const dateOf = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 function duration(from: string, to: string): string {
@@ -29,7 +30,7 @@ type Turn = { prompt: string; edits: Step[]; commands: Step[]; delegated: Step[]
  * A thread as a Markdown report for a review or a pull request: what was asked, the files changed (by module, with
  * their summaries), what failed, then each request with what the agent did. Reads are counted, not listed.
  */
-export function threadMarkdown(session: Session, steps: Step[], map: ProjectMap | null, failures: FailureGroup[]): string {
+export function threadMarkdown(session: Session, steps: Step[], map: ProjectMap | null): string {
   const root = map?.root ?? session.cwd;
   const rel = (p: string) => (root && p.startsWith(root) ? relative(root, p) : p);
   const files = new Map((map?.files ?? []).map((f) => [f.path, f]));
@@ -57,7 +58,7 @@ export function threadMarkdown(session: Session, steps: Step[], map: ProjectMap 
     }
     if (st.kind === "tool_result") {
       const call = pairer.result(st);
-      if (failedResult(st)) cur().failed.push({ call, result: st });
+      if (isErrorResult(st, call?.tool)) cur().failed.push({ call, result: st });
       continue;
     }
     if (st.kind === "text" && !st.isSubagent && st.text?.trim()) cur().lastText = st.text;
@@ -79,7 +80,8 @@ export function threadMarkdown(session: Session, steps: Step[], map: ProjectMap 
 
   const edits = steps.filter((s) => s.kind === "edit").length;
   const commands = steps.filter((s) => s.kind === "tool_call" && s.tool === "Bash").length;
-  const failedCalls = steps.filter((s) => s.kind === "tool_result" && failedResult(s)).length;
+  const failedAll = turns.flatMap((t) => t.failed);
+  const failedCalls = failedAll.length;
   const subagentSteps = steps.length - main.length;
   const asked = turns.filter((t) => t.prompt);
 
@@ -115,11 +117,11 @@ export function threadMarkdown(session: Session, steps: Step[], map: ProjectMap 
     }
   }
 
-  if (failures.length) {
+  if (failedAll.length) {
     out.push("## What failed", "");
-    for (const g of failures) {
-      out.push(`- **${g.title}** (${g.count}×${g.retried ? ", retried" : ""})${g.advice ? ` · ${oneLine(g.advice, 220)}` : ""}`);
-      out.push(`  ${code(oneLine(g.evidence[0]?.error ?? g.error, 160))}`);
+    for (const g of groupFailed(failedAll).slice(0, 12)) {
+      out.push(`- **${oneLine(g.title, 120)}** (${g.count}×)`);
+      out.push(`  ${code(oneLine(g.sample, 160))}`);
     }
     out.push("");
   }

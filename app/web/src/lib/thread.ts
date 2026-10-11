@@ -6,6 +6,7 @@
 // on reads (an agent that only reads still goes somewhere); a command's reads (`reads`) count as reads of its beat.
 import { useEffect, useMemo } from "react";
 import type { Step } from "@contract";
+import { isErrorResult } from "@shared/failed";
 import { useLive } from "./live";
 import { stepsOf, useAgentFocus } from "./agentFocus";
 import { makeFileResolver, type FileResolver } from "./paths";
@@ -39,19 +40,6 @@ export const TRACER_MOVES_ON: ReadonlySet<BeatAction> = new Set<BeatAction>(["ed
 const READ_TOOLS = new Set(["Read", "NotebookRead"]);
 const SEARCH_TOOLS = new Set(["Grep", "Glob", "WebSearch", "WebFetch", "ToolSearch"]);
 const SUBAGENT_TOOLS = new Set(["Agent", "Task"]);
-
-/** Same rules as the server's Failures view (app/server/src/failures/failures.service.ts). */
-const ERROR_PATTERNS: RegExp[] = [
-  /^\s*<tool_use_error>/i, /^\s*error\b/i, /^\s*exit code [1-9]\d*/i,
-  /file has not been read yet/i, /string to replace not found/i,
-  /permission (denied|to use)|was blocked|denied by|not allowed/i,
-];
-export function isFailedResult(s: Step): boolean {
-  if (s.kind !== "tool_result") return false;
-  if ((s.input as { isError?: boolean } | undefined)?.isError) return true;
-  const head = (s.text ?? "").slice(0, 300);
-  return ERROR_PATTERNS.some((re) => re.test(head));
-}
 
 export type SummaryCounts = {
   commands: number; browser: number; subagents: number; searches: number;
@@ -184,9 +172,9 @@ type Draft = {
 type DraftMove = { beat: number; file: string; ts: string; out?: Move; read?: boolean };
 
 const failedSeen = new WeakMap<Step, boolean>();
-const failedOf = (s: Step) => {
+const failedOf = (s: Step, tool?: string) => {
   let f = failedSeen.get(s);
-  if (f === undefined) failedSeen.set(s, (f = isFailedResult(s)));
+  if (f === undefined) failedSeen.set(s, (f = isErrorResult(s, tool)));
   return f;
 };
 
@@ -280,7 +268,8 @@ class ThreadBuilder {
     d.version++;
     if (s.toolUseId && s.kind !== "tool_result") this.callBeat.set(s.toolUseId, d);
     this.stepBeat.set(s.id, d.at);
-    if (failedOf(s)) { d.failed++; if (d.counts) d.counts.failed++; }
+    const tool = s.kind === "tool_result" && s.toolUseId ? this.callBeat.get(s.toolUseId)?.steps.find((c) => c.kind !== "tool_result" && c.toolUseId === s.toolUseId)?.tool : undefined;
+    if (failedOf(s, tool)) { d.failed++; if (d.counts) d.counts.failed++; }
   }
   /** A file-touching step: the resolved map node, if any, joins the beat. */
   private fileStep(d: Draft, s: Step, action: BeatAction) {

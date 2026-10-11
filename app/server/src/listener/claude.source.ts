@@ -220,7 +220,7 @@ export class ClaudeSource implements LogSource {
       else text = JSON.stringify(block.content ?? "");
       const step = textStep(o, sessionId, i, ts, "tool_result", text);
       if (typeof block.tool_use_id === "string") step.toolUseId = block.tool_use_id;
-      if (block.is_error) step.input = { isError: true, toolUseId: block.tool_use_id }; // read by the failures module
+      if (block.is_error) step.input = { isError: true, toolUseId: block.tool_use_id }; // read by isErrorResult (shared/failed.ts)
       sink.step(step, { cwd: o.cwd });
     });
   }

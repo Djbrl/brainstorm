@@ -86,7 +86,7 @@ export class ShareController {
     const replay = this.sharedReplay(session);
     this.usage.bump("sh");
     const steps: Step[] = replay.steps;
-    const md = threadMarkdown(replay.sessions[0] ?? session, steps, replay.map, replay.failures ?? []);
+    const md = threadMarkdown(replay.sessions[0] ?? session, steps, replay.map);
     res.setHeader("Content-Type", "text/markdown; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${fileName(replay, session)}.md"`);
     return res.send(md);

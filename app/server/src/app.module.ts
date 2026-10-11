@@ -6,7 +6,6 @@ import { MapperModule } from "./mapper/mapper.module";
 import { ReaderModule } from "./reader/reader.module";
 import { AskModule } from "./ask/ask.module";
 import { ReplayModule } from "./replay/replay.module";
-import { FailuresModule } from "./failures/failures.module";
 import { WorkspaceModule } from "./workspace/workspace.module";
 import { AgentsModule } from "./agents/agents.module";
 import { HealthController } from "./core/health.controller";
@@ -21,5 +20,5 @@ import { ElsewhereModule } from "./elsewhere/elsewhere.module";
 // Owned by the lead. Agents: don't edit; ask in docs/build-log.md "Requests".
 import { UsageModule } from "./usage/usage.module";
 import { OnboardingModule } from "./onboarding/onboarding.controller";
-@Module({ imports: [CoreModule, UsageModule, LlmModule, ListenerModule, MapperModule, ReaderModule, AskModule, ReplayModule, FailuresModule, WorkspaceModule, AgentsModule, CoworkModule, ShotsModule, AttentionModule, OpenModule, GitModule, ImageModule, ElsewhereModule, OnboardingModule], controllers: [HealthController] })
+@Module({ imports: [CoreModule, UsageModule, LlmModule, ListenerModule, MapperModule, ReaderModule, AskModule, ReplayModule, WorkspaceModule, AgentsModule, CoworkModule, ShotsModule, AttentionModule, OpenModule, GitModule, ImageModule, ElsewhereModule, OnboardingModule], controllers: [HealthController] })
 export class AppModule {}

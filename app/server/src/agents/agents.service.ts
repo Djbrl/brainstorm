@@ -1,3 +1,4 @@
+import { isErrorResult } from "../shared/failed";
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
@@ -17,11 +18,8 @@ const PULSE_MS = 1_000;
 /** First-prompt labels kept for subagents that haven't touched the workspace yet. */
 const PROMPTS_MAX = 500;
 
-const FAILED = /^\s*(<tool_use_error>|error\b|exit code [1-9])|file has not been read yet|string to replace not found|permission (denied|to use)|was blocked|denied by|not allowed/i;
-/** Same rule as Follow and the Failures view: a result flagged as an error, or one that reads like one. */
-function isFailed(step: Step): boolean {
-  return !!(step.input as { isError?: boolean } | undefined)?.isError || FAILED.test((step.text ?? "").slice(0, 300));
-}
+/** The tool of each call still waiting for its result (by tool_use id), so a result is judged by the rule for its tool. */
+const CALL_TOOLS_MAX = 400;
 
 /** What a step the map can't show is doing, in plain words. */
 function awayOf(step: Step): string | undefined {
@@ -60,6 +58,7 @@ function shortLabel(text: string | undefined, max = 32): string | undefined {
 export class AgentsService implements OnModuleInit, OnModuleDestroy {
   private agents = new Map<string, AgentPresence>();
   private subLabels = new Map<string, string>(); // agentId -> short label (meta file or first prompt), once the agent shows
+  private callTools = new Map<string, string>();
   private firstPrompts = new Map<string, string>(); // agentId -> short label of its first prompt, until the agent shows
   private sessionNames = new Map<string, string>(); // sessionId -> main-thread name (dropped when the session changes)
   private sentAt = new Map<string, number>(); // agent id -> when it was last broadcast
@@ -124,6 +123,10 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
   private onStep(step: Step) {
     const id = step.agentId ?? step.sessionId;
     if (!id) return;
+    if (step.kind === "tool_call" && step.toolUseId && step.tool) {
+      this.callTools.set(step.toolUseId, step.tool);
+      if (this.callTools.size > CALL_TOOLS_MAX) this.callTools.delete(this.callTools.keys().next().value!);
+    }
     let a = this.agents.get(id);
     // A subagent's first prompt names it if its meta file doesn't; remember it (cheaply) until the agent shows.
     if (step.agentId && !a && step.kind === "prompt" && !this.firstPrompts.has(id)) {
@@ -153,7 +156,7 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     const prev = this.agents.get(id);
     const next: AgentPresence = { ...a, name: this.nameFor(step, id), ts: now, active: true };
     if (away) next.away = away; else delete next.away;
-    if (step.kind === "tool_result" && isFailed(step)) {
+    if (step.kind === "tool_result" && isErrorResult(step, step.toolUseId ? this.callTools.get(step.toolUseId) : undefined)) {
       next.errorAt = now;
       next.error = (step.text ?? "").replace(/<\/?tool_use_error>/g, "").trim().split("\n")[0].slice(0, 160);
     }

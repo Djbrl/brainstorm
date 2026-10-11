@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from "@nestjs/common";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { deflateRawSync, inflateRawSync } from "node:zlib";
 import { lstat, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
@@ -140,7 +140,7 @@ export function stripComments(src: string, lang: "c" | "rust" | "py"): string {
 }
 
 /** A tsconfig's (or jsconfig's) import aliases: where its `paths` and `baseUrl` point. */
-type TsAliases = { base: string; paths: [prefix: string, suffix: string, targets: string[]][]; hasBaseUrl: boolean };
+type TsAliases = { base: string; paths: [prefix: string, suffix: string, targets: string[], exact: boolean][]; hasBaseUrl: boolean };
 const TS_EXT = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".vue", ".svelte"];
 /** `./x.js` written in TypeScript (NodeNext) means x.ts: the source a compiled name stands for. */
 const COMPILED_TO_SOURCE: Record<string, string[]> = { ".js": [".ts", ".tsx"], ".jsx": [".tsx"], ".mjs": [".mts"], ".cjs": [".cts"] };
@@ -284,7 +284,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     const rels = pool.map((r) => {
       const rel = posix(relative(root, r.abs));
       lines.set(rel, r.lines);
-      for (const to of this.resolveSpecs(r.abs, this.parseImports(r.abs, r.content), poolSet)) {
+      for (const to of this.resolveSpecs(root, r.abs, this.parseImports(r.abs, r.content), poolSet)) {
         const k = posix(relative(root, to));
         importedBy.set(k, (importedBy.get(k) ?? 0) + 1);
       }
@@ -332,7 +332,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
       specs.set(r.abs, this.parseImports(r.abs, r.content));
     }
     const out = new Map<string, Set<string>>();
-    for (const [abs, s] of specs) out.set(abs, this.resolveSpecs(abs, s, fileSet));
+    for (const [abs, s] of specs) out.set(abs, this.resolveSpecs(root, abs, s, fileSet));
     const unselected = new Set(listing.rels.filter((rel) => !chosen.has(rel)).map((rel) => join(root, rel)));
     const map: ProjectMap = { root, files: nodes, edges: [], modules: [...moduleIds.values()], formerRoots: formerRoots(this.cfg.claudeProjectsDir, root), ...(listing.stopped ? { scanStopped: true } : {}) };
     const c: Cached = {
@@ -442,24 +442,24 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** The files `abs` imports, each once. */
-  private resolveSpecs(abs: string, specs: string[], fileSet: Set<string>): Set<string> {
+  private resolveSpecs(root: string, abs: string, specs: string[], fileSet: Set<string>): Set<string> {
     const out = new Set<string>();
-    for (const spec of specs) for (const to of this.resolveImport(abs, spec, fileSet)) if (to !== abs) out.add(to);
+    for (const spec of specs) for (const to of this.resolveImport(root, abs, spec, fileSet)) if (to !== abs) out.add(to);
     return out;
   }
 
   /** Files an import points to: one for most languages, every file of the package for Go and Java wildcard imports. */
-  private resolveImport(fromFile: string, spec: string, fileSet: Set<string>): string[] {
+  private resolveImport(root: string, fromFile: string, spec: string, fileSet: Set<string>): string[] {
     const ext = extname(fromFile);
     if (ext === ".go") return this.resolveGo(fromFile, spec, fileSet);
     if (ext === ".rs") return this.resolveRust(fromFile, spec, fileSet);
     if (ext === ".java") return this.resolveJava(spec, fileSet);
     if (C_EXT.has(ext)) return this.resolveInclude(fromFile, spec, fileSet);
-    const one = this.resolveOne(fromFile, spec, fileSet);
+    const one = this.resolveOne(root, fromFile, spec, fileSet);
     return one ? [one] : [];
   }
 
-  private resolveOne(fromFile: string, spec: string, fileSet: Set<string>): string | undefined {
+  private resolveOne(root: string, fromFile: string, spec: string, fileSet: Set<string>): string | undefined {
     const ext = extname(fromFile);
     if (ext === ".py") {
       const pyFile = (base: string) => [`${base}.py`, join(base, "__init__.py")].find((c) => fileSet.has(c));
@@ -481,10 +481,11 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     }
     if (spec.startsWith(".")) return this.jsFile(resolve(dirname(fromFile), spec), fileSet);
     // A bare specifier: an alias from the nearest tsconfig (paths, baseUrl), else a package (not on the map).
-    const ts = this.tsAliasesFor(dirname(fromFile));
+    const ts = this.tsAliasesFor(root, dirname(fromFile));
     if (!ts) return undefined;
-    let best: [string, string, string[]] | undefined;
+    let best: [string, string, string[], boolean] | undefined;
     for (const p of ts.paths) {
+      if (p[3] && spec !== p[0]) continue; // an alias without * means that name only
       if (spec.length >= p[0].length + p[1].length && spec.startsWith(p[0]) && spec.endsWith(p[1]) && (!best || p[0].length > best[0].length)) best = p;
     }
     if (best) {
@@ -507,23 +508,26 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     return undefined;
   }
 
-  /** The nearest tsconfig.json (or jsconfig.json) above a folder, with its aliases; null when none has any. `extends` is not followed. */
-  private tsAliasesFor(dir: string): TsAliases | null {
+  /** The nearest tsconfig.json (or jsconfig.json) above a folder and inside the project, with its aliases; null when
+   * none has any. `extends` is not followed. Only a regular file under 1 MB is read. */
+  private tsAliasesFor(root: string, dir: string): TsAliases | null {
     if (this.tsconfigs.has(dir)) return this.tsconfigs.get(dir)!;
     let found: TsAliases | null = null;
     const file = ["tsconfig.json", "jsconfig.json"].map((f) => join(dir, f)).find((f) => existsSync(f));
     if (file) {
       try {
+        const st = lstatSync(file);
+        if (!st.isFile() || st.size > 1_000_000) throw new Error("not a small regular file");
         const json = stripComments(readFileSync(file, "utf8"), "c").replace(/,(\s*[}\]])/g, "$1");
         const opts = (JSON.parse(json) as { compilerOptions?: { baseUrl?: string; paths?: Record<string, string[]> } }).compilerOptions ?? {};
         const base = resolve(dir, opts.baseUrl ?? ".");
-        const paths = Object.entries(opts.paths ?? {}).filter(([, t]) => Array.isArray(t)).map(([k, t]): [string, string, string[]] => {
+        const paths = Object.entries(opts.paths ?? {}).filter(([, t]) => Array.isArray(t)).map(([k, t]): [string, string, string[], boolean] => {
           const star = k.indexOf("*");
-          return star === -1 ? [k, "", t.map((x) => x.replace("*", ""))] : [k.slice(0, star), k.slice(star + 1), t];
+          return star === -1 ? [k, "", t.map((x) => x.replace("*", "")), true] : [k.slice(0, star), k.slice(star + 1), t, false];
         });
         found = paths.length || opts.baseUrl ? { base, paths, hasBaseUrl: !!opts.baseUrl } : null;
       } catch { found = null; } // unreadable or not JSON: no aliases
-    } else if (dirname(dir) !== dir) found = this.tsAliasesFor(dirname(dir));
+    } else if (dir !== root && dir.startsWith(root + sep)) found = this.tsAliasesFor(root, dirname(dir)); // never above the project
     this.tsconfigs.set(dir, found);
     return found;
   }
@@ -818,7 +822,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     if (setChanged) this.indexes.delete(c.fileSet);
     const edgesChanged = new Set<string>();
     for (const abs of setChanged ? c.specs.keys() : changed) {
-      const next = this.resolveSpecs(abs, c.specs.get(abs) ?? [], c.fileSet);
+      const next = this.resolveSpecs(root, abs, c.specs.get(abs) ?? [], c.fileSet);
       if (!sameSet(c.out.get(abs), next)) { c.out.set(abs, next); edgesChanged.add(abs); }
     }
     if (edgesChanged.size || removed.size) this.flattenEdges(c);

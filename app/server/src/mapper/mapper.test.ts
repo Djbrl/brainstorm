@@ -554,7 +554,7 @@ test("a git repo follows .gitignore alone (plus .git and caches): .github, build
 test("imports: .js names for .ts files, tsconfig paths and baseUrl, Python absolute and package imports, nothing from comments", async () => {
   const root = tempRepo({
     "tsconfig.json": '{\n  // aliases\n  "compilerOptions": { "baseUrl": ".", "paths": { "@/*": ["src/*"], "~lib": ["lib/index.ts"], }, },\n}\n',
-    "src/a.ts": "import { b } from './b.js';\nimport { c } from '@/c';\nimport l from '~lib';\nimport u from 'src/util';\nimport r from 'react';\n// import { gone } from './gone';\n/* import { old } from './old'; */\n",
+    "src/a.ts": "import { b } from './b.js';\nimport { c } from '@/c';\nimport l from '~lib';\nimport u from 'src/util';\nimport r from 'react';\nimport e from '~libextra';\n// import { gone } from './gone';\n/* import { old } from './old'; */\n",
     "src/b.ts": "export const b = 1;\n", "src/c.tsx": "export const c = 1;\n", "src/util.ts": "", "src/gone.ts": "", "src/old.ts": "",
     "lib/index.ts": "export default 1;\n",
     "src/n.tsx": "import { b } from './b.jsx';\nimport { c } from './c.js';\n",
@@ -575,5 +575,23 @@ test("imports: .js names for .ts files, tsconfig paths and baseUrl, Python absol
   } finally {
     svc.onModuleDestroy();
     rmSync(root, { recursive: true, force: true }); rmSync(projects, { recursive: true, force: true });
+  }
+});
+
+test("imports: an alias without * means that name only, and no tsconfig above the project is read", async () => {
+  const outer = mkdtempSync(join(tmpdir(), "bs-outer-"));
+  writeFileSync(join(outer, "tsconfig.json"), '{ "compilerOptions": { "baseUrl": "proj", "paths": { "@x/*": ["proj/src/*"] } } }');
+  const root = join(outer, "proj");
+  mkdirSync(join(root, "src"), { recursive: true });
+  writeFileSync(join(root, "src/a.ts"), "import b from '@x/b';\nimport c from 'src/b';\n");
+  writeFileSync(join(root, "src/b.ts"), "export default 1;\n");
+  const projects = mkdtempSync(join(tmpdir(), "bs-projects-"));
+  const svc = new MapperService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { defaultRoot: root, claudeProjectsDir: projects } as never);
+  try {
+    const map = await svc.getMapAsync(root);
+    assert.deepEqual(map.edges.filter((e) => e.from === join(root, "src/a.ts")), []); // the outer tsconfig isn't the project's
+  } finally {
+    svc.onModuleDestroy();
+    rmSync(outer, { recursive: true, force: true }); rmSync(projects, { recursive: true, force: true });
   }
 });

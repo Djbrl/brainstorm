@@ -47,6 +47,25 @@ test("maskSecrets: 500 KB of a hyphenated run takes linear time", () => {
   fast("sk-", () => maskSecrets("sk-".repeat(100_000)), 100);
 });
 
+test("maskSecrets: the key-name, header, URL, command-line, .netrc, .pgpass and YAML rules take linear time", () => {
+  const run = (s) => s.repeat(Math.ceil(200_000 / s.length));
+  const shapes = {
+    "name=": run("a="), "name:": run("a:"), 'name="': run('a="'), "name='b ": run("a='b "), "password=x(": run("password=abc123("),
+    "password: x ": run("password: x "), "pw: x line": run("pw: x\n"), "DB_PASS=": run("DB_PASS="), "api_key run": run("api_key"),
+    "open quote": 'password: "' + "x".repeat(200_000), "escapes in quotes": 'password: "' + "\\x".repeat(100_000),
+    "authorization": run("authorization: "), "authorization scheme": run("Authorization: Bearer x "),
+    "cookie": run("cookie: a="), "x-api-key": run("x-api-key: "), "Bearer": run("Bearer "), "?code=": run("?code="),
+    "scheme://": run("http://"), "scheme://user:": run("http://a:"), "scheme://key@": run("http://aaaaaaaaaaaaaaaaaaaaaaa1@"),
+    "slack": run("hooks.slack.com/services/"), "discord": run("discord.com/api/webhooks/12345/"),
+    "machine": run("machine a "), "machine login": run("machine a login b "), "password line": run("\n password "),
+    "docker login": run("docker login "), "sshpass": run("sshpass -x "), "mysql -p": run("mysql -p "),
+    "pgpass": run("a:1:b:c:"), "pgpass lines": run("a:1:b:c:d e\n"),
+    "yaml block keys": run("password: |\n"), "yaml block lines": "password: |\n" + run("  y\n"),
+    "letters then =": "a".repeat(200_000) + "=", "a-": run("a-"),
+  };
+  for (const [name, s] of Object.entries(shapes)) fast(name, () => maskSecrets(s), 100);
+});
+
 test("commandWrites: a long run of braces, open and spaces", () => {
   fast("braces", () => commandWrites("echo > " + "{".repeat(65_536), "/w"));
   fast("braces and commas", () => commandWrites("echo > " + "{,".repeat(32_768), "/w"));

@@ -1,4 +1,4 @@
-// Owner: A. What Codex's log lines say, in the shapes Claude Code's steps use (see codex.source.ts): its diffs and
+// What Codex's log lines say, in the shapes Claude Code's steps use (see codex.source.ts): its diffs and
 // patches as before/after, its command outputs as a Claude Code terminal shows them, its prompts with the context
 // Codex Desktop adds to them set apart. Pure functions, no state.
 

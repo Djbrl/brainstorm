@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import Anthropic from "@anthropic-ai/sdk";
 import { ConfigService } from "../core/config.service";
 
-// Owner: D.
+// The Claude client Ask uses (only with an API key).
 @Injectable()
 export class ClaudeService {
   private client: Anthropic | null = null;

@@ -1,4 +1,4 @@
-// Owned by the lead. The first-run tour: a card that points at one part of the screen at a time (the threads, a thread's
+// The first-run tour: a card that points at one part of the screen at a time (the threads, a thread's
 // steps, one step, the files, the map with an example agent, the Readmap, the keys) and says what it is, with Skip,
 // Back and Next on every step (Esc skips, ← → go back and on). It drives the app itself: it opens the newest thread,
 // one of its steps, the Files tab, and closes them again. The extras stay hidden until their step (tour.css), and

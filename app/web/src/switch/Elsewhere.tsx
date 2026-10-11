@@ -1,4 +1,4 @@
-// Owner: switcher. In the header, only when it's true: agents at work in your other projects ("1 agent in skindiff"),
+// In the header, only when it's true: agents at work in your other projects ("1 agent in skindiff"),
 // amber when one waits on you. A click lists them; picking one switches to its project and opens the thread.
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";

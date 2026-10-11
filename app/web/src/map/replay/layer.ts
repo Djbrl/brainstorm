@@ -1,4 +1,4 @@
-// Owner: replay agent. Map-canvas side of the thread replay: tracer, stops, read flashes, the focus (which files are
+// Map-canvas side of the thread replay: tracer, stops, read flashes, the focus (which files are
 // lit and named), the camera follow when locked, playback and keyboard. The wheel zooms the map: scrubbing is the Track
 // tab's scroll, the arrow keys and the player's slider.
 import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react";

@@ -32,7 +32,7 @@ const fileName = (replay: Replay, session: Session) => `rundown-${slug(replay.sh
 
 const escHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
-// Owned by the lead. Sharing a thread: GET /api/share (one .html file anyone can open) and GET /api/export.md (a report).
+// Sharing a thread: GET /api/share (one .html file anyone can open) and GET /api/export.md (a report).
 @Controller()
 export class ShareController {
   constructor(private listener: ListenerService, private replays: ReplayService, private usage: UsageService, private cfg: ConfigService) {}

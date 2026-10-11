@@ -1,4 +1,4 @@
-// Owner: S. The system's own folder picker, opened by the server (it runs on the person's machine): a web page can't
+// The system's own folder picker, opened by the server (it runs on the person's machine): a web page can't
 // learn a folder's path from the browser's picker or a drop, only its name. macOS: AppleScript's `choose folder`;
 // Windows: the .NET folder dialog through PowerShell; Linux: zenity, else kdialog.
 import { execFile } from "node:child_process";

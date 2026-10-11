@@ -1,4 +1,4 @@
-// Owned by the lead. Map | Places: two views of the same thread, floating at the top of the Map tab. (A thread's Track
+// Map | Places: two views of the same thread, floating at the top of the Map tab. (A thread's Track
 // is the sidebar's second tab, next to the map.) On a small window it sits in the thread bar instead (`inBar`), and the
 // top of the map is left to the folded sidebar's card with the thread's step (lens.css).
 import { useNav } from "../lib/nav";

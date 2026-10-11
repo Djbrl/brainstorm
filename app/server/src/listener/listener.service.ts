@@ -19,7 +19,7 @@ import { CommandEdits } from "./command-edits";
 import { commandReads } from "./command-writes";
 import { backfillAgentIds } from "./agent-ids";
 
-// Owner: A. Tail the coding agents' session logs (log sources: claude.source.ts for ~/.claude/projects, codex.source.ts
+// Tail the coding agents' session logs (log sources: claude.source.ts for ~/.claude/projects, codex.source.ts
 // for ~/.codex/sessions), store the Steps they parse, emit them on the bus and broadcast them over ws.
 
 export { sanitizeText, promptTitle, withoutPastes } from "./text";
@@ -190,7 +190,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       text TEXT, tool TEXT, input TEXT, file_path TEXT, diff TEXT, label TEXT, risk TEXT,
       is_subagent INTEGER NOT NULL DEFAULT 0
     )`);
-    // Added 5 Oct 2026: sessions.worked, kept up to date as steps are stored, instead of a scan of every step per list.
+    // `sessions.worked`, kept up to date as steps are stored, instead of a scan of every step per list.
     if (!(db.prepare(`PRAGMA table_info(sessions)`).all() as { name: string }[]).some((c) => c.name === "worked")) {
       db.exec("BEGIN");
       try {
@@ -199,25 +199,25 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
         db.exec("COMMIT");
       } catch (e) { db.exec("ROLLBACK"); throw e; }
     }
-    // Added 30 Sep 2026: pairs a tool result with its call exactly (older rows are paired by order).
+    // Pairs a tool result with its call exactly (older rows are paired by order).
     const stepCols = (db.prepare(`PRAGMA table_info(steps)`).all() as { name: string }[]).map((c) => c.name);
-    // Added 6 Oct 2026: which coding agent a thread ran in (null: Claude Code, every thread stored before).
+    // Which coding agent a thread ran in (null: Claude Code, every thread stored before).
     if (!(db.prepare(`PRAGMA table_info(sessions)`).all() as { name: string }[]).some((c) => c.name === "harness")) db.exec(`ALTER TABLE sessions ADD COLUMN harness TEXT`);
     if (!stepCols.includes("tool_use_id")) db.exec(`ALTER TABLE steps ADD COLUMN tool_use_id TEXT`);
-    // Added 5 Oct 2026: which subagent a step comes from, so parallel subagents stay apart after a reload. Steps stored
+    // Which subagent a step comes from, so parallel subagents stay apart after a reload. Steps stored
     // before then get theirs from their logs, once (see agent-ids.ts).
     if (!stepCols.includes("agent_id")) db.exec(`ALTER TABLE steps ADD COLUMN agent_id TEXT`);
-    // Added 11 Oct 2026: which file an offset is in, to notice a log replaced or cut short (see openLog).
+    // Which file an offset is in, to notice a log replaced or cut short (see openLog).
     const offsetCols = (db.prepare(`PRAGMA table_info(listener_offsets)`).all() as { name: string }[]).map((c) => c.name);
     if (!offsetCols.includes("ino")) db.exec(`ALTER TABLE listener_offsets ADD COLUMN ino INTEGER`);
     if (!offsetCols.includes("head")) db.exec(`ALTER TABLE listener_offsets ADD COLUMN head TEXT`);
     db.exec(`CREATE INDEX IF NOT EXISTS steps_session_seq ON steps(session_id, seq)`);
     db.exec(`CREATE INDEX IF NOT EXISTS steps_label ON steps(kind, label)`);
-    // Added 6 Oct 2026: "was this file touched by a step?" for the picture endpoint (image/).
+    // "was this file touched by a step?" for the picture endpoint (image/).
     db.exec(`CREATE INDEX IF NOT EXISTS steps_file ON steps(file_path)`);
-    // Added 3 Oct 2026: compacted-conversation recaps were stored as prompts; they read as the agent's text.
+    // Compacted-conversation recaps were stored as prompts; they read as the agent's text.
     db.exec(`UPDATE steps SET kind = 'text' WHERE kind = 'prompt' AND text LIKE 'This session is being continued from a previous conversation%'`);
-    // Added 11 Oct 2026: Claude Code's threads were stored with harness NULL (so a re-read of its logs, which deletes
+    // Claude Code's threads were stored with harness NULL (so a re-read of its logs, which deletes
     // by harness, would have kept them); titles are masked like every other text; times ahead of the clock were kept.
     this.once("listener: harness claude", () => db.exec(`UPDATE sessions SET harness = 'claude' WHERE harness IS NULL`));
     this.once("listener: titles masked", () => {

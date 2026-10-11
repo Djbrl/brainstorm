@@ -1,4 +1,4 @@
-/* Owner: C. AskBox */
+/* The Ask box. */
 .askbox { display: flex; flex-direction: column; gap: 14px; }
 
 .ask-thread { display: flex; flex-direction: column; gap: 22px; }

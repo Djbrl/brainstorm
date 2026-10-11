@@ -16,7 +16,7 @@ import { OpenModule } from "./open/open.module";
 import { ImageModule } from "./image/image.module";
 import { ElsewhereModule } from "./elsewhere/elsewhere.module";
 
-// Owned by the lead. Agents: don't edit; ask in docs/build-log.md "Requests".
+// The server: every module it runs.
 import { UsageModule } from "./usage/usage.module";
 import { UpdatesModule } from "./updates/updates.module";
 import { OnboardingModule } from "./onboarding/onboarding.controller";

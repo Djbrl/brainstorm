@@ -1,4 +1,4 @@
-// Owned by the lead. The third level: one step of the open thread in a side panel (its diff or output, and Ask), the
+// The third level: one step of the open thread in a side panel (its diff or output, and Ask), the
 // same on the Map and the Track. It follows the cursor: scroll the steps or scrub the replay and it shows the step
 // you're on. A click anywhere outside it (on the map, say) closes it, as do Esc and Back. Its link is
 // /thread/<id>/step/<stepId>.

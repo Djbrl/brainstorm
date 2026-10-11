@@ -1,4 +1,4 @@
-// Owner: A. What every log source does to text before it's stored: secrets masked, long texts clipped; and a thread's
+// What every log source does to text before it's stored: secrets masked, long texts clipped; and a thread's
 // title from its first prompt. Shared by the Claude Code and Codex sources (claude.source.ts, codex.source.ts).
 import { maskSecrets } from "../privacy/mask";
 

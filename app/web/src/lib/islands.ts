@@ -1,4 +1,4 @@
-// Owner: islands. Files an agent touches outside the open project: an orchestrator thread editing another repo, a visitor
+// Files an agent touches outside the open project: an orchestrator thread editing another repo, a visitor
 // from another project. The map draws them as small islands around the project, one per project (the folders Rundown
 // knows as projects; else the folder under your home), holding only the files touched. Clicking one opens that project.
 //

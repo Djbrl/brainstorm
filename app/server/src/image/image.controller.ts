@@ -6,7 +6,7 @@ import { extname, isAbsolute, resolve } from "node:path";
 import { isLocalHost } from "../core/local";
 import { ListenerService } from "../listener/listener.service";
 
-// Owner: viewers. "Show the picture" in the step panel: an image an agent read, loaded from the person's disk when they
+// "Show the picture" in the step panel: an image an agent read, loaded from the person's disk when they
 // ask (Codex's log keeps only the path; Claude Code's keeps the picture, served by shots/). It reads files from the
 // disk, so it is guarded tightly, and every refusal is the same plain 404 (it never says which rule failed):
 //  - only a picture by extension (png, jpg, jpeg, gif, webp, bmp), before and after symlinks are followed;

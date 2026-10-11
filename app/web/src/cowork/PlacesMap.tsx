@@ -1,4 +1,4 @@
-// Owner: cowork. The places map, in the code map's language: each kind of work (Web, Services, Your apps, Apps) is a
+// The places map, in the code map's language: each kind of work (Web, Services, Your apps, Apps) is a
 // circle like a top folder, its sites circles inside it, their pages dots, packed the same way (d3-hierarchy: the same
 // places always give the same map, nothing floats). A page is coloured by when it was last worked on, ringed orange if
 // something changed there, a red dot if a step failed there. The open thread's marker stands on the place it's at (its

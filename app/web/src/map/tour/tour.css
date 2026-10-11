@@ -1,4 +1,4 @@
-/* Owned by the lead. The first-run tour (Tour.tsx): one card beside what it explains, a ring around that, nothing else
+/* The first-run tour (Tour.tsx): one card beside what it explains, a ring around that, nothing else
    over the app. While it runs (:root[data-tour]), the extras are out of sight until their step: the Readmap, the file
    window, the key hints, the "agents elsewhere" pill, the notes over the map, the usage question and the old welcome
    card. `visibility`, not `display`: their own rules for small windows stay as they are. */

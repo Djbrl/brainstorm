@@ -1,4 +1,4 @@
-// Owner: D. A file's colour on the map: the theme's recency colours (CSS variables, themes.css) and the mix between them.
+// A file's colour on the map: the theme's recency colours (CSS variables, themes.css) and the mix between them.
 // No app state in here: the caller says whether this is a recording and since when a change counts as new.
 import type { RGB } from "./themes";
 

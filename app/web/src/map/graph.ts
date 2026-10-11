@@ -1,4 +1,4 @@
-// Owner: map-layout. The map's files, placed once by folder: every folder is a circle, its files and subfolders packed
+// The map's files, placed once by folder: every folder is a circle, its files and subfolders packed
 // inside it (d3-hierarchy's circle packing, the same answer every time). Nothing is simulated, so nothing shakes: a
 // position depends only on which files exist, not on what's open or what an agent does. Folders open and close as
 // you zoom (fold.ts), which only changes what's drawn. When files come or go, the circles that move glide to their

@@ -1,4 +1,4 @@
-/* Owner: camera. The Readmap (Readmap.tsx): a card in the top-right corner of the map, over it like a picture in picture,
+/* The Readmap (Readmap.tsx): a card in the top-right corner of the map, over it like a picture in picture,
    following what the agent reads. The same card as the file window (replay/peek.css) and as wide on a big map, so the two
    stand as one column on the right; its header too: what was read, the agents' buttons, ×. Hidden while a side panel
    covers that corner, and on a phone. M (or the thread bar's Readmap) shows it again. */

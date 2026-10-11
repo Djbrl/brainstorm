@@ -1,4 +1,4 @@
-// Owned by the lead. The shell: the header with where you are (project › thread › step), and the view for that place.
+// The shell: the header with where you are (project › thread › step), and the view for that place.
 // Each part reads only the slices it shows (useLiveSelector, useNavState), so a live message or a replay cursor move
 // re-renders the parts that changed, not the whole app.
 import { isReplay, shallowEqual, useLiveActions, useLiveSelector, useHarness, useLiveStep } from "./lib/live";

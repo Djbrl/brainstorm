@@ -2,7 +2,7 @@ import { closeSync, openSync, readSync, statSync } from "node:fs";
 import { basename, dirname, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
-// Steps stored before 5 Oct 2026 have no agent_id: it was live only. Without it, a reloaded thread can't tell parallel
+// Steps stored by older versions have no agent_id: it was live only. Without it, a reloaded thread can't tell parallel
 // subagents apart. This fills it in once, from the subagent logs the steps came from
 // (<project>/<sessionId>/subagents/agent-<id>.jsonl, every line carries its agentId). It only sets agent_id where it is
 // missing: no step is added, and seq, offsets and everything else stay as they are. A log that is gone is skipped.

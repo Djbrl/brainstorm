@@ -1,4 +1,4 @@
-// Owner: sidebar agent. Threads tab: the list of threads, nothing more. Clicking one opens it on the map, and the sidebar
+// Threads tab: the list of threads, nothing more. Clicking one opens it on the map, and the sidebar
 // shows it in the list's place (its steps; a running one follows live), with a back arrow to the list.
 // The list comes in sections under quiet labels: Claude Code, Codex, and Other projects (the threads of other projects
 // that touched this one, each row naming its project).

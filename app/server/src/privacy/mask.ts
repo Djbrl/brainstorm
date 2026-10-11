@@ -1,4 +1,4 @@
-// Owner: D. Redact API keys, tokens, passwords before anything is stored or sent.
+// Redact API keys, tokens, passwords before anything is stored or sent.
 //
 // Every rule runs in linear time on any input (test/regex-timing.test.cjs): an open-ended class is either bounded or
 // can't fail after it has run (so the text it ran over is consumed, not scanned again from the next character), and

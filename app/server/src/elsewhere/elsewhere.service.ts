@@ -10,7 +10,7 @@ import { maskSecrets } from "../privacy/mask";
 import { isIdleTranscript } from "../workspace/threads";
 import { decodeProjectDir } from "../workspace/workspace.service";
 
-// Owner: switcher. Agents at work in the person's other projects, so the app can say so and take you there. Cheap on
+// Agents at work in the person's other projects, so the app can say so and take you there. Cheap on
 // purpose: the logs of other projects aren't read, only their files' last change (a thread is working while its log
 // grows), a few KB of a live one (where it runs, its title), and what the plugin's hooks said (they post every
 // session's events, whatever the project).

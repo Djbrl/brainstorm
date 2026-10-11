@@ -1,4 +1,4 @@
-// Owned by the lead. The map theme: how the map (and the chrome around it) looks. One choice per browser.
+// The map theme: how the map (and the chrome around it) looks. One choice per browser.
 //
 // The theme is set as <html data-theme="…"> so CSS can restyle surfaces (styles/themes.css), and read on every
 // frame by the canvas layers through getTheme() (see map/themes.ts), like mapPrefs.

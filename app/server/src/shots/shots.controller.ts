@@ -2,7 +2,7 @@ import { Controller, Get, NotFoundException, Param, Res } from "@nestjs/common";
 import type { Response } from "express";
 import { SHOT_TYPES, ShotsService } from "./shots.service";
 
-// Owned by the lead. A screenshot a tool returned, for the step panel. The URL keeps its old /tasks prefix, so the web
+// A screenshot a tool returned, for the step panel. The URL keeps its old /tasks prefix, so the web
 // app and links stay as they were. Local only: the server listens on 127.0.0.1.
 @Controller()
 export class ShotsController {

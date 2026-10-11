@@ -1,4 +1,4 @@
-// Owner: switcher. The project's name, first in the tab bar: a click lists your other projects (the ones Claude Code and
+// The project's name, first in the tab bar: a click lists your other projects (the ones Claude Code and
 // Codex worked in lately, the workspace picker's list) to hop to in one click, and "All projects…" for the picker.
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";

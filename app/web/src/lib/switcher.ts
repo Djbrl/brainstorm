@@ -1,4 +1,4 @@
-// Owner: switcher. Getting from one thread to another in one move: the threads in the tab bar (which, in which order),
+// Getting from one thread to another in one move: the threads in the tab bar (which, in which order),
 // the threads you opened lately (remembered per project, per browser), and the threads at work in your other projects
 // (GET /api/elsewhere, asked every few seconds while the page is in view).
 import { useEffect, useMemo, useSyncExternalStore } from "react";

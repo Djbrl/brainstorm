@@ -10,7 +10,7 @@ import { EventsGateway } from "../core/events.gateway";
 import { safely } from "../core/safely";
 import { ListenerService } from "../listener/listener.service";
 
-// Owner: D. Live presence of agents (main session threads and subagents): which file each one is on, and its recent route.
+// Live presence of agents (main session threads and subagents): which file each one is on, and its recent route.
 const INACTIVE_MS = 2 * 60_000;
 const DROP_MS = 30 * 60_000;
 const TRAIL_MAX = 12;

@@ -1,4 +1,4 @@
-// Owner: viewers. An HTML file as a page: rendered in a sandboxed frame, scaled down from a desktop width to fit the
+// An HTML file as a page: rendered in a sandboxed frame, scaled down from a desktop width to fit the
 // panel. Nothing in it runs and nothing leaves the machine: the frame allows no scripts, forms, popups or navigation
 // (sandbox with no permissions), and the page's own policy refuses every request except styles and images written
 // into it. So its own stylesheet links and pictures by path don't show: the layout and the text do.

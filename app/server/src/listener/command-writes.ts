@@ -1,4 +1,4 @@
-// Owner: A. The files a shell command writes, creates or deletes, found by reading the command text (nothing is run).
+// The files a shell command writes, creates or deletes, found by reading the command text (nothing is run).
 // Agents change files through the shell as often as through their edit tools: `sed -i`, `cat > f <<EOF`, `mv`,
 // `python3 - <<'PY' … Path('app.vue').write_text(…)`, Codex's `apply_patch`. This is the static half: what the command
 // says it writes. Only what can be known from the text is returned: a path built from a variable, a glob or a command

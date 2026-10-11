@@ -1,4 +1,4 @@
-// Owned by the lead. Names on the map without the pile-up. One LabelSpace per frame holds the files' footprints, the
+// Names on the map without the pile-up. One LabelSpace per frame holds the files' footprints, the
 // open folders' names (drawNode.ts drawFolderNames), the replay's badges and the file names, so no name prints over a
 // file, a badge or another name; a name with no room waits for the zoom, like town names on a map. Names are stamped
 // from small cached pictures (their outline stroked once), measured at their size on screen, and only the ones on

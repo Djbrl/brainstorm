@@ -1,4 +1,4 @@
-/* Owned by the lead. The settings button and its window. */
+/* The settings button and its window. */
 .settings { position: relative; margin-right: 10px; }
 /* The header is its own layer (backdrop-filter): lift it above the banner and the map so the menu can open over them. */
 .topbar { position: relative; z-index: 30; }

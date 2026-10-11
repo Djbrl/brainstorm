@@ -2,7 +2,7 @@
 
 /** The coding agent a thread ran in (its logs: listener/claude.source.ts, listener/codex.source.ts). */
 export type Harness = "claude" | "codex";
-/** `harness`: added 6 Oct 2026 ("claude" for every thread stored before). */
+/** `harness`: which coding agent the thread ran in. */
 /** `home`: the repo the thread works in, its real folder (links followed, a worktree's repo): one name for a repo that
  *  moved or is reached through a link (~/brainstorm, ~/Documents/brainstorm and ~/rundown are one project). */
 export type Session = { id: string; cwd: string; title: string; startedAt: string; lastEventAt: string; status: "running" | "idle"; harness: Harness; home?: string };
@@ -14,8 +14,8 @@ export type Step = {
   label?: string;       // short human label, filled by the reader (B)
   risk?: string[];      // e.g. ["deleted test", "touches auth"], filled by the reader (B)
   isSubagent?: boolean;
-  agentId?: string;     // subagent id (from its log); absent for the main session thread. Stored since 5 Oct 2026; older steps filled from their logs once.
-  toolUseId?: string;   // tool_call/edit: the call's tool_use id; tool_result: the id it answers. Absent on steps stored before 30 Sep 2026.
+  agentId?: string;     // subagent id (from its log); absent for the main session thread. Older steps get it from their logs once.
+  toolUseId?: string;   // tool_call/edit: the call's tool_use id; tool_result: the id it answers. Absent on steps stored by early versions.
   reads?: string[];     // a shell command (tool_call, Bash): the files it reads by its text (`cat`, `sed -n`, `grep`…), absolute; not stored, worked out when read
 };
 export type FileNode = { path: string; module: string; lines: number; lastChangedAt?: string; activeSessionId?: string; summary?: string };
@@ -138,7 +138,7 @@ export type CoworkSummary = {
 };
 
 /**
- * Does a thread need you? (GET /api/attention, ws "attention"). Added 5 Oct 2026.
+ * Does a thread need you? (GET /api/attention, ws "attention").
  * permission: a tool call waits for your OK. question: the agent asked you something (AskUserQuestion, an MCP form).
  * plan: a plan waits for approval. stuck: the same tool failed 3 times in a row. done: the agent finished and it's your turn.
  * `sure` is false when it's inferred from the log alone (a call with no result and no activity for a while); the plugin's

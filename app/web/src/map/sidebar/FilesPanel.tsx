@@ -1,4 +1,4 @@
-// Owner: sidebar agent. Files tab: a searchable folder tree of the codebase, with per-file recency
+// Files tab: a searchable folder tree of the codebase, with per-file recency
 // dots and, during a replay, which files that thread touched.
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { ProjectMap } from "@contract";

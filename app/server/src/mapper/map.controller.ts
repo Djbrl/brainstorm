@@ -2,7 +2,7 @@ import { Controller, Get, Query } from "@nestjs/common";
 import { MapperService } from "./mapper.service";
 import { ConfigService } from "../core/config.service";
 
-// Owner: B.
+// GET /api/map: the open project's map.
 @Controller()
 export class MapController {
   constructor(private mapper: MapperService, private cfg: ConfigService) {}

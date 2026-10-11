@@ -1,4 +1,4 @@
-// Owner: viewers. Pictures opened large over the page (a screenshot a tool took, an image an agent read): fitted to
+// Pictures opened large over the page (a screenshot a tool took, an image an agent read): fitted to
 // the window, ← → between a step's pictures, Esc or a click outside closes. One picture is loaded at a time, the one on
 // show (the browser keeps the ones already seen in its cache).
 import { useEffect } from "react";

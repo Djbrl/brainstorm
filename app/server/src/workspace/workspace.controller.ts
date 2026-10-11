@@ -2,7 +2,7 @@ import { Body, Controller, Get, Post, ServiceUnavailableException } from "@nestj
 import { chooseFolder, type Chosen } from "./choose-folder";
 import { WorkspaceService } from "./workspace.service";
 
-// Owner: S.
+// The open project: its status, suggestions, the folder picker and switching.
 @Controller()
 export class WorkspaceController {
   constructor(private ws: WorkspaceService) {}

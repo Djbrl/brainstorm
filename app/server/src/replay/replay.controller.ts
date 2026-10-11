@@ -3,7 +3,7 @@ import type { Replay } from "../types";
 import { redactReplayJson } from "./redact";
 import { ReplayService } from "./replay.service";
 
-// Owned by the lead. Static export for the hosted demo: GET /api/replay?sessionId=a,b&root=
+// Static export for the hosted demo: GET /api/replay?sessionId=a,b&root=
 @Controller()
 export class ReplayController {
   constructor(private replays: ReplayService) {}

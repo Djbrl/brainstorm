@@ -1,4 +1,4 @@
-// Owner: cowork. Turns non-code tool calls (browser, web, connectors, outward CLIs) into places and actions.
+// Turns non-code tool calls (browser, web, connectors, outward CLIs) into places and actions.
 // Pure: no Nest, no db. One tracker per session, fed call/result pairs in order. See docs/technical.md, "Places".
 import { isErrorResult } from "../shared/failed";
 import { shellArgv } from "../listener/command-writes";

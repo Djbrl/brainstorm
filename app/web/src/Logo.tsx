@@ -1,4 +1,4 @@
-// Owned by the lead. The Rundown logo: three steps (ink, cobalt, the brand orange) and the wordmark, Satoshi Black with a
+// The Rundown logo: three steps (ink, cobalt, the brand orange) and the wordmark, Satoshi Black with a
 // capital R. The ink parts are drawn in the current text colour so they follow every theme. Source: brand/rundown-logo.svg
 // (outlined: no font to load).
 export function Logo({ height = 20, label = "Rundown" }: { height?: number; label?: string }) {

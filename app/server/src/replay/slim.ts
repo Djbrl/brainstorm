@@ -1,6 +1,6 @@
 import type { Edge, FileNode, ProjectMap, Step } from "../types";
 
-// Owned by the lead. A shared replay carries one thread, so it doesn't need the whole project's map (up to 3,000 files
+// A shared replay carries one thread, so it doesn't need the whole project's map (up to 3,000 files
 // and their imports, megabytes). It keeps the files the thread touched, and a few around them so the map still reads
 // as a project and not a handful of lonely dots: the files they import or are imported by first (those lines are
 // drawn), then files from the same folders. The viewer lays files out by folder (web map/graph.ts), so the touched

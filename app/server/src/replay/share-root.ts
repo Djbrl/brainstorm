@@ -1,4 +1,4 @@
-// Owned by the lead. Which project's map a shared thread carries (share.controller.ts).
+// Which project's map a shared thread carries (share.controller.ts).
 import { existsSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import type { Session, Step } from "../types";

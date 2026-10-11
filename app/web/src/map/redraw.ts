@@ -1,4 +1,4 @@
-// Owner: perf-canvas. When the map canvas redraws.
+// When the map canvas redraws.
 //
 // force-graph redraws a frame only when it has to (the camera moved, the canvas resized):
 // its autoPauseRedraw. Everything else that changes the picture comes from us: an agent gliding, a replay step, a file

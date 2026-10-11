@@ -12,7 +12,7 @@ import { UsageService } from "../usage/usage.service";
 import { insideAny } from "../core/roots";
 import { tooBroad } from "../workspace/workspace.service";
 
-// Owner: D.
+// Answers a question from a small, masked context (the step, its diff, the steps before, a file excerpt).
 const SYSTEM = `You are Rundown, a guide to a codebase that AI coding agents are editing live.
 Answer the question for someone learning this codebase. Use ONLY the context provided (file excerpt, the agent's recent steps and diff).
 Be concise: 2 to 6 short sentences or a few bullets, plain language, name concrete files and functions.
@@ -75,7 +75,7 @@ export class AskService implements OnModuleInit {
     const target = stepId ?? "";
 
     // Cache: same question + same target + unchanged file (only real Claude answers, so a fixed key is picked up).
-    // Answers of exactly 700 tokens were cut off by the old limit (before 5 Oct 2026): ask again.
+    // Answers of exactly 700 tokens were cut off by an older version's limit: ask again.
     const cached = this.dbs.db
       .prepare(`SELECT response FROM ask_answers WHERE question = ? AND step_id = ? AND file_path = ? AND file_hash = ? AND json_extract(response, '$.fallback') = 0 AND json_extract(response, '$.tokensOut') != 700 ORDER BY id DESC LIMIT 1`)
       .get(question, target, text(req.filePath) ?? "", fileHash) as { response: string } | undefined;

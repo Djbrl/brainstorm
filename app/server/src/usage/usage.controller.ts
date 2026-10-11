@@ -2,7 +2,7 @@ import { BadRequestException, Body, Controller, ForbiddenException, Get, Headers
 import { isLocalHost } from "../core/local";
 import { THEMES, UsageService, WEB_KEYS, type UsageKey, type UsageStatus } from "./usage.service";
 
-// Owned by the lead. The usage-stats setting and the counts the web app reports (see usage.service.ts). Only from the app
+// The usage-stats setting and the counts the web app reports (see usage.service.ts). Only from the app
 // itself: JSON with a local Origin, so no other site can flip the setting or add counts.
 export function local(origin: string | undefined, type: string | undefined) {
   if (!type?.includes("application/json")) throw new BadRequestException("JSON only");

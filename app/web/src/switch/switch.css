@@ -1,4 +1,4 @@
-/* Owner: switcher. The thread tabs under the header, Find a thread (⌘K), agents in other projects, the shortcuts window. */
+/* The thread tabs under the header, Find a thread (⌘K), agents in other projects, the shortcuts window. */
 
 /* ---- the tab bar ---- */
 .threadbar { display: flex; align-items: center; gap: 16px; padding: 6px 20px; border-bottom: 1px solid var(--line); background: var(--bg); flex: none; min-height: 47px; }

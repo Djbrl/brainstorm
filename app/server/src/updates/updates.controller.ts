@@ -2,7 +2,7 @@ import { BadRequestException, Body, Controller, Get, Headers, Put } from "@nestj
 import { local } from "../usage/usage.controller";
 import { UpdatesService, type UpdatesStatus } from "./updates.service";
 
-// Owned by the lead. The "tell me when there's a new version" setting (updates.service.ts). Only from the app itself.
+// The "tell me when there's a new version" setting (updates.service.ts). Only from the app itself.
 @Controller()
 export class UpdatesController {
   constructor(private updates: UpdatesService) {}

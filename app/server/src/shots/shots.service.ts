@@ -5,7 +5,7 @@ import { DbService } from "../core/db.service";
 import { ConfigService } from "../core/config.service";
 import { ListenerService } from "../listener/listener.service";
 
-// Owned by the lead. Screenshots that tools returned (browser, computer use, simulator), read from Claude Code's
+// Screenshots that tools returned (browser, computer use, simulator), read from Claude Code's
 // session logs and kept in the local database, so they survive Claude Code's log cleanup. The step panel shows them
 // (web follow/content/ToolView.tsx). Local only: nothing here is part of a replay export.
 

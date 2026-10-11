@@ -1,4 +1,4 @@
-// Owned by the lead. One store for the whole app: REST bootstrap + websocket updates, or a static replay file.
+// One store for the whole app: REST bootstrap + websocket updates, or a static replay file.
 //
 // The state lives in an external store (not React state). WebSocket messages are queued and applied together, once
 // per animation frame (or after 100 ms when the tab is in the background), so a burst of messages costs one render.

@@ -1,4 +1,4 @@
-// Owner: sidebar agent. The folded sidebar with a thread open: its Track, folded down to a few lines in the top-left
+// The folded sidebar with a thread open: its Track, folded down to a few lines in the top-left
 // corner. The moment the thread is on (the newest while it follows live) as the Track's highlighted row, the ones before
 // it fading out above, the next one below when you look back, always four rows of the same height; the same words and dots as the Track (ReplaySteps'
 // textOf). The newest moment's dot breathes while the thread works (only that one: a moment you scroll back to keeps

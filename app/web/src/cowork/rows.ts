@@ -1,4 +1,4 @@
-// Owner: cowork. The open thread as rows of places, for the Places list and its player (PlaceSteps, CoworkView): each
+// The open thread as rows of places, for the Places list and its player (PlaceSteps, CoworkView): each
 // stretch of work in a place, and Your computer before, between and after them (moments with no place: the code); the
 // row the thread is at; and going to a row (the thread's cursor to its moment, the map's marker to its place).
 import { useLiveSelector } from "../lib/live";

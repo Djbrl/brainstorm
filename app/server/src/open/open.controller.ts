@@ -7,7 +7,7 @@ import { ListenerService } from "../listener/listener.service";
 import { tooBroad, WorkspaceService } from "../workspace/workspace.service";
 import { insideAny } from "../core/roots";
 
-// Owner: viewers. "Open in your default app" for a file shown in the step panel: the computer opens it with whatever
+// "Open in your default app" for a file shown in the step panel: the computer opens it with whatever
 // app it uses for that kind of file. Only a text or code file (by extension: never a program, a script a double-click would run, or an app),
 // only one that exists, and only inside the project or a folder a thread worked in. Only from the app itself: a JSON
 // request with a local Origin (no CORS, so no other site can send one).

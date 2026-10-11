@@ -1,4 +1,4 @@
-// Owner: thread-replay foundation. One session (thread) as a timeline of beats for the map replay.
+// One session (thread) as a timeline of beats for the map replay.
 //
 // Light detail (default): your prompts, each edit, and runs of reads are beats; everything in between
 // (messages, thinking, commands, browser, subagents, results) folds into one summary beat with counts.

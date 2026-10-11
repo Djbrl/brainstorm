@@ -1,4 +1,4 @@
-// Owner: C (words and numbers). What counts as a thread, the same in the workspace picker and the sidebar.
+// What counts as a thread, the same in the workspace picker and the sidebar.
 // A thread is one Claude Code session: a `<sessionId>.jsonl` transcript at the top of one of the repo's Claude Code
 // project folders (its main checkout, its worktrees, folders it lived in before it moved), counted once per id.
 // Not threads: subagent transcripts (`<session>/subagents/*.jsonl`, part of their session), a session whose

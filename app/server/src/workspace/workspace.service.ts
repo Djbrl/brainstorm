@@ -59,7 +59,7 @@ const POLL_MS = 300;
 const FOLDER_CHECK_MS = 5_000;
 const POLL_TIMEOUT_MS = 5 * 60_000;
 
-// Owner: S (workspace setup, server).
+// The open project: choosing it, setting it up, and switching to another.
 @Injectable()
 export class WorkspaceService implements OnModuleInit, OnModuleDestroy {
   private log = new Logger("Workspace");

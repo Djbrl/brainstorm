@@ -20,7 +20,7 @@ function actionOf(step: Step): string | undefined {
   return undefined; // runs, delegations etc. have no file to stand on
 }
 
-// Owned by the lead. Builds replays: the hosted demo's export (GET /api/replay) and shared replays (GET /api/share).
+// Builds replays: the hosted demo's export (GET /api/replay) and shared replays (GET /api/share).
 @Injectable()
 export class ReplayService {
   constructor(private listener: ListenerService, private mapper: MapperService, private askService: AskService, private cfg: ConfigService, private workspace: WorkspaceService) {}

@@ -1,4 +1,4 @@
-// Owner: switcher. Find a thread (⌘K): every thread of this project, newest first, and below them the threads at work in
+// Find a thread (⌘K): every thread of this project, newest first, and below them the threads at work in
 // your other projects. Type to narrow, ↑ ↓ to choose, Enter to open. A thread elsewhere switches the project first.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";

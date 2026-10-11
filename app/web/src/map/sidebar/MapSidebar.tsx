@@ -1,4 +1,4 @@
-// Owner: sidebar agent. Floating left sidebar on the map: [Threads | Files] tabs, collapsible to a slim tab.
+// Floating left sidebar on the map: [Threads | Files] tabs, collapsible to a slim tab.
 // Threads lists them; an open thread shows in their place (TrackPanel: its steps, or its places on the Places lens,
 // next to the map: scrolling them moves the tracer), its back arrow returning to the list (the thread stays open);
 // Files is the project's folder tree, or the selected file (FileView) in its place.

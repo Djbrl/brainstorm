@@ -1,4 +1,4 @@
-// Owner: A. Files an agent changed through a shell command instead of its edit tool (`sed -i`, a Python script writing
+// Files an agent changed through a shell command instead of its edit tool (`sed -i`, a Python script writing
 // app.vue, `cat > x <<EOF`): they become edits of the thread, like any other, so the map, the Track and the counts see
 // them. Claude Code and Codex alike (their commands are `Bash` steps).
 // - Which files: what the command says it writes (command-writes.ts reads the command), plus, live, any file that changed

@@ -1,4 +1,4 @@
-// Owner: map-focus. Map choices remembered per browser, read on every frame by the canvas layers (like lib/theme):
+// Map choices remembered per browser, read on every frame by the canvas layers (like lib/theme):
 // how much of an open thread the map lights up (its last 15 moments, its last 50, or all of it: see replay/layer.ts's
 // focus), whether the camera locks onto what moves (the replay tracer, or an agent you follow), and whether the small
 // window with the file the agent is reading or writing shows while you follow or replay a thread (replay/Peek.tsx), and

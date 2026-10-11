@@ -1,4 +1,4 @@
-// Owner: D. Force graph of files/modules, glow by recency, a ripple per agent edit + outline while active, side panel + AskBox.
+// Force graph of files/modules, glow by recency, a ripple per agent edit + outline while active, side panel + AskBox.
 // The pieces: graph.ts (nodes, layout, forces), drawNode.ts (drawing a frame), color.ts (recency colours), labels.ts
 // (names), useMapCamera.ts (what the camera frames), useLiveAgents.ts (agents on the map), redraw.ts (when to redraw).
 import { LensSwitch } from "./LensSwitch";

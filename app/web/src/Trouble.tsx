@@ -1,4 +1,4 @@
-// Owned by the lead. When something goes wrong, said in plain words with a way out, instead of a page that waits
+// When something goes wrong, said in plain words with a way out, instead of a page that waits
 // forever or goes blank: the server out of reach (useOffline, Offline, OfflineBanner) and a crash while drawing the
 // page (Crashed, an error boundary).
 import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from "react";

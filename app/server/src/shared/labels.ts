@@ -1,4 +1,4 @@
-// Owned by the lead. Tool calls and shell commands in words, for the web (Follow, the map's step list) and the
+// Tool calls and shell commands in words, for the web (Follow, the map's step list) and the
 // server (Track) alike: "Stop the preview", not "preview stop". Used until (or instead of) a model-written label.
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");

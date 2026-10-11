@@ -1,4 +1,4 @@
-// Owner: replay agent. Small module-level store shared by the replay layer (inside MapView) and MapView's camera.
+// Small module-level store shared by the replay layer (inside MapView) and MapView's camera.
 import type { RefObject } from "react";
 import type { ForceGraphMethods } from "react-force-graph-2d";
 import type { Safe } from "../camera";

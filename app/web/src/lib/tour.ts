@@ -1,4 +1,4 @@
-// Owned by the lead. The first-run tour (map/tour/Tour.tsx): which step shows, and whether this install had it. Kept by
+// The first-run tour (map/tour/Tour.tsx): which step shows, and whether this install had it. Kept by
 // the server (GET/PUT /api/onboarding), not in a browser: the Claude app's pane, Chrome and Safari would each show it
 // again. While it runs, the extras (the Readmap, the file window, read lines, the key hints, the "agents elsewhere"
 // pill) are hidden until the step that shows them (`:root[data-tour]`, tour.css), and an example agent can walk the map.

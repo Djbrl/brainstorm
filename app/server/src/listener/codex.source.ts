@@ -1,4 +1,4 @@
-// Owner: A. Codex's session logs: <codexDir>/sessions/YYYY/MM/DD/rollout-<time>-<uuid>.jsonl, and archived threads
+// Codex's session logs: <codexDir>/sessions/YYYY/MM/DD/rollout-<time>-<uuid>.jsonl, and archived threads
 // in <codexDir>/archived_sessions/. One file per thread (a long thread can go on in a new file with the same thread id).
 // Every line is { timestamp, ordinal, type, payload }; the first is the session_meta (thread id, folder, version).
 //
@@ -86,7 +86,7 @@ const within = (p: string, root: string) => p === root || p.startsWith(root.ends
 
 export class CodexSource implements LogSource {
   readonly harness = "codex" as const;
-  /** 2 (6 Oct 2026): subagents inside their parent's thread; calls answered after a restart kept. */
+  /** 2: subagents inside their parent's thread; calls answered after a restart kept. */
   readonly version = 2;
   private watcher?: FSWatcher;
   private scope: Scope = { roots: [] };

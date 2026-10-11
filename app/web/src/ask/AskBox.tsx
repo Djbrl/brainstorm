@@ -1,4 +1,4 @@
-// Owner: C. Ask about a step (the step panel) or a file (the map). Shows answer, model and cost.
+// Ask about a step (the step panel) or a file (the map). Shows answer, model and cost.
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { AskRequest, AskResponse } from "@contract";
 import { ask } from "../lib/api";

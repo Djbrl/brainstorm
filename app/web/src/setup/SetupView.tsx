@@ -1,4 +1,4 @@
-// Owner: C. Pick a workspace, then a loading checklist while Rundown reads the code and connects to Claude Code.
+// Pick a workspace, then a loading checklist while Rundown reads the code and connects to Claude Code.
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { SetupStatus, SetupStep, WorkspaceSuggestion } from "@contract";
 import { clock, useLive } from "../lib/live";

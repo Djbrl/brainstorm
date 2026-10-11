@@ -1,4 +1,4 @@
-// Owned by the lead. Where you are in the app, and the links for it.
+// Where you are in the app, and the links for it.
 //
 // Three levels, one at a time:
 //   /                                   the project: the map at rest, live agents as dots, what changed since you last looked

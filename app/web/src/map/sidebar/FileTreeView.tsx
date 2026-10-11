@@ -1,4 +1,4 @@
-// Owner: sidebar agent. The folder tree built in fileTree.ts, as the lines it shows (flattenTree). A project can have
+// The folder tree built in fileTree.ts, as the lines it shows (flattenTree). A project can have
 // tens of thousands of files and a search can open every folder, so only the lines in and near the view are drawn
 // (every line is the same height), with empty space standing in for the rest.
 import { memo, useCallback, useLayoutEffect, useRef, useState } from "react";

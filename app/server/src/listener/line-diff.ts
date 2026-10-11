@@ -1,4 +1,4 @@
-// Owner: A. The changed parts of a file, as the step views show an edit: each hunk's lines before and after (with a
+// The changed parts of a file, as the step views show an edit: each hunk's lines before and after (with a
 // little context), hunks joined by "\n---\n" like a MultiEdit. Used for files a command changed (command-edits.ts),
 // where only the whole file before and after is known.
 

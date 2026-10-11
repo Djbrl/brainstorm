@@ -1,4 +1,4 @@
-// Owner: A. A log source: one coding agent's session logs on disk (Claude Code's ~/.claude/projects, Codex's
+// A log source: one coding agent's session logs on disk (Claude Code's ~/.claude/projects, Codex's
 // ~/.codex/sessions). The listener (listener.service.ts) does what's the same for every agent: it tails the files a
 // source points it to, a chunk at a time, stores what the source parses from each line and tells the app. A source
 // knows where its logs are, which of them belong to the open project, and what a line means.

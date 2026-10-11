@@ -3,7 +3,7 @@ import { ElsewhereService } from "./elsewhere.service";
 import { ListenerModule } from "../listener/listener.module";
 import { AttentionModule } from "../attention/attention.module";
 
-// Owner: switcher.
+// GET /api/elsewhere: threads at work in the person's other projects.
 @Controller()
 export class ElsewhereController {
   constructor(private elsewhere: ElsewhereService) {}

@@ -1,4 +1,4 @@
-// Owner: peek. A small window over the map with the file the agent is reading or writing at the replay cursor, while you
+// A small window over the map with the file the agent is reading or writing at the replay cursor, while you
 // follow a thread live or replay it: the change as a diff (a new file as numbered lines), or the part of a file it read.
 // It reuses the step panel's renderers (Diff with its styles, editPair, the numbered Code) and hides while that panel is
 // open, since it shows the same step in full. Between files (the agent talking, running commands) it keeps the last

@@ -1,4 +1,4 @@
-// Owned by the lead. The one question about usage stats, asked once: the tour's last step (map/tour/Tour.tsx), or this
+// The one question about usage stats, asked once: the tour's last step (map/tour/Tour.tsx), or this
 // card after the tour for someone who skipped it (App's AfterTour): nothing is counted or sent
 // until the person answers yes (server usage/usage.service.ts). Saying no is as easy as saying yes, and Settings can
 // change it later. Not on a replay (the hosted demo, a shared file) or a development build, which never sends.

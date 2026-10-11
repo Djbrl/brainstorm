@@ -5,7 +5,7 @@ import { BusService } from "../core/bus.service";
 import { env } from "../core/local";
 import { safely } from "../core/safely";
 
-// Owned by the lead. Anonymous usage stats: once a day, counts of what was used, sent to the landing site so we know how
+// Anonymous usage stats: once a day, counts of what was used, sent to the landing site so we know how
 // many people use Rundown, roughly where, and which parts matter. Off until the person says yes (the app asks once;
 // since 0.7, also for installs that never chose), off again in Settings, always off with DO_NOT_TRACK=1 or
 // RUNDOWN_USAGE=off, and never sent from a development build. "Delete the stats already sent" asks the site to remove

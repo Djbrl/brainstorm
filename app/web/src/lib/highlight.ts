@@ -1,4 +1,4 @@
-// Owner: viewers. Colour-coded code for the step panel and the file window, with the same grammars and colours the
+// Colour-coded code for the step panel and the file window, with the same grammars and colours the
 // diff viewer uses (refractor, already in the app for diffs). Loaded the first time code is shown: refractor's core,
 // then each language's grammar on its own (a grammar pulls in the ones it builds on), so a project in TypeScript never
 // downloads Rust. Highlighting is synchronous once a grammar is in, and only the lines on show are coloured.

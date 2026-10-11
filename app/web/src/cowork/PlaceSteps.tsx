@@ -1,4 +1,4 @@
-// Owner: cowork. The open thread's places in the sidebar (Places view): the Track's rows (one line, a dot), one per
+// The open thread's places in the sidebar (Places view): the Track's rows (one line, a dot), one per
 // stretch of work in a place, saying what the agent did there ('Searched "…"', 'Clicked "Send"', data.ts runWords), the
 // place quiet at the right; and the same way back through the thread as the Track: the row the thread is at is the
 // highlighted one (its newest while it follows live), scrolling the list moves the thread there (the moment at the

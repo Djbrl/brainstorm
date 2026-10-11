@@ -2,7 +2,7 @@ import { Controller, Get, Param, Query, Res } from "@nestjs/common";
 import type { Response } from "express";
 import { ListenerService } from "./listener.service";
 
-// Owner: A.
+// Threads and their steps: GET /api/sessions and GET /api/sessions/:id/steps.
 @Controller()
 export class SessionsController {
   constructor(private listener: ListenerService) {}

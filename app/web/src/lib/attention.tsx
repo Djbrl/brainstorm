@@ -1,4 +1,4 @@
-// Owner: attention. Threads waiting on you: words for each state, the tab title, and desktop notifications.
+// Threads waiting on you: words for each state, the tab title, and desktop notifications.
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Attention, AttentionState } from "@contract";
 import { useLive } from "./live";

@@ -1,4 +1,4 @@
-// Owned by the lead. A thread in chapters: each message the person typed starts one, and the agent's work up to the
+// A thread in chapters: each message the person typed starts one, and the agent's work up to the
 // next message belongs to it. People remember a thread by what they asked, so the step list and the player's
 // timeline are cut there. Messages Claude Code puts in the person's place (a subagent handing back, a hook's context,
 // a background task finishing) are steps inside a chapter, not chapters.

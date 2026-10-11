@@ -19,13 +19,13 @@ export const IGNORE_DIRS = new Set([
  */
 export const GIT_IGNORE_DIRS = new Set([".git", "node_modules", "__pycache__", ".cache", ".pytest_cache", ".mypy_cache", ".ruff_cache"]);
 export const LOCKFILES = new Set(["package-lock.json", "yarn.lock", "pnpm-lock.yaml", "Cargo.lock", "poetry.lock", "composer.lock"]);
-/** Code, styles and docs. Widened 6 Oct 2026 (Vue, Svelte, Swift, Kotlin, Ruby, PHP, C-family...): a Nuxt or iOS project's
- * main files were missing from its map. Imports are read for JS/TS only. */
+/** Code, styles and docs (Vue, Svelte, Swift, Kotlin, Ruby, PHP, C-family...), so a Nuxt or iOS project's main files are
+ * on its map. */
 export const SOURCE_EXT = new Set([
   ".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs", ".py", ".go", ".rs", ".java", ".md", ".json", ".css", ".html",
   ".vue", ".svelte", ".astro", ".scss", ".sass", ".less", ".swift", ".kt", ".kts", ".rb", ".php", ".c", ".h", ".cc", ".cpp",
   ".hpp", ".cs", ".m", ".mm", ".dart", ".scala", ".ex", ".exs", ".lua", ".sh", ".sql",
-  // More C and C++ (CUDA, Arduino, inline headers), other languages, build and config files (6 Oct 2026).
+  // More C and C++ (CUDA, Arduino, inline headers), other languages, build and config files.
   ".cxx", ".hh", ".hxx", ".ipp", ".inl", ".ino", ".cu", ".cuh", ".zig", ".nim", ".hs", ".ml", ".mli", ".clj", ".cljs",
   ".erl", ".hrl", ".r", ".jl", ".pl", ".pm", ".ps1", ".bash", ".zsh", ".fish", ".toml", ".yml", ".yaml", ".proto",
   ".graphql", ".gql", ".tf", ".hcl", ".nix", ".cmake", ".gradle", ".groovy", ".mk", ".dockerfile",
@@ -42,7 +42,7 @@ export const SOURCE_NAMES = new Set([
  */
 export function maxFiles(): number {
   const n = Number(env("MAX_FILES"));
-  return Number.isInteger(n) && n > 0 ? n : 3000; // 800 until 6 Oct; the canvas pass made 5,000 smooth at 4× CPU (docs/performance.md)
+  return Number.isInteger(n) && n > 0 ? n : 3000; // the canvas stays smooth at 5,000 at 4× CPU (docs/performance.md)
 }
 /** New files that appear while the map is open may take it this far past maxFiles(). */
 export const liveHeadroom = () => Math.max(100, Math.round(maxFiles() / 8));

@@ -1,4 +1,4 @@
-// Owner: sidebar agent. The open thread, in the sidebar's Threads tab (a back arrow to the list): its steps, next to the map (scrolling them moves the
+// The open thread, in the sidebar's Threads tab (a back arrow to the list): its steps, next to the map (scrolling them moves the
 // tracer), or its places on the Places lens, under the thread's name (with Share) and, when
 // subagents worked in it, who: everyone, or one agent on its own. Live isn't a button: a running thread follows its
 // newest step until you move off it (then a footer offers the way back), and follows again once you're back on it

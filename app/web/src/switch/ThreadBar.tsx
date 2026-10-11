@@ -1,4 +1,4 @@
-// Owner: switcher. The tab bar under the header: your threads at work, waiting on you, or opened lately, one click (or
+// The tab bar under the header: your threads at work, waiting on you, or opened lately, one click (or
 // one key: 1 to 9, [ and ]) from each other. Find a thread (⌘K) for the rest, this project's and your other projects'.
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useLiveSelector } from "../lib/live";

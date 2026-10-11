@@ -1,4 +1,4 @@
-// Owned by the lead. Threads from before a repo moved.
+// Threads from before a repo moved.
 // Claude Code files each thread under a folder named after where it ran (~/Documents/brainstorm →
 // "-Users-dsy-Documents-brainstorm"). Move the repo to ~/brainstorm and its whole history stays under the old name,
 // so the app would open on an empty sidebar. A former home is a project folder whose threads ran in a folder with

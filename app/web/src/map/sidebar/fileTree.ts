@@ -1,4 +1,4 @@
-// Owner: sidebar agent. Pure folder-tree helpers for the Files tab: build once from the map,
+// Pure folder-tree helpers for the Files tab: build once from the map,
 // then prune for search / "touched by this thread" without touching the original tree, and lay out as rows.
 import type { FileNode } from "@contract";
 import { repoRelative } from "../../lib/paths";

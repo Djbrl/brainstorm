@@ -1,4 +1,4 @@
-/* Owner: sidebar agent. Floating left sidebar on the map: Threads | Files tabs, collapsible.
+/* Floating left sidebar on the map: Threads | Files tabs, collapsible.
    Same frosted sheet as the old .map-agents tracker it replaces. */
 .map-sidebar {
   position: absolute; left: 24px; top: var(--sb-top); bottom: auto; height: var(--sb-h); width: 340px; max-width: calc(100% - 32px);

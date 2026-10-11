@@ -1,4 +1,4 @@
-// Owner: A. Claude Code's session logs: ~/.claude/projects/<project>/<sessionId>.jsonl, and subagents' at
+// Claude Code's session logs: ~/.claude/projects/<project>/<sessionId>.jsonl, and subagents' at
 // <project>/<sessionId>/subagents/agent-*.jsonl. A project folder is named after where the thread ran
 // ("/Users/me/repo" → "-Users-me-repo", see moved.ts claudeProjectDir), so the open project's logs are in the folders
 // named like its roots; in a folder that only starts the same (a subfolder, a worktree, or a sibling: "app-backend"

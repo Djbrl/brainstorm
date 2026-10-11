@@ -1,4 +1,4 @@
-// Owned by the lead. The settings button in the header, and the settings window it opens: centred, over a veil, its
+// The settings button in the header, and the settings window it opens: centred, over a veil, its
 // own scroll (the header's backdrop-filter would pin a fixed child to the header, so the window lives in <body>).
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";

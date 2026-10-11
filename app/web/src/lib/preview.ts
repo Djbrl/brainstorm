@@ -1,4 +1,4 @@
-// Owned by the lead. Post-deadline preview (brainstorm-next): plays back recorded agent moves on the Map and a recorded
+// Post-deadline preview (brainstorm-next): plays back recorded agent moves on the Map and a recorded
 // setup run, so the hosted replay can show features that normally need the local server.
 import type { AgentPresence, FileNode, Replay, SetupStatus, WsMessage } from "@contract";
 import { clock } from "./live";

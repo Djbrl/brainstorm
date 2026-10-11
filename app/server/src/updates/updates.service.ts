@@ -3,7 +3,7 @@ import { chmodSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { dataDir } from "../core/local";
 
-// Owned by the lead. Whether the launcher (plugin/scripts/launch.mjs) checks GitHub once a day for a new version. Its own
+// Whether the launcher (plugin/scripts/launch.mjs) checks GitHub once a day for a new version. Its own
 // setting, apart from the usage stats: on by default. Kept in settings.json in the data folder, because the launcher
 // reads it before any server runs. RUNDOWN_UPDATE_CHECK=0 turns it off whatever the file says.
 

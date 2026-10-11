@@ -1,4 +1,4 @@
-/* Owner: D. Map view. Light, airy, one clean sheet on the right. */
+/* Map view. Light, airy, one clean sheet on the right. */
 .map-wrap { position: relative; width: 100%; height: 100%; overflow: hidden; overflow: clip; background: var(--bg); }
 .map-wrap canvas { display: block; }
 /* The canvas fades out toward the top and bottom edges, under the floating chrome (the lens pill and the

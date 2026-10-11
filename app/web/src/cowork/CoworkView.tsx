@@ -1,4 +1,4 @@
-// Owner: cowork. Places: where the open thread went outside the code. The same screen as the Map (full-screen map,
+// Places: where the open thread went outside the code. The same screen as the Map (full-screen map,
 // threads sidebar, no legend: the places read without one), in the same language (PlacesMap); the open thread's panel
 // in the sidebar lists its places (PlaceSteps). No Readmap here: a visit is the thread's movement itself, which the
 // camera already follows.

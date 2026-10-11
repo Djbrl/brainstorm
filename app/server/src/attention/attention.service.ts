@@ -9,7 +9,7 @@ import { ListenerService } from "../listener/listener.service";
 import { isErrorResult } from "../shared/failed";
 import { maskSecrets } from "../privacy/mask";
 
-// Owner: attention. Does a thread need you? Worked out from the log (calls with no result, failures in a row, a finished
+// Does a thread need you? Worked out from the log (calls with no result, failures in a row, a finished
 // turn) and made certain by the plugin's hooks (PermissionRequest, Notification, Stop) when they're installed.
 
 /** A call with no result and no activity this long, for a tool that's normally instant, is probably a permission prompt. */

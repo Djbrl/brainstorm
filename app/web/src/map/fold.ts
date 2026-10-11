@@ -1,4 +1,4 @@
-// Owner: map-fold. Folders open as you zoom, like a city map that shows its streets as you come closer: a folder whose
+// Folders open as you zoom, like a city map that shows its streets as you come closer: a folder whose
 // circle is small on screen shows as one circle with its name and how many files it holds; as it grows past OPEN_PX
 // its files fade in where they always are (graph.ts never moves them). The files you look at, an open thread's files,
 // where a followed or working agent is: their folders show open at any zoom. Nothing here changes the layout, only

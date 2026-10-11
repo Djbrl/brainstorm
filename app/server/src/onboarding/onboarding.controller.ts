@@ -2,7 +2,7 @@ import { BadRequestException, Body, Controller, ForbiddenException, Get, Headers
 import { isLocalHost } from "../core/local";
 import { DbService } from "../core/db.service";
 
-// Owned by the lead. Whether this install has had the tour (web lib/tour.ts): kept here, not in a browser, so the
+// Whether this install has had the tour (web lib/tour.ts): kept here, not in a browser, so the
 // Claude app's pane, Chrome and Safari don't each show it again. `done` once it's finished or skipped.
 const KEY = "onboarding.done";
 

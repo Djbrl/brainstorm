@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { dataDir } from "../core/local";
 
-// Owned by the lead. Removes everything unrelated to the project from a replay before it is published: titles of the
+// Removes everything unrelated to the project from a replay before it is published: titles of the
 // user's other Claude threads, other project names and folders, private files, personal emails. The list lives in
 // server/data/redact.json, which is gitignored on purpose (committing it would publish the very names it hides).
 type RedactList = {

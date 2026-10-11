@@ -1,4 +1,4 @@
-// Owned by the lead. When you last looked, so the map can show what changed since then instead of everything.
+// When you last looked, so the map can show what changed since then instead of everything.
 // The time is saved when the page is hidden or closed, and read once per tab: looking at the map or reloading doesn't
 // move the line, coming back later in a new tab does. Per browser; a blocked storage means every visit counts as the first.
 

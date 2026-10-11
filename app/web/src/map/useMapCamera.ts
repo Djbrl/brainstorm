@@ -1,4 +1,4 @@
-// Owner: D. What the map's camera frames and when (moved out of MapView.tsx): the whole project or an open thread's
+// What the map's camera frames and when (moved out of MapView.tsx): the whole project or an open thread's
 // files, the open file, a followed agent; again when a panel opens or the window resizes, unless you moved it yourself.
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { ThreadReplay } from "../lib/nav";

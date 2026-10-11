@@ -1,4 +1,4 @@
-// Owned by the lead. A tiny external store and the hook that reads a slice of it (used by lib/live.tsx and lib/nav.tsx).
+// A tiny external store and the hook that reads a slice of it (used by lib/live.tsx and lib/nav.tsx).
 import { useRef, useSyncExternalStore } from "react";
 
 export type Store<S> = { get: () => S; subscribe: (listener: () => void) => () => void };

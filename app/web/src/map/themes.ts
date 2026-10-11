@@ -1,4 +1,4 @@
-// Owned by the lead. How each map theme draws on the canvas: files, imports, labels and agent markers.
+// How each map theme draws on the canvas: files, imports, labels and agent markers.
 // Colours that also style the chrome (recency, accent) come from CSS variables set per theme in themes.css;
 // this file holds what CSS can't reach. The current theme is read on every frame (getTheme()).
 import { getTheme, type ThemeId } from "../lib/theme";

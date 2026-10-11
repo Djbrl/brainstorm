@@ -1,4 +1,4 @@
-// Owner: camera. The part of a map canvas that no panel covers (the "safe area"), and camera moves that land in it.
+// The part of a map canvas that no panel covers (the "safe area"), and camera moves that land in it.
 // The sidebar on the left, a side panel (or the file window) on the right, the lens
 // pill at the top, the player at the bottom: all float over the canvas. Every framing (fit, a file, a followed agent,
 // the replay tracer) centres its content in what's left, measured from the DOM, not hard-coded.

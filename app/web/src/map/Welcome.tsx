@@ -1,4 +1,4 @@
-// Owned by the lead. The first visit: one card that says what you're looking at, and one choice. Nothing plays until you
+// The first visit: one card that says what you're looking at, and one choice. Nothing plays until you
 // ask for it. Shown once per browser (and on the hosted demo, once per visitor).
 import { useRef, useState } from "react";
 import { isReplay, useLive } from "../lib/live";

@@ -1,4 +1,4 @@
-// Owned by the lead. Counting a use for the anonymous usage stats (server usage/usage.service.ts): the server keeps the
+// Counting a use for the anonymous usage stats (server usage/usage.service.ts): the server keeps the
 // counts and sends one report a day, if the setting is on. A replay (the hosted demo, a shared file) counts nothing.
 import { useCallback, useEffect, useState } from "react";
 import { isReplay } from "./live";

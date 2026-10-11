@@ -1,4 +1,4 @@
-// Owner: camera. The Readmap: a second, small camera in the top-right corner, like a picture in picture. The big camera
+// The Readmap: a second, small camera in the top-right corner, like a picture in picture. The big camera
 // follows an agent's edits; this one follows what it reads, by itself: it glides to the file the agent last read, close
 // enough to read its name and its neighbours' (files read are often far from where the agent writes, out of the big
 // camera's view). Several files read together (within a few seconds of the last one) are framed together if their names

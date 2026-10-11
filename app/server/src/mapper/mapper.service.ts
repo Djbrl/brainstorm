@@ -150,7 +150,7 @@ const skipped = skippedRel, mappable = mappableRel;
 
 const sameSet = (a: Set<string> | undefined, b: Set<string>) => !!a && a.size === b.size && [...a].every((x) => b.has(x));
 
-// Owner: B. List the project's files (git, else a walk), imports → edges, lastChangedAt from mtime then git, watch for changes.
+// List the project's files (git, else a walk), imports → edges, lastChangedAt from mtime then git, watch for changes.
 @Injectable()
 export class MapperService implements OnModuleInit, OnModuleDestroy {
   private log = new Logger("Mapper");

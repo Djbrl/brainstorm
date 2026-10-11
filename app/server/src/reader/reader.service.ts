@@ -11,7 +11,7 @@ const SECRET_RES = [
   /(?:api[_-]?key|secret|token|password)\s*[:=]\s*['"][^'"\s]{8,}['"]/i,
 ];
 
-// Owner: B. Listens to bus "step" and flags risky edits (an .env file, auth, payment, a deleted test, a big deletion, a
+// Listens to bus "step" and flags risky edits (an .env file, auth, payment, a deleted test, a big deletion, a
 // possible secret) from the step itself, at once. No model.
 @Injectable()
 export class ReaderService implements OnModuleInit {

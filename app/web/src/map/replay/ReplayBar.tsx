@@ -1,4 +1,4 @@
-// Owner: replay agent. The map's floating footer, the player, shown while you replay (Space); and the share menu, beside
+// The map's floating footer, the player, shown while you replay (Space); and the share menu, beside
 // the open thread's title in the sidebar. The player is only what playing needs: back, play, forward, a
 // timeline cut by chapter (red where one failed), speed and hide. The step panel follows the cursor (no "Open step"),
 // the camera recenters itself, "Every step" is under the step list.

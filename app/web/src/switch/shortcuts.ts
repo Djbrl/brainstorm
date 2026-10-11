@@ -1,4 +1,4 @@
-// Owner: switcher. The keyboard shortcuts, in one list: the ? window shows it, and the handlers check typing the same way.
+// The keyboard shortcuts, in one list: the ? window shows it, and the handlers check typing the same way.
 
 /** Typing in a field: single-key shortcuts stay out of the way. */
 export function isTyping(t: EventTarget | null): boolean {

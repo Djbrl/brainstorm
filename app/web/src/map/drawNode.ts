@@ -1,4 +1,4 @@
-// Owner: D. Drawing one frame of the map's files and import lines (moved out of MapView.tsx): plain functions of the
+// Drawing one frame of the map's files and import lines (moved out of MapView.tsx): plain functions of the
 // frame (Frame: what's asked once per frame) and of caches that live as long as the map. MapView calls them from
 // force-graph's frame callbacks.
 import type { Look } from "./replay/layer";

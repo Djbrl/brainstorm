@@ -1,4 +1,4 @@
-// Owner: C. Tiny hand-rolled markdown: paragraphs, headings, bullet/numbered lists, `code`, **bold**, *italic*, fenced code blocks,
+// Tiny hand-rolled markdown: paragraphs, headings, bullet/numbered lists, `code`, **bold**, *italic*, fenced code blocks,
 // [links](https://…) and bare web addresses (whole address in link colour, shortened in the middle: lib/links.tsx).
 import type { ReactNode } from "react";
 import { trimUrl, UrlLink } from "../lib/links";

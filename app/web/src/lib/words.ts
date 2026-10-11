@@ -1,4 +1,4 @@
-// Owner: C (words and numbers). One set of numbers for a thread, said the same way in every view:
+// One set of numbers for a thread, said the same way in every view:
 // - a step is one thing in the thread's step list (what the agent did or said, and your messages); tool results and
 //   empty thinking are part of the step they answer, not steps of their own (follow/format's isVisible);
 // - files: "Changed N files (N new) · read N more". Changed = every file the agent edited or wrote, anywhere; new =

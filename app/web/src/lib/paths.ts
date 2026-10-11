@@ -1,4 +1,4 @@
-// Owner: thread-replay foundation. Match a file an agent touched to a node on the map,
+// Match a file an agent touched to a node on the map,
 // even when the agent worked in another git worktree of the same repo.
 import type { ProjectMap } from "@contract";
 

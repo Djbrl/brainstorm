@@ -1,4 +1,4 @@
-/* Owner: peek. The small window with the file the agent is reading or writing (Peek.tsx): bottom right, above the fit
+/* The small window with the file the agent is reading or writing (Peek.tsx): bottom right, above the fit
    button, clear of the sidebar and the player. It hides while a side panel is open (the step panel shows the same step
    in full, a file's panel covers its corner). */
 .map-peek { position: absolute; right: 24px; bottom: 78px; z-index: 5; width: 360px; height: 220px; display: flex; flex-direction: column;

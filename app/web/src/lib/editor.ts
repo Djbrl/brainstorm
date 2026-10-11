@@ -25,7 +25,7 @@ export const editorName = (e: Editor) => (e === "system" ? "your default app" : 
 /** The editor's own link for a file (at a line), or null for "the app your computer uses" (opened by the server). */
 export function editorLink(e: Editor, path: string, line?: number): string | null {
   if (e === "system") return null;
-  return `${e}://file${encodeURI(path)}${line ? `:${line}` : ""}`;
+  return `${e}://file${path.split("/").map(encodeURIComponent).join("/")}${line ? `:${line}` : ""}`;
 }
 /** Opens a file the way the setting says. */
 export function openInEditor(e: Editor, path: string, line?: number) {

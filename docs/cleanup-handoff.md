@@ -1,6 +1,6 @@
 # Cleanup handoff (11 Oct 2026, evening)
 
-Phases 1, 2 and 3 of the audit's plan are done on local branches. Nothing is pushed or merged to `main`.
+Phases 1 to 4 of the audit's plan are done on local branches. Nothing is pushed or merged to `main`.
 
 - **The audit and the to-do list:** the Claude Doc "Rundown code audit", https://claude.ai/code/artifact/767fb401-b9b7-4bfb-936c-03fc5129868a.
 - **Full reports and probes:** branch `claude/review` (keep it local: it documents the holes and the computer name).
@@ -12,7 +12,7 @@ Phases 1, 2 and 3 of the audit's plan are done on local branches. Nothing is pus
 | --- | --- |
 | `cleanup/phase-1` | Done, reviewed. 17 commits on `main` 56eb7a5. |
 | `cleanup/phase-2` | Phases 2 and 3, on top of `cleanup/phase-1`: 64 commits, 236/236 tests, both typechecks clean. Phases 2 and 3 reviewed; every finding fixed (Phase 3: tsconfig lookup bounded to the project, exact aliases, a 10 s limit on git's ignored-folder listing, a returning folder's spelling saved). The To-do tab is ticked for both phases. |
-| `cleanup/p2-*`, `cleanup/p3-*` | All merged into `cleanup/phase-2`; their worktrees can be removed. |
+| `cleanup/p2-*`, `cleanup/p3-*`, `cleanup/p4-*` | All merged into `cleanup/phase-2`; their worktrees can be removed. |
 
 ## Before release (maintainer)
 
@@ -35,4 +35,5 @@ Phases 1, 2 and 3 of the audit's plan are done on local branches. Nothing is pus
 - `app/README.md` (the hackathon brief) still mentions Nemotron and `brainstorm.db`.
 - Audit items not done: peek and diff line-number colours, the nav trailing-slash case.
 - `test/regex-timing.test.cjs` is timing-based and flaked once.
-- Phase 4 (one copy of each rule, shared contract) in the To-do tab.
+- Phase 4 is done (not separately reviewed). Kept on purpose: copies whose behaviour differs (listed in the commits). Next: Phase 5 (split the large files, renames) and Phase 6 (tests, release process).
+- Thread titles: attached context next to typed words is no longer in the title; typed HTML stays.

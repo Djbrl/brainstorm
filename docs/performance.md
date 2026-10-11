@@ -226,7 +226,7 @@ agents, reader, mapper, bus).
 
 ### Left for later
 
-- **Narrow hooks everywhere:** the map, replay and sidebar still read the whole store with `useLive()`/`useNav()`; moving
+- **Narrow hooks everywhere:** done in Phase 4 of the cleanup (11 Oct 2026): every view reads only its slices of the live and nav stores; the wide `useLive()`/`useNav()` are gone.
   them to `useLiveSelector`, `useNavState`, `useNavActions` and `useReplayCursor` is the biggest remaining front-end
   win, especially for the Track list.
 - **Live agents in Prism and Hologram (then called PS2 and Dead Space)** stay slow at 4× CPU (about 7 fps at 5k files): a file with an agent on it still

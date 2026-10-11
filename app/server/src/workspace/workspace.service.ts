@@ -246,7 +246,9 @@ export class WorkspaceService implements OnModuleInit, OnModuleDestroy {
       }
     } else if (this.missing && this.isValidDir(this.missing) && !tooBroad(this.missing)) {
       this.log.log(`the project folder ${this.missing} is back: opening it`);
-      this.activate(caseOnDisk(this.missing) ?? this.missing);
+      const back = caseOnDisk(this.missing) ?? this.missing;
+      if (back !== this.missing) this.setSetting("workspace", back); // back under another spelling: saved as it is now
+      this.activate(back);
     }
   }
 

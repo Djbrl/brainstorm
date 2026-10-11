@@ -1,13 +1,21 @@
 // Loads GET /api/cowork?sessionId= for one thread and shapes it for the view: change groups, verb names, area names.
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CoworkArea, CoworkEvent, CoworkSummary, CoworkVerb } from "@contract";
 import { isReplay, replayCowork } from "../lib/live";
 import { get } from "../lib/api";
+import { usePoll } from "../lib/hooks";
 
 /** The places of one thread (its subagents included). Refreshes while the thread is running. */
 export function useCowork(sessionId: string | null, running: boolean, loaded = true) {
   const [data, setData] = useState<CoworkSummary | null>(null);
   const [error, setError] = useState(false);
+  const gen = useRef(0); // answers for an earlier thread are dropped
+  const load = () => {
+    const g = gen.current;
+    if (!sessionId) return;
+    get<CoworkSummary>(`/api/cowork?sessionId=${encodeURIComponent(sessionId)}`)
+      .then((d) => { if (g === gen.current) { setData(d); setError(false); } }).catch(() => g === gen.current && setError(true));
+  };
   useEffect(() => {
     setData(null);
     if (!sessionId || !loaded) return;
@@ -15,16 +23,12 @@ export function useCowork(sessionId: string | null, running: boolean, loaded = t
       setData(replayCowork(sessionId) ?? { areas: { web: 0, local: 0, services: 0, apps: 0 }, codeSteps: 0, sites: [], pages: [], events: [] });
       return;
     }
-    let stop = false;
-    const load = () => get<CoworkSummary>(`/api/cowork?sessionId=${encodeURIComponent(sessionId)}`)
-      .then((d) => { if (!stop) { setData(d); setError(false); } }).catch(() => !stop && setError(true));
     load();
-    // While it runs: again every 8 s, but not while the tab is hidden (once more when it shows again).
-    const t = running ? setInterval(() => { if (document.visibilityState === "visible") load(); }, 8000) : undefined;
-    const onShow = () => { if (document.visibilityState === "visible") load(); };
-    if (running) document.addEventListener("visibilitychange", onShow);
-    return () => { stop = true; if (t) clearInterval(t); document.removeEventListener("visibilitychange", onShow); };
+    return () => { gen.current++; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, running, loaded]);
+  // While it runs: again every 8 s, but not while the tab is hidden (once more when it shows again).
+  usePoll(load, 8000, !!sessionId && loaded && running && !isReplay(), [sessionId]);
   return { data, error };
 }
 

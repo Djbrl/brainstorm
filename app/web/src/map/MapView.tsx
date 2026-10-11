@@ -226,8 +226,9 @@ export function MapView() {
     step: [replay?.index, replay?.sessionId, replay?.mode],
   });
   const inputs = useLatest({ size, selected, hover, tokens, linkFocus: hover ?? selected, pinned, foldOn, open: !!replay, playing, theme });
+  const readmapFrame = useRef<(() => boolean) | null>(null);   // the Readmap draws on the map's frames
   const { startFrame, drawNode, endFrame } = useMapFrame({
-    fg, inputs, epoch, caches, tween, graphRef, nodeIndexRef, resolveId, replayRef, live, followRef, ringLayer, redraw, files: map?.files ?? null,
+    fg, inputs, epoch, caches, tween, graphRef, nodeIndexRef, resolveId, replayRef, live, followRef, ringLayer, readmap: readmapFrame, redraw, files: map?.files ?? null,
   });
 
   // A closed folder: the camera goes into it (which opens it, fold.ts). A file: selected, or let go if it already was.
@@ -306,7 +307,7 @@ export function MapView() {
       <LensSwitch />
       {hasNodes && readmap && (
         <Readmap graphRef={graphRef} anim={anim} drawnRef={agentsRef} cam={camRef} subject={() => replayRef.current.subject()} now={() => replayRef.current.nowAt()} reads={readmapReads} agents={tracks} followId={followId} accent={tokens.accent}
-          big={!small} onTrack={follow} onLook={lookAt} onHide={() => setReadmap(false)} />
+          big={!small} onTrack={follow} onLook={lookAt} onHide={() => setReadmap(false)} frame={readmapFrame} kick={redraw.kick} />
       )}
 
       <Peek />

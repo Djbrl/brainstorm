@@ -36,7 +36,7 @@ export type FrameInputs = {
   theme: string;
 };
 
-export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIndexRef, resolveId, replayRef, live, followRef, ringLayer, redraw, files }: {
+export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIndexRef, resolveId, replayRef, live, followRef, ringLayer, readmap, redraw, files }: {
   fg: RefObject<ForceGraphMethods<GNode, never> | undefined>;
   inputs: { readonly current: FrameInputs };
   epoch: RefObject<number>; caches: RefObject<Caches>;
@@ -49,6 +49,8 @@ export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIn
   followRef: RefObject<string | null>;
   /** The agents' breathing rings, over the canvas (syncRings). */
   ringLayer: RefObject<HTMLDivElement | null>;
+  /** The Readmap's draw, while it shows (Readmap.tsx): it draws on the map's frames; true while it still moves. */
+  readmap: RefObject<(() => boolean) | null>;
   redraw: Redraw;
   /** The files: a change to one's size or activity changes its footprint. */
   files: FileNode[] | null;
@@ -172,6 +174,7 @@ export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIn
     const am = live.moving(F.t);
     if (am === Motion.Smooth || (replayRef.current.tracing && replayRef.current.active && inputs.current.playing)) moreMotion(F, Motion.Smooth);
     else if (replayRef.current.ringing()) moreMotion(F, Motion.Slow);   // the replay marker's thinking ring, when it was drawn
+    if (readmap.current?.()) moreMotion(F, Motion.Smooth);               // the Readmap's camera gliding, a read's ring there
     redraw.drew(F.motion);
   }, [drawModules, drawAgentLayer, redraw]); // eslint-disable-line react-hooks/exhaustive-deps
 

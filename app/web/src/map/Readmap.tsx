@@ -6,10 +6,12 @@
 // buttons below pick the agent: the big camera follows it, the Readmap its reads. With none picked, it watches the one
 // that read last. Nothing read: the whole project, with the big camera's frame. A click shows that place on the big
 // map. Shown unless turned off (its ×, or M; a Readmap button brings it back), on any map but a phone's.
+// It draws on the map's own frames (MapView's endFrame calls `frame`), and asks for more only while its camera glides
+// or a read's ring swells: at rest it does no work, like the map.
 import { useEffect, useRef, type MouseEvent, type RefObject } from "react";
 import type { AgentPresence } from "@contract";
 import { agentColor, baseName, initial, inkOn, lastReadAt, readsWithTimes, shortName, type AgentAnim } from "./agents";
-import type { Camera } from "./camera";
+import { boxOf, fitView, type Camera, type View } from "./camera";
 import type { Graph, GNode } from "./graph";
 import { mapStyle } from "./themes";
 import { useLiveSelector } from "../lib/live";
@@ -28,7 +30,6 @@ const NAMES_MAX = 7;         // file names besides the ones read
 const TOGETHER_MS = 15_000;  // reads this close to the last one are one look around (several files read at once)
 const READABLE = 3.5;        // a file's radius in the picture (px) from which its name goes under it
 
-type View = { x: number; y: number; k: number };
 export type ReadmapReads = {
   resolveId: (file: string) => string | undefined; at: (id: string) => GNode | undefined; whose: (a: AgentPresence) => boolean;
   /** Looking back through a thread: the files read at that moment (node ids, newest first), which it shows instead
@@ -36,7 +37,7 @@ export type ReadmapReads = {
   past: string[] | null;
 };
 
-export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, agents, followId, accent, big, onTrack, onLook, onHide }: {
+export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, agents, followId, accent, big, onTrack, onLook, onHide, frame, kick }: {
   graphRef: RefObject<Graph>;
   anim: RefObject<Map<string, AgentAnim>>;
   /** The agents the map draws this frame (where each one is comes from `anim`). */
@@ -59,6 +60,10 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
   /** Show a point of the map (graph units) on the big map, as a hand move. */
   onLook: (x: number, y: number, ms: number) => void;
   onHide: () => void;
+  /** Filled with the Readmap's draw: the map calls it on each of its frames; it returns whether it still moves. */
+  frame: { current: (() => boolean) | null };
+  /** Ask the map for a frame (the Readmap just showed, or changed size). */
+  kick: () => void;
 }) {
   const { w: W, h: H } = big ? BIG : SMALL;
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -84,25 +89,17 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
     el.width = W * dpr; el.height = H * dpr;
     const ctx = el.getContext("2d");
     if (!ctx) return;
-    let raf = 0, last = 0, settled = false, sig = "";
+    let last = 0, settled = false;
     let idx = { g: -1 as number, m: new Map<string, GNode>() };   // the map's nodes by id, made again when it changes
     // The theme's colours and font, read again twice a second (a theme switch), not every frame (that's a style flush).
     let tok = { ink: "", quiet: "", font: "", at: -1e9 };
-    const draw = (t: number) => {
-      raf = requestAnimationFrame(draw);
-      if (document.hidden) return;
-      const g = graphRef.current, st = mapStyle(), A0 = anim.current, c0 = cam.current?.view(), m0 = subjectRef.current(), n0 = nowRef.current();
-      // Every frame while something in it moves (its own glide, an agent's, the big camera's frame, a read's ring), as
-      // smooth as the big map; nothing at all while it all stands still.
-      let s = `${g?.id}|${document.documentElement.dataset.theme}|${followRef.current}|${c0 ? `${c0.x.toFixed(1)},${c0.y.toFixed(1)},${c0.k.toFixed(3)}` : ""}|${m0 ? `${m0.x.toFixed(1)},${m0.y.toFixed(1)}` : ""}|${n0 ? `${n0.x.toFixed(1)},${n0.y.toFixed(1)}` : ""}`;
-      for (const a of drawnRef.current ?? []) {
-        const p = A0?.get(a.id);
-        s += `|${a.id}:${a.ts}:${a.trail.length}:${p ? `${p.x.toFixed(1)},${p.y.toFixed(1)},${p.alpha.toFixed(2)},${p.flashes.length}` : ""}`;
-      }
-      const flashing = [...(A0?.values() ?? [])].some((p) => p.flashes.some((f) => t - f.t0 < READ_FLASH_MS));
-      if (settled && !flashing && s === sig) { last = t; return; }
-      sig = s;
-      const dt = Math.min(0.1, (t - last) / 1000); last = t;
+    // On the map's frames: whatever moves on the map (an agent, the big camera, a replay step) draws a frame there, and
+    // this picture with it. Its own glide and a read's swelling ring ask the map for more (the return value).
+    const draw = (): boolean => {
+      const t = performance.now();
+      const g = graphRef.current, st = mapStyle(), n0 = nowRef.current();
+      // Coming out of rest, the glide takes one frame's step, as it would have on a frame loop that kept running.
+      const dt = settled ? 1 / 60 : Math.min(0.1, (t - last) / 1000); last = t;
       if (t - tok.at > 500) {
         const cs = getComputedStyle(el);
         tok = { ink: cs.getPropertyValue("--ink").trim() || "#121214", quiet: cs.getPropertyValue("--cool").trim() || "#c7cbd6", font: cs.getPropertyValue("--font-body") || "sans-serif", at: t };
@@ -110,9 +107,9 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
       const { ink, quiet, font } = tok;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
-      if (!g?.nodes.length) return;
+      if (!g?.nodes.length) return false;
       const whole = wholeView(g, W, H);
-      if (!whole) return;
+      if (!whole) return false;
 
       // ---- what to show: the file the watched agent read last, or the whole map ----
       const R = readsRef.current(), drawn = drawnRef.current ?? [], A = anim.current;
@@ -145,8 +142,7 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
         want = { x: read.x!, y: read.y!, k: Math.max(whole.k, Math.min(14, read.r * kf >= 5 ? kf : 7 / Math.max(0.5, read.r))) };
         // Read together with others: all of them, if every one still reads at that zoom (room left for the names).
         if (together.length > 1) {
-          let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, rMin = Infinity;
-          for (const n of together) { x0 = Math.min(x0, n.x! - n.r); x1 = Math.max(x1, n.x! + n.r); y0 = Math.min(y0, n.y! - n.r); y1 = Math.max(y1, n.y! + n.r); rMin = Math.min(rMin, n.r); }
+          const { x0, y0, x1, y1 } = boxOf(together)!, rMin = Math.min(...together.map((n) => n.r));
           const kb = Math.min(14, (W - 56) / Math.max(1, x1 - x0), (H - 40) / Math.max(1, y1 - y0));
           if (rMin * kb >= READABLE) want = { x: (x0 + x1) / 2, y: (y0 + y1) / 2, k: Math.max(whole.k, Math.min(kb, want.k)) };
           else together = [read];
@@ -319,10 +315,12 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
       for (const [el2, text] of [[verbEl.current, verb], [fileEl.current, file], [dirEl.current, dir]] as const) {
         if (el2 && el2.textContent !== text) el2.textContent = text;
       }
+      return !settled;
     };
-    raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
-  }, [graphRef, anim, drawnRef, cam, W, H]);
+    frame.current = draw;
+    kick();
+    return () => { if (frame.current === draw) frame.current = null; };
+  }, [graphRef, anim, drawnRef, cam, W, H]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A click: the big map shows that place (the file read, or the point clicked on the whole map).
   const onClick = (e: MouseEvent<HTMLCanvasElement>) => {
@@ -359,16 +357,10 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
   );
 }
 
-/** The view that shows the whole map in the picture. */
+/** The view that shows the whole map in the picture (a folder's files are inside it: only folders and loose files count). */
 function wholeView(g: Graph, W: number, H: number): View | null {
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const n of g.nodes) {
-    if (n.x === undefined || n.y === undefined || (!n.dir && n.up)) continue;   // a folder's files are inside it
-    x0 = Math.min(x0, n.x - n.r); x1 = Math.max(x1, n.x + n.r); y0 = Math.min(y0, n.y - n.r); y1 = Math.max(y1, n.y + n.r);
-  }
-  if (x0 === Infinity) return null;
-  const k = Math.min((W - 16) / Math.max(1, x1 - x0), (H - 16) / Math.max(1, y1 - y0));
-  return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, k };
+  const box = boxOf(g.nodes.filter((n) => n.dir || !n.up));
+  return box && fitView({ w: W, h: H, left: 0, top: 0, right: 0, bottom: 0 }, box, { pad: 8, minZoom: 0, maxZoom: Infinity });
 }
 
 /** The agents you can follow from the Readmap: the open thread's (main first, then its subagents), or else everyone on

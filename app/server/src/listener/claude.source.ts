@@ -1,12 +1,14 @@
 // Owner: A. Claude Code's session logs: ~/.claude/projects/<project>/<sessionId>.jsonl, and subagents' at
 // <project>/<sessionId>/subagents/agent-*.jsonl. A project folder is named after where the thread ran
-// ("/Users/me/repo" → "-Users-me-repo"), so the open project's logs are the folders starting with its roots' names.
+// ("/Users/me/repo" → "-Users-me-repo", see moved.ts claudeProjectDir), so the open project's logs are in the folders
+// named like its roots; in a folder that only starts the same (a subfolder, a worktree, or a sibling: "app-backend"
+// next to "app"), a log is the project's if the folder its thread ran in is inside a root.
 import chokidar, { type FSWatcher } from "chokidar";
 import { readdirSync, statSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
 import { homedir } from "node:os";
 import type { StepKind } from "../types";
-import { encodeRoot, underPrefix } from "./moved";
+import { fileCwds, folderOf, within } from "./moved";
 import type { LogFile, LogSource, NewStep, Scope, Sink, WatchEvents } from "./source";
 import { sanitizeDeep, sanitizeText, TEXT_LIMIT, TOOL_RESULT_LIMIT } from "./text";
 
@@ -42,7 +44,7 @@ export class ClaudeSource implements LogSource {
   readonly harness = "claude" as const;
   private watcher?: FSWatcher;
   private ready = false;
-  private prefixes: string[] = [];
+  private roots: string[] = [];
   private override?: string;
   /** Top-level project folders chokidar watches (only the open project's are descended into). */
   private watchedTop = new Set<string>();
@@ -57,7 +59,7 @@ export class ClaudeSource implements LogSource {
 
   private setScope(scope: Scope) {
     this.override = scope.override;
-    this.prefixes = scope.override ? [] : scope.roots.map(encodeRoot);
+    this.roots = scope.override ? [] : scope.roots;
     this.guestFiles = scope.guests?.files ?? [];
     this.guestTops = new Set(this.guestFiles.map((f) => relative(this.dir, f).split(sep)[0]).filter(Boolean));
   }
@@ -67,10 +69,25 @@ export class ClaudeSource implements LogSource {
     return this.guestFiles.some((g) => file === g || file.startsWith(g.replace(/\.jsonl$/, "") + sep));
   }
 
-  /** True if `projectDir` (a top-level folder name under the projects folder) belongs to the open project. */
+  /** True if `projectDir` (a top-level folder name under the projects folder) can hold the open project's threads. */
   private matches(projectDir: string): boolean {
     if (this.override) return projectDir.includes(this.override);
-    return this.prefixes.some((p) => underPrefix(projectDir, p));
+    return this.roots.some((r) => folderOf(projectDir, r));
+  }
+  /** Each log's recorded folders (`cwd`), read once it has one (they never change). */
+  private cwds = new Map<string, string[]>();
+  /** True if a log in a matching folder is the open project's: the folder is a root's own, or the thread ran inside a root. */
+  private isOurs(file: string): boolean {
+    if (this.override) return true;
+    const top = relative(this.dir, file).split(sep)[0] ?? "";
+    if (this.roots.some((r) => folderOf(top, r) === "own")) return true;
+    let cwds = this.cwds.get(file);
+    if (!cwds) {
+      cwds = fileCwds(file, { first: true });
+      if (!cwds.length) return false; // nothing written yet: asked again on its next change
+      this.cwds.set(file, cwds);
+    }
+    return cwds.some((c) => this.roots.some((r) => within(c, r)));
   }
   /** A folder to watch: the open project's, or one a visitor's transcript is in (only that transcript is read there). */
   private watches(projectDir: string): boolean {
@@ -126,10 +143,9 @@ export class ClaudeSource implements LogSource {
     this.setScope(scope);
     const files: LogFile[] = [];
     for (const d of this.matchingDirs()) {
-      if (this.matches(d)) { collectJsonl(join(this.dir, d), files); continue; }
-      const theirs: LogFile[] = [];   // a visitor's folder: only its transcripts
+      const theirs: LogFile[] = [];
       collectJsonl(join(this.dir, d), theirs);
-      files.push(...theirs.filter((f) => this.isGuest(f.path)));
+      files.push(...theirs.filter((f) => (this.matches(d) && this.isOurs(f.path)) || this.isGuest(f.path))); // a visitor's: only its transcripts
     }
     return files;
   }
@@ -141,7 +157,7 @@ export class ClaudeSource implements LogSource {
 
   inScope(file: string, scope: Scope) {
     this.setScope(scope);
-    return this.matches(relative(this.dir, file).split(sep)[0] ?? "") || this.isGuest(file);
+    return (this.matches(relative(this.dir, file).split(sep)[0] ?? "") && this.isOurs(file)) || this.isGuest(file);
   }
 
   hidden(files: Iterable<string>) {

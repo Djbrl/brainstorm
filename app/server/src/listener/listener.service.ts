@@ -1,14 +1,14 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from "@nestjs/common";
 import { HttpAdapterHost } from "@nestjs/core";
 import { closeSync, existsSync, openSync, readdirSync, readSync, realpathSync, statSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import { join, resolve } from "node:path";
 import type { Harness, Session, Step } from "../types";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";
 import { ConfigService } from "../core/config.service";
 import { safely } from "../core/safely";
-import { formerRoots, repoBase } from "./moved";
+import { formerRoots, repoBase, within } from "./moved";
 import { ClaudeSource } from "./claude.source";
 import { CodexSource } from "./codex.source";
 import type { LogFile, LogSource, NewStep, Scope, Sink } from "./source";
@@ -827,7 +827,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     if (!cwd || !this.activeRoot) return false;
     let abs: string;
     try { abs = resolve(cwd); } catch { return false; }
-    return this.roots.some((r) => abs === r || abs.startsWith(r + sep));
+    return this.roots.some((r) => within(abs, r)); // either Unicode form: macOS records the decomposed one
   }
 
   private rowToStep(row: any): Step {

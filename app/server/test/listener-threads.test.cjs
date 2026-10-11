@@ -63,3 +63,30 @@ test("a step line without a uuid is skipped, with one warning for the file", asy
   await t.close();
 });
 
+
+test("Claude Code's folder names: a path over 200 characters is cut and hashed as it does; either Unicode form of the root", async () => {
+  const { mkdirSync } = require("node:fs");
+  const { claudeProjectDir, folderOf } = require(require("./helpers.cjs").dist("listener/moved.js"));
+  assert.equal(claudeProjectDir("/Users/me/my.app"), "-Users-me-my-app");
+  const long = "/work/" + "deep-folder-name/".repeat(14) + "x".repeat(6);
+  assert.equal(long.length, 250);
+  const name = claudeProjectDir(long);
+  let h = 0; for (const c of long) h = (h * 31 + c.charCodeAt(0)) | 0;
+  assert.equal(name, long.replace(/[^A-Za-z0-9]/g, "-").slice(0, 200) + "-" + Math.abs(h).toString(36));
+  assert.equal(folderOf(name, long), "own");
+  assert.equal(folderOf(claudeProjectDir(long + "/.claude/worktrees/w"), long), "maybe");
+  assert.equal(folderOf(claudeProjectDir("/work/other"), long), false);
+
+  for (const [root, cwd] of [[long, long], ["/work/café-app", "/work/café-app"]]) {
+    const t = await makeListener({ root });
+    const dir = join(t.cfg.claudeProjectsDir, claudeProjectDir(cwd));
+    mkdirSync(dir, { recursive: true });
+    const f = join(dir, "s1.jsonl");
+    writeFileSync(f, jsonl([line("prompt", { cwd, i: 0, text: "hello" }), line("tool", { cwd, i: 1 })]));
+    const claude = t.listener.sources.find((s) => s.harness === "claude");
+    assert.deepEqual(claude.list(t.listener.scope()).map((x) => x.path), [f], root);
+    await t.readNow(f, true);
+    assert.deepEqual(t.listener.listSessions().map((s) => s.id), ["s1"], root);
+    await t.close();
+  }
+});

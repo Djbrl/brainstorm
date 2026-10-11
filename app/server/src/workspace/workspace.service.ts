@@ -10,6 +10,7 @@ import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";
 import { ConfigService } from "../core/config.service";
 import { ListenerService } from "../listener/listener.service";
+import { claudeProjectDir, folderOf, sanitizeName } from "../listener/moved";
 import { MapperService } from "../mapper/mapper.service";
 import { isIdleTranscript } from "./threads";
 import { walkCandidates } from "../mapper/list-files";
@@ -17,7 +18,6 @@ import { env } from "../core/local";
 import { safely } from "../core/safely";
 
 const execFileP = promisify(execFile);
-const encodeRoot = (root: string) => root.replace(/[^A-Za-z0-9-]/g, "-");
 const real = (p: string) => { try { return realpathSync(p); } catch { return p; } };
 
 /** Turn a Claude Code project folder name back into a real path by walking the filesystem ("-Users-me-my-app" → /Users/me/my-app). */
@@ -28,7 +28,7 @@ export function decodeProjectDir(name: string): string | null {
     let entries: string[];
     try { entries = readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name); } catch { return null; }
     for (const e of entries) {
-      const enc = encodeRoot(e);
+      const enc = sanitizeName(e);
       if (rest === enc) return join(dir, e);
       if (rest.startsWith(enc + "-")) { const hit = walk(join(dir, e), rest.slice(enc.length + 1), depth + 1); if (hit) return hit; }
     }
@@ -162,7 +162,7 @@ export class WorkspaceService implements OnModuleInit {
       let root = decoded ?? resolve(cwds[0]);
       if (!decoded) outer: for (const c of cwds) {
         for (let cand = resolve(c); cand !== dirname(cand); cand = dirname(cand)) {
-          if (encodeRoot(cand) === d) { root = cand; break outer; }
+          if (claudeProjectDir(cand) === d) { root = cand; break outer; }
         }
       }
       if (/\/Library\/Application Support\//.test(root)) continue; // Claude Desktop's own scratch folders
@@ -339,13 +339,12 @@ export class WorkspaceService implements OnModuleInit {
 
   /** Threads (see threads.ts) active in the last 24h across the Claude Code project folders for `root` and its worktrees. */
   private countRecentSessions(root: string): number {
-    const encoded = resolve(root).replace(/[^A-Za-z0-9-]/g, "-");
     let dirs: string[];
     try { dirs = readdirSync(this.cfg.claudeProjectsDir); } catch { return 0; }
     const ids = new Set<string>();
     const now = Date.now();
     for (const d of dirs) {
-      if (d !== encoded && !d.startsWith(encoded + "-")) continue;
+      if (!folderOf(d, root)) continue;
       const dirPath = join(this.cfg.claudeProjectsDir, d);
       let entries: string[];
       try { entries = readdirSync(dirPath); } catch { continue; }

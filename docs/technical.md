@@ -45,7 +45,7 @@ Modules talk through the bus and a few public service methods, such as `Listener
 
 ## Reading Claude Code logs
 
-Claude Code writes one JSON object per line to `~/.claude/projects/<project path with / replaced by ->/<sessionId>.jsonl`. Subagent transcripts live one level deeper, in `<sessionId>/subagents/agent-*.jsonl`, and share the parent's `sessionId`.
+Claude Code writes one JSON object per line to `~/.claude/projects/<project path with / replaced by ->/<sessionId>.jsonl`. Subagent transcripts live one level deeper, in `<sessionId>/subagents/agent-*.jsonl`, and share the parent's `sessionId`. The project folder's name is the path with every character but a letter or digit replaced by `-`, cut at 200 characters with `-` and a hash of the path after it (`listener/moved.ts` `claudeProjectDir`, as Claude Code names it). A folder whose name only starts like the project's (a subfolder, a worktree, or a sibling: `app-backend` next to `app`) is read only for the logs whose thread ran inside the project (their `cwd`). Both Unicode forms of the project's path are tried (macOS records the decomposed one).
 
 | Log line | Becomes |
 | --- | --- |

@@ -107,3 +107,25 @@ test("a thread from another project that edits this one's files is a visitor her
   assert.deepEqual(ids(), ["orch"]);
   await t.close();
 });
+
+test("a sibling project whose folder name starts the same (app-backend, app.v2) is not read; a subfolder is", async () => {
+  const { mkdirSync } = require("node:fs");
+  const t = await makeListener({ root: "/work/demo-repo" });
+  t.live();
+  t.listener.isListening = true;
+  const L = t.listener;
+  const files = {};
+  for (const [id, cwd] of [["backend", "/work/demo-repo-backend"], ["v2", "/work/demo-repo.v2"], ["src", "/work/demo-repo/src"], ["own", "/work/demo-repo"]]) {
+    const dir = join(t.cfg.claudeProjectsDir, cwd.replace(/[^A-Za-z0-9]/g, "-"));
+    mkdirSync(dir, { recursive: true });
+    files[id] = join(dir, `${id}.jsonl`);
+    writeFileSync(files[id], jsonl([line("prompt", { sessionId: id, cwd, i: 1, text: `in ${id}` }), line("tool", { sessionId: id, cwd, i: 2 })]));
+  }
+  const claude = L.sources.find((s) => s.harness === "claude");
+  assert.deepEqual(claude.list(L.scope()).map((f) => basename(f.path, ".jsonl")).sort(), ["own", "src"]);
+  for (const f of Object.values(files)) await t.readNow(f);
+  const stored = t.dbs.db.prepare(`SELECT id FROM sessions ORDER BY id`).all().map((r) => r.id);
+  assert.deepEqual(stored, ["own", "src"]);
+  assert.deepEqual([...new Set(t.sent.filter((m) => m.type === "step").map((m) => m.step.sessionId))].sort(), ["own", "src"]);
+  await t.close();
+});

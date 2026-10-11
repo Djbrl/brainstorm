@@ -29,9 +29,9 @@ export type Lens = "map" | "places";
 export type ReplaySpeed = 1 | 2 | 4;
 /**
  * How much of an open thread is out: its steps as a list (what opening a thread shows), or the replay with its player
- * (from the footer). "footprint", the files it touched all lit at once with no tracer, is no longer opened by the UI.
+ * (from the footer).
  */
-export type ThreadMode = "footprint" | "steps" | "play";
+export type ThreadMode = "steps" | "play";
 /** Open a thread at its end: the index is clamped to its last moment once it loads (a running one then follows live). */
 export const END = Number.MAX_SAFE_INTEGER;
 /**
@@ -64,9 +64,9 @@ type Nav = {
 
   /** The open thread, or null on the project overview. */
   replay: ThreadReplay | null;
-  /** Open a thread: its footprint unless `mode` says otherwise, landing on a beat index or on the beat holding a step id. `live` follows its newest step; `lens` switches the view too. */
+  /** Open a thread: its steps unless `mode` says otherwise, landing on a beat index or on the beat holding a step id. `live` follows its newest step; `lens` switches the view too. */
   startReplay: (sessionId: string, at?: number | string, opts?: { live?: boolean; mode?: ThreadMode; lens?: Lens }) => void;
-  /** Show more or less of the open thread (footprint → steps → play). */
+  /** Show more or less of the open thread (steps → play). */
   setThreadMode: (mode: ThreadMode) => void;
   /** Keep a live replay on the newest beat (called as the thread grows). */
   followLive: (index: number) => void;
@@ -258,14 +258,14 @@ function createNavStore(): NavStore {
     // Moving the cursor by hand stops following live; followLive is the only setter that keeps it.
     setReplayIndex: (i) => setReplay((r) => (r ? { ...r, live: false, index: Math.max(0, typeof i === "function" ? i(r.index) : i) } : r)),
     followLive: (i) => setReplay((r) => (r && r.live && r.index !== i ? { ...r, index: Math.max(0, i), atStep: undefined } : r)),
-    setReplayLive: (live) => setReplay((r) => (r ? { ...r, live, playing: false, mode: r.mode === "footprint" ? "steps" : r.mode } : r)),
+    setReplayLive: (live) => setReplay((r) => (r ? { ...r, live, playing: false } : r)),
     setReplayPlaying: (playing) => setReplay((r) => (r ? { ...r, playing, live: playing ? false : r.live, mode: playing ? "play" : r.mode } : r)),
     setReplaySpeed: (speed) => setReplay((r) => (r ? { ...r, speed } : r)),
     setReplayDetail: (detail, atStep) => setReplay((r) => (r ? { ...r, detail, playing: false, atStep: atStep ?? replayCursor.stepId ?? undefined } : r)),
     landReplay: (index) => setReplay((r) => (r ? { ...r, index: Math.max(0, index), atStep: undefined } : r)),
     openStep: (sid, stepId) => set({
       ...replayPatch((r) => (r && r.sessionId === sid
-        ? { ...r, atStep: stepId, playing: false, live: false, mode: r.mode === "footprint" ? "steps" : r.mode }
+        ? { ...r, atStep: stepId, playing: false, live: false }
         : { sessionId: sid, index: 0, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: "steps", atStep: stepId })),
       step: stepId,
     }),
@@ -292,7 +292,7 @@ function createNavStore(): NavStore {
         lens: p.lens, step: p.step, file: p.file ?? null,
         ...replayPatch((r) => {
           if (!p.thread) { replayCursor.stepId = null; return null; }
-          if (r && r.sessionId === p.thread) return p.step ? { ...r, atStep: p.step, playing: false, mode: r.mode === "footprint" ? "steps" : r.mode } : r;
+          if (r && r.sessionId === p.thread) return p.step ? { ...r, atStep: p.step, playing: false } : r;
           return { sessionId: p.thread, index: END, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: "steps", atStep: p.step ?? undefined };
         }),
       });

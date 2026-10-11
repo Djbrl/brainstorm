@@ -454,7 +454,7 @@ export function MapView() {
   const footprintKey = fp ? `${fp.length}|${fp[0] ?? ""}|${fp[fp.length - 1] ?? ""}` : "";
   // Anything that changes the picture: one frame (the frame itself says if more must follow).
   useEffect(() => { redraw.kick(); }, [redraw, graph, map?.files, drawnAgents, waiting, followId, hover, selected, tokens, theme, replay,
-    replayLayer.active, replayLayer.tracing, replayLayer.footprintMode, showReads, stepWindow, footprintKey, size.w, size.h]);
+    replayLayer.active, replayLayer.tracing, showReads, stepWindow, footprintKey, size.w, size.h]);
   // A replay step: the tracer glides, a read flashes, an edit pulses (up to about a second).
   useEffect(() => { redraw.kick(1300); }, [redraw, replay?.index, replay?.sessionId, replay?.mode]);
   // A new agent position, error or activity: its glide, flash or pulse plays out (drawAgents), the frame keeps them coming.

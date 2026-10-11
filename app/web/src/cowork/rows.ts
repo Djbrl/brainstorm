@@ -35,7 +35,7 @@ export function usePlaceRows() {
   const { data, row: picked } = usePlaces();
   const { replay } = useNavState();
   const { full, light, index, pos, stepOf, steps } = usePlaceTimeline();
-  const { setReplayIndex, setReplayPlaying, setThreadMode } = useNavActions();
+  const { setReplayIndex, setReplayPlaying } = useNavActions();
   useLiveSelector((s) => (replay ? s.steps[replay.sessionId] : undefined));   // a new step: rows again
   const runs = data ? placeRuns(data.events) : [];
   const rows: PlaceRow[] = [];
@@ -67,7 +67,6 @@ export function usePlaceRows() {
     for (let k = r.to; b === undefined && k >= 0; k--) { const id = full.beats[k]?.step.id; if (id) b = light.stepBeat.get(id); }
     if (b === undefined) b = 0;
     placesStore.set({ row: { i, beat: b, event: r.run?.last.id ?? null, step: r.to } });
-    if (replay?.mode === "footprint") setThreadMode("steps");
     if (!playing) setReplayPlaying(false);
     setReplayIndex(b);
     return true;

@@ -31,7 +31,7 @@ export type ReplayLayerApi = {
   nodeAlpha: (id: string) => number;
   /** How a file reads in the focus (eased), or null when nothing is in focus and its fade is over: the map as it is. */
   look: (id: string) => Look | null;
-  /** True while the tracer is drawn (a replay or steps, not the footprint): Metro quiets the import lines then. */
+  /** True while the tracer is drawn (a thread is open): Metro quiets the import lines then. */
   tracing: boolean;
   /** At the thread's last step while its agent thinks. */
   thinking: boolean;
@@ -39,8 +39,6 @@ export type ReplayLayerApi = {
   ringing: () => boolean;
   /** The player is open (a replay, playing or paused): the arrow keys step through it, not move the map. */
   playable: boolean;
-  /** The thread's footprint mode (its files lit, no tracer): MapView frames it. */
-  footprintMode: boolean;
   /** The files in focus (what a fit frames: the recent window, or the whole thread), or null with no thread open. */
   footprint: () => string[] | null;
   /** Whether the open thread touched a file at all (read or changed), at any point. */
@@ -148,8 +146,8 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
   const { replay, setReplayIndex, setReplayPlaying, landReplay } = useNav();
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
   const active = !!replay && !!thread && thread.sessionId === replay.sessionId && thread.detail === replay.detail;
-  // A thread opens on its footprint: its files lit, the camera on them, no tracer. The keys and the wheel drive the replay only once it plays.
-  const mode = replay?.mode ?? "footprint";
+  // A thread opens on its steps. The keys and the wheel drive the replay only once it plays.
+  const mode = replay?.mode ?? "steps";
   const playable = active && mode === "play";
   const len = active ? thread!.beats.length : 0;
   const last = Math.max(0, len - 1);
@@ -240,7 +238,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     seen: { x: null as number | null, y: null as number | null, lock: false, pinned: false, safe: null as unknown, a: null as number | null, e: null as number | null, f: null as number | null } });
   useEffect(() => {
     const L = camLoop.current;
-    if (!active || mode === "footprint") return;
+    if (!active) return;
     L.tick = () => {
       L.raf = 0;
       const a = anim.current, cam = camera.current;
@@ -383,7 +381,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
   const draw = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
     const s = st.current;
     ringDrawn.current = false;
-    if (!s.active || !s.thread || s.len === 0 || s.mode === "footprint") return;
+    if (!s.active || !s.thread || s.len === 0) return;
     const { beats, moves } = s.thread;
     const beat = beats[s.index];
     if (!beat) return;
@@ -567,7 +565,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
 
   const marks = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
     const s = st.current, boxes: Box[] = [];
-    const beat = s.active && s.thread && s.mode !== "footprint" ? s.thread.beats[s.index] : undefined;
+    const beat = s.active && s.thread ? s.thread.beats[s.index] : undefined;
     if (!beat || !s.thread) return { boxes, named: null };
     const { moves } = s.thread, mi = beat.moveIndex, curFile = mi >= 0 ? moves[mi].file : PARK, nodes = nodeIndexRef.current;
     const h = 15 / scale, pad = 2 / scale, win = getStepWindow();
@@ -603,11 +601,11 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     const mi = s.thread.beats[s.index]?.moveIndex ?? -1;
     return mi >= 0 ? [s.thread.moves[mi].file] : [];
   }, [focus]);
-  const subject = useCallback(() => (st.current.active && st.current.mode !== "footprint" ? anim.current.cam : null), []);
+  const subject = useCallback(() => (st.current.active ? anim.current.cam : null), []);
   const touches = useCallback((id: string) => !!st.current.thread?.touched.has(id), []);
   const readsNow = useCallback(() => {
     const s = st.current;
-    if (!s.active || !s.thread || s.mode === "footprint" || s.live) return null;
+    if (!s.active || !s.thread || s.live) return null;
     for (let i = s.index; i >= 0 && i > s.index - READS_BACK; i--) {
       const b = s.thread.beats[i];
       // A read, or a run of commands that read files (cat, sed -n, grep: the server's `reads`).
@@ -617,7 +615,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
   }, []);
 
   const nowAt = useCallback(() => nowRef.current, []);
-  return { active, thinking, ringing, tracing: active && mode !== "footprint", playable, footprintMode: active && mode === "footprint", footprint, touches, readsNow, nowAt, subject, nodeAlpha, look, draw, marks };
+  return { active, thinking, ringing, tracing: active, playable, footprint, touches, readsNow, nowAt, subject, nodeAlpha, look, draw, marks };
 }
 
 /**

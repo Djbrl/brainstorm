@@ -38,15 +38,20 @@ export class DbService implements OnApplicationShutdown {
    * fresh one starts: the history is read again from the agents' logs. A read-only one gets one clear line in the log.
    */
   private open(file: string): DatabaseSync {
+    let db: DatabaseSync | undefined;
     try {
-      const db = new DatabaseSync(file);
+      db = new DatabaseSync(file);
       db.prepare("SELECT count(*) FROM sqlite_master").get(); // reads the header: a broken file fails here
       return db;
     } catch (e) {
+      try { db?.close(); } catch { /* not open */ }
       const msg = (e as Error).message ?? String(e);
       if (/not a database|malformed|corrupt/i.test(msg)) {
         const aside = `${file}.broken-${new Date().toISOString().replace(/[:.]/g, "-")}`;
-        for (const ext of ["", "-wal", "-shm"]) if (existsSync(file + ext)) renameSync(file + ext, aside + ext);
+        for (const ext of ["", "-wal", "-shm"]) if (existsSync(file + ext)) {
+          renameSync(file + ext, aside + ext);
+          try { chmodSync(aside + ext, 0o600); } catch { /* not ours to change */ }
+        }
         this.log.error(`${file} is damaged (${msg}): moved it to ${aside} and started a fresh one; your threads are read again from the agents' logs`);
         this.notice(`Rundown's database was damaged, so it started a fresh one and read your threads again. The old file is ${aside}.`);
         return new DatabaseSync(file);
@@ -65,6 +70,7 @@ export class DbService implements OnApplicationShutdown {
       let n: Record<string, unknown> = {};
       try { n = JSON.parse(readFileSync(f, "utf8")); } catch { /* none yet */ }
       writeFileSync(f, JSON.stringify({ ...n, failure: text, failureToldAt: 0 }), { mode: 0o600 });
+      chmodSync(f, 0o600); // the mode above only applies to a new file
     } catch { /* the log has it */ }
   }
 

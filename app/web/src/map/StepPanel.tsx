@@ -1,8 +1,9 @@
 // The third level: one step of the open thread in a side panel (its diff or output, and Ask), the
 // same on the Map and the Track. It follows the cursor: scroll the steps or scrub the replay and it shows the step
 // you're on. A click anywhere outside it (on the map, say) closes it, as do Esc and Back. Its link is
-// /thread/<id>/step/<stepId>.
-import { useEffect, useMemo, useRef } from "react";
+// /thread/<id>/step/<stepId>. Places shows its steps in the same panel, with its own header (where, "1 of 3 here")
+// and its own way back; there it goes by the places rather than the cursor.
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { KEEPS_OPEN, useClickAway, useLastShown } from "./panel";
 import type { Step } from "@contract";
 import { useLiveActions, useLiveSelector } from "../lib/live";
@@ -13,7 +14,18 @@ import { isVisible, pairResults } from "../follow/format";
 import "../follow/follow.css";
 import "./map.css";
 
-export function StepPanel() {
+type StepPanelProps = {
+  /** Under Back, above the step (Places: the place, and ‹ › through its steps). */
+  header?: ReactNode;
+  /** The Back button's words. */
+  back?: string;
+  /** Close it (Back, and the step view's own close). The app's closeStep by default. */
+  onClose?: () => void;
+  /** Follow the replay cursor and close on a click away (the Map). Places' panel goes by its places instead. */
+  follow?: boolean;
+};
+
+export function StepPanel({ header, back = "Back to the steps", onClose, follow = true }: StepPanelProps = {}) {
   const { loadSteps } = useLiveActions();
   const { replay, step: stepId } = useNavState();
   const { showStep, closeStep } = useNavActions();
@@ -33,14 +45,15 @@ export function StepPanel() {
     lastIndex.current = index;
     // The thread was built again under a cursor that didn't move: its moments may have renumbered, and the cursor is
     // put back on its step (App's KeepCursor). The open step stays.
-    if (!moved) return;
+    if (!moved || !follow) return;
     if (!cur || pending || !thread || index === undefined) return;
     const beat = thread.beats[Math.min(index, thread.beats.length - 1)];
     if (beat && thread.stepBeat.get(cur) !== beat.index) showStep(beat.step.id);
-  }, [index, pending, thread, showStep]);
+  }, [index, pending, thread, showStep, follow]);
 
   // Click away to close (a drag on the map keeps it).
-  useClickAway(!!stepId, KEEPS_OPEN, closeStep);
+  const close = onClose ?? closeStep;
+  useClickAway(follow && !!stepId, KEEPS_OPEN, close);
 
   const results = useMemo(() => pairResults(steps ?? []), [steps]);
   let step: Step | undefined = stepId ? steps?.find((s) => s.id === stepId) : undefined;
@@ -71,8 +84,9 @@ export function StepPanel() {
     <div className={`map-panel pl-panel ${step ? "open" : ""}`} aria-hidden={!step} inert={!step} ref={panel} tabIndex={-1}
       role="region" aria-label="Step" onFocus={() => { focusInside.current = true; }}
       onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null) && e.relatedTarget) focusInside.current = false; }}>
-      {shown && <button className="pl-panel-back" onClick={closeStep}><i aria-hidden="true">‹</i>Back to the steps</button>}
-      {shown && <StepDetail step={shown.step} result={shown.result} onClose={closeStep} />}
+      {shown && <button className="pl-panel-back" onClick={close}><i aria-hidden="true">‹</i>{back}</button>}
+      {shown && header}
+      {shown && <StepDetail step={shown.step} result={shown.result} onClose={close} />}
     </div>
   );
 }

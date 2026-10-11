@@ -2,8 +2,8 @@
 // threads sidebar, no legend: the places read without one), in the same language (PlacesMap); the open thread's panel
 // in the sidebar lists its places (PlaceSteps). No Readmap here: a visit is the thread's movement itself, which the
 // camera already follows.
-// Clicking a place opens its step in the side panel, the same step view as on the Map and the Track (and the same link: …/places/step/<id>).
-import { useCallback, useEffect, useMemo, useRef } from "react";
+// Clicking a place opens its step in the side panel, the Map's StepPanel with the place in its header (and the same link: …/places/step/<id>).
+import { useCallback, useEffect, useRef } from "react";
 import { useLiveSelector } from "../lib/live";
 import { useNavActions, useNavState, useReplayCursor } from "../lib/nav";
 import { initial } from "../map/agents";
@@ -14,8 +14,7 @@ import { Dock } from "../map/replay/ReplayBar";
 import { togglePlay } from "../map/replay/layer";
 import { useShortcut } from "../switch/shortcuts";
 import { HOME, eventsAt, placeOfStep, placeTitle, placesStore, useCowork, usePlaces, useSelectPlace } from "./data";
-import { StepDetail } from "../follow/StepDetail";
-import { pairResults } from "../follow/format";
+import { StepPanel } from "../map/StepPanel";
 import { PlacesMap } from "./PlacesMap";
 import { NARROW, useMedia } from "../lib/breakpoints";
 import "../map/map.css";
@@ -52,9 +51,8 @@ export function PlacesView() {
     if (place) placesStore.set({ selected: place });
   }, [navStep, !!data]);
 
-  // The step in the panel, its result, and the other steps in the same place (to step through them).
+  // The step in the panel (StepPanel shows it), and the other steps in the same place (to step through them).
   const steps = useLiveSelector((s) => (replay ? s.steps[replay.sessionId] : undefined));
-  const results = useMemo(() => pairResults(steps ?? []), [steps]);
   const step = stepId ? steps?.find((s) => s.id === stepId) : undefined;
   const here = data && selected ? [...new Set(eventsAt(data, selected).map((e) => e.stepId))] : [];
   const pos = stepId ? here.indexOf(stepId) : -1;
@@ -109,22 +107,14 @@ export function PlacesView() {
       {data && rows.length > 0 && <Dock steps={{ at, count: rows.length, go, noun: "place" }} />}
       {!replay && <p className="cw-note">Pick a thread to see where it went outside the code.</p>}
       {replay && error && <p className="cw-note">The places couldn't load. Check that Rundown is still running.</p>}
-      <div className={`map-panel pl-panel ${step ? "open" : ""}`} aria-hidden={!step}>
-        {step && (
-          <>
-            <button className="pl-panel-back" onClick={() => selectPlace(null)}><i aria-hidden="true">‹</i>Back to the places</button>
-            {here.length > 1 && (
-              <div className="pl-panel-nav">
-                <span>{place ? placeTitle(place) : ""}</span>
-                <span className="pl-panel-count">{pos + 1} of {here.length} here</span>
-                <button onClick={() => pos > 0 && replay && openStep(replay.sessionId, here[pos - 1])} disabled={pos <= 0} aria-label="Previous step here">‹</button>
-                <button onClick={() => pos < here.length - 1 && replay && openStep(replay.sessionId, here[pos + 1])} disabled={pos >= here.length - 1} aria-label="Next step here">›</button>
-              </div>
-            )}
-            <StepDetail step={step} result={results.get(step.id)} onClose={() => selectPlace(null)} />
-          </>
-        )}
-      </div>
+      <StepPanel follow={false} back="Back to the places" onClose={() => selectPlace(null)} header={step && here.length > 1 && (
+        <div className="pl-panel-nav">
+          <span>{place ? placeTitle(place) : ""}</span>
+          <span className="pl-panel-count">{pos + 1} of {here.length} here</span>
+          <button onClick={() => pos > 0 && replay && openStep(replay.sessionId, here[pos - 1])} disabled={pos <= 0} aria-label="Previous step here">‹</button>
+          <button onClick={() => pos < here.length - 1 && replay && openStep(replay.sessionId, here[pos + 1])} disabled={pos >= here.length - 1} aria-label="Next step here">›</button>
+        </div>
+      )} />
     </div>
   );
 }

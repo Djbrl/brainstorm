@@ -2,7 +2,7 @@
 description: Open Rundown, the live map and replay of this project's agent sessions, beside this thread (in the Claude desktop app) or in the browser. Add "browser" to open it in your default browser instead.
 disable-model-invocation: true
 argument-hint: "[browser]"
-allowed-tools: Bash(node:*), mcp__Claude_Browser__tabs_context, mcp__Claude_Browser__tabs_select, mcp__Claude_Browser__preview_start
+allowed-tools: Bash(node *${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs*), mcp__Claude_Browser__tabs_context, mcp__Claude_Browser__tabs_select, mcp__Claude_Browser__preview_start
 ---
 
 ## Launcher output

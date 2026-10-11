@@ -1,7 +1,7 @@
 ---
 description: Save this thread as a replay file anyone can open in a browser, plus a Markdown summary, to share it.
 disable-model-invocation: true
-allowed-tools: Bash(node:*)
+allowed-tools: Bash(node *${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs*)
 ---
 
 ## Launcher output

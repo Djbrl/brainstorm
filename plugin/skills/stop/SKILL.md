@@ -1,7 +1,7 @@
 ---
 description: Stop the Rundown server running in the background.
 disable-model-invocation: true
-allowed-tools: Bash(node:*)
+allowed-tools: Bash(node *${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs*)
 ---
 
 !`node "${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs" --stop`

@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import { closeSync, existsSync, openSync, readdirSync, readSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { homedir } from "node:os";
-import type { SetupStatus, SetupStep, WorkspaceSuggestion } from "../shared/contract";
+import type { SetupStatus, SetupStep, WorkspaceConflict, WorkspaceSuggestion } from "../shared/contract";
 import { worktreeRepo } from "../shared/paths";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
@@ -264,7 +264,7 @@ export class WorkspaceService implements OnModuleInit, OnModuleDestroy {
     if (inGitRepo(abs)) return;
     const quick = await walkCandidates(abs, { dirs: 5_000, ms: 1_500 });
     if (!quick.stopped) return;
-    throw new ConflictException({
+    throw new ConflictException(<WorkspaceConflict>{
       statusCode: 409, code: "large",
       message: `${basename(abs)} isn't a git project and holds a lot of folders: Rundown would map only what it finds in a few seconds. Open it anyway, or pick the project's own folder inside it.`,
     });

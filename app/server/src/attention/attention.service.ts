@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import type { StatementSync } from "node:sqlite";
-import type { Attention, AttentionState, Step } from "../shared/contract";
+import type { Attention, AttentionState, HookSignal, Step } from "../shared/contract";
 import { BusService } from "../core/bus.service";
 import { DbService } from "../core/db.service";
 import { EventsGateway } from "../core/events.gateway";
@@ -41,16 +41,6 @@ const CATCH_UP = 600;
 /** Which threads belong to the open workspace is re-checked this often (the listener's list is costly to build). */
 const SCOPE_MS = 60_000;
 
-/** What the plugin's hooks send (see plugin/scripts/signal.mjs). */
-export type HookSignal = {
-  event: "PermissionRequest" | "Notification" | "Stop" | "UserPromptSubmit";
-  session_id: string;
-  notification_type?: string;
-  tool_name?: string;
-  tool_input?: Record<string, unknown>;
-  tool_use_id?: string;
-  message?: string;
-};
 
 type Tracker = {
   lastTs: number;

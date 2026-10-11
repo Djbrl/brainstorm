@@ -1,6 +1,6 @@
 // Pick a workspace, then a loading checklist while Rundown reads the code and connects to Claude Code.
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import type { SetupStatus, SetupStep, WorkspaceSuggestion } from "@contract";
+import type { SetupStatus, SetupStep, WorkspaceConflict, WorkspaceSuggestion } from "@contract";
 import { clock, useLive } from "../lib/live";
 import { relTime } from "../follow/format";
 import { Logo } from "../Logo";
@@ -23,8 +23,8 @@ async function openWorkspace(root: string, anyway = false): Promise<SetupStatus>
   const r = await fetch("/api/workspace", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ root, ...(anyway ? { anyway } : {}) }) });
   if (!r.ok) {
     let msg = `Couldn't open that folder (${r.status}).`, code: string | undefined;
-    try { const b = await r.json(); code = b.code; msg = (Array.isArray(b.message) ? b.message.join(" ") : b.message) || b.error || msg; } catch { /* keep default */ }
-    if (r.status === 409 && code === "large") throw new AskFirst(msg, root);
+    try { const b: { code?: string; message?: string | string[]; error?: string } = await r.json(); code = b.code; msg = (Array.isArray(b.message) ? b.message.join(" ") : b.message) || b.error || msg; } catch { /* keep default */ }
+    if (r.status === 409 && code === ("large" satisfies WorkspaceConflict["code"])) throw new AskFirst(msg, root);
     throw new Error(msg);
   }
   return r.json();

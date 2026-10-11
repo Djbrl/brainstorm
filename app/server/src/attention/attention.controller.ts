@@ -1,6 +1,7 @@
 import { Body, Controller, ForbiddenException, Get, Headers, HttpCode, Post } from "@nestjs/common";
 import { maskDeep } from "../privacy/mask";
-import { AttentionService, type HookSignal } from "./attention.service";
+import type { HookSignal } from "../shared/contract";
+import { AttentionService } from "./attention.service";
 
 @Controller()
 export class AttentionController {

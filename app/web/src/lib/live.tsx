@@ -19,7 +19,7 @@
 // (layout, path resolvers, the file tree) key memos on `state.structureVersion` instead.
 import { installSetupShim, startAgentPlayback } from "./preview";
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
-import type { AgentPresence, Attention, AskRequest, AskResponse, Edge, Harness, SetupStatus, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
+import type { AgentPresence, Attention, AskRequest, AskResponse, Edge, Harness, LiveToken, SetupStatus, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
 import { harnessOf, withHarness } from "./harness";
 import { listeners, shallowEqual, useStoreSelector } from "./store";
 
@@ -53,7 +53,6 @@ type Action =
   | { type: "map"; map: ProjectMap }
   | { type: "agents"; agents: AgentPresence[] }
   | { type: "attention-all"; list: Attention[] }
-  | { type: "setup-status"; status: SetupStatus }
   | { type: "reset" }
   | { type: "replay"; data: Replay }
   | WsMessage;
@@ -196,7 +195,7 @@ function applyBatch(base: LiveState, actions: Action[], ix: Indexes): LiveState 
       case "agent": (st().agents = own(s.agents, (o) => ({ ...o })))[a.agent.id] = a.agent; break;
       case "attention-all": st().attention = Object.fromEntries(a.list.map((x) => [x.sessionId, x])); owned.add(s.attention); statusCheck = true; break;
       case "attention": (st().attention = own(s.attention, (o) => ({ ...o })))[a.attention.sessionId] = a.attention; statusCheck = true; break;
-      case "setup-status": case "setup": st().setup = a.status; break;
+      case "setup": st().setup = a.status; break;
       case "reset":
         Object.assign(st(), { sessions: [], steps: {}, map: null, agents: {}, attention: {}, sessionsLoaded: false, structureVersion: s.structureVersion + 1 });
         reindex(ix, s); sortNeeded = false; changedFrom.clear(); removed.clear();
@@ -398,7 +397,7 @@ function loadAll(store: LiveStore) {
     .then((v) => { if (gen === store.generation()) then(v); }).catch(() => {});
   get<SetupStatus>("/api/workspace", (status) => {
     store.checkRoot(status?.root ?? null);
-    if (gen === store.generation()) store.dispatch({ type: "setup-status", status });
+    if (gen === store.generation()) store.dispatch({ type: "setup", status });
   });
   get<Session[]>("/api/sessions", (sessions) => store.dispatch({ type: "sessions", sessions }));
   get<ProjectMap>("/api/map", (map) => store.dispatch({ type: "map", map }));
@@ -444,7 +443,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
     // when the server restarts, so it's fetched again on every connection.
     const connect = () => {
       fetch("/api/live-token").then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-        .then(({ token }: { token: string }) => { if (!stop) open(token); }, retry);
+        .then(({ token }: LiveToken) => { if (!stop) open(token); }, retry);
     };
     const open = (token: string) => {
       const sock = (ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?t=${encodeURIComponent(token)}`));

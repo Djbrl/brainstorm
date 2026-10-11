@@ -19,7 +19,7 @@ export const errorLine = (text = "") => errorText(text).trim().split("\n")[0];
 /** `tool`: the tool the result answers (a result step doesn't carry it); without it only the stored flag counts. */
 export function isErrorResult(step: Step, tool?: string): boolean {
   if (step.kind !== "tool_result") return false;
-  if ((step.input as { isError?: boolean } | undefined)?.isError) return true;
+  if (step.isError || (step.input as { isError?: boolean } | undefined)?.isError) return true;
   const t = tool ?? step.tool ?? "";
   const head = (step.text ?? "").slice(0, 300);
   if (SHELL_TOOLS.has(t)) return SHELL_ERROR.test(head);

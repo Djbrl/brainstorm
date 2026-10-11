@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Get, Headers, HttpCode, Post, Put } from "@nestjs/common";
 import { isLocalHost } from "../core/local";
-import { THEMES, UsageService, WEB_KEYS, type UsageKey, type UsageStatus } from "./usage.service";
+import type { UsageStatus } from "../shared/contract";
+import { THEMES, UsageService, WEB_KEYS, type UsageKey } from "./usage.service";
 
 // The usage-stats setting and the counts the web app reports (see usage.service.ts). Only from the app
 // itself: JSON with a local Origin, so no other site can flip the setting or add counts.

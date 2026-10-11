@@ -8,7 +8,7 @@
 // Each edit comes with a result (so attention never sees it waiting) and says it came from a command (input.byCommand).
 import { statSync } from "node:fs";
 import { basename, relative, resolve, sep } from "node:path";
-import type { Step } from "../shared/contract";
+import type { CommandEditInput, Step } from "../shared/contract";
 import { mappableRel, skippedRel } from "../mapper/ignore";
 import { MAX_PARSE_BYTES } from "../mapper/read-file";
 import { commandWrites, shellArgv } from "./command-writes";
@@ -138,9 +138,9 @@ export class CommandEdits {
       const created = ch ? ch.before === "" : false;
       const deleted = w.kind === "delete" || (ch !== undefined && ch.after === null);
       const diff = ch && ch.before !== null ? lineHunks(ch.before, ch.after ?? "") : undefined;
-      const input = {
+      const input: CommandEditInput = {
         file_path: path, command: sanitizeText(call.command, 4_000), byCommand: true,
-        ...(deleted ? { deleted: true } : {}), ...(w.from ? { from: w.from } : {}),
+        ...(deleted ? { deleted: true as const } : {}), ...(w.from ? { from: w.from } : {}),
       };
       const who = { isSubagent: call.isSubagent, ...(call.agentId ? { agentId: call.agentId } : {}) };
       out.push({

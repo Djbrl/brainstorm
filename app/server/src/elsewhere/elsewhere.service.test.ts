@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { HookSignal } from "../attention/attention.service";
+import type { HookSignal } from "../shared/contract";
 import { ElsewhereService } from "./elsewhere.service";
 
 /** A Claude Code projects folder with one thread per project, and a service that sees `here` as the open workspace. */

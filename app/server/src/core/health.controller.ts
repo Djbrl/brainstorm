@@ -1,4 +1,5 @@
 import { Controller, Get, Query } from "@nestjs/common";
+import type { LiveToken } from "../shared/contract";
 import { env } from "./local";
 import { keyTag, LIVE_TOKEN, proof } from "./secrets";
 
@@ -12,5 +13,5 @@ export class HealthController {
   }
 
   /** The live feed's token, for Rundown's own page. Other origins can't read this answer (no CORS). */
-  @Get("live-token") liveToken() { return { token: LIVE_TOKEN }; }
+  @Get("live-token") liveToken(): LiveToken { return { token: LIVE_TOKEN }; }
 }

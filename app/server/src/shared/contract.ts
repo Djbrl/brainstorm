@@ -17,7 +17,11 @@ export type Step = {
   agentId?: string;     // subagent id (from its log); absent for the main session thread. Older steps get it from their logs once.
   toolUseId?: string;   // tool_call/edit: the call's tool_use id; tool_result: the id it answers. Absent on steps stored by early versions.
   reads?: string[];     // a shell command (tool_call, Bash): the files it reads by its text (`cat`, `sed -n`, `grep`…), absolute; not stored, worked out when read
+  isError?: boolean;    // tool_result: the tool said it failed. Read by isErrorResult (shared/failed.ts), as is input.isError, where stored steps keep it.
 };
+/** The input of an edit a shell command made (a script, sed -i, a redirect): the server saw the file change
+ *  (listener/command-edits.ts). `from`: the file it was moved from; `deleted`: the command removed it. */
+export type CommandEditInput = { file_path: string; command: string; byCommand: true; deleted?: true; from?: string };
 export type FileNode = { path: string; module: string; lines: number; lastChangedAt?: string; activeSessionId?: string; summary?: string };
 export type Edge = { from: string; to: string };
 /** `formerRoots`: where the repo lived before it moved, so paths in older threads still land on today's files. */
@@ -58,6 +62,10 @@ export type SetupStatus = {
   /** The project that was open is gone (renamed, moved or deleted): root is null, and the page says so above the picker. */
   missing?: { root: string; name: string };
 };
+/** POST /api/workspace's 409 answer: a big folder that isn't a git project, opened only when asked again with `anyway`. */
+export type WorkspaceConflict = { statusCode: 409; code: "large"; message: string };
+/** GET /api/live-token: the live feed's token (the socket's `?t=`). */
+export type LiveToken = { token: string };
 export type WorkspaceSuggestion = { root: string; name: string; lastActiveAt?: string; sessions: number; exists: boolean };
 
 /**
@@ -152,4 +160,34 @@ export type Attention = {
   detail?: string;    // the command, file, question or error, one line
   stepId?: string;    // the call it's about
   agentId?: string;   // set when a subagent is the one waiting
+};
+
+/** The usage stats setting (GET/PUT /api/usage). */
+export type UsageStatus = {
+  enabled: boolean;
+  /** The person has answered (yes or no). Until then nothing is counted or sent, and the app asks. */
+  asked: boolean;
+  /** This install's random id, once a report was sent (shown in Settings, for a deletion request). */
+  id: string | null;
+  /** Why it's off whatever the setting says: DO_NOT_TRACK or RUNDOWN_USAGE in the environment. */
+  locked: string | null;
+  /** False in a development build: nothing is sent even when enabled. */
+  sends: boolean;
+  lastSent: string | null;
+  /** Counts not sent yet, by event name. */
+  pending: Partial<Record<string, number>>;
+};
+
+/** "Tell me when there's a new version" (GET/PUT /api/updates). `locked`: why it's off whatever the setting says. */
+export type UpdatesStatus = { enabled: boolean; locked: string | null };
+
+/** What the plugin's hooks send (POST /api/attention/hook; see plugin/scripts/signal.mjs). */
+export type HookSignal = {
+  event: "PermissionRequest" | "Notification" | "Stop" | "UserPromptSubmit";
+  session_id: string;
+  notification_type?: string;
+  tool_name?: string;
+  tool_input?: Record<string, unknown>;
+  tool_use_id?: string;
+  message?: string;
 };

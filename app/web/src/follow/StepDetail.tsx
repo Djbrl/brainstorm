@@ -1,7 +1,7 @@
 // The step panel's body: one step in full (its diff, text or tool view) and Ask.
 import { useEffect, useMemo, useState } from "react";
 import { Diff } from "../lib/Diff";
-import type { Step } from "@contract";
+import type { CommandEditInput, Step } from "@contract";
 import { AskBox } from "../ask/AskBox";
 import { Markdown } from "../ask/Markdown";
 import { FileIcon, Glyph, RiskIcon } from "./Glyph";
@@ -90,7 +90,7 @@ export function editPair(s: Step): { before: string; after: string } | null {
 /** A file an agent changed by running a command (a script, sed -i, a redirect) instead of its edit tool: the server
  * saw it change (listener/command-edits.ts). The diff when it was watching; the command either way. */
 function CommandEditBody({ step }: { step: Step }) {
-  const i = inputOf(step);
+  const i = inputOf(step) as Partial<CommandEditInput>;
   const deleted = i.deleted === true;
   return (
     <>

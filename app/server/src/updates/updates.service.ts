@@ -7,7 +7,9 @@ import { dataDir } from "../core/local";
 // setting, apart from the usage stats: on by default. Kept in settings.json in the data folder, because the launcher
 // reads it before any server runs. RUNDOWN_UPDATE_CHECK=0 turns it off whatever the file says.
 
-export type UpdatesStatus = { enabled: boolean; locked: string | null };
+import type { UpdatesStatus } from "../shared/contract";
+
+export type { UpdatesStatus };
 
 export function settingsFile(dir = dataDir()) { return join(dir, "settings.json"); }
 

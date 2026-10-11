@@ -48,3 +48,7 @@ test("errorText and errorLine drop Claude Code's wrapper", () => {
   assert.equal(errorLine("<tool_use_error>\n  Exit code 1\nboom\n</tool_use_error>"), "Exit code 1");
   assert.equal(errorLine(""), "");
 });
+
+test("Step.isError counts like the stored input flag", () => {
+  assert.equal(isErrorResult({ id: "r", sessionId: "s", seq: 1, ts: "", kind: "tool_result", text: "fine", isError: true }), true);
+});

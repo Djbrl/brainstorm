@@ -4,6 +4,7 @@ import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
 import { env } from "../core/local";
 import { safely } from "../core/safely";
+import type { UsageStatus } from "../shared/contract";
 
 // Anonymous usage stats: once a day, counts of what was used, sent to the landing site so we know how
 // many people use Rundown, roughly where, and which parts matter. Off until the person says yes (the app asks once;
@@ -31,19 +32,6 @@ const FIRST_TRY_MS = 60_000;          // after start, so a crash loop doesn't re
 const EVERY_MS = 60 * 60_000;         // then hourly: one report per UTC day at most
 const SAVE_MS = 30_000;               // counts are saved this often (a restart loses at most that much)
 
-export type UsageStatus = {
-  enabled: boolean;
-  /** The person has answered (yes or no). Until then nothing is counted or sent, and the app asks. */
-  asked: boolean;
-  /** This install's random id, once a report was sent (shown in Settings, for a deletion request). */
-  id: string | null;
-  /** Why it's off whatever the setting says: DO_NOT_TRACK or RUNDOWN_USAGE in the environment. */
-  locked: string | null;
-  /** False in a development build: nothing is sent even when enabled. */
-  sends: boolean;
-  lastSent: string | null;
-  pending: Partial<Record<UsageKey, number>>;
-};
 
 @Injectable()
 export class UsageService implements OnModuleInit, OnModuleDestroy {

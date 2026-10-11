@@ -1,6 +1,7 @@
 // Counting a use for the anonymous usage stats (server usage/usage.service.ts): the server keeps the
 // counts and sends one report a day, if the setting is on. A replay (the hosted demo, a shared file) counts nothing.
 import { useCallback, useEffect, useState } from "react";
+import type { UpdatesStatus, UsageStatus } from "@contract";
 import { isReplay } from "./live";
 import { getTheme } from "./theme";
 
@@ -15,7 +16,7 @@ export function track(name: WebEvent) {
   }).catch(() => { /* offline or an older server: nothing to do */ });
 }
 
-export type UsageStatus = { enabled: boolean; asked: boolean; id: string | null; locked: string | null; sends: boolean; lastSent: string | null; pending: Record<string, number> };
+export type { UsageStatus, UpdatesStatus };
 
 /** Where the site says exactly what's sent, how long it's kept and how to have it deleted. */
 export const PRIVACY_URL = "https://brainstorm-landing.vercel.app/privacy.html#usage-stats";
@@ -41,8 +42,6 @@ export function useUsageSetting() {
     .catch(() => false), []);
   return { status, set, toggle, forget };
 }
-
-export type UpdatesStatus = { enabled: boolean; locked: string | null };
 
 /** "Tell me when there's a new version" (server updates/updates.service.ts): on by default, apart from the usage stats. */
 export function useUpdatesSetting() {

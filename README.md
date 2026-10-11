@@ -10,7 +10,7 @@ Rundown was called Brainstorm until October 2026 (the plugin was renamed in 0.5;
 
 AI agents make it easy to stop understanding your own work. Rundown runs next to Claude Code and shows what the agents did, where, and why, so a human stays in the loop. Every session becomes a replay you can watch live or catch up on later, for code and for work that isn't code.
 
-Rundown is a prototype (0.3). The full release is planned for late October 2026.
+Rundown is a preview (version 0.8.1). The full release is planned for late October 2026.
 
 ## Install (Claude Code plugin, preview)
 
@@ -34,21 +34,21 @@ Then start a new session in your project and run `/rundown:open`: the map opens 
 - **[brainstorm-next.vercel.app](https://brainstorm-next.vercel.app)**: a real recording of Claude Code agents (one lead and four subagents) building Rundown itself, played back. Open the thread to see what it touched, then its steps or its replay. Nothing to install.
 - **[brainstorm-landing.vercel.app](https://brainstorm-landing.vercel.app)**: what Rundown does, the roadmap, and the waitlist for the full release.
 
-![Map: a thread replaying, the agent's numbered path across the project's files, its steps in the sidebar](docs/screenshots/replay.jpg)
+<!-- TODO: new screenshot -->
 
 ## Run it from source
 
-For development, or to run it without the plugin. Needs Node 24, Claude Code and git. Nemotron and a Claude key are optional (without them: plain labels, no summaries, no Ask).
+For development, or to run it without the plugin. Needs Node.js 22.13 or later, Claude Code and git. A Claude API key is optional (without it: no Ask).
 
 ```bash
 git clone https://github.com/Djbrl/brainstorm.git && cd brainstorm
-cp app/.env.example app/.env   # set MAP_ROOT, SESSION_FILTER, ANTHROPIC_API_KEY, NEMOTRON_*
+cp app/.env.example app/.env   # optional: every line is a comment you can switch on. The project is chosen in the app, or with RUNDOWN_ROOT
 (cd app/server && npm install) && (cd app/web && npm install)
 cd app/server && npm run dev    # terminal 1: http://localhost:4000
 cd app/web && npm run dev       # terminal 2, from the repo root: http://localhost:5173
 ```
 
-Full guide, Brev setup and troubleshooting: [docs/run-locally.md](docs/run-locally.md). To build the plugin bundle yourself: `node app/scripts/build-plugin.mjs` from the repo root (details in [plugin/README.md](plugin/README.md)).
+Full guide and troubleshooting: [docs/run-locally.md](docs/run-locally.md). To build the plugin bundle yourself: `node app/scripts/build-plugin.mjs` from the repo root (details in [plugin/README.md](plugin/README.md)).
 
 ## What it does
 
@@ -56,20 +56,16 @@ Full guide, Brev setup and troubleshooting: [docs/run-locally.md](docs/run-local
 - **Map**: the project's modules and files as a graph. Files changed since you last looked stand out. Each agent is a marker that moves to the file it writes; an open thread adds its trail and its reads as short lines of sight. Replay any thread on the map, step by step. Hover or select a file to see what it imports and what uses it; click it for its summary, the steps that touched it, and a question box.
 - **Places**: where a thread went outside the code: websites, the apps you run on this computer, services (GitHub, Vercel, connectors, cloud CLIs), and what it changed there, from deploys and pushes to sent forms. Same screen as the Map; click a place to read the step in a side panel.
 - **Track**: the open thread's steps in the sidebar, next to the map, grouped by what you asked. Scrolling them moves the agent along the map; open a step for its diff, its output or the screenshots it took.
-- **Errors**: a failed tool call turns the agent's marker red with one red ring, and shows red in the steps (with the first line of the error), on the replay bar and in the Track. (At the hackathon, a separate Failures view grouped and ranked them.)
+- **Errors**: a failed tool call turns the agent's marker red with one red ring, and shows red in the steps (with the first line of the error), on the replay bar and in the Track.
 - **Share**: Share on the replay player (or `/rundown:share`) saves a thread as one `.html` file anyone can open in a browser, with nothing to install, and as a Markdown report for a review or a pull request. Secrets and emails are masked, your home folder and computer name hidden, and screenshots never included.
 - **Ask**: questions go to Claude with a small, grounded context (the step, its diff, the steps before it, the file and module summaries, at most 150 lines of the file). Every answer shows its model, tokens and cost.
 
 
 ## AI models
 
-- **Nemotron 3 Nano on NVIDIA Brev** (vLLM, one L40S) does the bulk work: a two-sentence summary of every file and module, and a label of at most 8 words for every agent step. See [docs/brev-setup.md](docs/brev-setup.md).
-- **Claude** answers questions, about $0.03 each. If Claude is unreachable, Nemotron answers instead.
+- **Claude** answers questions in Ask, about $0.03 each, with your own API key. Without a key, Ask is off.
+- File summaries and model-written step labels are off in the plugin. At the hackathon they came from Nemotron 3 Nano on NVIDIA Brev; that setup is gone, and they'll move to the Claude Code you already have (see the [roadmap](docs/roadmap.md)). The notes are in the [hackathon archive](docs/archive/hackathon/README.md).
 - Most features need no AI at all: the timeline, the graph, imports, git history and recency.
-
-Measured numbers: [docs/numbers.md](docs/numbers.md). Nemotron stress test: 81k lines of Hono summarized in 73 seconds for $0.02 of GPU time.
-
-That was the hackathon setup. The Brev instance is shut down now, so the plugin ships with summaries off; they'll move to the Claude Code you already have (see the [roadmap](docs/roadmap.md)).
 
 ## Privacy
 
@@ -95,22 +91,20 @@ The landing site that receives it adds the country from the request (two letters
 
 | | |
 | --- | --- |
-| [Technical documentation](docs/technical.md) | Architecture, modules, contract, API, storage, how each model is used, Failures algorithm, privacy |
-| [Run it on your machine](docs/run-locally.md) | Running from source, configuring, Nemotron on Brev, troubleshooting |
-| [How we built it](docs/how-we-built-it.md) | One human and several AI agents in parallel: who did what, timeline, problems and fixes |
+| [Technical documentation](docs/technical.md) | Architecture, modules, contract, API, storage, how each model is used, privacy |
+| [Run it on your machine](docs/run-locally.md) | Running from source, configuring, troubleshooting |
 | [Roadmap](docs/roadmap.md) | Product vision, packaging as a plugin, pricing ideas, decisions |
 | [Tasks and the Track](docs/tasks.md) | Following agents beyond code: how the Track is built, privacy |
 | [Plugin](plugin/README.md) | Install, updates, settings, what it stores, uninstall |
-| [What's next](docs/next-steps.md) | What we cut at the hackathon and how we'd build it, with size estimates |
-| [Measured numbers](docs/numbers.md) · [Brev setup log](docs/brev-setup.md) · [Build log](docs/build-log.md) | The raw record |
+| [Build log](docs/build-log.md) · [Hackathon archive](docs/archive/hackathon/README.md) | The raw record, and the notes from the hackathon day |
 
 ## The hackathon
 
-Rundown, then called Brainstorm, was built in about three hours on 27 September 2026 at GOMYCODE × NVIDIA "Come Build with AI", by one human and several AI agents working in parallel ([how we built it](docs/how-we-built-it.md)). The repo exactly as it stood at the 16:30 deadline is tagged [`hackathon-submission`](https://github.com/Djbrl/brainstorm/tree/hackathon-submission); everything after it is labeled `[post-deadline]` in the history.
+Rundown, then called Brainstorm, was built in about three hours on 27 September 2026 at GOMYCODE × NVIDIA "Come Build with AI", by one human and several AI agents working in parallel. The repo exactly as it stood at the 16:30 deadline is tagged [`hackathon-submission`](https://github.com/Djbrl/brainstorm/tree/hackathon-submission). The notes from that day are kept in [docs/archive/hackathon](docs/archive/hackathon/README.md).
 
 ## Known limits
 
-Claude Code only today (Codex is next). No file summaries or model-written step labels in the plugin yet. The history slider and pause/steer are not built yet; see the [to-do list](docs/todo.md) and the [roadmap](docs/roadmap.md).
+Works with Claude Code and Codex sessions. No file summaries or model-written step labels in the plugin yet. The history slider and pause/steer are not built yet; see the [to-do list](docs/todo.md) and the [roadmap](docs/roadmap.md).
 
 ## License
 

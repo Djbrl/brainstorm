@@ -93,7 +93,10 @@ export class AskService implements OnModuleInit {
       res = { answer: r.text, model: r.model, tokensIn: r.tokensIn, tokensOut: r.tokensOut, costUsd, fallback: false };
     } catch (e) {
       this.log.warn(`Claude failed: ${(e as Error).message}`);
-      const answer = this.cfg.claude.key ? "Could not reach Claude right now. Try again in a moment." : `To ask questions, add an Anthropic API key: run /plugin configure ${process.env.RUNDOWN_PLUGIN_ID || "rundown@rundown"} in Claude Code, then start a new session.`;
+      // Started by a skill (/rundown:open), which doesn't get the plugin's settings: a key may be set that this server didn't get.
+      const answer = this.cfg.claude.key ? "Could not reach Claude right now. Try again in a moment."
+        : process.env.RUNDOWN_NO_SETTINGS === "1" ? `Ask needs a restart to pick up your key: start a new Claude Code session. If you haven't added a key yet, run /plugin configure ${process.env.RUNDOWN_PLUGIN_ID || "rundown@rundown"} in Claude Code first.`
+        : `To ask questions, add an Anthropic API key: run /plugin configure ${process.env.RUNDOWN_PLUGIN_ID || "rundown@rundown"} in Claude Code, then start a new session.`;
       return { answer, model: "none", tokensIn: 0, tokensOut: 0, costUsd: 0, fallback: true };
     }
 

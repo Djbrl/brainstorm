@@ -174,6 +174,11 @@ async function start(port, lockToken) {
     RUNDOWN_PLUGIN_ID: `rundown@${MARKET}`, RUNDOWN_LOCK_TOKEN: lockToken ?? "",
   });
   if (KEY) env.ANTHROPIC_API_KEY = KEY;
+  // A skill has no plugin settings, so no key: the server says so if Ask is used, and the next hook (which has the
+  // settings) restarts it with the key (needsRestart).
+  env.RUNDOWN_NO_SETTINGS = SETTINGS ? "" : "1";
+  const n = readNotices();
+  if (!!n.startedWithoutSettings !== !SETTINGS) { if (SETTINGS) delete n.startedWithoutSettings; else n.startedWithoutSettings = true; writeNotices(n); }
   let died = null;
   const child = spawn(process.execPath, [SERVER], { cwd: DATA, env, detached: true, windowsHide: true, stdio: ["ignore", out, out] });
   child.on("error", (e) => { died = e.message; });
@@ -360,9 +365,11 @@ async function main() {
 }
 
 /** Whether the running server should be replaced by this launcher's: only by a newer version (an older launcher, still
- * loaded in another session, never restarts it), or, from the hook (which has the settings), for another key. */
+ * loaded in another session, never restarts it), or, from the hook (which has the settings), for another key, or when a
+ * skill started it without the settings and there is a key to give it. */
 const needsRestart = (run) => newer(VERSION, run.health.version) ||
-  (SETTINGS && run.health.version === VERSION && (keyHash(KEY, run.secret) ?? null) !== (run.health.anthropicKey ?? null));
+  (SETTINGS && run.health.version === VERSION && ((keyHash(KEY, run.secret) ?? null) !== (run.health.anthropicKey ?? null) ||
+    (!!KEY && !!readNotices().startedWithoutSettings)));
 
 /** The running server, started or restarted as needed: {port, health, secret} or {busy: true, port}, or null. */
 async function ensureRunning() {

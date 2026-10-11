@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gitEnv } from "./git-safety";
@@ -88,9 +88,69 @@ test("a copied repo's filters, diff drivers, includes, submodules and gpg progra
 });
 
 test("gitEnv keeps the person's own settings and adds the pins after them", () => {
-  const env = gitEnv(undefined, { LC_ALL: "C" });
-  assert.equal(env.LC_ALL, "C");
-  const n = Number(env.GIT_CONFIG_COUNT);
-  const keys = Array.from({ length: n }, (_, i) => env[`GIT_CONFIG_KEY_${i}`]);
-  assert.ok(keys.includes("core.fsmonitor") && keys.includes("log.showSignature"));
+  const env = gitEnv();
+  assert.equal(env.PATH, process.env.PATH);
+  assert.ok(keysOf(env).includes("core.fsmonitor") && keysOf(env).includes("log.showSignature"));
+  const tmp = realpathSync(mkdtempSync(join(tmpdir(), "rd-gitsafe-")));
+  try { assert.equal(gitEnv(tmp, { LC_ALL: "C" })?.LC_ALL, "C"); } finally { rmSync(tmp, { recursive: true, force: true }); } // not a repo: no pins
+});
+
+const keysOf = (env: NodeJS.ProcessEnv) => Array.from({ length: Number(env.GIT_CONFIG_COUNT) }, (_, i) => env[`GIT_CONFIG_KEY_${i}`]!);
+const pinsOf = (env: NodeJS.ProcessEnv | null) => {
+  assert.ok(env);
+  return Object.fromEntries(Array.from({ length: Number(env.GIT_CONFIG_COUNT) }, (_, i) => [env[`GIT_CONFIG_KEY_${i}`]!, env[`GIT_CONFIG_VALUE_${i}`]!]));
+};
+function scratchRepo() {
+  const tmp = realpathSync(mkdtempSync(join(tmpdir(), "rd-gitsafe-")));
+  const repo = join(tmp, "repo");
+  mkdirSync(join(repo, "src"), { recursive: true });
+  git(repo, "init", "-q", "-b", "main");
+  writeFileSync(join(repo, "src/a.ts"), "a\n"); git(repo, "add", "."); git(repo, "commit", "-qm", "one");
+  return { tmp, repo };
+}
+
+test("a config too big to read: no git runs there at all (fails closed)", async () => {
+  const { tmp, repo } = scratchRepo();
+  const marker = join(tmp, "marker");
+  try {
+    const prog = join(tmp, "run.sh");
+    writeFileSync(prog, `#!/bin/sh\necho ran >> "${marker}"\ncat\n`, { mode: 0o755 });
+    writeFileSync(join(repo, ".gitattributes"), "* filter=x\n");
+    // Enough driver entries that listing them is past what the server reads (16 MB), with the real one among them.
+    const pad = "p".repeat(200);
+    appendFileSync(join(repo, ".git/config"), `[filter "x"]\n\tclean = ${prog}\n` + Array.from({ length: 75_000 }, (_, i) => `[filter "d${i}"]\n\tclean = ${pad}\n`).join(""));
+    const t = new Date(Date.now() + 5000); utimesSync(join(repo, "src/a.ts"), t, t);
+    assert.equal(gitEnv(repo), null);
+    const svc = new GitService({ on() {}, emit() {} } as never, { broadcast() {} } as never, { listSessions: () => [] } as never, { status: () => ({ root: null }) } as never);
+    assert.equal(await svc.read(repo), null);                 // as if not a repo
+    assert.equal((await listProjectFiles(repo, 100)).source, "walk");
+    assert.equal(listProjectFilesSync(repo, 100).source, "walk");
+    assert.equal((await gitLastCommitTimes(repo, new Set(["src/a.ts"]))).times.size, 0);
+    assert.equal(existsSync(marker), false);
+  } finally { rmSync(tmp, { recursive: true, force: true }); }
+});
+
+test("a driver included only on some branch (includeIf onbranch:) is pinned once that branch is checked out", () => {
+  const { tmp, repo } = scratchRepo();
+  try {
+    git(repo, "branch", "evil");
+    writeFileSync(join(repo, ".git/evil.cfg"), `[filter "x"]\n\tclean = ${join(tmp, "run.sh")}\n`);
+    git(repo, "config", "includeIf.onbranch:evil.path", "evil.cfg");
+    assert.equal(pinsOf(gitEnv(repo))["filter.x.clean"], undefined);
+    git(repo, "-c", "filter.x.clean=cat", "checkout", "-q", "evil");
+    assert.equal(pinsOf(gitEnv(repo))["filter.x.clean"], "cat");
+  } finally { rmSync(tmp, { recursive: true, force: true }); }
+});
+
+test("a map root inside the repo: included files are found from the top of the repo, and their changes seen", () => {
+  const { tmp, repo } = scratchRepo();
+  try {
+    writeFileSync(join(tmp, "inc.cfg"), "");
+    git(repo, "config", "include.path", "../../inc.cfg");
+    const sub = join(repo, "src");
+    assert.equal(pinsOf(gitEnv(sub))["filter.y.clean"], undefined);
+    writeFileSync(join(tmp, "inc.cfg"), `[filter "y"]\n\tclean = evil\n`);
+    utimesSync(join(tmp, "inc.cfg"), new Date(Date.now() + 2000), new Date(Date.now() + 2000));
+    assert.equal(pinsOf(gitEnv(sub))["filter.y.clean"], "cat");
+  } finally { rmSync(tmp, { recursive: true, force: true }); }
 });

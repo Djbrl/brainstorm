@@ -2,7 +2,7 @@
 // It stops as soon as every wanted file has a time, and in any case after `maxCommits` commits or `timeoutMs`,
 // so a repo with a long history never blocks the server or fills memory.
 import { execFileSync, spawn } from "node:child_process";
-import { gitEnv } from "../core/git-safety";
+import { gitEnvOrThrow } from "../core/git-safety";
 
 export type GitTimesOptions = { maxCommits?: number; timeoutMs?: number };
 
@@ -31,7 +31,7 @@ export function recentCommitTimes(root: string, n = 1000, timeoutMs = 5000): Pro
   return new Promise((resolveP) => {
     const parser = new GitLogParser();
     let child;
-    try { child = spawn("git", RECENT_ARGS(root, n), { stdio: ["ignore", "pipe", "ignore"], windowsHide: true, timeout: timeoutMs, env: gitEnv(root) }); } catch { return resolveP(parser.times); }
+    try { child = spawn("git", RECENT_ARGS(root, n), { stdio: ["ignore", "pipe", "ignore"], windowsHide: true, timeout: timeoutMs, env: gitEnvOrThrow(root) }); } catch { return resolveP(parser.times); }
     let rest = "";
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk: string) => {
@@ -47,7 +47,7 @@ export function recentCommitTimes(root: string, n = 1000, timeoutMs = 5000): Pro
 export function recentCommitTimesSync(root: string, n = 1000, timeoutMs = 5000): Map<string, number> {
   const parser = new GitLogParser();
   try {
-    const out = execFileSync("git", RECENT_ARGS(root, n), { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"], timeout: timeoutMs, windowsHide: true, env: gitEnv(root) });
+    const out = execFileSync("git", RECENT_ARGS(root, n), { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"], timeout: timeoutMs, windowsHide: true, env: gitEnvOrThrow(root) });
     for (const l of out.split("\n")) parser.line(l);
   } catch { /* not a repo, no commits yet, or no git */ }
   return parser.times;
@@ -62,7 +62,7 @@ export function gitLastCommitTimes(root: string, wanted: Set<string>, opts: GitT
   return new Promise((resolveP) => {
     let child;
     try {
-      child = spawn("git", ["-C", root, "-c", "core.quotepath=off", "log", "--no-show-signature", `--max-count=${maxCommits}`, "--name-only", "--format=%x01%ct"], { stdio: ["ignore", "pipe", "pipe"], windowsHide: true, env: gitEnv(root) });
+      child = spawn("git", ["-C", root, "-c", "core.quotepath=off", "log", "--no-show-signature", `--max-count=${maxCommits}`, "--name-only", "--format=%x01%ct"], { stdio: ["ignore", "pipe", "pipe"], windowsHide: true, env: gitEnvOrThrow(root) });
     } catch (e) { return resolveP({ times: parser.times, commits: 0, complete: false, error: (e as Error).message }); }
     let rest = "", stderr = "", settled = false, stoppedEarly = false;
     const finish = (error?: string) => {

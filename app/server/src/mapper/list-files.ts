@@ -5,7 +5,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { readdirSync, statSync, type Dirent } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { gitEnv } from "../core/git-safety";
+import { gitEnvOrThrow } from "../core/git-safety";
 import { isIgnoredDirName, isMappableRel, isSourceName } from "./ignore";
 import { recentCommitTimes, recentCommitTimesSync } from "./git-times";
 
@@ -64,7 +64,7 @@ function listing(cand: Candidates, source: Listing["source"], changedAt?: Map<st
 function gitCandidates(root: string): Promise<Candidates | null> {
   return new Promise((resolveP) => {
     let child;
-    try { child = spawn("git", LS_ARGS(root), { stdio: ["ignore", "pipe", "ignore"], windowsHide: true, env: gitEnv(root) }); } catch { return resolveP(null); }
+    try { child = spawn("git", LS_ARGS(root), { stdio: ["ignore", "pipe", "ignore"], windowsHide: true, env: gitEnvOrThrow(root) }); } catch { return resolveP(null); }
     const acc = { rels: [] as string[], tracked: new Set<string>(), total: 0 };
     let rest = "";
     child.stdout.setEncoding("utf8");
@@ -83,7 +83,7 @@ function gitCandidates(root: string): Promise<Candidates | null> {
 
 function gitCandidatesSync(root: string): Candidates | null {
   try {
-    const out = execFileSync("git", LS_ARGS(root), { encoding: "utf8", maxBuffer: 512 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"], timeout: 30_000, windowsHide: true, env: gitEnv(root) });
+    const out = execFileSync("git", LS_ARGS(root), { encoding: "utf8", maxBuffer: 512 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"], timeout: 30_000, windowsHide: true, env: gitEnvOrThrow(root) });
     const acc = { rels: [] as string[], tracked: new Set<string>(), total: 0 };
     parseLsFiles(out.split("\0"), acc);
     return acc.total ? acc : null;
@@ -196,7 +196,7 @@ export function gitIgnored(root: string, rels: string[]): Promise<Set<string>> {
     const out = new Set<string>();
     if (!rels.length) return resolveP(out);
     let child;
-    try { child = spawn("git", ["-C", root, "check-ignore", "-z", "--stdin"], { stdio: ["pipe", "pipe", "ignore"], windowsHide: true, env: gitEnv(root) }); } catch { return resolveP(out); }
+    try { child = spawn("git", ["-C", root, "check-ignore", "-z", "--stdin"], { stdio: ["pipe", "pipe", "ignore"], windowsHide: true, env: gitEnvOrThrow(root) }); } catch { return resolveP(out); }
     let buf = "";
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (d: string) => { buf += d; });

@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import type { GitFileState, GitState, GitWorktree, Step } from "../types";
 import { BusService } from "../core/bus.service";
 import { EventsGateway } from "../core/events.gateway";
-import { gitEnv } from "../core/git-safety";
+import { gitEnvOrThrow } from "../core/git-safety";
 import { ListenerService } from "../listener/listener.service";
 import { WorkspaceService } from "../workspace/workspace.service";
 
@@ -100,7 +100,7 @@ export class GitService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async git(args: string[], cwd: string): Promise<string> {
-    const { stdout } = await run("git", ["--no-optional-locks", ...args], { cwd, maxBuffer: 64 * 1024 * 1024, timeout: 15_000, env: gitEnv(cwd, { GIT_OPTIONAL_LOCKS: "0", LC_ALL: "C" }) });
+    const { stdout } = await run("git", ["--no-optional-locks", ...args], { cwd, maxBuffer: 64 * 1024 * 1024, timeout: 15_000, env: gitEnvOrThrow(cwd, { GIT_OPTIONAL_LOCKS: "0", LC_ALL: "C" }) });
     return stdout;
   }
 

@@ -116,3 +116,19 @@
 :root:is([data-theme="prism"], [data-theme="hologram"]) .sn-scroll i { background: var(--hover-2); }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .pip-grab i { background: var(--hover-2); }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .sidebar-collapsed .pip-bar { background: var(--hover-2); }
+
+/* The live dots' pulse (a thread working: blue; one waiting on you: amber, breathing): a ring on its own layer that
+   swells and fades, animated by transform and opacity, which the compositor runs without the main thread. They used to
+   animate a box-shadow: the dot, and the blurred sheet under it, repainted every frame for as long as a thread ran
+   (about 8% of a slow laptop's main thread for two dots). */
+:is(.sn-m.working b, .sidebar-file-active, .sidebar-thread-status.running, .track-back-live i, .file-view-live i, .threadbar-dot.running,
+  .sidebar-thread-status.waiting, .threadbar-dot.waiting, .rp-waiting.blocked > b) { position: relative; }
+:is(.sn-m.working b, .sidebar-file-active, .sidebar-thread-status.running, .track-back-live i, .file-view-live i, .threadbar-dot.running)::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%; background: rgba(37,99,235,.5); pointer-events: none;
+  animation: live-ring 1.6s ease-out infinite; will-change: transform, opacity; }
+:is(.sidebar-thread-status.waiting, .threadbar-dot.waiting, .rp-waiting.blocked > b)::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%; background: rgba(245,158,11,.55); pointer-events: none;
+  animation: waiting-ring 1.8s ease-out infinite; will-change: transform, opacity; }
+@keyframes live-ring { from { transform: scale(1); opacity: 1; } to { transform: scale(3.2); opacity: 0; } }
+@keyframes waiting-ring { 0% { transform: scale(1); opacity: 1; } 70% { transform: scale(2.8); opacity: 0; } 100% { transform: scale(2.8); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { :is(.sn-m.working b, .sidebar-file-active, .sidebar-thread-status.running, .track-back-live i, .file-view-live i, .threadbar-dot.running, .sidebar-thread-status.waiting, .threadbar-dot.waiting, .rp-waiting.blocked > b)::after { animation: none; opacity: 0; } }

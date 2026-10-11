@@ -6,6 +6,7 @@ import { clock } from "../lib/live";
 import { attentionText, needsYou } from "../lib/attention";
 import { agentAlpha, DIM, visibleAgents, type AgentAnim } from "./agents";
 import { mapStyle, tripMs } from "./themes";
+import { Motion } from "./redraw";
 
 
 export function useLiveAgents({ agents: live, attention, hiddenAgents, threadId }: {
@@ -35,17 +36,21 @@ export function useLiveAgents({ agents: live, attention, hiddenAgents, threadId 
   const anim = useRef(new Map<string, AgentAnim>());
   const keepRef = useRef(!!threadId); keepRef.current = !!threadId;
 
-  /** Whether the live agents are still moving: a glide, a fade, a read's line, a pulse, a red flash, a wait's breath. */
-  const moving = useCallback((t: number) => {
+  /** Whether the live agents are still moving on the canvas: a glide, a fade, a read's line, a pulse, a red flash. Not
+   *  the rings of one thinking or waiting on you: they breathe in the page over the map (MapView's AgentRings, a CSS
+   *  animation), and the map rests. Drawn on the canvas they repainted the whole map every frame for as long as an
+   *  agent thought, up to 5 minutes a pause: 35–42% of a slow laptop's main thread on a 5,000-file map. */
+  const moving = useCallback((t: number): Motion => {
     const now = clock(), route = mapStyle().route;
     for (const a of agentsRef.current) {
       const st = anim.current.get(a.id);
       if (!st) continue;   // not on the map (its file isn't a node)
-      if (t - st.t0 < tripMs(route, 650) + 50 || st.flashes.length || t - st.pulseT0 < 700 || t - st.errT0 < 2600 || waitingRef.current.has(a.id) || thinkingRef.current.has(a.id) || st.easing) return true;
-      const target = agentAlpha(a, now, waitingRef.current.has(a.id) || thinkingRef.current.has(a.id), keepRef.current) * (dimmedRef.current.has(a.id) ? DIM : 1);
-      if (Math.abs(target - st.alpha) > 0.01) return true;
+      if (t - st.t0 < tripMs(route, 650) + 50 || st.flashes.length || t - st.pulseT0 < 700 || t - st.errT0 < 2600 || st.easing) return Motion.Smooth;
+      const ring = waitingRef.current.has(a.id) || thinkingRef.current.has(a.id);
+      const target = agentAlpha(a, now, ring, keepRef.current) * (dimmedRef.current.has(a.id) ? DIM : 1);
+      if (Math.abs(target - st.alpha) > 0.01) return Motion.Smooth;
     }
-    return false;
+    return Motion.None;
   }, []);
 
   return { agents, drawnAgents, waiting, waitingRef, thinkingRef, agentsRef, anim, moving, dimmedRef };

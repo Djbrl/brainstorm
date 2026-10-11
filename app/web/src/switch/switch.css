@@ -40,8 +40,8 @@
 .threadbar-close svg { width: 12px; height: 12px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; fill: none; }
 
 .threadbar-dot { width: 7px; height: 7px; border-radius: 50%; background: transparent; flex: none; } /* at rest: no dot, only its room */
-.threadbar-dot.running { background: var(--accent); animation: sidebar-pulse 1.6s infinite; }
-.threadbar-dot.waiting { background: #f59e0b; animation: attn-breathe 1.8s infinite; }
+.threadbar-dot.running { background: var(--accent); }
+.threadbar-dot.waiting { background: #f59e0b; }
 @media (prefers-reduced-motion: reduce) { .threadbar-dot.running, .threadbar-dot.waiting { animation: none; } }
 
 .threadbar-find { flex: none; display: flex; align-items: center; gap: 8px; border: 0; background: none; padding: 6px 10px;

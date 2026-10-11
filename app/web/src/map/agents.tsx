@@ -52,6 +52,9 @@ export function agentAlpha(a: AgentPresence, now: number, busy: boolean, keep: b
 // Writes are movement: the marker sits on the last file the agent changed and glides there on each edit/write,
 // and its trail links only write positions. Reads are a line of sight: the marker stays put and a thin line to
 // the file read fades out. A step with no file (a search or a command) is a short pulse on the marker.
+/** A breathing ring for the page to draw over the map: where (CSS pixels on the canvas), whose colour, how strong. */
+export type AgentRing = { id: string; kind: "think" | "wait"; x: number; y: number; color: string; alpha: number };
+
 export type AgentAnim = {
   x: number; y: number; fromX: number; fromY: number; t0: number; file: string; alpha: number;
   seen: Set<string>; seeded: boolean;           // trail entries already accounted for (no flash on first sight)
@@ -134,8 +137,14 @@ export function drawAgents(opts: {
   keep?: boolean;
   /** Agents in the background (you look back through the thread, or at another agent of it): drawn faint. */
   dimmed?: ReadonlySet<string>;
+  /** Filled with the rings that breathe (thinking, waiting on you), in CSS pixels on the canvas: the page draws them
+   *  over the map (MapView's AgentRings, CSS animations), so a breath doesn't repaint the whole map. */
+  rings?: AgentRing[];
 }) {
-  const { ctx, scale, agents, anim, resolve, accent, hoverFile, followId, resolveId, showReads, quiet, waiting, thinking, keep, dimmed } = opts;
+  const { ctx, scale, agents, anim, resolve, accent, hoverFile, followId, resolveId, showReads, quiet, waiting, thinking, keep, dimmed, rings } = opts;
+  // Graph point → CSS pixel on the canvas (its transform is in device pixels).
+  const m = ctx.getTransform(), dpr = ctx.canvas.width / Math.max(1, ctx.canvas.clientWidth);
+  const onScreen = (x: number, y: number) => ({ x: (m.a * x + m.c * y + m.e) / dpr, y: (m.b * x + m.d * y + m.f) / dpr });
   const t = performance.now();
   const now = clock();
   const style = mapStyle(), font = style.marker === "badge" ? style.labelFont ?? opts.font : opts.font;   // Metro names agents in its own type
@@ -291,22 +300,29 @@ export function drawAgents(opts: {
       // The trip under way: Prism's afterimages behind.
       if (trip) drawTrip(ctx, style.route, trip, p, e, color, 9 / scale, st.alpha, scale);
 
-      // Thinking: a slow ring in its colour, swelling and fading, until its next step.
+      // Thinking: a slow ring in its colour, swelling and fading, until its next step. Waiting on you: an amber ring that
+      // breathes, as long as it waits. Both breathe in the page over the map (`rings`), or here when nobody takes them.
+      const at = rings && (st.thinkA > 0.01 || st.waitA > 0.01) ? onScreen(st.x, st.y) : null;
       if (st.thinkA > 0.01) {
-        const b = (t % THINK_MS) / THINK_MS;
-        ctx.globalAlpha = st.alpha * st.thinkA * Math.sin(b * Math.PI) * 0.7;
-        ctx.beginPath(); ctx.arc(st.x, st.y, (11 + b * 9) / scale, 0, Math.PI * 2);
-        ctx.strokeStyle = color; ctx.lineWidth = 2 / scale; ctx.stroke();
+        if (at) rings!.push({ id: a.id, kind: "think", x: at.x, y: at.y, color, alpha: st.alpha * st.thinkA });
+        else {
+          const b = (t % THINK_MS) / THINK_MS;
+          ctx.globalAlpha = st.alpha * st.thinkA * Math.sin(b * Math.PI) * 0.7;
+          ctx.beginPath(); ctx.arc(st.x, st.y, (11 + b * 9) / scale, 0, Math.PI * 2);
+          ctx.strokeStyle = color; ctx.lineWidth = 2 / scale; ctx.stroke();
+        }
         ctx.globalAlpha = st.alpha;
       }
 
-      // Waiting on you: an amber ring that breathes, as long as it waits.
       const waitLabel = waiting?.get(a.id);
       if (st.waitA > 0.01) {
-        const b = (t % WAIT_MS) / WAIT_MS;
-        ctx.globalAlpha = st.alpha * st.waitA * (1 - b) * 0.9;
-        ctx.beginPath(); ctx.arc(st.x, st.y, (11 + b * 16) / scale, 0, Math.PI * 2);
-        ctx.strokeStyle = WAIT_AMBER; ctx.lineWidth = 2.6 / scale; ctx.stroke();
+        if (at) rings!.push({ id: a.id, kind: "wait", x: at.x, y: at.y, color: WAIT_AMBER, alpha: st.alpha * st.waitA });
+        else {
+          const b = (t % WAIT_MS) / WAIT_MS;
+          ctx.globalAlpha = st.alpha * st.waitA * (1 - b) * 0.9;
+          ctx.beginPath(); ctx.arc(st.x, st.y, (11 + b * 16) / scale, 0, Math.PI * 2);
+          ctx.strokeStyle = WAIT_AMBER; ctx.lineWidth = 2.6 / scale; ctx.stroke();
+        }
         ctx.globalAlpha = st.alpha * st.waitA;
         ctx.beginPath(); ctx.arc(st.x, st.y, 12 / scale, 0, Math.PI * 2);
         ctx.strokeStyle = WAIT_AMBER; ctx.lineWidth = 2.2 / scale; ctx.stroke();

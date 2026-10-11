@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { protectGit } from "./core/git-safety";
 protectGit(); // before anything runs git
 import { join, resolve } from "node:path";
-import { chmodSync, existsSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { NestFactory } from "@nestjs/core";
 import { WsAdapter } from "@nestjs/platform-ws";
 import type { NestExpressApplication } from "@nestjs/platform-express";
@@ -52,9 +52,26 @@ async function bootstrap() {
   if (env("DATA_DIR")) {
     // 0600: the secret lets the launcher and the hooks check they talk to this server, not something else on the port.
     const state = join(dataDir(), "server.json");
-    writeFileSync(state, JSON.stringify({ pid: process.pid, port, version, startedAt: new Date().toISOString(), secret: SECRET }), { mode: 0o600 });
+    const mine = { pid: process.pid, port, version, startedAt: new Date().toISOString(), secret: SECRET };
+    writeFileSync(state, JSON.stringify(mine), { mode: 0o600 });
     chmodSync(state, 0o600); // the mode above only applies to a new file
     rmSync(join(dataDir(), "launch.lock"), { force: true }); // up: the launcher that started us is done
+    // One server per data folder. If server.json names another one that's alive, a launcher started it beside us
+    // (we were too busy to answer it): it's the one everyone finds now, so we go, instead of running on untracked
+    // on the same database. If it names a dead one, we're the server again.
+    const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; } };
+    setInterval(() => {
+      let st: { pid?: number } | null = null;
+      try { st = JSON.parse(readFileSync(state, "utf8")); } catch { return; }   // gone: /rundown:stop is stopping us anyway
+      if (!st?.pid || st.pid === process.pid) return;
+      if (alive(st.pid)) {
+        console.log(`Another Rundown (pid ${st.pid}) took over ${dataDir()}: stopping this one (pid ${process.pid}).`);
+        setTimeout(() => process.exit(0), 3000).unref();
+        void app.close().finally(() => process.exit(0));
+        return;
+      }
+      try { writeFileSync(state, JSON.stringify(mine), { mode: 0o600 }); } catch { /* next minute */ }
+    }, 60_000).unref();
   }
   console.log(`Rundown ${version} on http://localhost:${port}  (api /api, ws /ws)`);
 }

@@ -50,7 +50,7 @@
 .sn-m.fl b { background: var(--risk); }
 .sn-m em { flex: none; font-style: normal; font-size: 12px; font-weight: 600; color: #b3261e; }
 .sn-m.current { background: var(--accent-soft); color: var(--ink); }
-.sn-m.working b { background: var(--accent); animation: sidebar-pulse 1.6s infinite; }   /* the newest moment, while the thread works */
+.sn-m.working b { background: var(--accent); }   /* the newest moment, while the thread works */
 .sn-m.done.d1 { opacity: .62; }
 .sn-m.done.d2 { opacity: .3; }
 .sn-m.done.d3 { opacity: .18; }
@@ -156,16 +156,15 @@
 .sidebar-file-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--cool); }
 .sidebar-file-dot.hot { background: var(--hot); }
 .sidebar-file-dot.warm { background: var(--warm); }
-.sidebar-file-active { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; box-shadow: 0 0 0 0 rgba(37,99,235,.5); animation: sidebar-pulse 1.6s infinite; }
+.sidebar-file-active { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
 .sidebar-tree-touched { flex: none; font-size: 11px; color: var(--accent); white-space: nowrap; }
-@keyframes sidebar-pulse { 0% { box-shadow: 0 0 0 0 rgba(37,99,235,.5); } 100% { box-shadow: 0 0 0 8px rgba(37,99,235,0); } }
 
 
 /* Threads: click to open (its Track). The open one is a pill; a running one pulses blue. */
 button.sidebar-thread-head { width: calc(100% + 16px); border: 0; background: transparent; padding: 7px 8px; margin: -7px -8px; border-radius: 10px; text-align: left; color: var(--ink); cursor: pointer; box-sizing: border-box; }
 button.sidebar-thread-head:hover { background: #f4f4f7; }
 .sidebar-thread.selected button.sidebar-thread-head { background: var(--accent-soft); }
-.sidebar-thread-status.running { background: var(--accent); box-shadow: 0 0 0 0 rgba(37,99,235,.55); animation: sidebar-pulse 1.6s infinite; }
+.sidebar-thread-status.running { background: var(--accent); }
 .sidebar-thread-head time { font-variant-numeric: tabular-nums; }
 
 /* The sidebar takes the map's height but a margin (Map, Places). */
@@ -197,8 +196,7 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .sidebar-more:hover { background: #f4f4f7; }
 
 /* Waiting on you (attention): an amber dot that breathes, and a badge in place of the worktree name. */
-.sidebar-thread-status.waiting { background: #f59e0b; box-shadow: 0 0 0 0 rgba(245,158,11,.55); animation: attn-breathe 1.8s infinite; }
-@keyframes attn-breathe { 0% { box-shadow: 0 0 0 0 rgba(245,158,11,.55); } 70% { box-shadow: 0 0 0 7px rgba(245,158,11,0); } 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); } }
+.sidebar-thread-status.waiting { background: #f59e0b; }
 .sidebar-thread-attn { flex: none; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
 .sidebar-thread-attn.blocked { background: #fff4e0; color: #9a5800; }
 .sidebar-thread-attn.turn { background: color-mix(in srgb, var(--ink-3) 18%, transparent); color: var(--ink-2); font-weight: 600; } /* readable in every theme */
@@ -285,7 +283,7 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
   padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(0,0,0,.10);
   font-size: 13px; color: var(--ink-2); animation: back-live-in .22s cubic-bezier(.2,.8,.2,1); }
 .track-back-live > span { display: flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.track-back-live i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: sidebar-pulse 1.6s infinite; }
+.track-back-live i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .track-back-live button { flex: none; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font-size: 12.5px; font-weight: 600; padding: 6px 12px; }
 .track-back-live button:hover { filter: brightness(1.08); }
 @keyframes back-live-in { from { opacity: 0; transform: translateY(8px); } }
@@ -316,7 +314,7 @@ button.sidebar-thread-head:hover { background: #f4f4f7; }
 .file-view-git { display: flex; align-items: center; gap: 10px; margin: 10px 0 0; color: var(--ink-2); font-size: 13.5px; }
 .file-view-git i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .file-view-live { display: flex; align-items: center; gap: 10px; margin: 14px 0 0; color: var(--accent); font-weight: 500; font-size: 14px; }
-.file-view-live i { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--accent); box-shadow: 0 0 0 0 rgba(37,99,235,.5); animation: sidebar-pulse 1.6s infinite; }
+.file-view-live i { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--accent); }
 .file-view section { margin-top: 28px; }
 .file-view h3 { font-size: 15.5px; font-weight: 700; margin: 0 0 9px; }
 .file-view-summary { margin: 0; font-size: 15px; line-height: 1.55; color: var(--ink); }

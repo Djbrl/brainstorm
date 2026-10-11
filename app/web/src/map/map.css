@@ -70,3 +70,17 @@
 .map-cap button:hover { background: var(--hover, rgba(0,0,0,.05)); color: var(--ink); }
 .map-sparse { position: absolute; top: 132px; left: 50%; transform: translateX(-50%); margin: 0; z-index: 2; pointer-events: none;
   font-size: 14px; color: var(--ink-3); white-space: nowrap; }
+
+/* Agents' breathing rings (agents.tsx hands them over, MapView's syncRings places them): over the canvas, animated by
+   CSS, so a thinking pause doesn't repaint the map. Thinking: a ring in the agent's colour swelling from 11 to 20 px
+   and fading, every 2.4 s. Waiting on you: an amber ring from 11 to 27 px, fading out, every 1.8 s (its steady ring
+   stays on the canvas). Under the floating panels. */
+.agent-rings { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+.agent-ring { position: absolute; left: 0; top: 0; width: 0; height: 0; transition: opacity .2s; }
+.agent-ring::before { content: ""; position: absolute; left: -11px; top: -11px; width: 22px; height: 22px; border-radius: 50%;
+  box-sizing: border-box; will-change: transform, opacity; }
+.agent-ring.think::before { border: 2px solid var(--c); animation: agent-think 2.4s linear infinite; }
+.agent-ring.wait::before { border: 2.6px solid var(--c); animation: agent-wait 1.8s linear infinite; }
+@keyframes agent-think { 0% { transform: scale(1); opacity: 0; } 50% { opacity: .7; } 100% { transform: scale(1.82); opacity: 0; } }
+@keyframes agent-wait { 0% { transform: scale(1); opacity: .9; } 100% { transform: scale(2.45); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .agent-ring::before { animation: none; opacity: .5; } }

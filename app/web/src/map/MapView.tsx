@@ -9,7 +9,7 @@ import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-for
 import type { FileNode, ProjectMap } from "@contract";
 import { useLive } from "../lib/live";
 import { mapPrefs, useNav } from "../lib/nav";
-import { drawAgents } from "./agents";
+import { drawAgents, type AgentRing } from "./agents";
 import { MapSidebar } from "./sidebar/MapSidebar";
 import { Dock } from "./replay/ReplayBar";
 import { Peek } from "./replay/Peek";
@@ -120,6 +120,7 @@ export function MapView() {
   const selectedRef = useRef(selected); selectedRef.current = selected;
   const space = useRef(new LabelSpace());         // taken this frame: files, replay badges, folder names, file names
   const markedRef = useRef<string | null>(null);  // the file the replay's marker names this frame
+  const ringLayer = useRef<HTMLDivElement>(null), ringsOut = useRef<AgentRing[]>([]);   // agents' breathing rings (syncRings)
   // Every file and folder by id (a folder's ends in "/").
   const nodeIndex = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n])), [graph.nodes]);
   const nodeIndexRef = useRef(nodeIndex); nodeIndexRef.current = nodeIndex;
@@ -428,9 +429,10 @@ export function MapView() {
     drawAgents({
       ctx, scale, agents: agentsRef.current, anim: anim.current, accent: tokens.accent, font: tokens.body,
       hoverFile: hoverRef.current, followId: followRef.current, resolveId, showReads: mapPrefs.showReads, quiet: !openRef.current, waiting: waitingRef.current,
-      thinking: thinkingRef.current, keep: openRef.current, dimmed: dimmedRef.current,
+      thinking: thinkingRef.current, keep: openRef.current, dimmed: dimmedRef.current, rings: ringsOut.current = [],
       resolve: (id) => { const n = nodeIndexRef.current.get(id); return n && n.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y, r: n.r } : undefined; },
     });
+    syncRings(ringLayer.current, ringsOut.current);
   }, [resolveId]);
 
   const endFrame = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
@@ -444,8 +446,9 @@ export function MapView() {
     // What still moves decides whether the next frame comes (redraw.ts).
     if (Math.abs(F.lookSum - lastLookSum.current) > 1e-6) moreMotion(F, Motion.Smooth);   // files easing into or out of a focus
     lastLookSum.current = F.lookSum;
-    if (agentsMoving(F.t) || (replayRef.current.tracing && replayRef.current.active && playingRef.current)) moreMotion(F, Motion.Smooth);
-    else if (replayRef.current.thinking && replayRef.current.tracing) moreMotion(F, Motion.Slow);   // the marker's thinking ring
+    const am = agentsMoving(F.t);
+    if (am === Motion.Smooth || (replayRef.current.tracing && replayRef.current.active && playingRef.current)) moreMotion(F, Motion.Smooth);
+    else if (replayRef.current.thinking && replayRef.current.tracing) moreMotion(F, Motion.Slow);   // the replay marker's thinking ring
     redraw.drew(F.motion);
   }, [drawModules, drawAgentLayer, redraw]);
 
@@ -565,6 +568,8 @@ export function MapView() {
           enablePointerInteraction={false}
         />
       )}
+      {/* Agents' breathing rings (thinking, waiting on you), over the canvas: CSS animates them, the map rests. */}
+      <div className="agent-rings" ref={ringLayer} aria-hidden="true" />
 
 
       <MapSidebar agents={agents} accent={tokens.accent} followId={followId}
@@ -608,4 +613,22 @@ function CapNote({ map }: { map: ProjectMap }) {
       <button onClick={close} aria-label="Close this note">×</button>
     </p>
   );
+}
+
+/** Puts the agents' breathing rings where the frame just drew them (one element per agent and kind, kept between frames
+ *  so its CSS animation runs on): only their place and strength change, on a frame the map draws anyway. */
+function syncRings(layer: HTMLDivElement | null, rings: AgentRing[]) {
+  if (!layer) return;
+  const seen = new Set<string>();
+  for (const r of rings) {
+    const key = `${r.kind}:${r.id}`;
+    seen.add(key);
+    let el = layer.querySelector<HTMLElement>(`[data-ring="${CSS.escape(key)}"]`);
+    if (!el) { el = document.createElement("i"); el.dataset.ring = key; el.className = `agent-ring ${r.kind}`; layer.appendChild(el); }
+    const tr = `translate(${r.x.toFixed(1)}px, ${r.y.toFixed(1)}px)`, op = r.alpha.toFixed(2);
+    if (el.style.transform !== tr) el.style.transform = tr;
+    if (el.style.opacity !== op) el.style.opacity = op;
+    if (el.style.getPropertyValue("--c") !== r.color) el.style.setProperty("--c", r.color);
+  }
+  for (const el of [...layer.children] as HTMLElement[]) if (!seen.has(el.dataset.ring ?? "")) el.remove();
 }

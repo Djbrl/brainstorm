@@ -61,10 +61,10 @@ function nodeOk() {
 
 /** What answers on `port`. With the server's secret, `verified` says it proved it knows it: it's the Rundown we
  * started, not some other program that took the port after it stopped. */
-async function health(port, secret) {
+async function health(port, secret, ms = 800) {
   try {
     const challenge = randomBytes(16).toString("hex");
-    const r = await fetch(`http://127.0.0.1:${port}/api/health?challenge=${challenge}`, { signal: AbortSignal.timeout(800) });
+    const r = await fetch(`http://127.0.0.1:${port}/api/health?challenge=${challenge}`, { signal: AbortSignal.timeout(ms) });
     if (!r.ok) return null;
     const h = await r.json();
     if (secret) h.verified = h.proof === createHmac("sha256", secret).update(`health:${challenge}`).digest("hex");
@@ -82,13 +82,23 @@ function readState() {
 async function running() {
   const st = readState();
   if (!st?.port) return null;
-  const h = await health(st.port, st.secret);
-  if (!h || (st.secret ? !h.verified : h.pid !== st.pid)) return null;
+  let h = await health(st.port, st.secret);
+  // No answer in 800 ms, but its process is alive and its port taken: most likely busy (reading a long history, mapping
+  // a big project), not gone. Ask again with more patience before anyone starts a second server beside it: that used to
+  // happen, the new one took over server.json and the old one ran on untracked, on the same database.
+  if (!h && (await busy(st))) for (let t = 0; !h && t < (BACKGROUND ? 3_000 : 12_000); t += 3_000) h = await health(st.port, st.secret, 3_000);
+  if (!h) return (await busy(st)) ? { port: st.port, health: null, secret: st.secret, pid: st.pid, busy: true } : null;
+  if (st.secret ? !h.verified : h.pid !== st.pid) return null;
   return { port: st.port, health: h, secret: st.secret };
 }
 
+/** Whether a process is alive (signal 0 only checks). */
+const alive = (pid) => { if (!pid) return false; try { process.kill(pid, 0); return true; } catch (e) { return e.code === "EPERM"; } };
+/** server.json's process is alive and something holds its port: a server too busy to answer, most likely ours. */
+const busy = async (st) => alive(st.pid) && !(await portFree(st.port));
+
 async function stop(run) {
-  try { process.kill(run.health.pid, "SIGTERM"); } catch { /* already gone */ }
+  try { process.kill(run.health?.pid ?? run.pid, "SIGTERM"); } catch { /* already gone */ }
   for (let i = 0; i < 30 && (await health(run.port)); i++) await sleep(100);
   rmSync(STATE, { force: true });
   rmSync(LOCK, { force: true }); // whatever start it guarded is over
@@ -224,6 +234,11 @@ async function main() {
 
   // A different plugin version (after an update) or a new API key: restart so the running server matches.
   // Only a launcher that has a key compares keys (the skills don't receive plugin settings, the hook does).
+  // A server too busy to answer is left alone: it's up, and it will answer (a restart for a new version waits for the next session).
+  if (run?.busy) {
+    if (BACKGROUND) return tellUser(await notices(run.port));
+    return say(`Rundown is busy (still reading, it doesn't answer yet) on http://localhost:${run.port}/. Try again in a moment, or run /rundown:stop and open it again.`);
+  }
   if (run && (run.health.version !== VERSION || (KEY && run.health.anthropicKey !== keyHash(KEY, run.secret)))) {
     await stop(run);
     run = null;

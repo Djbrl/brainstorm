@@ -134,7 +134,11 @@ cores: read wall times as rough), plus profiles of the production build on the 5
   about 1 ms a second). JS heap 9–18 MB at rest, 40–95 MB with the 10k thread open and replaying.
 - **Web, an agent "Thinking…":** the map repaints every frame for the ring, up to 5 minutes per pause
   (`THINKING_MAX_MS`): 11% of the main thread at 1× on 5k–20k files, 35–42% at 4× (the benchmark's "rest" window, right
-  after its live writer stops mid-turn). Five minutes later it falls back to the 5% above. The biggest cost left.
+  after its live writer stops mid-turn). Five minutes later it falls back to the 5% above. **Fixed the same day:** the
+  rings (thinking, waiting on you) are elements over the canvas that CSS animates (MapView's `syncRings`), so the map
+  doesn't repaint for them (60 → 0 repaints a second, JS 1.2 s → 0.1 s per 8 s), and the live and waiting dots in the
+  sidebar and the thread bar pulse with transform and opacity, not a box-shadow over a blurred sheet. Main thread at 4×
+  during a pause: 24–28% → 8% (3.5% with no animation at all).
 - **Opening and replaying the 10k thread** (the benchmark's replay step looked for the old Replay button; fixed in
   `front.mjs`, measured separately): ready in 0.85 s at 1×, 1.6 s at 4×, one 12.6 MB download; a 4× replay plays
   67–75 moments in 10 s at 29–30 fps (headless Chrome on this loaded machine held 30 fps in several windows), main thread
@@ -142,7 +146,11 @@ cores: read wall times as rough), plus profiles of the production build on the 5
 - **Bundle:** 1,029 KB of JS (362 KB gzipped), first load 362 KB (112 KB gzipped): +106 KB since 5 Oct.
 - **Installed plugin:** three 0.6.0 servers were running at once (4747, 4748, 4749; 73–125 MB each, two on the same
   database). The launcher waits 800 ms for `/api/health`; a busy server misses it, a second one starts on the next port,
-  `server.json` points at the new one and the old one runs on untracked.
+  `server.json` points at the new one and the old one runs on untracked. **Fixed the same day:** while server.json's
+  process is alive and holds its port, the launcher asks again with more patience (3 s at session start, 12 s when
+  opened by hand) and never starts a second server beside it (it says it's busy); and a server that server.json no
+  longer names, while the one it names is alive, stops itself within a minute (`main.ts`). Servers from 0.6 and 0.7.0
+  don't have that: the extra ones need stopping by hand once.
 
 ## The overnight pass (5–6 Oct 2026)
 

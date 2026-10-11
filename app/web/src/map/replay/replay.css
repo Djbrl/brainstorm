@@ -157,7 +157,7 @@
 .rp-waiting > * { grid-column: 2; }
 .rp-waiting > b { grid-column: 1; grid-row: 1; width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; }
 .rp-waiting.blocked { background: #fff7e8; color: #7a4600; }
-.rp-waiting.blocked > b { background: #f59e0b; animation: attn-breathe 1.8s infinite; }
+.rp-waiting.blocked > b { background: #f59e0b; }
 .rp-waiting.turn { background: #f4f4f7; color: var(--ink-2); }
 .rp-waiting.turn > b { background: var(--ink-3); }
 .rp-waiting-line { font-weight: 650; }
@@ -181,7 +181,6 @@
 /* Dark themes: the light amber and grey sheets would glare (and the grey one left its pale text at 1.5:1). */
 :root:is([data-theme="prism"], [data-theme="hologram"]) .rp-waiting.blocked { background: rgba(245,158,11,.14); color: #f5c06a; }
 :root:is([data-theme="prism"], [data-theme="hologram"]) .rp-waiting.turn { background: var(--hover); color: var(--ink-2); }
-@keyframes attn-breathe { 0% { box-shadow: 0 0 0 0 rgba(245,158,11,.55); } 70% { box-shadow: 0 0 0 7px rgba(245,158,11,0); } 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); } }
 
 /* Narrow (tablet and phone): the footer and the player fit the width they have. */
 @media (max-width: 1100px) {

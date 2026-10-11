@@ -65,10 +65,9 @@
 @media (prefers-reduced-motion: reduce) { .sn-scroll i { transition: none; } }
 @media (prefers-reduced-motion: reduce) { .sn-m.working b { animation: none; } }
 
-/* Small window: the card takes the top row up to the Readmap (Map | Places moved to the thread bar), at most 520 px, the
-   current moment reads in full, on up to three lines, and its player stands in for the footer's (too cramped there). */
+/* Small window: the card takes the top row up to the Readmap (Map | Places moved to the thread bar), at most 520 px, and the
+   current moment reads in full, on up to three lines. The player stays at the bottom, as on a wide window. */
 @media (min-width: 601px) and (max-width: 1100px) {
-  .map-wrap:has(.sidebar-now) .dock { display: none; }
   .sidebar-now { width: auto; min-width: 0; max-width: 520px; right: 258px; }
   :is(.map-wrap, .cw-wrap):not(:has(.readmap)) .sidebar-now { right: 24px; }
   /* Room for three lines whatever the step, so the card doesn't change height as you scroll. */

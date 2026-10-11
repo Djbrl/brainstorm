@@ -64,6 +64,7 @@ export function ThreadBar({ project, onFind, onHelp, onAllProjects }: { project:
           onOpen={() => openThread(nav, t.session)}
           onClose={() => { forgetThread(root, t.session.id); if (t.session.id === openId) nav.stopReplay(); }} />)}
       </div>
+      {openId && <PlayButton />}
       <LensSwitch inBar />
       <KeyHints open={!!openId} onHelp={onHelp} />
       <button className="threadbar-find" onClick={onFind} title={`Find any thread, in this project or another (${MOD} K)`}>
@@ -80,17 +81,31 @@ const keepFocus = (e: MouseEvent) => e.preventDefault();
 const press = (key: string) => dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
 
 /**
- * The keys people use most, said quietly beside Find a thread, and clickable: play, center and the camera lock with a
+ * Play or pause the open thread's replay, at every width (Space does the same): the player comes up at the bottom
+ * with its position and speed. Also in a shared replay's header, which has no thread bar.
+ */
+const PLAY = <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.2v9.6L12.8 8z" fill="currentColor" /></svg>;
+const PAUSE = <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9M11 3.5v9" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" /></svg>;
+export function PlayButton() {
+  const playing = useReplayCursor((c) => c.playing);
+  return (
+    <button className="play-button" onMouseDown={keepFocus} onClick={() => press(" ")} aria-label={playing ? "Pause" : "Play"}
+      title={playing ? "Pause (Space)" : "Play from the step you're on (Space)"}>
+      {playing ? PAUSE : PLAY}<span>{playing ? "Pause" : "Play"}</span>
+    </button>
+  );
+}
+
+/**
+ * The keys people use most, said quietly beside Find a thread, and clickable: center and the camera lock with a
  * thread open, the Readmap on the map, and ? for the rest.
  */
 function KeyHints({ open, onHelp }: { open: boolean; onHelp: () => void }) {
-  const playing = useReplayCursor((c) => c.playing);
   const lock = useCameraLock();
   const readmap = useReadmap();
   const { lens } = useNavState();
   return (
     <div className="threadbar-keys" aria-label="Keyboard shortcuts">
-      {open && <button className="threadbar-key-extra" onMouseDown={keepFocus} onClick={() => press(" ")} title={playing ? "Pause (Space)" : "Play from the step you're on (Space)"}><kbd>Space</kbd>{playing ? "Pause" : "Play"}</button>}
       {open && <button className="threadbar-key-extra" onMouseDown={keepFocus} onClick={() => press("c")} title="Center the camera on the agent (C)"><kbd>C</kbd>Center</button>}
       {open && <button className="threadbar-key-extra" role="switch" aria-checked={lock} onMouseDown={keepFocus} onClick={() => setCameraLock(!lock)}
         title={lock ? "The camera keeps the agent centred. Click to move the map freely (L)" : "Keep the agent centred as it moves (L)"}><kbd>L</kbd>{lock ? "Free camera" : "Lock camera"}</button>}

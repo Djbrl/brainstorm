@@ -17,7 +17,7 @@ import { Crashed, Offline, OfflineBanner, useOffline } from "./Trouble";
 import { useAttentionAlerts } from "./lib/attention";
 import { Logo } from "./Logo";
 import { track } from "./lib/usage";
-import { ThreadBar } from "./switch/ThreadBar";
+import { PlayButton, ThreadBar } from "./switch/ThreadBar";
 import { Elsewhere } from "./switch/Elsewhere";
 import { Keys } from "./switch/Keys";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
@@ -41,9 +41,10 @@ function Crumbs({ project }: { project: string }) {
   const st = useLiveStep(replay && step ? step : null);
   return (
     <nav className="crumbs" aria-label="Where you are">
-      {replay ? <button onClick={stopReplay}>{project}</button> : <span aria-current="page">{project}</span>}
+      {/* No project name (the server out of reach): no empty crumb. */}
+      {project && (replay ? <button onClick={stopReplay}>{project}</button> : <span aria-current="page">{project}</span>)}
       {replay && <>
-        <span className="sep" aria-hidden="true">›</span>
+        {project && <span className="sep" aria-hidden="true">›</span>}
         {step ? <button onClick={closeStep}>{title || "Thread"}</button>
           : <button className="here" aria-current="page" onClick={() => setThreadMode("steps")}>{title || "Thread"}</button>}
         {codex && <span className="crumb-harness" title="This thread ran in Codex">Codex</span>}
@@ -130,7 +131,8 @@ function Shell() {
         {isReplay()
           ? <a className="wordmark" href="https://brainstorm-landing.vercel.app" aria-label="Rundown home"><Logo label="Rundown home" /></a>
           : <button className="wordmark" onClick={goHome} aria-label="Home" title="Home"><Logo /></button>}
-        {state.replay || state.shared ? <Crumbs project={project} /> : <div className="topbar-space" />}
+        {state.replay || state.shared ? <Crumbs project={project || (state.shared ? "The whole map" : "")} /> : <div className="topbar-space" />}
+        {state.shared && replay && <PlayButton />}
         <div className="status">
           {!state.replay && !state.shared && <Elsewhere />}
           {state.preview && (

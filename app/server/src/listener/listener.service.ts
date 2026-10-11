@@ -261,7 +261,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     db.function("step_reads", { deterministic: true }, (tool, input, cwd) => readsJson(tool as string | null, input as string | null, cwd as string | null));
     return {
       insertStep: db.prepare(
-        `INSERT OR REPLACE INTO steps (id, session_id, seq, ts, kind, text, tool, input, file_path, diff, label, risk, is_subagent, tool_use_id, agent_id)
+        `INSERT OR IGNORE INTO steps (id, session_id, seq, ts, kind, text, tool, input, file_path, diff, label, risk, is_subagent, tool_use_id, agent_id)
          VALUES (@id, @session_id, @seq, @ts, @kind, @text, @tool, @input, @file_path, @diff, @label, @risk, @is_subagent, @tool_use_id, @agent_id)`,
       ),
       sessionRow: db.prepare(`SELECT * FROM sessions WHERE id = ?`),
@@ -270,6 +270,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       allSessions: db.prepare(`SELECT * FROM sessions ORDER BY last_event_at DESC`),
       saveOffset: db.prepare(`INSERT INTO listener_offsets (file, offset) VALUES (?, ?) ON CONFLICT(file) DO UPDATE SET offset = excluded.offset`),
       stepById: db.prepare(`SELECT * FROM steps WHERE id = ?`),
+      stepThread: db.prepare(`SELECT session_id FROM steps WHERE id = ?`),
       stepsOf: db.prepare(`SELECT * FROM steps WHERE session_id = ? ORDER BY seq ASC`),
       stepsAfter: db.prepare(`SELECT * FROM steps WHERE session_id = ? AND seq > ? ORDER BY seq ASC`),
       stepsJson: db.prepare(stepsJsonSql(`session_id = ?`)),
@@ -492,8 +493,10 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     if (!source) return true;
     const batch: Batch = { quietUntil, quiet: true, sessions: new Map(), events: [], announced: new Set(), seqBefore: new Map() };
     const sink = this.sinkFor(batch, source.harness);
-    db.exec("BEGIN");
     try {
+      // IMMEDIATE: the write lock from the start. A transaction that reads first (is this step stored?) and writes after
+      // can't wait for a lock another program holds (busy_timeout): it fails at once.
+      db.exec("BEGIN IMMEDIATE");
       for (let s = start; s < end;) {
         let e = buf.indexOf(NL, s);
         if (e === -1 || e >= end) e = end;
@@ -557,7 +560,10 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   /** What a source's parse stores into this chunk: steps numbered in order, threads created with its harness. */
   private sinkFor(b: Batch, harness: Harness): Sink {
     const sink: Sink = {
-      step: (s: NewStep, opts) => {
+      step: (parsed: NewStep, opts) => {
+        const id = this.ownId(parsed);
+        if (id === undefined) return;
+        const s = id === parsed.id ? parsed : { ...parsed, id };
         const step = inStoredOrder(s, this.allocSeq(b, s.sessionId));
         this.storeStep(b, step, harness, opts);
         // A shell command that finished: the files it changed become edits too (command-edits.ts). In history at once,
@@ -581,9 +587,12 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     if (!edits.length) return;
     const db = this.dbs.db;
     const b: Batch = { quietUntil: 0, quiet: false, sessions: new Map(), events: [], announced: new Set(), seqBefore: new Map() };
-    db.exec("BEGIN");
     try {
-      for (const e of edits) this.storeStep(b, inStoredOrder(e, this.allocSeq(b, e.sessionId)), harness, { cwd: "" });
+      db.exec("BEGIN IMMEDIATE");
+      for (const e of edits) {
+        const id = this.ownId(e);
+        if (id !== undefined) this.storeStep(b, inStoredOrder({ ...e, id }, this.allocSeq(b, e.sessionId)), harness, { cwd: "" });
+      }
       this.flushSessions(b);
       db.exec("COMMIT");
     } catch (e) {
@@ -593,6 +602,18 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     this.announce(b);
+  }
+
+  /** The id a parsed step is stored under in its thread, or undefined if the thread has it already. Claude Code copies
+   * earlier lines, uuid and all, into a resumed or forked thread's log, and repeats some lines within a log: a line the
+   * thread has keeps its first place, and a copy of another thread's line gets an id of its own (`<id>@<thread>`), so
+   * it never takes that thread's step. Ids stored before stay as they were (links, screenshots and answers use them). */
+  private ownId(s: NewStep): string | undefined {
+    const at = this.st.stepThread.get(s.id) as { session_id: string } | undefined;
+    if (!at) return s.id;
+    if (at.session_id === s.sessionId) return undefined;
+    const own = `${s.id}@${s.sessionId}`;
+    return this.st.stepThread.get(own) ? undefined : own;
   }
 
   private allocSeq(b: Batch, sessionId: string): number {

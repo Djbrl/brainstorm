@@ -172,9 +172,18 @@ export class ClaudeSource implements LogSource {
 
   // ---- parsing ----
 
-  parse(_file: string, line: unknown, sink: Sink) {
+  /** Files that had a step line without a uuid (said once per file). */
+  private noUuid = new Set<string>();
+
+  parse(file: string, line: unknown, sink: Sink) {
     const o = line as RawLine;
     if (!o || typeof o !== "object") return;
+    if ((o.type === "user" || o.type === "assistant") && typeof o.uuid !== "string") {
+      // A step's id is its line's uuid: without one it would collide with every other such line. Skipped.
+      if (this.noUuid.has(file)) return;
+      this.noUuid.add(file);
+      throw new Error("a line without a uuid, skipped (and any others in this file)");
+    }
     if (o.type === "custom-title") {
       if (o.sessionId && o.customTitle) sink.customTitle(o.sessionId, o.customTitle);
       return;
@@ -249,7 +258,7 @@ const subagentOf = (o: RawLine) => (o.isSidechain === true ? { isSubagent: true,
 
 function textStep(o: RawLine, sessionId: string, blockIndex: number, ts: string, kind: StepKind, text: string): NewStep {
   return {
-    id: `${o.uuid ?? ""}:${blockIndex}`, sessionId, ts, kind,
+    id: `${o.uuid}:${blockIndex}`, sessionId, ts, kind,
     text: sanitizeText(text, kind === "tool_result" ? TOOL_RESULT_LIMIT : TEXT_LIMIT),
     ...subagentOf(o),
   };
@@ -259,7 +268,7 @@ function toolStep(o: RawLine, sessionId: string, i: number, ts: string, name: st
   const isEdit = name === "Edit" || name === "MultiEdit" || name === "Write";
   const filePath: string | undefined = typeof input?.file_path === "string" ? input.file_path : typeof input?.path === "string" ? input.path : undefined;
   const base = {
-    id: `${o.uuid ?? ""}:${i}`, sessionId, ts, tool: name, input: sanitizeDeep(input) as unknown, filePath,
+    id: `${o.uuid}:${i}`, sessionId, ts, tool: name, input: sanitizeDeep(input) as unknown, filePath,
     ...subagentOf(o), ...(toolUseId ? { toolUseId } : {}),
   };
   if (!isEdit) return { ...base, kind: "tool_call" };

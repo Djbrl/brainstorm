@@ -1,4 +1,4 @@
-import { relative } from "node:path";
+import { relativeTo } from "../core/paths";
 import type { ProjectMap, Session, Step } from "../shared/contract";
 import { errorText, isErrorResult } from "../shared/failed";
 import { SUBAGENT_TOOLS } from "../shared/tools";
@@ -33,7 +33,7 @@ type Turn = { prompt: string; edits: Step[]; commands: Step[]; delegated: Step[]
  */
 export function threadMarkdown(session: Session, steps: Step[], map: ProjectMap | null): string {
   const root = map?.root ?? session.cwd;
-  const rel = (p: string) => (root && p.startsWith(root) ? relative(root, p) : p);
+  const rel = (p: string) => (root ? relativeTo(p, root) ?? p : p); // /a/bc is not inside /a/b
   const files = new Map((map?.files ?? []).map((f) => [f.path, f]));
   const main = steps.filter((s) => !s.isSubagent);
 

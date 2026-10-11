@@ -164,12 +164,17 @@ export function pathFor(p: Place): string {
   return path + file;
 }
 
+/** decodeURIComponent, or the text as it is when it isn't valid (a stray "%" in a hand-typed link). */
+function safeDecode(s: string): string {
+  try { return decodeURIComponent(s); } catch { return s; }
+}
+
 function readPlace(): Place {
   const raw = hashMode ? location.hash.replace(/^#/, "") || "/" : location.pathname;
   const m = /^(?:\/thread\/([^/]+)(?:\/(map|track|places))?(?:\/step\/([^/]+))?)?(?:\/file\/(.+?))?\/?$/.exec(raw);
   if (m && (m[1] || m[4])) {
-    const file = m[4] ? m[4].split("/").map(decodeURIComponent).join("/") : null;
-    return { thread: m[1] ? decodeURIComponent(m[1]) : null, lens: m[2] === "places" ? "places" : "map", step: m[3] ? decodeURIComponent(m[3]) : null, file };
+    const file = m[4] ? m[4].split("/").map(safeDecode).join("/") : null;
+    return { thread: m[1] ? safeDecode(m[1]) : null, lens: m[2] === "places" ? "places" : "map", step: m[3] ? safeDecode(m[3]) : null, file };
   }
   // Links from before the paths: ?view=map&lens=places&thread=<id>&step=<id> (and ?view=cowork for Places).
   const q = new URLSearchParams(location.search), thread = q.get("thread");

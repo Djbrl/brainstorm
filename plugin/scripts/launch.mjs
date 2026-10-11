@@ -264,6 +264,8 @@ function noteFailure(msg) {
 /**
  * Until 0.4 the plugin was called "brainstorm", so Claude Code gave it another data folder. The first time, take over its
  * database and notices, and stop its server first (so the database is whole, and two servers don't run side by side).
+ * Once all of it is copied, the old copies are removed; if a copy fails, the new partial copies go and the old folder
+ * stays as it was.
  */
 async function adoptOldData() {
   if (existsSync(join(DATA, "rundown.db")) || existsSync(join(DATA, "brainstorm.db"))) return;
@@ -279,9 +281,17 @@ async function adoptOldData() {
         while (Date.now() < deadline && alive(h.pid)) await sleep(100);
       }
     } catch { /* not running */ }
-    for (const f of ["brainstorm.db", "brainstorm.db-wal", "brainstorm.db-shm", "notices.json"]) {
-      try { if (existsSync(join(old, f))) copyFileSync(join(old, f), join(DATA, f)); } catch { /* start fresh without it */ }
+    const files = ["brainstorm.db", "brainstorm.db-wal", "brainstorm.db-shm", "notices.json"].filter((f) => existsSync(join(old, f)));
+    const copied = [];
+    try {
+      for (const f of files) { copyFileSync(join(old, f), join(DATA, f)); copied.push(f); }
+    } catch (e) { // start fresh without it, and leave the old folder as it was
+      log(`couldn't take over ${old}: ${e.message}`);
+      for (const f of copied) try { rmSync(join(DATA, f), { force: true }); } catch { /* best effort */ }
+      return;
     }
+    // Taken over whole: the old copy would only be a second, stale history of the person's sessions.
+    for (const f of [...files, "server.json"]) try { rmSync(join(old, f), { force: true }); } catch { /* left behind */ }
     return;
   }
 }

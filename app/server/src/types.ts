@@ -16,6 +16,7 @@ export type Step = {
   isSubagent?: boolean;
   agentId?: string;     // subagent id (from its log); absent for the main session thread. Stored since 5 Oct 2026; older steps filled from their logs once.
   toolUseId?: string;   // tool_call/edit: the call's tool_use id; tool_result: the id it answers. Absent on steps stored before 30 Sep 2026.
+  reads?: string[];     // a shell command (tool_call, Bash): the files it reads by its text (`cat`, `sed -n`, `grep`…), absolute; not stored, worked out when read
 };
 export type FileNode = { path: string; module: string; lines: number; lastChangedAt?: string; activeSessionId?: string; summary?: string };
 export type Edge = { from: string; to: string };

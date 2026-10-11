@@ -10,6 +10,7 @@ import { replayCamera } from "./store";
 import { centerFor, type Camera } from "../camera";
 import { getCameraLock, getStepWindow, type StepWindow } from "../prefs";
 import { along, casing, drawMarker, drawTrip, landings, mapStyle, platform, polyPath, routePoints, tripMs } from "../themes";
+import { PARK } from "../agents";
 
 export type NodePos = { x?: number; y?: number; r: number };
 /**
@@ -394,7 +395,9 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
 
     // Marker target: just off the file's top-right, like the live agents.
     const markerAt = (id: string) => { const n = pos(id); return n ? platform(n.x, n.y, n.r, scale) : undefined; };
-    const curFile = mi >= 0 ? moves[mi].file : null;
+    // Before its first move (it hasn't touched a file yet: commands, searches, thinking), the marker waits at the top of
+    // the project (PARK), never nowhere.
+    const curFile = mi >= 0 ? moves[mi].file : PARK;
     const target = curFile ? markerAt(curFile) : undefined;
     let trip: ReturnType<typeof routePoints> | null = null, tp = 1, te = 1;
     if (target) {
@@ -534,8 +537,8 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
       ctx.textAlign = "left";
       ctx.font = `600 ${12 / scale}px ${font}`;
       ctx.lineWidth = 3.5 / scale; ctx.strokeStyle = mapStyle().halo;
-      const name = baseName(curFile);
-      ctx.strokeText(name, lx, a.y); ctx.fillStyle = mark; ctx.fillText(name, lx, a.y);
+      const name = curFile === PARK ? "" : baseName(curFile);
+      if (name) { ctx.strokeText(name, lx, a.y); ctx.fillStyle = mark; ctx.fillText(name, lx, a.y); }
       if (beat.outside) {
         const note = "outside project";
         ctx.font = `500 ${11 / scale}px ${font}`;
@@ -558,7 +561,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     const s = st.current, boxes: Box[] = [];
     const beat = s.active && s.thread && s.mode !== "footprint" ? s.thread.beats[s.index] : undefined;
     if (!beat || !s.thread) return { boxes, named: null };
-    const { moves } = s.thread, mi = beat.moveIndex, curFile = mi >= 0 ? moves[mi].file : null, nodes = nodeIndexRef.current;
+    const { moves } = s.thread, mi = beat.moveIndex, curFile = mi >= 0 ? moves[mi].file : PARK, nodes = nodeIndexRef.current;
     const h = 15 / scale, pad = 2 / scale, win = getStepWindow();
     for (const [file, k] of stopsAt(s.thread, mi, s.index - (win === "all" ? WINDOW : win), curFile)) {   // as draw() does
       const n = nodes?.get(file);
@@ -569,7 +572,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     const a = anim.current;
     if (curFile && a.file === curFile && (!s.live || !liveShown?.current)) {   // the marker (where it is this frame) and its name to the right
       ctx.save(); ctx.font = `600 ${NAME_FONT / scale}px ${font}`;
-      const w = ctx.measureText(baseName(curFile)).width; ctx.restore();
+      const w = curFile === PARK ? 0 : ctx.measureText(baseName(curFile)).width; ctx.restore();
       const m = (MARK_R + 3) / scale;
       boxes.push({ x0: a.x - m, x1: a.x + m, y0: a.y - m, y1: a.y + m });
       boxes.push({ x0: a.x + 12 / scale, x1: a.x + 16 / scale + w, y0: a.y - 9 / scale, y1: a.y + (beat.outside ? 23 : 9) / scale });
@@ -581,7 +584,7 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
       const by = read.y - read.r - 8 / scale;
       boxes.push({ x0: read.x - w / 2 - pad, x1: read.x + w / 2 + pad, y0: by - 14 / scale, y1: by + pad });
     }
-    return { boxes, named: curFile };
+    return { boxes, named: curFile === PARK ? null : curFile };
   }, [font, nodeIndexRef, stopsAt]);
 
   const footprint = useCallback(() => {
@@ -599,7 +602,8 @@ export function useReplayLayer({ fg, wrapRef, nodeIndexRef, accent, font, camera
     if (!s.active || !s.thread || s.mode === "footprint" || s.live) return null;
     for (let i = s.index; i >= 0 && i > s.index - READS_BACK; i--) {
       const b = s.thread.beats[i];
-      if (b?.action === "read" && b.files.length) return [...b.files].reverse();
+      // A read, or a run of commands that read files (cat, sed -n, grep: the server's `reads`).
+      if ((b?.action === "read" || b?.kind === "summary") && b.files.length) return [...b.files].reverse();
     }
     return [];
   }, []);

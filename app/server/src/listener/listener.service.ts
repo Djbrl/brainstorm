@@ -13,6 +13,7 @@ import { CodexSource } from "./codex.source";
 import type { LogFile, LogSource, NewStep, Scope, Sink } from "./source";
 import { promptTitle } from "./text";
 import { CommandEdits } from "./command-edits";
+import { commandReads } from "./command-writes";
 import { backfillAgentIds } from "./agent-ids";
 
 // Owner: A. Tail the coding agents' session logs (log sources: claude.source.ts for ~/.claude/projects, codex.source.ts
@@ -248,6 +249,8 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
 
   private prepare() {
     const db = this.dbs.db;
+    // A shell command's reads, worked out from its text when steps are read (any thread, old ones too): see readsJson.
+    db.function("step_reads", { deterministic: true }, (tool, input, cwd) => readsJson(tool as string | null, input as string | null, cwd as string | null));
     return {
       insertStep: db.prepare(
         `INSERT OR REPLACE INTO steps (id, session_id, seq, ts, kind, text, tool, input, file_path, diff, label, risk, is_subagent, tool_use_id, agent_id)
@@ -604,7 +607,13 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       const cwd = opts?.cwd || this.batchSession(b, step.sessionId)?.cwd || "";
       if (cwd && !this.isWithinRoot(cwd)) { this.visitors.add(step.sessionId); this.sessionsCache = null; }
     }
-    if (!b.quiet) b.events.push({ step });
+    if (!b.quiet) {
+      if (step.kind === "tool_call" && step.tool === "Bash" && !step.reads) {
+        const r = readsOf(step.tool, step.input, opts?.cwd || this.batchSession(b, step.sessionId)?.cwd || this.cwdOf(step.sessionId));
+        if (r.reads) step.reads = r.reads;
+      }
+      b.events.push({ step });
+    }
   }
 
   /** The chunk's copy of a session row (read once per chunk), or undefined if there is none yet. */
@@ -791,7 +800,16 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
       isSubagent: !!row.is_subagent,
       ...(row.agent_id ? { agentId: row.agent_id } : {}),
       ...(row.tool_use_id ? { toolUseId: row.tool_use_id } : {}),
+      ...readsOf(row.tool, row.input, this.cwdOf(row.session_id)),
     };
+  }
+
+  /** A thread's folder, for its commands' relative paths (cached: rowToStep runs for every step of a long thread). */
+  private cwds = new Map<string, string>();
+  private cwdOf(sessionId: string): string {
+    let c = this.cwds.get(sessionId);
+    if (c === undefined) { c = ((this.st.sessionRow.get(sessionId) as { cwd?: string } | undefined)?.cwd) ?? ""; if (c) this.cwds.set(sessionId, c); }
+    return c;
   }
 
   getStep(id: string): Step | undefined {
@@ -865,6 +883,33 @@ const STEP_JSON = `'{"id":' || ${jq("id")} || ',"sessionId":' || ${jq("session_i
   || CASE WHEN risk IS NOT NULL AND risk != '' THEN ',"risk":' || risk ELSE '' END
   || ',"isSubagent":' || CASE WHEN is_subagent THEN 'true' ELSE 'false' END
   || CASE WHEN agent_id IS NOT NULL AND agent_id != '' THEN ',"agentId":' || ${jq("agent_id")} ELSE '' END
-  || CASE WHEN tool_use_id IS NOT NULL AND tool_use_id != '' THEN ',"toolUseId":' || ${jq("tool_use_id")} ELSE '' END || '}'`;
+  || CASE WHEN tool_use_id IS NOT NULL AND tool_use_id != '' THEN ',"toolUseId":' || ${jq("tool_use_id")} ELSE '' END
+  || coalesce(',"reads":' || step_reads(tool, input, (SELECT cwd FROM sessions WHERE sessions.id = steps.session_id)), '') || '}'`;
+
+/**
+ * The files a shell command read (`cat`, `sed -n`, `grep`, … : command-writes.ts commandReads), as a step's `reads`:
+ * worked out from the command when steps are read, not stored, so threads from before it have them too. Review agents
+ * read the code through the shell far more than with the Read tool; without this they never showed on the map.
+ */
+const readsCache = new Map<string, string | null>();
+function readsJson(tool: string | null, input: string | null, cwd: string | null): string | null {
+  if (tool !== "Bash" || !input) return null;
+  const key = `${cwd ?? ""}\n${input}`;
+  let out = readsCache.get(key);
+  if (out === undefined) {
+    let command: unknown, dir: unknown;
+    try { ({ command, workdir: dir = undefined } = JSON.parse(input) as { command?: unknown; workdir?: unknown }); } catch { /* not JSON */ }
+    const reads = typeof command === "string" && command.trim() ? commandReads(command, typeof dir === "string" ? dir : cwd || "/") : [];
+    out = reads.length ? JSON.stringify(reads) : null;
+    readsCache.set(key, out);
+    if (readsCache.size > 20_000) readsCache.delete(readsCache.keys().next().value!);
+  }
+  return out;
+}
+/** The same, for a step object: `{ reads }` or nothing. */
+export function readsOf(tool: string | null | undefined, input: unknown, cwd: string): { reads?: string[] } {
+  const j = readsJson(tool ?? null, input == null ? null : typeof input === "string" ? input : JSON.stringify(input), cwd);
+  return j ? { reads: JSON.parse(j) as string[] } : {};
+}
 const stepsJsonSql = (where: string) =>
   `SELECT '[' || coalesce(group_concat(j, ','), '') || ']' AS out FROM (SELECT ${STEP_JSON} AS j FROM steps WHERE ${where} ORDER BY seq ASC)`;

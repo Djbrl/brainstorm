@@ -2,7 +2,8 @@
 //
 // Light detail (default): your prompts, each edit, and runs of reads are beats; everything in between
 // (messages, thinking, commands, browser, subagents, results) folds into one summary beat with counts.
-// Full detail: every step is a beat. Either way the tracer only moves on edits (TRACER_MOVES_ON).
+// Full detail: every step is a beat. Either way the tracer moves on edits (TRACER_MOVES_ON), and before the first edit
+// on reads (an agent that only reads still goes somewhere); a command's reads (`reads`) count as reads of its beat.
 import { useEffect, useMemo } from "react";
 import type { Step } from "@contract";
 import { useLive } from "./live";
@@ -180,7 +181,7 @@ type Draft = {
   version: number;        // bumped on every change
   out?: Beat; outVersion: number;
 };
-type DraftMove = { beat: number; file: string; ts: string; out?: Move };
+type DraftMove = { beat: number; file: string; ts: string; out?: Move; read?: boolean };
 
 const failedSeen = new WeakMap<Step, boolean>();
 const failedOf = (s: Step) => {
@@ -210,6 +211,7 @@ class ThreadBuilder {
   private touched = new Map<string, { edits: number; reads: number }>();
   private stepBeat = new Map<string, number>(); // step id → draft position
   private editCount = 0;
+  private edited = false;             // the tracer moved on an edit: from then on only edits move it
   private stepCount = 0;
   private absorbed = 0;
   private callBeat = new Map<string, Draft>(); // tool_use id → the draft holding the call
@@ -287,10 +289,44 @@ class ThreadBuilder {
       this.touch(file, action);
       if (!d.files.includes(file)) d.files.push(file);
       d.file = file;
-      if (TRACER_MOVES_ON.has(action)) { this.moveTo(file, d.at, s.ts); d.moveIndex = this.moves.length - 1; }
+      this.place(d, file, action, s.ts);
     }
     d.outside = d.files.length === 0 && !!s.filePath;
     d.version++;
+  }
+  /** Where the tracer stands: on an edit's file; before any edit, on the file it read last (an agent that only reads,
+   *  a reviewer, goes from file to file instead of standing nowhere the whole thread). */
+  private place(d: Draft, file: string, action: BeatAction, ts: string) {
+    if (TRACER_MOVES_ON.has(action)) this.edited = true;
+    else if (action !== "read" || this.edited) return;
+    // Reads place it once per moment, on the last file read: a run of 100 commands reading 40 files is one stop, not 40.
+    const last = this.moves[this.moves.length - 1];
+    if (action === "read" && last?.beat === d.at && last.read && this.moves.length - 1 === d.moveIndex) {
+      if (last.file !== file) { this.moves[this.moves.length - 1] = { beat: d.at, file, ts, read: true }; this.drop(file); d.moveIndex = this.moves.length - 1; }
+      return;
+    }
+    this.moveTo(file, d.at, ts);
+    if (action === "read" && this.moves[this.moves.length - 1]?.beat === d.at) this.moves[this.moves.length - 1].read = true;
+    d.moveIndex = this.moves.length - 1;
+  }
+  /** The move before the last one already on `file` (A, B, then A again): they'd be the same stop twice, keep one. */
+  private drop(file: string) {
+    const n = this.moves.length;
+    if (n >= 2 && this.moves[n - 2].file === file) this.moves.splice(n - 1, 1);
+  }
+  /** The files a shell command read (`reads`, worked out by the server from `cat`, `sed -n`, `grep`…): reads of its beat,
+   *  which keeps its own words ("Ran 3 commands"). */
+  private commandReads(d: Draft, s: Step) {
+    let changed = false;
+    for (const p of s.reads ?? []) {
+      const file = this.resolve(p);
+      if (!file) continue;
+      this.touch(file, "read");
+      if (!d.files.includes(file)) d.files.push(file);
+      this.place(d, file, "read", s.ts);
+      changed = true;
+    }
+    if (changed) d.version++;
   }
 
   private feed(s: Step) {
@@ -302,6 +338,7 @@ class ThreadBuilder {
       const d = this.newBeat("step", s, action);
       this.add(d, s);
       if (action !== "other") this.fileStep(d, s, action);
+      else if (s.reads) this.commandReads(d, s);
       return;
     }
 
@@ -337,6 +374,7 @@ class ThreadBuilder {
     let o = this.open.get(k);
     if (o?.kind !== "summary") { o = this.newBeat("summary", s, "other"); o.counts = emptyCounts(); this.open.set(k, o); }
     this.add(o, s); count(o.counts!, s); this.lastOf.set(k, o);
+    if (s.reads) this.commandReads(o, s);
   }
 
   /** The thread as callers see it: absorbed summaries left out and the rest renumbered; unchanged beats reused. */

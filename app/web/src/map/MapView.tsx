@@ -9,7 +9,7 @@ import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-for
 import type { FileNode, ProjectMap } from "@contract";
 import { useLive } from "../lib/live";
 import { mapPrefs, useNav } from "../lib/nav";
-import { drawAgents, type AgentRing } from "./agents";
+import { drawAgents, PARK, type AgentRing } from "./agents";
 import { TOUR_AGENT, tourHidesExtras, useTour } from "../lib/tour";
 import { MapSidebar } from "./sidebar/MapSidebar";
 import { Dock } from "./replay/ReplayBar";
@@ -19,7 +19,7 @@ import { StepPanel } from "./StepPanel";
 import { useSelectedFile } from "./useSelectedFile";
 import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
 import { makeFileResolver } from "../lib/paths";
-import { islandPath, useIslands } from "../lib/islands";
+import { islandPath, isPlaceRoot, useIslands } from "../lib/islands";
 import { enterProject } from "../lib/switcher";
 import { focusAgent, setAgentFocus, useAgentFocus } from "../lib/agentFocus";
 import { useLiveActions } from "../lib/live";
@@ -126,7 +126,14 @@ export function MapView() {
   const markedRef = useRef<string | null>(null);  // the file the replay's marker names this frame
   const ringLayer = useRef<HTMLDivElement>(null), ringsOut = useRef<AgentRing[]>([]);   // agents' breathing rings (syncRings)
   // Every file and folder by id (a folder's ends in "/").
-  const nodeIndex = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n])), [graph.nodes]);
+  // The nodes by id, and PARK: where an agent waits that hasn't touched a file yet, the top of the project's circle.
+  const nodeIndex = useMemo(() => {
+    const m = new Map(graph.nodes.map((n) => [n.id, n]));
+    let reach = 0;
+    for (const n of graph.nodes) if (!n.up && !n.isle && n.x !== undefined && n.y !== undefined) reach = Math.max(reach, Math.hypot(n.x, n.y) + n.r);
+    if (reach > 0) m.set(PARK, { id: PARK, x: 0, y: -reach, r: 0, slot: 0, file: { path: "", module: "", lines: 0 } } as GNode);
+    return m;
+  }, [graph.nodes]);
   const nodeIndexRef = useRef(nodeIndex); nodeIndexRef.current = nodeIndex;
   /** Map an agent's file (or a searched directory) to a node id on the map. */
   const fileResolver = useMemo(() => makeFileResolver(map), [nodeIndex, map?.root, map?.formerRoots]);   // paths only: not every file update
@@ -483,7 +490,9 @@ export function MapView() {
     // An island (or a file on one): go to that project, the open thread still open (it shows there as a visitor).
     let isle: GNode | undefined = g;
     while (isle && !isle.dir?.island) isle = isle.up;
-    if (isle) {
+    // A place that isn't a project (the temporary files, Claude Code's own folder): a file there is selected like any
+    // (the Files tab shows where it is, with Show in Finder), a folder zoomed into.
+    if (isle && !isPlaceRoot(isle.dir!.island!)) {
       const root = isle.dir!.island!;
       const list = replay ? state.steps[replay.sessionId] ?? [] : [];
       let land: string | undefined;

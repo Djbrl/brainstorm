@@ -7,7 +7,7 @@ import { useMemo, useRef } from "react";
 import { hierarchy, pack, type HierarchyNode } from "d3-hierarchy";
 import type { NodeObject } from "react-force-graph-2d";
 import type { FileNode, ProjectMap } from "@contract";
-import type { Island } from "../lib/islands";
+import { isPlaceRoot, type Island } from "../lib/islands";
 import type { Look } from "./replay/layer";
 import type { StampMemo } from "./sprites";
 import { mapStyle, reachOf, type MapStyle, type RGB } from "./themes";
@@ -161,9 +161,15 @@ export function useGraph(map: ProjectMap | null, theme: string, structure?: numb
     // ISLE_MIN across so its name fits, then set in an arc around the project's right side, each pushed out until it
     // clears the ones before it. The project itself never moves.
     // An island's files in their folders, like the project's (tree), so a big one reads as a small map, not a heap.
+    // A run of single folders squashed into one (tree) reads by its last one there: "…/scratchpad", not
+    // "claude-501/-Users-me-rundown/af77b7dc…/scratchpad" (a temp folder's usual depth).
+    const short = (t: T): T => {
+      const parts = t.name.split("/");
+      return { ...t, name: parts.length > 2 ? `…/${parts[parts.length - 1]}` : t.name, ...(t.children ? { children: t.children.map(short) } : {}) };
+    };
     const isleT = (isle: Island): T => ({
       name: isle.name, rel: isle.root, isle,
-      children: isle.more ? isle.more.map(isleT) : tree({ root: isle.root, files: isle.files, edges: [], modules: [] } as unknown as ProjectMap).children,
+      children: isle.more ? isle.more.map(isleT) : (tree({ root: isle.root, files: isle.files, edges: [], modules: [] } as unknown as ProjectMap).children ?? []).map(short),
     });
     type P = HierarchyNode<T> & { x: number; y: number; r: number };
     const packedIsles = islands.map((isle) => {
@@ -193,7 +199,8 @@ export function useGraph(map: ProjectMap | null, theme: string, structure?: numb
         if (f) { n.file = f; n.slot = slotOf(f.lines); n.r = Math.min(radius(f.lines), n.slot); n.dir = undefined; }
         else {
           if (isle) {
-            const name = isle.more ? `+ ${isle.name}` : depth === 1 ? `${isle.name} · outside` : isle.name;
+            // A project: "name · outside"; a place that isn't one says where it is already ("Temporary files").
+            const name = isle.more ? `+ ${isle.name}` : depth === 1 && !isPlaceRoot(isle.root) ? `${isle.name} · outside` : isle.name;
             n.dir = { rel: isle.root, name, depth, files: [], kids: [], ...(isle.more ? { more: true } : { island: isle.root }) };
           } else n.dir = { rel: `${inRoot}/${q.data.rel}`, name: q.data.name, depth, files: [], kids: [], island: inRoot };
           n.r = depth === 1 ? Math.max(q.r, ISLE_MIN) : q.r; n.slot = n.r;

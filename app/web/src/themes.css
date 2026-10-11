@@ -27,6 +27,7 @@
 }
 :root[data-theme="prism"] :is(.sidebar-tabs, .rp-speed, .pl-panel-nav button, .pl-panel-back),
 :root[data-theme="hologram"] :is(.sidebar-tabs, .rp-speed, .pl-panel-nav button, .pl-panel-back) { background: var(--hover); }
+:root:is([data-theme="prism"], [data-theme="hologram"]) .file-view-reveal:hover { background: var(--hover); }
 :root[data-theme="prism"] :is(.sidebar-collapse:hover, .sidebar-agent-eye:hover, .sidebar-agent-main:hover, .sidebar-tree-dir:hover, .sidebar-tree-file:hover, .rp-icon:hover:not(:disabled), .rp-text:hover),
 :root[data-theme="hologram"] :is(.sidebar-collapse:hover, .sidebar-agent-eye:hover, .sidebar-agent-main:hover, .sidebar-tree-dir:hover, .sidebar-tree-file:hover, .rp-icon:hover:not(:disabled), .rp-text:hover) { background: var(--hover-2); }
 :root[data-theme="prism"] .rp-speed button.on, :root[data-theme="hologram"] .rp-speed button.on { background: var(--surface); }

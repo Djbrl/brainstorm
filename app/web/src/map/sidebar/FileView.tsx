@@ -9,6 +9,7 @@ import { missingSummary } from "../../lib/ai";
 import { mapStyle } from "../themes";
 import { relPath } from "../useSelectedFile";
 import { gitWord } from "../gitFilter";
+import { placeName } from "../../lib/islands";
 
 const modName = (m: string) => (!m || m === "." ? "root" : m);
 const baseName = (p: string) => p.split("/").pop() || p;
@@ -52,11 +53,23 @@ export function FileView({ file, root, edges, onFocus }: {
   const usedBy = useMemo(() => [...new Set(edges.filter((e) => e.to === file.path).map((e) => e.from))], [file.path, edges]);
   const touching = useMemo(() => {
     const out: Step[] = [];
-    for (const list of Object.values(steps)) for (const s of list) if (s.filePath === file.path) out.push(s);
+    for (const list of Object.values(steps)) for (const s of list) if (s.filePath === file.path || s.reads?.includes(file.path)) out.push(s);
     return out.sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 6);
   }, [file.path, steps]);
   const rel = relPath(file.path, root);
   const inGit = git ? gitWord(git, relPath(file.path, git.root)) : null;
+
+  // A file off the map (on an island: a temp folder, Claude Code's own, another project): where it is on the computer,
+  // Show in Finder, and the steps that touched it. Nothing about it was read (no summary, no imports, no size).
+  if (file.module === "outside") return (
+    <div className="file-view">
+      <h2 title={baseName(file.path)}>{baseName(file.path)}</h2>
+      <p className="file-view-path outside" title={file.path}>{file.path}</p>
+      <p className="file-view-meta">Outside the project · {islandName(file.path)}</p>
+      <button className="file-view-reveal" onClick={() => reveal(file.path)}>{REVEAL}</button>
+      <Touching steps={touching} file={file} now={now} />
+    </div>
+  );
 
   return (
     <div className="file-view">
@@ -76,19 +89,7 @@ export function FileView({ file, root, edges, onFocus }: {
       {imports.length > 0 && <Deps title="Imports" color={mapStyle().imports} paths={imports} root={root} onFocus={onFocus} />}
       {usedBy.length > 0 && <Deps title="Used by" color={mapStyle().usedBy} paths={usedBy} root={root} onFocus={onFocus} />}
 
-      {touching.length > 0 && (
-        <section>
-          <h3>Recent agent steps</h3>
-          <ul className="file-view-steps">
-            {touching.map((s) => (
-              <li key={s.id}>
-                <span>{s.label ?? (s.tool ? `${s.tool} ${baseName(file.path)}` : s.kind)}</span>
-                <time>{changedAgo(s.ts, now).replace("changed ", "")}</time>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <Touching steps={touching} file={file} now={now} />
 
       <section>
         <h3>Ask about this file</h3>
@@ -97,6 +98,31 @@ export function FileView({ file, root, edges, onFocus }: {
     </div>
   );
 }
+
+function Touching({ steps, file, now }: { steps: Step[]; file: FileNode; now: number }) {
+  if (!steps.length) return null;
+  return (
+    <section>
+      <h3>Recent agent steps</h3>
+      <ul className="file-view-steps">
+        {steps.map((s) => (
+          <li key={s.id}>
+            <span>{s.label ?? (s.tool ? `${s.tool} ${baseName(file.path)}` : s.kind)}</span>
+            <time>{changedAgo(s.ts, now).replace("changed ", "")}</time>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+const REVEAL = /Mac/.test(navigator.platform) ? "Show in Finder" : /Win/.test(navigator.platform) ? "Show in Explorer" : "Show in its folder";
+const reveal = (path: string) => {
+  fetch("/api/reveal", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path }) })
+    .catch(() => { /* the server can't reach it: nothing to do */ });
+};
+/** Which island the file is on, in words ("Temporary files", "skindiff"). */
+const islandName = (p: string) => placeName(p) ?? p.split("/").slice(-2, -1)[0] ?? "";
 
 function Deps({ title, color, paths, root, onFocus }: { title: string; color: string; paths: string[]; root: string; onFocus: (path: string) => void }) {
   return (

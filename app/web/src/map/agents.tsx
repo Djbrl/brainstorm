@@ -112,15 +112,20 @@ export function lastReadAt(a: AgentPresence): number {
   return 0;
 }
 
-/** Where the marker stands (a map node): the last file written that's on the map; with none in its trail, where it
- *  stood already (`was`), else the newest file it touched that's on the map. It used to be the trail's first file: after
- *  a dozen commands and reads (the trail keeps 12), one off the map (a scratch file, a temp folder), and the agent
- *  went off the map with it, the camera with nothing left to follow. */
-export function anchorFile(a: AgentPresence, resolveId: (file: string) => string | undefined, was?: string): string | undefined {
-  for (let i = a.trail.length - 1; i >= 0; i--) if (isWrite(a.trail[i].action)) { const id = resolveId(a.trail[i].file); if (id) return id; }
+/** Where an agent waits that hasn't touched a file yet: the top of the project's circle (MapView adds it to the nodes). */
+export const PARK = "@project";
+
+/** Where the marker stands (a map node): the last file it changed; before it changes any, the last one it read (a
+ *  reviewer that only reads goes from file to file); with neither on the map, where it stood already (`was`: a command,
+ *  a search, it stays put); else the top of the project (PARK), until it touches something. Never nowhere: an agent
+ *  that existed but stood on no file used to be left off the map, which looked broken. */
+export function anchorFile(a: AgentPresence, resolveId: (file: string) => string | undefined, was?: string): string {
+  let wrote = false;
+  for (let i = a.trail.length - 1; i >= 0; i--) if (isWrite(a.trail[i].action)) { wrote = true; const id = resolveId(a.trail[i].file); if (id) return id; }
+  if (!wrote) for (let i = a.trail.length - 1; i >= 0; i--) { const id = resolveId(a.trail[i].file); if (id) return id; }
   if (was) return was;
-  for (let i = a.trail.length - 1; i >= 0; i--) { const id = resolveId(a.trail[i].file); if (id) return id; }
-  return a.file ? resolveId(a.file) : undefined;
+  const here = a.file ? resolveId(a.file) : undefined;
+  return here ?? PARK;
 }
 
 export function drawAgents(opts: {

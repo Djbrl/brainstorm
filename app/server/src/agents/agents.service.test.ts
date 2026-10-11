@@ -59,11 +59,23 @@ test("a subagent shows as soon as it acts, named after its first prompt; off the
   assert.equal(sent.at(-1)?.name, "Subagent · Find where the camera is set up");
   assert.equal(sent.at(-1)?.away, "Running a command");
   assert.equal(sent.at(-1)?.file, undefined);
+  // A temp file is a place too, on its island (it used to be nowhere): the agent is there.
   bus.emit("step", step({ agentId: "sub1", isSubagent: true, tool: "Read", filePath: "/tmp/shot.png" }));
-  assert.equal(sent.at(-1)?.away, "Reading a file outside the project");
+  assert.equal(sent.at(-1)?.file, "/tmp/shot.png");
+  assert.equal(sent.at(-1)?.away, undefined);
   bus.emit("step", step({ agentId: "sub1", isSubagent: true, tool: "Read", filePath: "/r/camera.ts" }));
   assert.equal(sent.at(-1)?.file, "/r/camera.ts");
   assert.equal(sent.at(-1)?.away, undefined);
+});
+
+test("a command's reads go in the trail without moving the agent", () => {
+  const { bus, sent, step } = setup();
+  bus.emit("step", step({ tool: "Read", filePath: "/r/a.ts" }));
+  bus.emit("step", step({ tool: "Bash", reads: ["/r/b.ts", "/r/c.ts", "/dev/null"] }));
+  const a = sent.at(-1)!;
+  assert.equal(a.file, "/r/a.ts");
+  assert.deepEqual(a.trail.map((m) => `${m.action} ${m.file}`), ["read /r/a.ts", "read /r/b.ts", "read /r/c.ts"]);
+  assert.equal(a.away, "Running a command");
 });
 
 test("errors are sent at once", () => {

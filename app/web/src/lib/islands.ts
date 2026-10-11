@@ -27,15 +27,44 @@ function inProject(abs: string, map: ProjectMap): boolean {
 }
 
 /**
- * A file the map could show as outside the project: absolute, in none of the project's checkouts or former folders, and
- * in someone's own folders (not the system's, not a hidden folder like ~/.claude where plans and scratch files live).
- * The server puts agents on the same files (agents.service.ts onMap).
+ * A file the map shows outside the project: absolute and in none of the project's checkouts or former folders. Any
+ * real file: another project, or a place that isn't one (the temporary files, Claude Code's own folder, the rest of the
+ * computer: PLACES). It used to leave the hidden and system folders out, and an agent working only there (a reviewer
+ * writing its reports in a temp folder) was on the map nowhere. The server puts agents on the same files
+ * (agents.service.ts onMap).
  */
 export function isOutside(abs: string | undefined, map: ProjectMap | null): abs is string {
   if (!abs || !map || !abs.startsWith("/") || inProject(abs, map)) return false;
-  const home = /^\/(?:Users|home)\/[^/]+\/(.+)$/.exec(abs)?.[1];
-  return !!home && !home.startsWith(".") && !home.startsWith("Library/");
+  return !/^\/(dev|proc|sys)(\/|$)/.test(abs);
 }
+
+/** The places that aren't projects, each one island under its own name (the first that holds the file). A click on one
+ *  shows the file (its path, Show in Finder) instead of opening it as a project. */
+const PLACES: { test: (abs: string) => string | null; name: string }[] = [
+  { name: "Temporary files", test: (a) => /^(\/private\/tmp|\/tmp|\/private\/var\/folders\/[^/]+\/[^/]+|\/var\/folders\/[^/]+\/[^/]+)(?=\/)/.exec(a)?.[1] ?? null },
+  { name: "Claude Code's files", test: (a) => /^(\/(?:Users|home)\/[^/]+\/\.claude)(?=\/)/.exec(a)?.[1] ?? null },
+  { name: "Codex's files", test: (a) => /^(\/(?:Users|home)\/[^/]+\/\.codex)(?=\/)/.exec(a)?.[1] ?? null },
+  { name: "Library", test: (a) => /^(\/(?:Users|home)\/[^/]+\/Library)(?=\/)/.exec(a)?.[1] ?? null },
+  // Another hidden folder in the home folder (~/.npm, ~/.config): one island each, named as it is.
+  { name: "", test: (a) => /^(\/(?:Users|home)\/[^/]+\/\.[^/]+)(?=\/)/.exec(a)?.[1] ?? null },
+  // Outside the home folders: the system's, the tools' (/usr, /opt, /etc).
+  { name: "Elsewhere on this computer", test: (a) => (/^\/(?:Users|home)\//.test(a) ? null : "") },
+];
+const placeNames = new Map<string, string>();
+/** The place a file is in, if it isn't in a project: its island's root (and its name, kept for `names`). */
+function placeOf(abs: string): string | null {
+  for (const p of PLACES) {
+    const root = p.test(abs);
+    if (root === null) continue;
+    placeNames.set(root || "/", p.name || root.slice(root.lastIndexOf("/") + 1));
+    return root || "/";
+  }
+  return null;
+}
+/** The name of the place a file is in ("Temporary files"), or null when it's in a project. */
+export const placeName = (abs: string): string | null => { const r = placeOf(abs); return r === null ? null : placeNames.get(r) ?? null; };
+/** Whether an island is one of those places (not a project to open). */
+export const isPlaceRoot = (root: string) => placeNames.has(root);
 
 // ---- the projects Rundown knows (the workspace picker's list), to name an island after its project ----
 let roots: string[] | null = null, asked = false;
@@ -65,6 +94,8 @@ const CONTAINERS = new Set(["Documents", "Desktop", "Downloads", "Library", "Pic
 export function projectOf(abs: string, known: string[] | null): string {
   const hit = known?.find((r) => abs === r || abs.startsWith(r + "/"));
   if (hit) return hit;
+  const place = placeOf(abs);
+  if (place) return place;
   const m = /^(\/(?:Users|home)\/[^/]+)\/([^/]+)(?:\/([^/]+))?/.exec(abs);
   if (!m) return abs.slice(0, abs.lastIndexOf("/"));
   return CONTAINERS.has(m[2]) && m[3] ? `${m[1]}/${m[2]}/${m[3]}` : `${m[1]}/${m[2]}`;
@@ -86,6 +117,8 @@ function names(rootsList: string[]): Map<string, string> {
   const count = new Map<string, number>();
   for (const r of rootsList) count.set(base(r), (count.get(base(r)) ?? 0) + 1);
   return new Map(rootsList.map((r) => {
+    const place = placeNames.get(r);
+    if (place) return [r, place];
     if ((count.get(base(r)) ?? 0) < 2) return [r, base(r)];
     const segs = r.split("/");
     return [r, segs.slice(-2).join("/")];
@@ -103,13 +136,17 @@ export function useIslands(map: ProjectMap | null, thread: Session | undefined, 
     const out = new Map<string, { edited?: string; at: string }>(); // path → its last edit, and its last touch
     const add = (raw: string | undefined, ts: string, edit: boolean, only: string | null) => {
       if (!isOutside(raw, map)) return;
+      if (/^\/(?:Users|home)(?:\/[^/]+)?\/?$/.test(raw)) return;   // the home folder itself (`ls ~`), not a file
       const p = islandPath(raw);
       if (only && projectOf(p, known) !== only) return;
       const was = out.get(p);
       out.set(p, { edited: edit && (!was?.edited || ts > was.edited) ? ts : was?.edited, at: !was || ts > was.at ? ts : was.at });
     };
     const threadHome = homeOf(thread?.cwd, map, known);
-    for (const s of steps ?? []) if (s.filePath && (s.kind === "edit" || s.kind === "tool_call")) add(s.filePath, s.ts, s.kind === "edit", threadHome);
+    for (const s of steps ?? []) {
+      if (s.filePath && (s.kind === "edit" || s.kind === "tool_call")) add(s.filePath, s.ts, s.kind === "edit", threadHome);
+      if (s.reads) for (const r of s.reads) add(r, s.ts, false, threadHome);   // what its commands read (cat, sed -n, grep…)
+    }
     const cwdOf = new Map(sessions.map((s) => [s.id, s.cwd]));
     for (const a of agents) {
       const only = homeOf(cwdOf.get(a.sessionId), map, known);
@@ -124,7 +161,9 @@ export function useIslands(map: ProjectMap | null, thread: Session | undefined, 
     for (const [path, t] of touched) {
       const root = projectOf(path, known);
       const isle = by.get(root) ?? by.set(root, { files: [], at: "" }).get(root)!;
-      isle.files.push({ path, module: "outside", lines: 40, ...(t.edited ? { lastChangedAt: t.edited } : {}) });
+      // A place's files (scratch reports, saved outputs, a copy of the repo: often hundreds) as small dots, so its island
+      // doesn't outgrow the project; a project's at a file's usual size.
+      isle.files.push({ path, module: "outside", lines: placeNames.has(root) ? 6 : 40, ...(t.edited ? { lastChangedAt: t.edited } : {}) });
       if (t.at > isle.at) isle.at = t.at;
     }
     const named = names([...by.keys()]);

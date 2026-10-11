@@ -85,12 +85,12 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
     return p === root || p.startsWith(root + "/");
   }
 
-  /** A file the map can put an agent on: the open project's, or one outside it that the map shows as an island (in
-   *  someone's own folders, not a hidden one like ~/.claude where plans live, nor ~/Library). Same rule as lib/islands.ts. */
+  /** A file the map can put an agent on: any real file. The open project's are on the map; any other is on an island
+   *  beside it (lib/islands.ts): another project, the temporary files, Claude Code's own folder, the rest of the computer.
+   *  It used to leave out the hidden and system folders, and an agent working only there (a reviewer writing its
+   *  reports in a temp folder) was on the map nowhere. */
   private onMap(p: string | undefined): p is string {
-    if (this.inWorkspace(p)) return true;
-    const home = p ? /^\/(?:Users|home)\/[^/]+\/(.+)$/.exec(p)?.[1] : undefined;
-    return !!home && !home.startsWith(".") && !home.startsWith("Library/");
+    return !!p && isAbsolute(p) && !/^\/(dev|proc|sys)(\/|$)/.test(p);
   }
 
   /** Subagent description from Claude Code's agent-<id>.meta.json (cached; cheap: one readdir per new agent). */
@@ -162,10 +162,18 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
       next.file = file;
       next.action = action;
     } // steps without a file (Bash, text, thinking) only refresh ts/active
+    // The files a command reads (cat, sed -n, grep…: the listener works them out): reads in its trail, for the Readmap
+    // and the lines of sight. It stays where it is (only an edit, or a read before any edit, places it: see the map).
+    for (const r of step.kind === "tool_call" ? step.reads ?? [] : []) {
+      if (!this.onMap(r)) continue;
+      const last = next.trail[next.trail.length - 1], move: AgentMove = { file: r, action: "read", ts: now };
+      next.trail = last && last.file === r && last.action === "read" ? [...next.trail.slice(0, -1), move] : [...next.trail, move].slice(-TRAIL_MAX);
+    }
     this.agents.set(id, next);
     // Something the map shows changed: send now. Only the time moved (the pulse): at most once a second.
     const changed = !prev || prev.file !== next.file || prev.action !== next.action || prev.error !== next.error || prev.errorAt !== next.errorAt
-      || prev.active !== next.active || prev.name !== next.name || prev.away !== next.away;
+      || prev.active !== next.active || prev.name !== next.name || prev.away !== next.away || prev.trail.length !== next.trail.length
+      || prev.trail[prev.trail.length - 1]?.file !== next.trail[next.trail.length - 1]?.file;
     const t = Date.now();
     if (!changed && t - (this.sentAt.get(id) ?? 0) < PULSE_MS) return;
     this.sentAt.set(id, t);

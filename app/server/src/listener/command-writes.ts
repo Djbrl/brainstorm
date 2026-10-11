@@ -29,8 +29,30 @@ export function commandWrites(command: string, cwd: string): CommandWrite[] {
 
 class Out {
   private m = new Map<string, CommandWrite>();
+  private r = new Set<string>();
   add(w: CommandWrite) { this.m.set(w.path, w); } // an existing path keeps its place and takes the new kind
   list() { return [...this.m.values()]; }
+  read(p: string | undefined) { if (p && this.r.size < READS_MAX) this.r.add(p); }
+  /** What it read, less what it wrote (`sed -n p f > f2` reads f; `cat a > b` writes b, reads a). */
+  reads() { return [...this.r].filter((p) => !this.m.has(p)); }
+}
+
+const READS_MAX = 24;   // a `cat` of a whole folder's files: the first ones say enough
+
+/**
+ * Files a shell command reads, as absolute paths, in order: the operands of the commands that show or search files
+ * (`cat`, `head`, `tail`, `sed -n`, `grep`, `rg`, `wc`, `awk`, `jq`, `diff`, …) and `< file`. Only what the text says,
+ * like commandWrites: a glob, a variable or a path a script computes is left out. A folder (`grep -r x app/`) is kept:
+ * whoever shows it decides what a folder means. Never throws.
+ */
+export function commandReads(command: string, cwd: string): string[] {
+  try {
+    const out = new Out();
+    runShell(command, resolve(cwd), out, 0);
+    return out.reads();
+  } catch {
+    return [];
+  }
 }
 
 // ───────────────────────────── paths ─────────────────────────────
@@ -211,6 +233,7 @@ function parseShell(s: string): Seg[] {
         const fd = m[1] || (op[0] === "&" ? "all" : op[0] === ">" ? "1" : "0");
         if (op === "<<<") expect = { kind: "herestring" };
         else if (op === "<<" || op === "<<-") expect = { kind: "heredoc", strip: op === "<<-" };
+        else if (op === "<") expect = { kind: "redir", writes: false, amp: false, fd };   // a file read on stdin (commandReads)
         else if (op[0] === "<") expect = { kind: "skip" };
         else expect = { kind: "redir", writes: true, amp: op === ">&", fd };
       } else if (c === "&") { flush(); i++; }
@@ -278,7 +301,7 @@ function langOf(name: string): "sh" | Lang | undefined {
 }
 
 function runCommand(cmd: Cmd, dir: string | undefined, out: Out, depth: number): string | undefined {
-  for (const r of cmd.redirs) if (r.writes) add(out, pathOf(r.target, dir), "write");
+  for (const r of cmd.redirs) if (r.writes) add(out, pathOf(r.target, dir), "write"); else if (r.fd === "" || r.fd === "0") out.read(pathOf(r.target, dir));
 
   const words = cmd.words.slice();
   for (;;) {
@@ -294,6 +317,9 @@ function runCommand(cmd: Cmd, dir: string | undefined, out: Out, depth: number):
 
   const name = basename(words[0].text);
   const args = words.slice(1);
+
+  const reads = READERS[name];
+  if (reads) for (const w of reads(args)) if (w.text !== "-") out.read(pathOf(w, dir));
 
   switch (name) {
     case "cd": case "pushd": {
@@ -336,6 +362,25 @@ function runCommand(cmd: Cmd, dir: string | undefined, out: Out, depth: number):
   if (lang) runProgram(lang, cmd, args, dir, out, depth);
   return dir;
 }
+
+/** The commands that show or search files, and which of their words are the files they read. */
+const operandsOf = (valueFlags: string[] = [], skip = 0) => (args: Word[]) => parseArgs(args, valueFlags).operands.slice(skip);
+/** A program text first (grep's pattern, awk's or jq's program, sed's script), unless it came with -e or -f. */
+const afterProgram = (valueFlags: string[], given: string[]) => (args: Word[]) => {
+  const p = parseArgs(args, valueFlags);
+  return given.some((f) => p.vals.has(f) || p.flags.includes(f)) ? p.operands : p.operands.slice(1);
+};
+const GREP_VALUES = ["-e", "-f", "-m", "-A", "-B", "-C", "--include", "--exclude", "--exclude-dir", "-g", "--glob", "-t", "--type", "-T", "--type-not", "--max-count", "--context", "--color", "--colour"];
+const READERS: Record<string, (args: Word[]) => Word[]> = {
+  cat: operandsOf(), bat: operandsOf(["-l", "--language", "-r", "--line-range"]), less: operandsOf(), more: operandsOf(), nl: operandsOf(),
+  head: operandsOf(["-n", "-c"]), tail: operandsOf(["-n", "-c"]), wc: operandsOf(), file: operandsOf(), stat: operandsOf(["-f", "-c", "--format"]),
+  diff: operandsOf(["-U", "-C", "--label"]), cmp: operandsOf(), md5: operandsOf(), shasum: operandsOf(["-a"]), xxd: operandsOf(["-l", "-s", "-c"]),
+  grep: afterProgram(GREP_VALUES, ["-e", "-f"]), egrep: afterProgram(GREP_VALUES, ["-e", "-f"]), fgrep: afterProgram(GREP_VALUES, ["-e", "-f"]),
+  rg: afterProgram(GREP_VALUES, ["-e", "-f"]), ag: afterProgram(GREP_VALUES, ["-e", "-f"]),
+  awk: afterProgram(["-F", "-v", "-f"], ["-f"]), jq: afterProgram(["--arg", "--argjson", "-f", "--slurpfile", "--rawfile"], ["-f"]),
+  // sed: the files after its script, unless it edits them in place (then they're writes: sedFiles).
+  sed: (args) => (sedFiles(args).length ? [] : afterProgram(["-e", "-f"], ["-e", "-f"])(args)),
+};
 
 /** `sed -i` files, in the GNU forms (-i, -i.bak, --in-place) and the BSD one (-i ''); none when it isn't in place. */
 function sedFiles(args: Word[]): Word[] {

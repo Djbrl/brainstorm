@@ -481,3 +481,34 @@ test("live: a link to a folder outside the project, made while watching, maps no
     rmSync(root, { recursive: true, force: true }); rmSync(outside, { recursive: true, force: true }); rmSync(projects, { recursive: true, force: true });
   }
 });
+
+test("presence: deleting a file or switching project cancels its 60 s 'working on it' timer", async () => {
+  const root = tempRepo({ "src/a.ts": "export const a = 1;\n", "src/b.ts": "export const b = 1;\n" }, false);
+  const other = tempRepo({ "x.ts": "" }, false);
+  const projects = mkdtempSync(join(tmpdir(), "bs-projects-"));
+  const handlers: Record<string, (p: unknown) => void> = {};
+  const svc = new MapperService(
+    { on: (ev: string, fn: (p: unknown) => void) => { handlers[ev] = fn; }, emit() {} } as never,
+    { broadcast() {} } as never,
+    { defaultRoot: root, claudeProjectsDir: projects } as never,
+  );
+  const timers = () => (svc as unknown as { activeClearTimers: Map<string, unknown> }).activeClearTimers;
+  try {
+    svc.onModuleInit();
+    await svc.getMapAsync(root);
+    await new Promise((r) => setTimeout(r, 300));
+    const ts = new Date().toISOString();
+    handlers["file-touched"]({ path: join(root, "src/a.ts"), sessionId: "s1", ts });
+    handlers["file-touched"]({ path: join(root, "src/b.ts"), sessionId: "s1", ts });
+    assert.equal(timers().size, 2);
+    unlinkSync(join(root, "src/a.ts"));
+    await waitFor(() => !svc.getCached(root)!.byPath.has(join(root, "src/a.ts")) || undefined);
+    assert.deepEqual([...timers().keys()], [join(root, "src/b.ts")]);
+    await svc.switchRoot(other);
+    assert.equal(timers().size, 0);
+    assert.equal(svc.getCached(root)!.byPath.get(join(root, "src/b.ts"))!.activeSessionId, undefined);
+  } finally {
+    svc.onModuleDestroy();
+    for (const d of [root, other, projects]) rmSync(d, { recursive: true, force: true });
+  }
+});

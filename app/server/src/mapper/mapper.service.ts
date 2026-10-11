@@ -113,7 +113,8 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
   private indexes = new WeakMap<Set<string>, { java: Map<string, string[]>; goDirs: Map<string, string[]>; headers: Map<string, string[]> }>();
   private goModules = new Map<string, { dir: string; module: string } | null>(); // folder → nearest go.mod
   private live?: Live;
-  private activeClearTimers = new Map<string, NodeJS.Timeout>();
+  /** Files shown as being worked on, by path: the timer that clears it after 60 s, and the node it was set on. */
+  private activeClearTimers = new Map<string, { timer: NodeJS.Timeout; node: FileNode }>();
   private building = new Set<string>();
   /** The workspace's active root: the one we keep a live watch on (owner: S). */
   private activeRoot?: string;
@@ -138,8 +139,18 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
   onModuleDestroy() {
     this.stopWatch();
     if (this.mapBroadcast.timer) clearTimeout(this.mapBroadcast.timer);
-    for (const t of this.activeClearTimers.values()) clearTimeout(t);
-    this.activeClearTimers.clear();
+    this.clearPresence();
+  }
+
+  /** Stop showing agents on files: every file, or the given ones (deleted). */
+  private clearPresence(paths?: Iterable<string>) {
+    for (const key of paths ?? [...this.activeClearTimers.keys()]) {
+      const p = this.activeClearTimers.get(key);
+      if (!p) continue;
+      clearTimeout(p.timer);
+      p.node.activeSessionId = undefined;
+      this.activeClearTimers.delete(key);
+    }
   }
 
   /** The map for a root, built now (blocking) if nothing has built it yet. Prefer getMapAsync where a promise is fine. */
@@ -175,6 +186,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
   async switchRoot(root: string): Promise<ProjectMap> {
     const abs = resolve(root);
     if (this.live && this.live.root !== abs) this.stopWatch();
+    if (this.activeRoot !== abs) this.clearPresence(); // the old project's "working on it" marks would otherwise linger in its cached map
     this.activeRoot = abs;
     const c = await this.ensure(abs); // cache hit if something already built it (e.g. the reader)
     if (this.activeRoot === abs) {
@@ -699,6 +711,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
 
     // Apply: removals, then updates and additions. Each change goes on the bus with what the file was before.
     const at = Date.now();
+    this.clearPresence(removed);
     for (const abs of removed) {
       this.bus.emit("file-content", { path: abs, before: this.snapshotOf(c, abs, true), after: null, at });
       c.snapshots.delete(abs);
@@ -819,13 +832,14 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     this.gateway.broadcast({ type: "file", file: node });
 
     const key = path;
-    const existingTimer = this.activeClearTimers.get(key);
-    if (existingTimer) clearTimeout(existingTimer);
+    const existing = this.activeClearTimers.get(key);
+    if (existing) clearTimeout(existing.timer);
     const timer = setTimeout(() => {
       node.activeSessionId = undefined;
       this.activeClearTimers.delete(key);
-      this.gateway.broadcast({ type: "file", file: node });
+      // Only if the file is still on the active map: a deleted file or another project's file must not come back.
+      if (abs === this.activeRoot && this.cache.get(abs)?.byPath.get(path) === node) this.gateway.broadcast({ type: "file", file: node });
     }, 60_000);
-    this.activeClearTimers.set(key, timer);
+    this.activeClearTimers.set(key, { timer, node });
   }
 }

@@ -15,10 +15,15 @@ export function useCowork(sessionId: string | null, running: boolean, loaded = t
       return;
     }
     let stop = false;
-    const load = () => fetch(`/api/cowork?sessionId=${encodeURIComponent(sessionId)}`).then((r) => r.json()).then((d: CoworkSummary) => { if (!stop) { setData(d); setError(false); } }).catch(() => !stop && setError(true));
+    const load = () => fetch(`/api/cowork?sessionId=${encodeURIComponent(sessionId)}`)
+      .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+      .then((d: CoworkSummary) => { if (!stop) { setData(d); setError(false); } }).catch(() => !stop && setError(true));
     load();
-    const t = running ? setInterval(load, 8000) : undefined;
-    return () => { stop = true; if (t) clearInterval(t); };
+    // While it runs: again every 8 s, but not while the tab is hidden (once more when it shows again).
+    const t = running ? setInterval(() => { if (document.visibilityState === "visible") load(); }, 8000) : undefined;
+    const onShow = () => { if (document.visibilityState === "visible") load(); };
+    if (running) document.addEventListener("visibilitychange", onShow);
+    return () => { stop = true; if (t) clearInterval(t); document.removeEventListener("visibilitychange", onShow); };
   }, [sessionId, running, loaded]);
   return { data, error };
 }

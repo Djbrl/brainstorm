@@ -33,7 +33,7 @@ export function PlacesView() {
   const { state } = useLive();
   const { replay, setLens, step: navStep, openStep, closeStep } = useNav();
   const session = state.sessions.find((s) => s.id === replay?.sessionId);
-  const { data } = useCowork(replay?.sessionId ?? null, session?.status === "running", state.connected); // a recording is "connected" once loaded
+  const { data, error } = useCowork(replay?.sessionId ?? null, session?.status === "running", state.connected); // a recording is "connected" once loaded
   const { selected, stepId, highlight, row: pickedRow } = usePlaces();
 
   // The step in the panel is the app's open step, so its link, Back and Esc work as everywhere else. Two one-way
@@ -131,6 +131,7 @@ export function PlacesView() {
       <LensSwitch />
       {data && rows.length > 0 && <Dock steps={{ at, count: rows.length, go, noun: "place" }} />}
       {!replay && <p className="cw-note">Pick a thread to see where it went outside the code.</p>}
+      {replay && error && <p className="cw-note">The places couldn't load. Check that Rundown is still running.</p>}
       <div className={`map-panel pl-panel ${step ? "open" : ""}`} aria-hidden={!step}>
         {step && (
           <>

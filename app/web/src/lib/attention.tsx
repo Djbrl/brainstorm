@@ -1,6 +1,7 @@
 // Threads waiting on you: words for each state, the tab title, and desktop notifications.
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Attention, AttentionState } from "@contract";
+import { EDIT_TOOLS } from "@shared/tools";
 import { useLive } from "./live";
 import { isCodex } from "./harness";
 
@@ -12,7 +13,7 @@ export const yourTurn = (a?: Attention | null) => !!a && a.state === "done";
 const toolWord = (tool?: string) => {
   if (!tool) return "a tool";
   if (tool === "Bash") return "a command";
-  if (tool === "Edit" || tool === "MultiEdit" || tool === "Write" || tool === "NotebookEdit") return "an edit";
+  if (EDIT_TOOLS.has(tool)) return "an edit";
   if (tool === "Read") return "reading a file";
   if (tool === "WebFetch") return "opening a page";
   if (tool === "WebSearch") return "a web search";

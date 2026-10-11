@@ -1,6 +1,7 @@
 import { relative } from "node:path";
 import type { ProjectMap, Session, Step } from "../shared/contract";
 import { errorText, isErrorResult } from "../shared/failed";
+import { SUBAGENT_TOOLS } from "../shared/tools";
 import { groupFailed } from "./failure-text";
 import { CallPairer } from "../shared/pairing";
 import { promptTitle } from "../listener/listener.service";
@@ -52,7 +53,7 @@ export function threadMarkdown(session: Session, steps: Step[], map: ProjectMap 
     if (st.kind === "tool_call") {
       pairer.call(st);
       if (st.tool === "Bash") cur().commands.push(st);
-      else if (st.tool === "Task" || st.tool === "Agent") cur().delegated.push(st);
+      else if (SUBAGENT_TOOLS.has(st.tool ?? "")) cur().delegated.push(st);
       else if (st.tool === "Read" || st.tool === "Grep" || st.tool === "Glob") cur().reads++;
       continue;
     }

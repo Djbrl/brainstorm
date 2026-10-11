@@ -1,5 +1,6 @@
 import { agentName } from "../listener/agent-names";
 import { errorLine, isErrorResult } from "../shared/failed";
+import { CODE_SEARCH_TOOLS, READ_TOOLS, SUBAGENT_TOOLS } from "../shared/tools";
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
@@ -27,9 +28,9 @@ function awayOf(step: Step): string | undefined {
   const t = step.tool ?? "";
   if (step.filePath) return step.kind === "edit" || t === "Write" || t === "Edit" || t === "MultiEdit" ? "Editing a file outside the project" : "Reading a file outside the project";
   if (t === "Bash" || t === "BashOutput" || t === "exec_command" || t === "shell") return "Running a command";
-  if (t === "Grep" || t === "Glob" || t === "LS") return "Searching the code";
+  if (CODE_SEARCH_TOOLS.has(t)) return "Searching the code";
   if (t === "WebSearch" || t === "WebFetch") return "Looking something up on the web";
-  if (t === "Task" || t === "Agent") return "Starting a subagent";
+  if (SUBAGENT_TOOLS.has(t)) return "Starting a subagent";
   if (t.startsWith("mcp__") && /browser|chrome|computer|navigate/i.test(t)) return "Using the browser";
   return t ? "Using a tool" : undefined;
 }
@@ -38,12 +39,12 @@ function actionOf(step: Step): string | undefined {
   const t = step.tool ?? "";
   if (step.kind === "edit") return t === "Write" ? "write" : "edit";
   if (step.kind !== "tool_call") return undefined;
-  if (t === "Read" || t === "NotebookRead") return "read";
+  if (READ_TOOLS.has(t)) return "read";
   if (t === "Grep" || t === "Glob" || t === "LS" || t === "WebSearch") return "search";
   if (t === "Bash" || t === "BashOutput") return "run";
   if (t === "Write") return "write";
   if (t === "Edit" || t === "MultiEdit" || t === "NotebookEdit") return "edit";
-  if (t === "Task" || t === "Agent") return "delegate";
+  if (SUBAGENT_TOOLS.has(t)) return "delegate";
   return t ? t.toLowerCase() : undefined;
 }
 

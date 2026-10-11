@@ -1,5 +1,6 @@
 // Tiny inline SVG glyphs per step kind.
 import type { StepKind } from "@contract";
+import { SUBAGENT_TOOLS } from "@shared/tools";
 
 const P = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
@@ -19,7 +20,7 @@ export function Glyph({ kind, tool, size = 16 }: { kind: StepKind; tool?: string
         return <svg {...s}><path d="M3.5 5l3 3-3 3M8.5 11.5h4" {...P} /></svg>;
       if (tool === "Read" || tool === "Grep" || tool === "Glob" || tool === "WebSearch") // lens
         return <svg {...s}><circle cx="7" cy="7" r="3.8" {...P} /><path d="M10 10l3 3" {...P} /></svg>;
-      if (tool === "Task" || tool === "Agent") // branch
+      if (SUBAGENT_TOOLS.has(tool ?? "")) // branch
         return <svg {...s}><circle cx="4.5" cy="4" r="1.5" {...P} /><circle cx="4.5" cy="12" r="1.5" {...P} /><circle cx="11.5" cy="8" r="1.5" {...P} /><path d="M4.5 5.5v5M4.5 7.5c0 .5 1.5.5 5.5.5" {...P} /></svg>;
       return <svg {...s}><path d="M9.8 2.8a3 3 0 0 0-3.4 4L2.8 10.4a1.2 1.2 0 0 0 1.7 1.7l3.6-3.6a3 3 0 0 0 4-3.4l-1.8 1.8-1.6-.3-.3-1.6z" {...P} /></svg>; // wrench
   }

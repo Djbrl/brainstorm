@@ -12,6 +12,7 @@ import { HtmlPreview, isHtml, PAGE_MARKUP, ViewSwitch } from "./HtmlPreview";
 import { Lightbox } from "./Lightbox";
 import { cleanResult, formatCommand, hostOf, humanKey, parseJson, parseNumbered, parseSearch, parseShell, splitBatch, splitTabContext, type Tab } from "./parse";
 import { isErrorResult } from "@shared/failed";
+import { SUBAGENT_TOOLS } from "@shared/tools";
 import "./content.css";
 
 type Input = Record<string, unknown>;
@@ -473,7 +474,7 @@ export function ToolView({ step, result }: { step: Step; result?: Step }) {
   else if (tool === "WebSearch") body = <WebSearchView input={input} result={result} />;
   else if (tool === "WebFetch") body = <WebFetchView input={input} result={result} />;
   else if (BROWSER.test(tool)) body = <BrowserView tool={tool} input={input} result={result} />;
-  else if (tool === "Agent" || tool === "Task") body = <AgentView input={input} result={result} />;
+  else if (SUBAGENT_TOOLS.has(tool)) body = <AgentView input={input} result={result} />;
   else if (tool === "SendMessage" || tool === "SubagentHandback") body = <MessageView input={input} result={result} />;
   else if (tool === "AskUserQuestion") body = <QuestionsView input={input} result={result} />;
   else if (tool === "TodoWrite") body = <TodosView input={input} />;

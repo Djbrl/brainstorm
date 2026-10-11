@@ -8,6 +8,7 @@ import { safely } from "../core/safely";
 import { ListenerService } from "../listener/listener.service";
 import { errorText, isErrorResult } from "../shared/failed";
 import { CallPairer } from "../shared/pairing";
+import { EDIT_TOOLS } from "../shared/tools";
 import { maskSecrets } from "../privacy/mask";
 
 // Does a thread need you? Worked out from the log (calls with no result, failures in a row, a finished
@@ -21,7 +22,7 @@ const QUIET_MS = 12_000;
  * model looks at an image for a minute; 4% of reads, 20 to 40% of web fetches and searches pass 8 s), which flagged
  * threads that were only working.
  */
-const INSTANT = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
+const INSTANT = EDIT_TOOLS;
 /** The plugin's hooks were heard this recently: they say for certain when you're needed, so no guessing. */
 const HOOKS_TRUSTED_MS = 24 * 60 * 60_000;
 const ASKS = new Set(["AskUserQuestion"]);

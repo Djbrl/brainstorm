@@ -7,6 +7,7 @@ import { WorkspaceService } from "../workspace/workspace.service";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { Replay, Session, Step } from "../shared/contract";
+import { CODE_SEARCH_TOOLS } from "../shared/tools";
 import { summarizePlaces } from "../cowork/cowork.service";
 
 type Move = NonNullable<Replay["agentMoves"]>[number];
@@ -16,7 +17,7 @@ function actionOf(step: Step): string | undefined {
   if (step.kind === "edit") return t === "Write" ? "write" : "edit";
   if (step.kind !== "tool_call") return undefined;
   if (t === "Read") return "read";
-  if (t === "Grep" || t === "Glob" || t === "LS") return "search";
+  if (CODE_SEARCH_TOOLS.has(t)) return "search";
   return undefined; // runs, delegations etc. have no file to stand on
 }
 

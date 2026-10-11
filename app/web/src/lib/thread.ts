@@ -7,6 +7,7 @@
 import { useEffect, useMemo } from "react";
 import type { Step } from "@contract";
 import { isErrorResult } from "@shared/failed";
+import { READ_TOOLS, SEARCH_TOOLS, SUBAGENT_TOOLS } from "@shared/tools";
 import { useLive } from "./live";
 import { stepsOf, useAgentFocus } from "./agentFocus";
 import { makeFileResolver, type FileResolver } from "./paths";
@@ -37,9 +38,6 @@ export type ReplayDetail = "light" | "full";
 /** Which actions move the tracer. Edits only: reads flash their file without moving it. */
 export const TRACER_MOVES_ON: ReadonlySet<BeatAction> = new Set<BeatAction>(["edit"]);
 
-const READ_TOOLS = new Set(["Read", "NotebookRead"]);
-const SEARCH_TOOLS = new Set(["Grep", "Glob", "WebSearch", "WebFetch", "ToolSearch"]);
-const SUBAGENT_TOOLS = new Set(["Agent", "Task"]);
 
 export type SummaryCounts = {
   commands: number; browser: number; subagents: number; searches: number;

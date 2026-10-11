@@ -9,6 +9,8 @@
 //   useLiveSelector(s => s.sessions)          renders again only when that slice changes (Object.is). For a selector
 //   useLiveSelector(s => ({ a: s.a, b: s.b }), shallowEqual)   that builds an object, pass shallowEqual.
 //   useLiveActions()                          { loadSteps, reload }, never changes.
+// A thread's steps are fetched once, then kept up to date by "step" messages; history the server stores without
+// sending it step by step ("steps-stored", and every loaded thread after a reconnect) is fetched with ?afterSeq=.
 //   useLiveStep(stepId)                       one step by id, without scanning a thread.
 //   useLive()                                 { state, loadSteps, reload }: the whole state, renders on every change.
 // Migrating a component: replace `const { state } = useLive()` with one useLiveSelector per thing it reads (or one
@@ -47,6 +49,7 @@ type Action =
   | { type: "connected"; value: boolean }
   | { type: "sessions"; sessions: Session[] }
   | { type: "steps"; sessionId: string; steps: Step[] }
+  | { type: "steps-more"; sessionId: string; steps: Step[] } // a thread's steps after the ones it has (catchUp)
   | { type: "map"; map: ProjectMap }
   | { type: "agents"; agents: AgentPresence[] }
   | { type: "attention-all"; list: Attention[] }
@@ -63,6 +66,7 @@ type Indexes = {
   edgesFrom: Map<string, Edge[]>;                      // path → its outgoing imports
   stepAt: Map<string, { sid: string; i: number }>;     // step id → its thread and position in that thread's list
   serverStatus: Map<string, Session["status"]>;        // thread id → the status the server sent (before attention's say)
+  through: Map<string, number>;                        // thread id → the seq its steps are known up to, with none missing
 };
 
 /**
@@ -78,10 +82,11 @@ function indexMap(ix: Indexes, map: ProjectMap | null) {
   for (const e of map.edges) { const l = ix.edgesFrom.get(e.from); if (l) l.push(e); else ix.edgesFrom.set(e.from, [e]); }
 }
 function indexSteps(ix: Indexes, sid: string, list: Step[]) { list.forEach((st, i) => ix.stepAt.set(st.id, { sid, i })); }
+const lastSeq = (list: Step[]) => list.reduce((m, x) => Math.max(m, x.seq), -1);
 function reindex(ix: Indexes, s: LiveState) {
   indexMap(ix, s.map);
-  ix.stepAt.clear();
-  for (const [sid, list] of Object.entries(s.steps)) indexSteps(ix, sid, list);
+  ix.stepAt.clear(); ix.through.clear();
+  for (const [sid, list] of Object.entries(s.steps)) { indexSteps(ix, sid, list); ix.through.set(sid, lastSeq(list)); }
 }
 
 const byRecency = (a: Session, b: Session) => b.lastEventAt.localeCompare(a.lastEventAt);
@@ -124,8 +129,24 @@ function applyBatch(base: LiveState, actions: Action[], ix: Indexes): LiveState 
         steps()[a.sessionId] = a.steps;
         owned.add(a.steps); // freshly fetched: nobody else holds it yet
         indexSteps(ix, a.sessionId, a.steps);
+        ix.through.set(a.sessionId, lastSeq(a.steps));
         break;
       }
+      case "steps-more": {
+        const sid = a.sessionId, list = s.steps[sid];
+        if (!list) break;
+        ix.through.set(sid, Math.max(ix.through.get(sid) ?? -1, lastSeq(a.steps)));
+        const add = a.steps.filter((x) => ix.stepAt.get(x.id)?.sid !== sid);
+        if (!add.length) break;
+        const next = steps()[sid] = own(list, (o) => o.slice());
+        const from = next.length;
+        next.push(...add);
+        // Live steps that came meanwhile have higher seqs: put the list back in seq order.
+        if (from && next[from - 1].seq > next[from].seq) { next.sort((x, y) => x.seq - y.seq); indexSteps(ix, sid, next); }
+        else add.forEach((x, k) => ix.stepAt.set(x.id, { sid, i: from + k }));
+        break;
+      }
+      case "steps-stored": break; // handled by the store (enqueue): it fetches what a loaded thread lacks
       case "step": {
         const sid = a.step.sessionId, list = s.steps[sid];
         if (!list) break; // not loaded yet; will come with the REST fetch
@@ -133,6 +154,7 @@ function applyBatch(base: LiveState, actions: Action[], ix: Indexes): LiveState 
         const next = steps()[sid] = own(list, (o) => o.slice());
         next.push(a.step);
         ix.stepAt.set(a.step.id, { sid, i: next.length - 1 });
+        if (a.step.seq === (ix.through.get(sid) ?? -1) + 1) ix.through.set(sid, a.step.seq);
         break;
       }
       case "step-update": {
@@ -229,13 +251,15 @@ export type LiveStore = {
   /** A step by id, if its thread is loaded. */
   stepOf: (id: string) => Step | undefined;
   loadSteps: (sessionId: string) => void;
+  /** Fetch the steps a loaded thread lacks (after the seq it has them all up to). */
+  catchUp: (sessionId: string) => void;
   /** Refetch everything for the (new) active workspace. */
   reload: () => void;
 };
 
 export function createLiveStore(start: LiveState = initial): LiveStore {
   let state = start;
-  const ix: Indexes = { fileAt: new Map(), edgesFrom: new Map(), stepAt: new Map(), serverStatus: new Map() };
+  const ix: Indexes = { fileAt: new Map(), edgesFrom: new Map(), stepAt: new Map(), serverStatus: new Map(), through: new Map() };
   reindex(ix, state);
   const { subscribe, emit } = listeners();
   let queue: Action[] = [];
@@ -254,6 +278,16 @@ export function createLiveStore(start: LiveState = initial): LiveStore {
     emit();
   };
   const enqueue = (a: Action) => {
+    if (a.type === "step" && loading.has(a.step.sessionId) && !state.steps[a.step.sessionId]) {
+      // Its thread's first fetch is in flight and may have been answered before this step was stored: kept for after it.
+      const held = early.get(a.step.sessionId);
+      if (held) held.push(a); else early.set(a.step.sessionId, [a]);
+      return;
+    }
+    if (a.type === "steps-stored") {
+      if ((ix.through.get(a.sessionId) ?? Infinity) < a.lastSeq) catchUp(a.sessionId);
+      return;
+    }
     queue.push(a);
     if (frame || timer !== undefined) return;
     // A frame when the tab is visible; the timer covers background tabs, where frames don't run.
@@ -264,6 +298,10 @@ export function createLiveStore(start: LiveState = initial): LiveStore {
 
   // A thread's steps are fetched once at a time (several views ask for the same thread when it opens).
   const loading = new Set<string>();
+  /** Live steps that came while their thread's first fetch was in flight (see enqueue). */
+  const early = new Map<string, Action[]>();
+  /** Threads being caught up (catchUp), and whether to fetch again once that lands. */
+  const catching = new Map<string, boolean>();
   let generation = 0; // bumps on reload: answers for the previous workspace are dropped
   const loadSteps = (sessionId: string) => {
     if (isReplay() || loading.has(sessionId)) return;
@@ -272,14 +310,35 @@ export function createLiveStore(start: LiveState = initial): LiveStore {
     fetch(`/api/sessions/${encodeURIComponent(sessionId)}/steps`).then((r) => r.json())
       .then((steps: Step[]) => { if (gen === generation && Array.isArray(steps)) dispatch({ type: "steps", sessionId, steps }); })
       .catch(() => {})
-      .finally(() => { if (gen === generation) loading.delete(sessionId); });
+      .finally(() => {
+        if (gen !== generation) return;
+        loading.delete(sessionId);
+        const held = early.get(sessionId);
+        early.delete(sessionId);
+        if (held && state.steps[sessionId]) { queue.push(...held); flush(); } // the step case skips the ones it has
+      });
   };
-  const reload = () => { if (isReplay()) return; generation++; loading.clear(); dispatch({ type: "reset" }); loadAll(dispatch); };
+  const catchUp = (sessionId: string) => {
+    if (isReplay() || loading.has(sessionId) || !state.steps[sessionId]) return;
+    if (catching.has(sessionId)) { catching.set(sessionId, true); return; }
+    catching.set(sessionId, false);
+    const gen = generation;
+    fetch(`/api/sessions/${encodeURIComponent(sessionId)}/steps?afterSeq=${ix.through.get(sessionId) ?? -1}`).then((r) => r.json())
+      .then((steps: Step[]) => { if (gen === generation && Array.isArray(steps) && steps.length) dispatch({ type: "steps-more", sessionId, steps }); })
+      .catch(() => {})
+      .finally(() => {
+        if (gen !== generation) return;
+        const again = catching.get(sessionId);
+        catching.delete(sessionId);
+        if (again) catchUp(sessionId);
+      });
+  };
+  const reload = () => { if (isReplay()) return; generation++; loading.clear(); early.clear(); catching.clear(); dispatch({ type: "reset" }); loadAll(dispatch); };
   const stepOf = (id: string) => {
     const at = ix.stepAt.get(id), st = at && state.steps[at.sid]?.[at.i];
     return st && st.id === id ? st : undefined;
   };
-  return { get: () => state, subscribe, dispatch, enqueue, stepOf, loadSteps, reload };
+  return { get: () => state, subscribe, dispatch, enqueue, stepOf, loadSteps, catchUp, reload };
 }
 
 // Hosted demo: built with VITE_REPLAY_URL=/replay.json so it opens straight into the recording.
@@ -367,6 +426,8 @@ export function LiveProvider({ children }: { children: ReactNode }) {
         // first time too if the page loaded while the server was away (nothing came).
         if (opened || !store.get().setup) loadAll(store.dispatch);
         opened = true;
+        // Steps stored while the page wasn't listening (an outage, a restart, or before this first connection).
+        for (const sid of Object.keys(store.get().steps)) store.catchUp(sid);
       };
       sock.onclose = () => { clearTimeout(giveUp); retry(); };
       sock.onmessage = (e) => { try { store.enqueue(JSON.parse(e.data) as WsMessage); } catch {} };

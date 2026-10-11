@@ -237,9 +237,8 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
     return () => cancelAnimationFrame(t);
   }, [hasNodes, applyIntent]);
 
-  // Opening a thread or starting its replay frames its recent window once, locked or not (and again as the layout settles,
-  // unlocked and untouched: a link opened straight onto a thread loads the map at the same time). Closing the thread
-  // frames the whole project again.
+  // Opening a thread or starting its replay frames its recent window once, locked or not (a link opened straight onto a
+  // thread that loads before the map is framed by the hasNodes effect above). Closing the thread frames the whole project again.
   const openThread = replayActive ? replay?.sessionId : undefined;
   const playing = replay?.mode === "play";
   const hadThread = useRef(false);
@@ -250,9 +249,7 @@ export function useMapCamera({ cam, camRef, nodeIndex, nodeIndexRef, replayRef, 
     setIntent({ kind: "fit" });
     if (replayCamera.pinned) return; // a file is selected: the camera stays on the file
     fitAll(700);
-    const ts = openThread ? [600, 1800].map((ms) => setTimeout(() => applyIntent(700), ms)) : [];
-    return () => ts.forEach(clearTimeout);
-  }, [openThread, playing, setIntent, applyIntent, fitAll]);
+  }, [openThread, playing, setIntent, fitAll]);
 
   // Focus from Follow (and file links)
   useEffect(() => {

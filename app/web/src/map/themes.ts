@@ -12,8 +12,8 @@ export type MapStyle = {
   /** Imports (the hovered or selected file's): plain lines, or metro lines (horizontal, vertical and 45°). */
   link: "line" | "metro";
   halo: string; fileInk: string; fileInkQuiet: string;
-  moduleInk: string; moduleInkLively: string; moduleFont?: string; labelFont?: string;
-  linkIdle: string; imports: string; usedBy: string;
+  labelFont?: string;
+  imports: string; usedBy: string;
   markerStroke: string; markerText: string; glow: boolean;
   /** How an agent travels between files, and the shape of the trail it leaves (see routePoints):
    *  a straight glide (trails curve softly), metro track (Metro and Hologram), or a hop in an arc. */
@@ -41,8 +41,6 @@ export type MapStyle = {
 const BASE: MapStyle = {
   node: "dot", link: "line",
   halo: "rgba(249,249,247,0.9)", fileInk: "#121214", fileInkQuiet: "rgba(18,18,20,0.62)",
-  moduleInk: "rgba(29,29,31,0.2)", moduleInkLively: "rgba(29,29,31,0.34)",
-  linkIdle: "rgba(29,29,31,0.08)",
   imports: "rgba(37,99,235,0.7)", usedBy: "rgba(15,157,138,0.7)",
   markerStroke: "#fff", markerText: "#fff", glow: false, route: "glide",
   palette: ["#2f7ae5", "#0f9d8a", "#c2409a", "#7c4dde", "#2e9e4f", "#0b8fb3", "#b5487a", "#4a6fa5"],
@@ -60,17 +58,14 @@ const STYLES: Record<ThemeId, MapStyle> = {
     ...BASE, node: "station", link: "metro", route: "metro", track: "#1d1d1b", marker: "badge",
     imports: "rgba(37,99,235,0.95)", usedBy: "rgba(15,157,138,0.95)",   // shown only around the file you point at or pick: near full strength
     halo: "rgba(253,249,236,0.95)", fileInk: "#1d1d1b", fileInkQuiet: "rgba(29,29,27,0.74)",
-    moduleInk: "rgba(29,29,31,0.55)", moduleInkLively: "rgba(29,29,31,0.8)",
-    labelFont: FRUTIGER, moduleFont: FRUTIGER,
+    labelFont: FRUTIGER,
     lines: RER, palette: RER, zoneInk: "#e2730e",
     reach: [0.72, 1.1],                  // a station is 0.6r plus its ring; an agent adds one more ring
   },
   prism: {
     ...BASE, node: "cube", route: "hop",
     halo: "rgba(22,22,52,0.85)", fileInk: "#f0f2ff", fileInkQuiet: "rgba(215,222,255,0.62)",
-    moduleInk: "rgba(205,210,255,0.26)", moduleInkLively: "rgba(242,227,106,0.75)",
-    moduleFont: `"Arial Rounded MT Bold", "Nunito", system-ui, sans-serif`, labelFont: `"Arial Rounded MT Bold", "Nunito", system-ui, sans-serif`,
-    linkIdle: "rgba(120,160,255,0.16)",
+    labelFont: `"Arial Rounded MT Bold", "Nunito", system-ui, sans-serif`,
     imports: "rgba(242,227,106,0.9)", usedBy: "rgba(140,200,255,0.9)",
     markerStroke: "rgba(255,255,255,0.95)", markerText: "#1b1b40", glow: true,
     palette: ["#8fb4ff", "#7ee0ff", "#ff9ff3", "#c7a6ff", "#9dffb0", "#ffe08a", "#ffb38a", "#a6f0ff"],
@@ -80,9 +75,7 @@ const STYLES: Record<ThemeId, MapStyle> = {
   hologram: {
     ...BASE, node: "globe", route: "metro", trackWidth: 0.5,
     halo: "rgba(8,14,16,0.9)", fileInk: "#dcf6f8", fileInkQuiet: "rgba(160,205,215,0.6)",
-    moduleInk: "rgba(143,233,240,0.28)", moduleInkLively: "rgba(143,233,240,0.7)",
-    moduleFont: `"Arial Narrow", "Helvetica Neue", sans-serif`, labelFont: `"Arial Narrow", "Helvetica Neue", sans-serif`,
-    linkIdle: "rgba(120,170,180,0.16)",
+    labelFont: `"Arial Narrow", "Helvetica Neue", sans-serif`,
     imports: "rgba(95,227,224,0.9)", usedBy: "rgba(140,146,255,0.9)",
     markerStroke: "#0b1214", markerText: "#0b1214", glow: true,
     palette: ["#5fe3e0", "#7cc8ff", "#b6f0ff", "#a9a4ff", "#3fc1c9", "#8fe9f0", "#c7b8ff", "#a3d8ff"],

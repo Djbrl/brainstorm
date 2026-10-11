@@ -6,8 +6,6 @@ import { useNav } from "../lib/nav";
 
 export const relPath = (p: string, root: string) => (root && p.startsWith(root) ? p.slice(root.length).replace(/^\/+/, "") : p);
 
-const SETTLE_MS = 1800;
-
 /**
  * The selected file (a node id, its full path), how to select one (null clears it), and a count of picks: it goes up
  * every time a file is picked (on the map, in a list, by a link), the same file again included, so the sidebar can
@@ -25,18 +23,11 @@ export function useSelectedFile(root: string): [string | null, (path: string | n
     const rel = path ? relPath(path, root) : null;
     if (rel !== file) selectFile(rel);
   }, [root, file, selectFile]);
-  const mapAt = useRef(0); // when the map first showed: its layout keeps settling for a moment
-  if (root && !mapAt.current) mapAt.current = performance.now();
   useEffect(() => {
     const go = full && full !== shown.current;
     shown.current = full ?? null;
     if (!go) return;
     setFocusFile(full);
-    // Opened with the page: once the files have settled, center on it again (where it moved to), unless you've moved on.
-    const settling = SETTLE_MS - (performance.now() - mapAt.current);
-    if (settling <= 0) return;
-    const t = setTimeout(() => { if (shown.current === full) setFocusFile(full); }, settling);
-    return () => clearTimeout(t);
   }, [full, setFocusFile]);
   return [full ?? null, select, picks];
 }

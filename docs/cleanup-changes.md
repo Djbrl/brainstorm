@@ -450,3 +450,14 @@ No filled cobalt buttons anywhere: the app's restrained main button is the ink p
 - Outside the map (`f1a798a`): the boot and trouble pages' button (its hover went cobalt, and the dark themes made it pale blue with light text, under AA in Prism), Ask's send button, the skip link.
 - On the map, CSS only (`f12cf0c`): "Back to live", the tour's and the welcome card's main button, the replay's Play.
 - Kept blue on purpose: the switched-on filter chip in the thread list (a selection, not an action).
+
+### Map at rest
+
+The graph library's own animation loop, left open in Phase 6, is gone with the library.
+
+- **The map's canvas**: `useCanvasZoom` (app/web/src/map) owns the canvas, its size and pixel ratio, the camera, and wheel, trackpad, drag and pinch. It draws only when something changes. The camera, gestures and drawing order are the same as before. Commit `63be080`.
+- **Places** uses the same hook. The place under the pointer is found from the circles themselves, not from a hidden picture repainted every 0.8 s. Commit `0a144b3`.
+- **The library is removed** (react-force-graph-2d and what it brought: force-graph, d3-zoom, tween.js, lodash-es and more). The layout already came from d3-hierarchy. Commit `0433418`.
+- Measured at rest over 30 s (headless Chrome, 1440 px, nothing moving): animation-frame callbacks went from 63 a second to 0, map draws from 3 a second to 0, and main-thread work from 27.5 to about 3 to 5 ms a second. Places went from a callback every frame to none. In the dark themes the cubes and globes still turn slowly (15 draws a second), as designed.
+- Bundle: all JavaScript went from 1,069 kB (377 kB compressed) to 886 kB (317 kB compressed).
+- What a user might notice: nothing on screen. A laptop stays cooler with the map open. A two-finger pinch on a touch screen now zooms the map, not the page.

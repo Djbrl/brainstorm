@@ -195,8 +195,19 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   // ---- workspace switching (owner: S) ----
 
   private setRoot(root: string) {
-    this.project.set(root);
+    this.project.set(root, () => this.visitorsFound());
     this.store.invalidate();
+  }
+
+  /** The open project's visitors are known (a moment after it opened, ProjectScope.set): they're listed, the pages
+   * told, and their logs read (the backfill starts again with them, from where each log was read up to). */
+  private visitorsFound() {
+    this.store.invalidate();
+    for (const id of this.project.visitors) {
+      const session = this.store.getSession(id);
+      if (session) this.gateway.broadcast({ type: "session", session });
+    }
+    if (this.ready) this.backfillForNewFilter();
   }
 
   private scope(): Scope {

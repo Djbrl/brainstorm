@@ -105,6 +105,7 @@ test("a thread from another project that edits this one's files is a visitor her
   assert.ok(ids().includes("orch"));
   // Opening the demo repo again finds it from the stored steps; its own project lists it as its own.
   t.inner.setRoot("/work/demo-repo");
+  await t.inner.project.visitorsFound; // found a moment after the project opens
   assert.ok(ids().includes("orch"));
   assert.ok(t.inner.scope().guests!.ids.has("orch"));
   t.inner.setRoot("/orchestrator");

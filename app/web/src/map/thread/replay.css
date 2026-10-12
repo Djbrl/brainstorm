@@ -8,8 +8,8 @@
   background: transparent; color: var(--ink-2); transition: background .15s, color .15s; }
 .rp-icon:hover:not(:disabled) { background: var(--fill-hover); color: var(--ink); }
 .rp-icon:disabled { opacity: .35; cursor: default; }
-.rp-play { width: 38px; height: 38px; background: var(--accent); color: #fff; }
-.rp-play:hover:not(:disabled) { background: var(--accent); color: #fff; filter: brightness(1.08); }
+.rp-play { width: 38px; height: 38px; background: var(--ink); color: var(--bg); }
+.rp-play:hover:not(:disabled) { background: var(--ink); color: var(--bg); opacity: .86; }
 
 .rp-steps :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 

@@ -256,8 +256,8 @@ button.sidebar-thread-head:hover { background: var(--row-hover); }
   font-size: 13px; color: var(--ink-2); animation: back-live-in .22s cubic-bezier(.2,.8,.2,1); }
 .track-back-live > span { display: flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .track-back-live i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
-.track-back-live button { flex: none; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font-size: 12.5px; font-weight: 600; padding: 6px 12px; }
-.track-back-live button:hover { filter: brightness(1.08); }
+.track-back-live button { flex: none; border: 0; border-radius: 999px; background: var(--ink); color: var(--bg); font-size: 12.5px; font-weight: 600; padding: 6px 12px; }
+.track-back-live button:hover { opacity: .86; }
 @keyframes back-live-in { from { opacity: 0; transform: translateY(8px); } }
 @media (prefers-reduced-motion: reduce) { .track-back-live, .track-back-live i { animation: none; } }
 .track-share { margin-top: 1px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink-2); font-size: 12.5px; font-weight: 600; padding: 4px 12px; }

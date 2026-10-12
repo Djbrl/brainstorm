@@ -2,10 +2,14 @@
   "name": "rundown-server",
   "private": true,
   "version": "0.1.0",
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "build": "tsc -p .",
-    "dev": "tsc -p . && (tsc -p . -w --preserveWatchOutput &) && node --watch --watch-preserve-output dist/main.js",
+    "dev": "node ../scripts/dev-server.mjs",
     "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
     "test": "tsc -p tsconfig.test.json && node --test \"dist-test/**/*.test.js\""
   },
   "dependencies": {

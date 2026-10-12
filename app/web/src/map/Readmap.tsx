@@ -92,7 +92,7 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
     let last = 0, settled = false;
     let idx = { g: -1 as number, m: new Map<string, GNode>() };   // the map's nodes by id, made again when it changes
     // The theme's colours and font, read again twice a second (a theme switch), not every frame (that's a style flush).
-    let tok = { ink: "", quiet: "", font: "", at: -1e9 };
+    let tok = { ink: "", quiet: "", font: "", at: -1e9, theme: "" as string | undefined };
     // On the map's frames: whatever moves on the map (an agent, the big camera, a replay step) draws a frame there, and
     // this picture with it. Its own glide and a read's swelling ring ask the map for more (the return value).
     const draw = (): boolean => {
@@ -100,9 +100,11 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
       const g = graphRef.current, st = mapStyle(), n0 = nowRef.current();
       // Coming out of rest, the glide takes one frame's step, as it would have on a frame loop that kept running.
       const dt = settled ? 1 / 60 : Math.min(0.1, (t - last) / 1000); last = t;
-      if (t - tok.at > 500) {
+      // Read again every half second, and at once after a theme switch (the map may draw only one frame for it).
+      const theme = document.documentElement.dataset.theme;
+      if (t - tok.at > 500 || theme !== tok.theme) {
         const cs = getComputedStyle(el);
-        tok = { ink: cs.getPropertyValue("--ink").trim() || "#121214", quiet: cs.getPropertyValue("--cool").trim() || "#c7cbd6", font: cs.getPropertyValue("--font-body") || "sans-serif", at: t };
+        tok = { ink: cs.getPropertyValue("--ink").trim() || "#121214", quiet: cs.getPropertyValue("--cool").trim() || "#c7cbd6", font: cs.getPropertyValue("--font-body") || "sans-serif", at: t, theme };
       }
       const { ink, quiet, font } = tok;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

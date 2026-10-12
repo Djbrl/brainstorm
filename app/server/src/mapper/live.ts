@@ -95,13 +95,20 @@ export function flattenEdges(c: Cached) {
   c.map.edges = edges;
 }
 
+/** A file's content deflated, in a buffer of its own size: zlib hands back a 16 KB chunk even for a few hundred bytes,
+ * so 3,000 kept files held about 48 MB instead of 3 MB. */
+export function deflate(content: string | Buffer): Buffer {
+  const z = deflateRawSync(content, { level: 1 });
+  return z.buffer.byteLength > z.length * 2 ? Buffer.copyBytesFrom(z) : z;
+}
+
 /** Keep each file's content, a slice at a time after the map is out (compressing 3,000 files takes ~100 ms). */
 export function fillSnapshots(c: Cached, reads: Read[]) {
   let i = 0;
   const step = () => {
     for (const end = Math.min(reads.length, i + 300); i < end; i++) {
       const r = reads[i];
-      if (r.content && c.byPath.has(r.abs) && !c.snapshots.has(r.abs)) c.snapshots.set(r.abs, deflateRawSync(r.content, { level: 1 }));
+      if (r.content && c.byPath.has(r.abs) && !c.snapshots.has(r.abs)) c.snapshots.set(r.abs, deflate(r.content));
     }
     if (i < reads.length) setImmediate(step);
   };
@@ -321,7 +328,7 @@ export class LiveMap {
       if (!r || removed.has(r.abs)) continue;
       if (r.content) {
         const before = snapshotOf(c, r.abs, c.byPath.has(r.abs) || c.unselected.has(r.abs));
-        const after = deflateRawSync(r.content, { level: 1 }); // deflate is deterministic: same bytes, same content
+        const after = deflate(r.content); // deflate is deterministic: same bytes, same content
         if (!(before instanceof Buffer && before.equals(after))) this.bus.emit("file-content", fileChange(r.abs, at, before, after));
         c.snapshots.set(r.abs, after);
       }

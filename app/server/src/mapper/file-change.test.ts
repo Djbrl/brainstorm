@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { deflateRawSync } from "node:zlib";
-import { fileChange } from "./live";
+import { deflate, fileChange } from "./live";
 import { CommandEdits } from "../listener/command-edits";
 
 test("a file-content event carries the path; its content is read only when asked", () => {
@@ -24,4 +24,10 @@ test("the changes command edits keep are bounded by bytes, and never decompresse
   assert.ok(kept.changeBytes <= 16 * 1024 * 1024, `${kept.changeBytes}`);
   assert.equal(kept.changes.at(-1)!.path, "/r/f9");
   assert.equal(reads, 0);
+});
+
+test("a kept snapshot holds about its own size, not zlib's 16 KB chunk", () => {
+  const z = deflate("export const a = 1;\n".repeat(50));
+  assert.ok(z.buffer.byteLength <= 8192, `held ${z.buffer.byteLength} bytes for ${z.length}`);
+  assert.equal(fileChange("/r/a.ts", 1, z, null).before, "export const a = 1;\n".repeat(50));
 });

@@ -26,6 +26,8 @@ export const KNOBS: Knob[] = [
   { name: "DO_NOT_TRACK", about: "", hidden: true },
   { name: "RUNDOWN_USAGE_DEV", about: "1 lets a dev build send the usage counts (for testing the report; optional).", example: "1" },
   { name: "RUNDOWN_USAGE_URL", about: "Where the usage counts go (for testing the report; optional).", example: "http://127.0.0.1:3000/api/usage" },
+  { name: "RUNDOWN_DEBUG", about: "1 shows the server's debug lines, Nest's list of modules and routes at start among them (optional).", example: "1" },
+  { name: "NO_COLOR", about: "", hidden: true },
   { name: "RUNDOWN_CLAUDE_DIR", about: "", hidden: true },
   { name: "CLAUDE_PROJECTS_DIR", about: "", hidden: true },
   { name: "RUNDOWN_CODEX_DIR", about: "", hidden: true },
@@ -84,6 +86,10 @@ export const config = {
   /** The plugin started without its settings (an older Claude Code): a key added later needs a new session. */
   get noSettings(): boolean { return raw("RUNDOWN_NO_SETTINGS") === "1"; },
   get pluginId(): string { return raw("RUNDOWN_PLUGIN_ID") || "rundown@rundown"; },
+  /** No colour codes in the log (https://no-color.org: set and not empty). */
+  get noColor(): boolean { return !!raw("NO_COLOR"); },
+  /** The log's debug lines too. */
+  get debugLog(): boolean { return raw("RUNDOWN_DEBUG") === "1"; },
   /** $HOME as the shell has it (for "~" in commands). */
   get home(): string | undefined { return raw("HOME") || undefined; },
 };

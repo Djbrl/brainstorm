@@ -1,5 +1,0 @@
-out/
-# Fontshare originals are downloaded locally, never redistributed through Git.
-public/fonts/*.woff2
-public/fonts/*.woff
-public/fonts/*.ttf

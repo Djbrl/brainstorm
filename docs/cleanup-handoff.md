@@ -18,6 +18,6 @@ Checks at the end: server 314/314 tests, web 42/42 (vitest), both typechecks cle
 
 ## Left open
 
-See each phase's "Left open" in `docs/cleanup-changes.md`. The main ones: the server doesn't check the hook's signature; release tags; the reader rework; the hosted-demo code (kept by decision); moving `site/` and `video/` out; four audit findings in the listener and attention (listed under Phase 6); the graph library's own animation loop at rest (a later useCanvasZoom branch).
+See each phase's "Left open" in `docs/cleanup-changes.md`. The main ones: the server doesn't check the hook's signature; release tags; the reader rework; the hosted-demo code (kept by decision); four audit findings in the listener and attention (listed under Phase 6); the graph library's own animation loop at rest (a later useCanvasZoom branch).
 
 Worktrees `.claude/worktrees/{phase-1,phase-2,p2-*,p3-*,p4-*,p5-*,p6-*}` can be removed after the merge (`phase-2`'s `app/web/node_modules` link points into `p6-web`).

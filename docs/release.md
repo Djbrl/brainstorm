@@ -27,7 +27,7 @@ Then find every other place that names the old version, and update the ones that
 git grep -n "0\.8\.1" -- . ':!plugin/build' ':!docs/archive' ':!docs/build-log.md' ':!**/package-lock.json'
 ```
 
-Usually that is `README.md` ("Rundown is a preview (version …)"), `plugin/README.md` ("Preview release (…)"), and on the landing page `site/index.html` and `site/README.md`. The build log keeps old versions on purpose. `app/server/package.json` and `app/web/package.json` stay at 0.1.0: they are not published.
+Usually that is `README.md` ("Rundown is a preview (version …)"), `plugin/README.md` ("Preview release (…)"), and on the landing page (its own repository, `rundown-site`) `index.html` and `README.md`. The build log keeps old versions on purpose. `app/server/package.json` and `app/web/package.json` stay at 0.1.0: they are not published.
 
 ## 3. Build
 

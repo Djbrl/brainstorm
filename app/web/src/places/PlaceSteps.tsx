@@ -10,7 +10,7 @@ import { useNavState } from "../lib/nav";
 import { usePlaceRows } from "./rows";
 import { displayLabel } from "../step/format";
 import { injectedLabel } from "../lib/chapters";
-import { useLiveSelector } from "../lib/live";
+import { useThreadSteps } from "../lib/live";
 import { LinkedLabel } from "../lib/links";
 import { HOME_NAME, placesStore, runWords, usePlaces, useSelectPlace, type PlaceRun } from "./data";
 import { MomentRow, useCursorScroll } from "../map/thread/moments";
@@ -21,7 +21,7 @@ export function PlaceSteps() {
   const { data, selected } = usePlaces();
   const { thread, step: stepId } = useNavState();
   const selectPlace = useSelectPlace();
-  const steps = useLiveSelector((st) => (thread ? st.steps[thread.sessionId] : undefined));
+  const steps = useThreadSteps(thread?.sessionId);
   const stepById = useMemo(() => new Map((steps ?? []).map((x) => [x.id, x])), [steps]);
   const { rows, at, go } = usePlaceRows();
   const runs = rows.flatMap((r) => (r.run ? [r.run] : []));

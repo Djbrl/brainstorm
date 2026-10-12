@@ -44,6 +44,9 @@ export function FileView({ file, root, edges, onFocus }: {
   // Unique: a file can import from the same module in several statements.
   const imports = useMemo(() => [...new Set(edges.filter((e) => e.from === file.path).map((e) => e.to))], [file.path, edges]);
   const usedBy = useMemo(() => [...new Set(edges.filter((e) => e.to === file.path).map((e) => e.from))], [file.path, edges]);
+  // The steps that touched it, from the threads whose steps are loaded: the open one (held) and the last few let go of
+  // (KEEP_UNHELD in lib/live.tsx). An older thread's steps are let go of, so they drop out of this list; holding every
+  // thread for it would undo that, and the server has no route that answers "which steps touched this file".
   const touching = useMemo(() => {
     const out: Step[] = [];
     for (const list of Object.values(steps)) for (const s of list) if (s.filePath === file.path || s.reads?.includes(file.path)) out.push(s);

@@ -5,7 +5,7 @@
 // (App's LiveFollow). Space replays.
 import { useEffect, useRef, useState } from "react";
 import { useNavActions, useNavState } from "../../lib/nav";
-import { useLiveSelector } from "../../lib/live";
+import { useLiveSelector, useThreadSteps } from "../../lib/live";
 import { focusAgent, useAgentFocus, useThreadAgents } from "../../lib/agentFocus";
 import { useTheme } from "../../lib/theme";
 import { agentColor, initial, inkOn } from "../agents";
@@ -59,7 +59,7 @@ function AgentPicker({ title }: { title?: string }) {
   const sid = thread?.sessionId ?? null;
   const agents = useThreadAgents(sid);
   const focus = useAgentFocus(sid);
-  const steps = useLiveSelector((s) => (sid ? s.steps[sid] : undefined));
+  const steps = useThreadSteps(sid);
   useTheme(); // the colours follow the map theme
   const accent = readTokens().accent;
   // One row that scrolls sideways (a wheel scrolls it too), an edge fading where more agents hide; the one picked is

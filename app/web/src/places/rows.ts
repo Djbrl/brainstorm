@@ -1,7 +1,7 @@
 // The open thread as rows of places, for the Places list and its player (PlaceSteps, CoworkView): each
 // stretch of work in a place, and Your computer before, between and after them (moments with no place: the code); the
 // row the thread is at; and going to a row (the thread's cursor to its moment, the map's marker to its place).
-import { useLiveSelector } from "../lib/live";
+import { useThreadSteps } from "../lib/live";
 import { useNavActions, useNavState, useReplayCursor } from "../lib/nav";
 import { useThread } from "../lib/thread";
 import { placeRuns, placesStore, usePlaces, type PlaceRun } from "./data";
@@ -36,7 +36,7 @@ export function usePlaceRows() {
   const { thread } = useNavState();
   const { full, light, index, pos, stepOf, steps } = usePlaceTimeline();
   const { setReplayIndex, setReplayPlaying } = useNavActions();
-  useLiveSelector((s) => (thread ? s.steps[thread.sessionId] : undefined));   // a new step: rows again
+  useThreadSteps(thread?.sessionId);   // a new step: rows again (held, as useThread holds it)
   const runs = data ? placeRuns(data.events) : [];
   const rows: PlaceRow[] = [];
   let prev = -1;

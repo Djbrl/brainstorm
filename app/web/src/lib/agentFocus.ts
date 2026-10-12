@@ -3,7 +3,7 @@
 // this, so they all agree. Not saved: opening another thread shows everyone again.
 import { useMemo } from "react";
 import type { AgentPresence, Step } from "@contract";
-import { useLiveSelector } from "./live";
+import { useLiveSelector, useThreadSteps } from "./live";
 import { createAtom, useStoreSelector } from "./store";
 import { END, type NavActions, type OpenThread } from "./nav";
 
@@ -45,7 +45,7 @@ function taskName(text: string | undefined): string {
 
 /** The agents of a thread, main first then its subagents (latest started first), with their names. */
 export function useThreadAgents(sessionId: string | null): ThreadAgent[] {
-  const steps = useLiveSelector((s) => (sessionId ? s.steps[sessionId] : undefined));
+  const steps = useThreadSteps(sessionId); // held: the picker can show with no other view holding the thread
   const live = useLiveSelector((s) => s.agents);
   return useMemo(() => {
     if (!sessionId || !steps) return [];

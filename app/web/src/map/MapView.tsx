@@ -19,7 +19,7 @@ import { useThreadLayer, type ThreadLayerApi } from "./thread/ThreadLayer";
 import { islandPath, isPlaceRoot, useIslands } from "../lib/islands";
 import { enterProject } from "../lib/switcher";
 import { focusAgent, setAgentFocus, useAgentFocus } from "../lib/agentFocus";
-import { useLiveActions, useLiveSelector } from "../lib/live";
+import { useLiveActions, useLiveSelector, useThreadSteps } from "../lib/live";
 import { useNavActions } from "../lib/nav";
 import { useCamera, type Camera, type ReplayCamera } from "./camera";
 import { useTheme } from "../lib/theme";
@@ -71,7 +71,7 @@ export function MapView() {
   // perf/web-store's structure counter when the store has it (files or imports added, removed or moved).
   const sv = useLiveSelector((s) => s.structureVersion);
   // Files outside the project (another repo an orchestrator edits, a visitor's own project): islands beside the map.
-  const islandSteps = useLiveSelector((s) => (replay ? s.steps[replay.sessionId] : undefined));
+  const islandSteps = useThreadSteps(replay?.sessionId); // held while the thread is open
   // On the overview, only the agents still on the map (working, or seen in the last 10 minutes) keep an island: looked
   // at again every minute, so an agent that went quiet hours ago no longer leaves one beside the map.
   const islandMinute = useNow(60_000);

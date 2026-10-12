@@ -1,39 +1,23 @@
-# Cleanup handoff (11 Oct 2026, evening)
+# Cleanup handoff (12 Oct 2026)
 
-Phases 1 to 4 of the audit's plan are done on local branches. Nothing is pushed or merged to `main`.
+All six phases of the audit's plan are done on `cleanup/phase-2` (181 commits on `main` 56eb7a5, which it fast-forwards). Each phase was reviewed and its findings fixed. Nothing is pushed or merged.
 
-- **The audit and the to-do list:** the Claude Doc "Rundown code audit", https://claude.ai/code/artifact/767fb401-b9b7-4bfb-936c-03fc5129868a.
+- **Every change, with its why and what you might notice:** `docs/cleanup-changes.md`.
+- **The audit and the to-do list:** the Claude Doc "Rundown code audit", https://claude.ai/code/artifact/767fb401-b9b7-4bfb-936c-03fc5129868a (Phases 2 to 4 ticked).
 - **Full reports and probes:** branch `claude/review` (keep it local: it documents the holes and the computer name).
-- **Fixer brief:** `docs/cleanup-fix-brief.md`.
+- **Fixer brief:** `docs/cleanup-fix-brief.md`. **Release checklist:** `docs/release.md`.
 
-## Branches
+Checks at the end: server 314/314 tests, web 42/42 (vitest), both typechecks clean, `build-plugin.mjs --check` builds and reports `plugin/build` as out of date (expected until the release rebuild).
 
-| Branch | State |
-| --- | --- |
-| `cleanup/phase-1` | Done, reviewed. 17 commits on `main` 56eb7a5. |
-| `cleanup/phase-2` | Phases 2 and 3, on top of `cleanup/phase-1`: 64 commits, 236/236 tests, both typechecks clean. Phases 2 and 3 reviewed; every finding fixed (Phase 3: tsconfig lookup bounded to the project, exact aliases, a 10 s limit on git's ignored-folder listing, a returning folder's spelling saved). The To-do tab is ticked for both phases. |
-| `cleanup/p2-*`, `cleanup/p3-*`, `cleanup/p4-*` | All merged into `cleanup/phase-2`; their worktrees can be removed. |
+## Merge and release (maintainer)
 
-## Before release (maintainer)
+1. `git -C ~/rundown merge --ff-only cleanup/phase-2`
+2. `npm install` in `app/server` and `app/web` (the web tests add vitest), then follow `docs/release.md`: bump the version, rebuild `plugin/build`, `--check`, tag.
+3. Before tagging, with the new build installed, run `/rundown:open`, `/rundown:share` and `/rundown:stop` once: their `allowed-tools` were narrowed to the launcher and never tested live. If one stops loading, revert `d8e70b6`.
+4. Site deploy steps (email settings, the one-time usage index, the old waitlist): see the Phase 3 site section of `docs/cleanup-changes.md`.
 
-1. Run `/rundown:open`, `/rundown:share` and `/rundown:stop` once in a logged-in session with the new build: their `allowed-tools` is now `Bash(node *${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs*)`, not tested live. If any stops loading, revert `d8e70b6`.
-2. Look once at a project folder renamed while Rundown runs (the picker should say which folder went missing), and at a link that opens straight onto a thread (the re-framing timers were removed).
-3. The privacy page's date is 11 October (the site branch changed it).
-4. Behaviour changes users may notice: in git repos committed `.github`, `vendor`, `build`, `.idea` folders now show on the map; 0.4-era hooks (`x-brainstorm-hook`, `BRAINSTORM_*` env) are refused; pages use `127.0.0.1` instead of `localhost`.
+## Left open
 
-## Site deploy (maintainer, in order)
+See each phase's "Left open" in `docs/cleanup-changes.md`. The main ones: the server doesn't check the hook's signature; release tags; the reader rework; the hosted-demo code (kept by decision); moving `site/` and `video/` out; four audit findings in the listener and attention (listed under Phase 6); the graph library's own animation loop at rest (a later useCanvasZoom branch).
 
-1. Vercel env: `RESEND_API_KEY`, `RESEND_FROM` (verified Resend domain). `UNSUBSCRIBE_SECRET` now also signs confirm links: never change it. Optional `SITE_URL`.
-2. Deploy, then `node --env-file=tools/.env.local tools/index-usage.mjs` (dry run), then with `--yes`.
-3. Old waitlist entries count as unconfirmed. `tools/migrate-waitlist.mjs` counts them; `--keep` makes them confirmed (only if their original consent counts).
-4. Optional: Vercel Firewall rate limit on `/api/waitlist` and `/api/*`.
-
-## Left for later
-
-- Hooks: the server doesn't yet check an HMAC proof from the hook (the hook checks the server). Release tags. The reader rework (risk in the listener's sink).
-- `ListenerService.updateStep` and the `step-update` message are never sent; delete or use.
-- `app/README.md` (the hackathon brief) still mentions Nemotron and `brainstorm.db`.
-- Audit items not done: peek and diff line-number colours, the nav trailing-slash case.
-- `test/regex-timing.test.cjs` is timing-based and flaked once.
-- Phase 4 is done (not separately reviewed). Kept on purpose: copies whose behaviour differs (listed in the commits). Next: Phase 5 (split the large files, renames) and Phase 6 (tests, release process).
-- Thread titles: attached context next to typed words is no longer in the title; typed HTML stays.
+Worktrees `.claude/worktrees/{phase-1,phase-2,p2-*,p3-*,p4-*,p5-*,p6-*}` can be removed after the merge (`phase-2`'s `app/web/node_modules` link points into `p6-web`).

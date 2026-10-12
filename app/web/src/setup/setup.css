@@ -1,116 +1,115 @@
-/* Setup screen: one calm column, big type. */
-.su-root { height: 100%; overflow-y: auto; background: var(--bg); position: relative; }
+/* Setup: pick a folder, then a short checklist while Rundown reads it. One calm column in the app's own type scale
+   (titles like the app's other pages, 15px body, 13-14px quiet text) and its own buttons: pills, the main one in ink,
+   the other with a hairline. Every colour is a theme token, so the dark map themes carry over. */
+.su-root { height: 100%; overflow-y: auto; background: var(--bg); color: var(--ink); position: relative; }
 .su-wordmark { position: absolute; top: 22px; left: 28px; color: var(--ink); }
 .su-wordmark .logo { display: block; height: 20px; width: auto; }
-.su-col { max-width: 720px; margin: 0 auto; padding: 14vh 32px 96px; animation: su-in .5s cubic-bezier(.2,.7,.2,1) both; }
-.su-back { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; color: var(--accent); font-weight: 500; padding: 4px 0; margin-bottom: 20px; }
-.su-title { font-size: 60px; font-weight: 800; letter-spacing: -0.04em; line-height: 1.05; }
-.su-lede { margin: 16px 0 0; font-size: 20px; line-height: 1.5; color: var(--ink-2); max-width: 600px; }
-.su-name { overflow-wrap: anywhere; }
-.su-lede.su-path-shown { font-family: var(--font-mono); font-size: 14px; color: var(--ink-3); margin-top: 10px; overflow-wrap: anywhere; }
+.su-home { border: 0; background: none; padding: 0; cursor: pointer; border-radius: 6px; }
+.su-home:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.su-col { max-width: 640px; margin: 0 auto; padding: max(96px, 13vh) 32px 72px; animation: su-in .5s cubic-bezier(.2,.7,.2,1) both; }
+.su-title { font-size: 34px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.15; overflow-wrap: anywhere; }
+.su-lede { margin: 10px 0 0; font-size: 16px; line-height: 1.5; color: var(--ink-2); max-width: 560px; }
 
-/* Pick: one viewport. The heading and the field stay put; the projects scroll in their own area. */
-.su-col.su-pick { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: max(64px, 9vh) 32px 20px; }
-.su-pick .su-title { font-size: clamp(36px, 5.2vh, 52px); }
-.su-pick .su-lede { font-size: 17px; margin-top: 10px; }
-.su-pick .su-back { align-self: flex-start; margin-bottom: 12px; }
-.su-find { position: relative; display: flex; gap: 10px; margin-top: 28px; flex: none; }
-.su-find .su-input { font-family: inherit; font-size: 16px; padding: 13px 16px 13px 42px; }
-.su-find-icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
-.su-pick .su-list { margin-top: 18px; flex: 0 1 auto; min-height: 120px; overflow-y: auto; overscroll-behavior: contain; padding: 0 14px; margin-left: -14px; margin-right: -14px;
-  -webkit-mask-image: linear-gradient(#000 calc(100% - 20px), transparent); mask-image: linear-gradient(#000 calc(100% - 20px), transparent); padding-bottom: 20px; }
-.su-pick .su-ws { padding: 11px 14px; gap: 16px; border-radius: 12px; animation: none; }
-.su-pick .su-list.intro .su-ws { animation: su-in .4s cubic-bezier(.2,.7,.2,1) both; }
-.su-pick .su-ws-name { font-size: 18px; }
-.su-pick .su-ws-path { font-size: 12px; margin-top: 1px; }
-.su-pick .su-ws-meta { font-size: 13px; text-align: right; line-height: 1.35; }
-.su-pick .su-none { margin-top: 24px; }
-.su-count { flex: none; margin: 8px 0 0; font-size: 13px; color: var(--ink-3); }
-@media (max-width: 600px) { .su-col.su-pick { padding: 56px 16px 16px; } .su-pick .su-ws-path { display: none; } }
+/* A folder path: body font, ~ for home; the start gives way first, the folder's name stays. */
+.su-path { display: flex; min-width: 0; max-width: 100%; white-space: nowrap; }
+.su-path-head { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.su-path-tail { flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.su-lede.su-path-shown { margin-top: 6px; font-size: 14px; color: var(--ink-3); }
 
-/* Suggestions */
-.su-list { margin-top: 44px; border-top: 1px solid var(--line); }
-.su-ws { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto 20px; align-items: center; gap: 20px; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: transparent; padding: 20px 14px; margin: 0 -14px; width: calc(100% + 28px); border-radius: 14px; outline: none; transition: background .15s; animation: su-in .4s cubic-bezier(.2,.7,.2,1) both; }
-.su-ws:hover:not(:disabled), .su-ws:focus-visible { background: var(--accent-soft); }
-.su-ws:focus-visible .su-ws-go { color: var(--accent); transform: translateX(2px); }
-.su-ws-main { display: flex; flex-direction: column; min-width: 0; }
-.su-ws-name { font-family: var(--font-display); font-weight: 700; font-size: 24px; letter-spacing: -0.02em; line-height: 1.2; }
-.su-ws-path { font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-3); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.su-ws-meta { font-size: 14px; color: var(--ink-3); white-space: nowrap; }
-.su-ws-go { color: var(--ink-3); display: grid; place-items: center; transition: color .15s, transform .15s; }
-.su-ws.gone { opacity: .45; cursor: default; }
-.su-ws:disabled:not(.gone):not(.busy) { opacity: .6; }
-.su-none { margin-top: 40px; color: var(--ink-2); font-size: 16px; }
-.su-skel { display: flex; flex-direction: column; gap: 8px; padding: 22px 0; border-bottom: 1px solid var(--line); animation: su-in .4s both; }
-.su-skel span { height: 18px; width: 40%; border-radius: 8px; background: linear-gradient(90deg, #efeff4 0%, #e5e5ee 40%, #efeff4 80%); background-size: 200% 100%; animation: su-shimmer 1.3s linear infinite; }
-.su-skel span + span { height: 12px; width: 65%; }
+/* Buttons: the app's pills. Main action in ink (like "Reload" or "Open the live map"), a second one with a hairline
+   (like "Change project" and "Settings" in the header), quiet ones as words. */
+.su-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex: none; border: 1px solid var(--ink); background: var(--ink); color: var(--bg);
+  font: inherit; font-size: 14px; font-weight: 600; line-height: 20px; border-radius: 999px; padding: 9px 18px; min-height: 40px; cursor: pointer; transition: opacity .15s, background .15s; }
+.su-btn:not(:disabled):hover { opacity: .86; }
+.su-btn:disabled { background: var(--fill); border-color: var(--line); color: var(--ink-3); cursor: default; }
+.su-btn:focus-visible, .su-ghost:focus-visible, .su-choose:focus-visible, .su-link:focus-visible, .su-back:focus-visible, .su-anyway:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.su-ghost, .su-choose, .su-anyway { display: inline-flex; align-items: center; gap: 8px; flex: none; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 14px; font-weight: 600; line-height: 20px; border-radius: 999px; padding: 9px 18px; min-height: 40px; cursor: pointer; transition: border-color .15s, background .15s; }
+:is(.su-ghost, .su-choose, .su-anyway):not(:disabled):hover { border-color: var(--ink-3); }
+.su-choose:disabled { opacity: .6; cursor: default; }
+.su-choose svg { color: var(--ink-2); }
+.su-link { border: 0; background: transparent; color: var(--ink-2); font-size: 14px; font-weight: 500; padding: 9px 4px; border-radius: 8px; }
+.su-link:hover { color: var(--ink); }
 
-/* The find field (it takes a folder path too) and buttons */
-.su-input { flex: 1; min-width: 0; font: inherit; font-family: var(--font-mono); font-size: 14.5px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; outline: none; transition: border-color .15s, box-shadow .15s; }
-.su-input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+/* ---------- Pick: one viewport. The heading and the field stay put; the projects scroll in their own area. ---------- */
+.su-col.su-pick { height: 100%; display: flex; flex-direction: column; padding: max(88px, 10vh) 32px 20px; }
+.su-back { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; color: var(--ink-2); font-size: 14px; font-weight: 500; padding: 4px 8px 4px 2px; margin: 0 0 14px -2px; border-radius: 8px; }
+.su-back:hover { color: var(--ink); }
+.su-pick .su-choose { align-self: flex-start; margin-top: 24px; }
+.su-sub { margin: 32px 0 0; font-family: var(--font-body); font-size: 14px; font-weight: 600; letter-spacing: 0; color: var(--ink-2); }
+.su-find { position: relative; display: flex; gap: 8px; margin-top: 10px; flex: none; align-items: center; }
+.su-input { flex: 1; min-width: 0; font: inherit; font-size: 15px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 14px 10px 38px; min-height: 44px; outline: none; transition: border-color .15s, box-shadow .15s; }
+.su-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .su-input::placeholder { color: var(--ink-3); }
-.su-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; border: 0; background: var(--accent); color: #fff; font-weight: 600; font-size: 15px; border-radius: 12px; padding: 0 22px; min-width: 88px; transition: opacity .15s, transform .15s, box-shadow .15s; }
-.su-btn:disabled { opacity: .35; cursor: default; }
-.su-btn:not(:disabled):hover { transform: translateY(-1px); }
-.su-btn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--accent-soft); }
-.su-btn.big { font-family: var(--font-display); font-size: 19px; font-weight: 700; height: 56px; padding: 0 32px; border-radius: 16px; }
-.su-btn.big:not(:disabled) { animation: su-ready .5s cubic-bezier(.2,.7,.2,1); box-shadow: 0 8px 24px rgba(37,99,235,.25); }
-.su-error { margin: 10px 0 0; color: var(--risk); font-size: 14.5px; }
+.su-find-icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
+.su-error { margin: 10px 0 0; color: var(--risk-ink); font-size: 14px; line-height: 1.5; }
+.su-error.ask { color: var(--ink-2); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.su-anyway { padding: 5px 14px; min-height: 32px; font-size: 13.5px; }
 
-/* Checklist */
-.su-steps { list-style: none; margin: 48px 0 0; padding: 0; display: flex; flex-direction: column; }
-.su-step { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 18px; padding: 16px 0; border-bottom: 1px solid var(--line); animation: su-in .45s cubic-bezier(.2,.7,.2,1) both; }
-.su-step:first-child { border-top: 1px solid var(--line); }
-.su-step.pending .su-step-label { color: var(--ink-3); }
+.su-list { margin-top: 12px; border-top: 1px solid var(--line); flex: 0 1 auto; min-height: 120px; overflow-y: auto; overscroll-behavior: contain;
+  padding: 0 10px 20px; margin-left: -10px; margin-right: -10px;
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 20px), transparent); mask-image: linear-gradient(#000 calc(100% - 20px), transparent); }
+.su-list.intro .su-ws { animation: su-in .4s cubic-bezier(.2,.7,.2,1) both; }
+.su-ws { display: grid; grid-template-columns: minmax(0, 1fr) auto 16px; align-items: center; gap: 16px; width: calc(100% + 20px); margin: 0 -10px; padding: 12px 10px;
+  text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 10px; background: transparent; color: var(--ink); outline: none; transition: background .15s; }
+.su-ws:hover:not(:disabled), .su-ws:focus-visible { background: var(--row-hover, var(--accent-soft)); }
+.su-ws:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.su-ws-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.su-ws-name { font-size: 16px; font-weight: 600; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.su-ws-path { font-size: 13px; color: var(--ink-3); }
+.su-ws-meta { font-size: 13px; line-height: 1.35; color: var(--ink-3); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.su-ws-go { color: var(--ink-3); display: grid; place-items: center; transition: color .15s, transform .15s; }
+.su-ws:hover:not(:disabled) .su-ws-go, .su-ws:focus-visible .su-ws-go { color: var(--ink); transform: translateX(2px); }
+.su-ws.gone { opacity: .5; cursor: default; }
+.su-ws:disabled:not(.gone):not(.busy) { opacity: .6; }
+.su-none { margin-top: 20px; color: var(--ink-2); font-size: 15px; }
+.su-count { flex: none; margin: 6px 0 0; font-size: 13px; color: var(--ink-3); }
+.su-skel { display: flex; flex-direction: column; gap: 7px; padding: 15px 0; border-bottom: 1px solid var(--line); animation: su-in .4s both; }
+.su-skel span { height: 14px; width: 36%; border-radius: 7px; background: var(--fill, var(--line)); animation: su-breathe 1.3s ease-in-out infinite; }
+.su-skel span + span { height: 11px; width: 60%; }
+
+/* ---------- Checklist: every row on one grid, a 24px mark then the words. ---------- */
+.su-steps { list-style: none; margin: 36px 0 0; padding: 0; border-top: 1px solid var(--line); }
+.su-step { display: grid; grid-template-columns: 24px minmax(0, 1fr); column-gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--line); animation: su-in .45s cubic-bezier(.2,.7,.2,1) both; }
 .su-step-body { min-width: 0; }
-.su-step-top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
-.su-step-label { font-family: var(--font-display); font-weight: 700; font-size: 21px; letter-spacing: -0.015em; line-height: 1.3; transition: color .3s; }
-.su-step-count { font-size: 14px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
-.su-step-detail { margin-top: 3px; font-size: 15px; color: var(--ink-3); line-height: 1.5; overflow-wrap: anywhere; }
-.su-step-detail.hint { margin-top: 8px; padding: 2px 0 2px 14px; border-left: 2px solid var(--warm); color: var(--ink-2); white-space: pre-wrap; }
-.su-step.error .su-step-detail.hint { border-left-color: var(--risk); }
-.su-prog { margin-top: 10px; height: 4px; border-radius: 2px; background: #ececf1; overflow: hidden; }
+.su-step-top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; min-height: 24px; }
+.su-step-label { font-size: 16px; font-weight: 600; line-height: 24px; transition: color .3s; }
+.su-step.pending .su-step-label { color: var(--ink-3); }
+.su-step-count { font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.su-step-detail { margin-top: 2px; font-size: 14px; color: var(--ink-3); line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
+.su-step-detail.hint { color: var(--ink-2); }
+.su-prog { margin-top: 8px; height: 3px; border-radius: 2px; background: var(--track, var(--line)); overflow: hidden; }
 .su-prog span { display: block; height: 100%; border-radius: 2px; background: var(--accent); transition: width .6s cubic-bezier(.2,.7,.2,1); }
 
-.su-glyph { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; margin-top: 1px; transition: background .3s, color .3s; }
-.su-glyph.pending { background: transparent; }
-.su-pend { width: 8px; height: 8px; border-radius: 50%; background: var(--cool); }
-.su-glyph.running { background: var(--accent-soft); color: var(--accent); }
-.su-glyph.done { background: rgba(31,157,85,.12); color: var(--ok); animation: su-pop .35s cubic-bezier(.2,.9,.3,1.4); }
-.su-glyph.warn { background: #fff4e0; color: #c77a00; animation: su-pop .35s cubic-bezier(.2,.9,.3,1.4); }
-.su-glyph.error { background: #fdecea; color: var(--risk); animation: su-pop .35s cubic-bezier(.2,.9,.3,1.4); }
+.su-glyph { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; transition: background .3s, color .3s; }
+.su-pend { width: 7px; height: 7px; border-radius: 50%; background: var(--cool); }
+.su-glyph.running { color: var(--accent); }
+.su-glyph.done { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); animation: su-pop .35s cubic-bezier(.2,.9,.3,1.4); }
+/* Not a failure, something to know (no API key, no threads yet): a soft amber mark, the words in plain ink. */
+.su-glyph.warn { background: color-mix(in srgb, var(--warm) 22%, transparent); color: color-mix(in srgb, var(--warm) 45%, var(--ink)); }
+.su-glyph.error { background: color-mix(in srgb, var(--risk) 14%, transparent); color: var(--risk-ink); animation: su-pop .35s cubic-bezier(.2,.9,.3,1.4); }
 .su-draw { stroke-dasharray: 16; stroke-dashoffset: 16; animation: su-draw .4s .05s ease forwards; }
-.su-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(37,99,235,.25); border-top-color: var(--accent); animation: su-spin .8s linear infinite; display: inline-block; }
-.su-spin.light { border-color: rgba(255,255,255,.4); border-top-color: #fff; }
+.su-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid color-mix(in srgb, currentColor 22%, transparent); border-top-color: currentColor; animation: su-spin .8s linear infinite; display: inline-block; flex: none; }
+.su-glyph .su-spin, .su-ws-go .su-spin { color: var(--accent); }
 
-.su-actions { display: flex; align-items: center; gap: 24px; margin-top: 40px; }
-.su-link { border: 0; background: transparent; color: var(--ink-3); font-size: 15px; padding: 6px 0; transition: color .15s; }
-.su-link:hover { color: var(--accent); }
-.su-note { margin: 16px 0 0; font-size: 14.5px; color: var(--ink-3); }
+.su-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 32px; }
 
 @keyframes su-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-@keyframes su-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes su-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
 @keyframes su-spin { to { transform: rotate(360deg); } }
 @keyframes su-pop { from { transform: scale(.6); } to { transform: scale(1); } }
 @keyframes su-draw { to { stroke-dashoffset: 0; } }
-@keyframes su-ready { from { transform: scale(.97); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .su-col, .su-ws, .su-step, .su-glyph, .su-skel span { animation: none !important; } .su-draw { stroke-dashoffset: 0; } }
 
-/* Pick: the system's folder window first, then the folders Claude Code and Codex have worked in. */
-/* Choose a folder: the same sheet as the search field and the project rows (surface, hairline, the theme's ink), not
-   the big blue call to action. */
-.su-choose { display: inline-flex; align-items: center; gap: 10px; margin-top: 28px; height: 48px; padding: 0 20px 0 16px; border: 1px solid var(--line);
-  border-radius: 12px; background: var(--surface); color: var(--ink); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
-  transition: border-color .15s, box-shadow .15s, background .15s; }
-.su-choose svg { color: var(--accent); }
-.su-choose:not(:disabled):hover { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
-.su-choose:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
-.su-choose:disabled { opacity: .6; cursor: default; }
-.su-sub { margin: 36px 0 0; font-size: 15px; font-weight: 600; color: var(--ink-2); }
-.su-pick .su-sub + .su-find { margin-top: 12px; }
-.su-home { border: 0; background: none; padding: 0; cursor: pointer; }
-.su-pick .su-choose { display: inline-flex; flex: none; align-self: flex-start; height: 48px; } /* the picker's column is a flex column */
-
-/* A big folder that isn't a git project: said calmly (not an error), with Open anyway. */
-.su-error.ask { color: var(--ink-2); display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.su-anyway { border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13.5px; font-weight: 600; padding: 5px 14px; cursor: pointer; }
-.su-anyway:hover { border-color: var(--accent); color: var(--accent); }
+/* A narrow window: the header's 16px gutter, a smaller title, the paths kept (they shorten from the middle). */
+@media (max-width: 600px) {
+  .su-wordmark { left: 16px; top: 23px; }
+  .su-wordmark .logo { height: 17px; }
+  .su-col { padding: 80px 16px 48px; }
+  .su-col.su-pick { padding: 72px 16px 16px; }
+  .su-title { font-size: 28px; }
+  .su-lede { font-size: 15px; }
+  .su-ws { gap: 12px; }
+  .su-actions .su-btn, .su-actions .su-ghost { flex: 1 1 auto; justify-content: center; }
+}

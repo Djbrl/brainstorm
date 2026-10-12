@@ -9,6 +9,20 @@ import "./setup.css";
 
 const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`;
 const nameOf = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p;
+/** The home folder said as ~ (the server's paths are absolute; a home folder is /Users/<name> or /home/<name>). */
+const tildePath = (p: string) => p.replace(/^\/(?:Users|home)\/[^/]+(?=\/|$)/, "~");
+
+/** A folder path in the body font, home as ~. When it doesn't fit, the middle gives way (the start is cut with an
+ * ellipsis, the folder's own name stays whole); the full path is on hover. */
+function PathLine({ path, className = "" }: { path: string; className?: string }) {
+  const shown = tildePath(path);
+  const cut = Math.max(0, shown.lastIndexOf("/", shown.length - 2));
+  return (
+    <span className={`su-path ${className}`} title={path}>
+      <span className="su-path-head">{shown.slice(0, cut)}</span><span className="su-path-tail">{shown.slice(cut)}</span>
+    </span>
+  );
+}
 
 async function getSuggestions(): Promise<WorkspaceSuggestion[]> {
   const d = await get<WorkspaceSuggestion[]>("/api/workspace/suggestions").catch(() => []);
@@ -110,7 +124,7 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
       {onCancel && <button className="su-back" onClick={onCancel}><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 3.5L5.5 8l4.5 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>Back</button>}
       <h1 className="su-title">Pick a workspace</h1>
       {missing
-        ? <p className="su-lede">The folder <b>{missing.name}</b> isn't at {missing.root} anymore: it was renamed, moved or deleted. Pick it again where it is now.</p>
+        ? <p className="su-lede">The folder <b>{missing.name}</b> isn't at {tildePath(missing.root)} anymore: it was renamed, moved or deleted. Pick it again where it is now.</p>
         : <p className="su-lede">Rundown maps the code in a folder and follows the agents (Claude Code or Codex) working in it, live.</p>}
 
       <button className="su-choose" onClick={choose} disabled={choosing || !!busy}>
@@ -125,7 +139,7 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
         <input ref={inputRef} className="su-input" value={query} placeholder="Find a project" spellCheck={false} autoComplete="off" aria-label="Find a project (or paste a folder path)"
           onChange={(e) => { setQuery(e.target.value); setError(null); }}
           onKeyDown={(e) => { if (e.key === "ArrowDown") { e.preventDefault(); items()[0]?.focus(); } }} />
-        {isPath && <button className="su-btn" type="submit" disabled={!!busy}>{busy === q ? <span className="su-spin light" /> : "Open"}</button>}
+        {isPath && <button className="su-btn" type="submit" disabled={!!busy}>{busy === q ? <span className="su-spin" /> : "Open"}</button>}
       </form>
       {error && (
         <p className={`su-error${ask ? " ask" : ""}`} role="alert">{error}
@@ -141,7 +155,7 @@ function Pick({ onOpened, onCancel }: { onOpened: (s: SetupStatus, root: string)
             <button key={s.root} className={`su-ws ${s.exists ? "" : "gone"} ${busy === s.root ? "busy" : ""}`} disabled={!s.exists || !!busy} onClick={() => open(s.root)} style={{ animationDelay: `${Math.min(i, 10) * 35}ms` }} role="option" aria-selected={false}>
               <span className="su-ws-main">
                 <span className="su-ws-name">{s.name || nameOf(s.root)}</span>
-                <span className="su-ws-path">{s.root}</span>
+                <PathLine className="su-ws-path" path={s.root} />
               </span>
               <span className="su-ws-meta">
                 {!s.exists ? "folder not found" : <>{s.sessions ? plural(s.sessions, "thread") : "no threads yet"}{s.lastActiveAt && <><br />{relTime(s.lastActiveAt, now)}</>}</>}
@@ -183,7 +197,7 @@ function Loading({ status, root, onDone, onBack }: { status: SetupStatus | null;
   return (
     <div className="su-col">
       <h1 className="su-title su-name">{status?.name || nameOf(root)}</h1>
-      <p className="su-lede su-path-shown">{status?.root || root}</p>
+      <p className="su-lede su-path-shown"><PathLine path={status?.root || root} /></p>
 
       <ol className="su-steps">
         {steps.length === 0 && <li className="su-step"><StateGlyph state="running" /><div className="su-step-body"><div className="su-step-label">Getting started</div></div></li>}
@@ -206,10 +220,10 @@ function Loading({ status, root, onDone, onBack }: { status: SetupStatus | null;
       </ol>
 
       <div className="su-actions">
-        <button ref={btnRef} className="su-btn big" disabled={!ready} onClick={onDone}>
-          {ready ? "Open Rundown" : <><span className="su-spin light" />Getting ready</>}
+        <button ref={btnRef} className="su-btn" disabled={!ready} onClick={onDone}>
+          {ready ? "Open Rundown" : <><span className="su-spin" />Getting ready</>}
         </button>
-        <button className="su-link" onClick={onBack}>{failed ? "Pick another folder" : "Choose a different folder"}</button>
+        <button className="su-ghost" onClick={onBack}>{failed ? "Pick another folder" : "Choose a different folder"}</button>
       </div>
     </div>
   );

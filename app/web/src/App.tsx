@@ -196,7 +196,7 @@ function Shell() {
       <LiveFollow />
       {DEMO && kind === "preview" && <DemoOpen />}
       {/* The hosted demo keeps its one welcome card; your own Rundown has the tour (its last step asks about usage stats). */}
-      {isRecording() ? (DEMO && kind === "preview" || !thread) && kind !== "shared" && <Welcome /> : kind !== "shared" && kind !== "preview" && <><Tour /><AfterTour /></>}
+      {DEMO && kind === "preview" ? <Tour /> : isRecording() ? !thread && kind !== "shared" && <Welcome /> : kind !== "shared" && kind !== "preview" && <><Tour /><AfterTour /></>}
       <main className="view"><Crashed where="the map" key={`${thread?.sessionId ?? ""}|${lens}`}><Suspense fallback={<Loading />}>{
         screen === "offline" ? <Offline />
           : screen === "missing" ? <MissingThread onBack={stopReplay} />

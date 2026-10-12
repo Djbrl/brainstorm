@@ -20,6 +20,9 @@
 //   useReplay()               the open thread with its cursor: renders again as the cursor moves (the views that draw it).
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { ReplayDetail } from "./thread";
+
+/** How much of a thread shows at first: the hosted demo shows every step. */
+const DETAIL: ReplayDetail = import.meta.env.VITE_DEMO === "1" ? "full" : "light";
 import { listeners, readStored, readStoredJson, shallowEqual, useStoreSelector, writeStored } from "./store";
 
 /** How a thread is shown: where it happened in the code, or the places it went outside the code. */
@@ -193,7 +196,7 @@ export function createNavStore(): NavStore {
     file: first.file ?? null,
     step: first.step,
     lens: first.lens,
-    thread: first.thread ? { sessionId: first.thread, speed: 1, detail: "light", mode: "steps", atStep: first.step ?? undefined } : null,
+    thread: first.thread ? { sessionId: first.thread, speed: 1, detail: DETAIL, mode: "steps", atStep: first.step ?? undefined } : null,
     cursor: { index: first.thread ? END : 0, playing: false },
     cursorStep: null,
     hiddenAgents: loadHidden(),
@@ -236,7 +239,7 @@ export function createNavStore(): NavStore {
 
   const startReplay: NavActions["startReplay"] = (sid, at = 0, opts) => set({
     ...replayPatch((r) => ({
-      sessionId: sid, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: opts?.mode ?? "steps",
+      sessionId: sid, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? DETAIL, mode: opts?.mode ?? "steps",
       index: typeof at === "number" ? Math.max(0, at) : 0, atStep: typeof at === "string" ? at : undefined, live: !!opts?.live,
     })),
     step: null,
@@ -267,7 +270,7 @@ export function createNavStore(): NavStore {
     openStep: (sid, stepId) => set({
       ...replayPatch((r) => (r && r.sessionId === sid
         ? { ...r, atStep: stepId, playing: false, live: false }
-        : { sessionId: sid, index: 0, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: "steps", atStep: stepId })),
+        : { sessionId: sid, index: 0, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? DETAIL, mode: "steps", atStep: stepId })),
       step: stepId,
     }),
     showStep: (stepId) => { flags.replaceNext = true; set({ step: stepId }); },
@@ -295,7 +298,7 @@ export function createNavStore(): NavStore {
         ...replayPatch((r) => {
           if (!p.thread) return null;
           if (r && r.sessionId === p.thread) return p.step ? { ...r, atStep: p.step, playing: false } : r;
-          return { sessionId: p.thread, index: END, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? "light", mode: "steps", atStep: p.step ?? undefined };
+          return { sessionId: p.thread, index: END, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? DETAIL, mode: "steps", atStep: p.step ?? undefined };
         }),
       });
     });

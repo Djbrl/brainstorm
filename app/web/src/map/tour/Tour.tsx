@@ -6,7 +6,7 @@
 // The usage-stats question is its last step. A step with nothing to show (no thread yet, no Readmap on a phone) is left out.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { AgentPresence, FileNode, Step } from "@contract";
-import { useLiveSelector, useThreadSteps } from "../../lib/live";
+import { isRecording, useLiveSelector, useThreadSteps } from "../../lib/live";
 import { END, useNavActions, useNavState } from "../../lib/nav";
 import { PRIVACY_URL, useUsageSetting } from "../../lib/usage";
 import { TOUR_AGENT, tourStore, useTour, type TourStep } from "../../lib/tour";
@@ -59,6 +59,7 @@ export function Tour() {
   const finish = () => {
     window.dispatchEvent(new CustomEvent("rundown-sidebar", { detail: { tab: "threads" } }));
     tourStore.finish();
+    if (isRecording() && latest) actions.startReplay(latest.id, END);   // the demo goes back to its thread
   };
 
   // ---- what each step does to the app ----
@@ -142,7 +143,9 @@ export function Tour() {
 
 function cardFor(step: TourStep, { threads, title }: { threads: number; title?: string }): Card {
   switch (step) {
-    case "hello": return { title: "Welcome to Rundown", body: "Rundown shows what your coding agents do in this project, live, on a map of your files. Here's a quick look around: about a minute." };
+    case "hello": return isRecording()
+      ? { title: "Welcome to Rundown", body: "Rundown shows what your coding agents do in a project, live, on a map of your files. This is a recording of Claude Code and its subagents at work on a small trail-finder app. Here's a quick look around: about a minute." }
+      : { title: "Welcome to Rundown", body: "Rundown shows what your coding agents do in this project, live, on a map of your files. Here's a quick look around: about a minute." };
     case "threads": return { title: "Your threads", anchor: ".map-sidebar", body: threads
       ? "Each Claude Code or Codex session in this project is a thread, newest first. A blue dot means it's working right now."
       : "Each Claude Code or Codex session in this project will be a thread here, newest first, as soon as an agent works in it." };
@@ -153,7 +156,9 @@ function cardFor(step: TourStep, { threads, title }: { threads: number; title?: 
     case "readmap": return { title: "The Readmap", anchor: ".readmap", body: "Agents often read files far from where they work. The Readmap follows what they read, up close, so you don't have to look for it. M hides or shows it." };
     case "keys": return { title: "Shortcuts", anchor: ".threadbar-keys", body: "Space plays a thread back, T shows or hides the sidebar, M the Readmap. ? lists them all." };
     case "stats": return { title: "One last question", body: "Can Rundown send anonymous usage stats, once a day? Counts only (how much you used it), its version, your OS and country. Never code, paths, prompts or names. You can change this in Settings." };
-    case "end": return { title: "You're all set", body: "That's the tour. You can take it again any time from Settings." };
+    case "end": return isRecording()
+      ? { title: "Your turn", body: "The thread is open again: click a step to see it, press Space to watch it play, P for the places it went outside the code. ? lists every key." }
+      : { title: "You're all set", body: "That's the tour. You can take it again any time from Settings." };
   }
 }
 

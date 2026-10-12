@@ -1,8 +1,14 @@
 import "reflect-metadata";
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Replay, Session, Step } from "../shared/contract";
 import { ShareController } from "./share.controller";
+
+// A scratch data folder: the private redaction list (data/redact.json) of whoever runs the suite stays out of it.
+process.env.RUNDOWN_DATA_DIR = mkdtempSync(join(tmpdir(), "rundown-share-"));
 
 test("a share carries no Ask answers, and its file name comes from the masked title", async () => {
   const session = { id: "s1", cwd: "/tmp/p", title: "use ghp_FAKEfakeFAKEfake0123456789abcd to push", startedAt: "2026-10-11T10:00:00Z", lastEventAt: "", status: "idle", harness: "claude" } satisfies Session;

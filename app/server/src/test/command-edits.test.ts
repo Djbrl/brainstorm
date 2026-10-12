@@ -52,8 +52,10 @@ test("live: the diff comes from what the mapper saw change while the command ran
   t.bus.emit("file-content", { path: `${ROOT}/other.ts`, before: "x", after: "y", at: now - 1000 });
   appendFileSync(f, jsonl([call, result]));
   await t.readNow(f);
-  await new Promise((r) => setTimeout(r, 1800)); // live command edits wait for the mapper
-  const edits = t.listener.store.listSteps("s1").filter((s) => s.kind === "edit");
+  // Live command edits wait (1.5 s) for the mapper to see the files change: wait for them, not for a fixed time.
+  const editsNow = () => t.listener.store.listSteps("s1").filter((s) => s.kind === "edit");
+  for (const end = Date.now() + 10_000; editsNow().length < 2 && Date.now() < end; ) await new Promise((r) => setTimeout(r, 25));
+  const edits = editsNow();
   assert.deepEqual(edits.map((e) => e.filePath).sort(), [`${ROOT}/app.css`, `${ROOT}/app.vue`]);
   const vue = edits.find((e) => e.filePath!.endsWith("app.vue"));
   assert.deepEqual(vue!.diff, { before: "<h1>Hi</h1>\n<p>a</p>\n", after: "<h1>Hi dad</h1>\n<p>a</p>\n" });

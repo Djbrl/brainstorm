@@ -29,7 +29,9 @@ test("a listener that rejects is caught too", async () => {
   const onUnhandled = () => { unhandled = true; };
   process.on("unhandledRejection", onUnhandled);
   bus.emit("workspace", { root: "/x" });
-  await new Promise((r) => setTimeout(r, 10));
+  // An unhandled rejection is reported once the microtasks drain: two turns of the loop are past that.
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
   process.off("unhandledRejection", onUnhandled);
   assert.equal(after, true);
   assert.equal(unhandled, false);

@@ -11,28 +11,29 @@ import { commandWrites } from "../listener/command-writes";
 import { EMAIL, maskEmails } from "../replay/privacy";
 import { maskSecrets } from "../privacy/mask";
 
-/** The best of `runs` timings of `fn`, in ms. */
-function best(fn: () => unknown, runs = 3): number {
-  let min = Infinity;
-  for (let i = 0; i < runs; i++) {
-    const t0 = performance.now();
-    fn();
-    min = Math.min(min, performance.now() - t0);
-  }
-  return min;
-}
+/** The time of one call of `fn`, in ms. */
+const once = (fn: () => unknown) => { const t0 = performance.now(); fn(); return performance.now() - t0; };
 /** Under this, the full size is quick whatever the curve (a quadratic shape at these sizes takes seconds). */
 const QUICK_MS = 5;
 /** 4 times the input in under this many times the time: linear (4) or n log n passes, quadratic (16) fails. */
 const MAX_GROWTH = 8;
 
-/** `make(k)` builds the input at k times the shape's size and returns the work to time. */
+/**
+ * `make(k)` builds the input at k times the shape's size and returns the work to time. The two sizes are timed in
+ * turn (so a burst of load hits both) and the best of each kept; a shape that looks too slow is timed once more,
+ * longer, before it fails: load can fool one measurement, a quadratic shape fails every one.
+ */
 const fast = (name: string, make: (k: number) => () => unknown) => {
   const small = make(0.25), full = make(1);
   small(); full(); // warm up (the regex compiles, the JIT settles)
-  const a = best(small), b = best(full);
-  if (b < QUICK_MS) return;
-  assert.ok(b / Math.max(a, 0.01) < MAX_GROWTH, `${name}: ${a.toFixed(1)} ms at a quarter of the size, ${b.toFixed(1)} ms at full size (not linear)`);
+  const measure = (runs: number) => {
+    let a = Infinity, b = Infinity;
+    for (let i = 0; i < runs; i++) { a = Math.min(a, once(small)); b = Math.min(b, once(full)); }
+    return { a, b, ok: b < QUICK_MS || b / Math.max(a, 0.01) < MAX_GROWTH };
+  };
+  let m = measure(3);
+  if (!m.ok) m = measure(7);
+  assert.ok(m.ok, `${name}: ${m.a.toFixed(1)} ms at a quarter of the size, ${m.b.toFixed(1)} ms at full size (not linear)`);
 };
 /** `s` repeated to about n characters. */
 const rep = (s: string, n: number) => s.repeat(Math.max(1, Math.ceil(n / s.length)));

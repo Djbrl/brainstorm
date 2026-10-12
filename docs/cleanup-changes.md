@@ -432,3 +432,21 @@ The product app carried code only the hosted demo (brainstorm-next) uses. It now
 - **Demo build**: `lib/preview.ts` (agent playback, the setup run's stand-in for `/api/workspace`) and the "Setup preview" button and banner load only with `VITE_DEMO=1`. `npm run build:demo` builds the demo into `app/web/dist-demo/` with its recording as `replay.json`. Checked: the normal production bundle has none of the preview code (grep of the built JS), and the demo build, served locally, opens on the recording, moves the agents and plays the setup run like the build made the old way. Commit `4b0c0ce`.
 - **redact.json** stays: shared replays use it too. It is now documented (fields, what each one replaces) in [demo.md](demo.md), with the recording and build recipe. Commit `0c736ec`.
 - What a user might notice: nothing. The product's bundle is a little smaller.
+
+### Setup screens
+
+The maintainer found the "Pick a workspace" picker and the checklist after it dated and unlike the rest of the app (a 60px title, mono paths, a big glowing cobalt "Open Rundown"), and wanted them to work in a narrow window.
+
+- **Type and layout**: titles at the app's page size (34px, 28px on a phone), 15-16px body, 13-14px quiet text; the checklist rows on one grid (a 24px mark, then the words) with the same sizes everywhere; the "no API key" and "no threads yet" notes in plain ink beside a soft amber mark, no orange bar. Commit `ab11e35`.
+- **Paths**: in the body font, the home folder as `~`; when a path is too long the start gives way and the folder's own name stays, with the full path on hover. Same in the project rows and in the "folder went away" message.
+- **Buttons**: the app's pills. "Open Rundown" is an ink pill, "Choose a different folder" and "Choose a folder…" a hairline pill like the header's "Change project" and "Settings", Back a quiet word. On a phone the two actions take the full width.
+- **Themes**: every colour is now a theme token (the skeleton, the progress track, the marks and the spinners were fixed light colours), so the Prism and Hologram themes carry over; focus rings are visible, reduced motion is respected.
+- Checked at 1440, 800, 420 and 360 px, light, Prism and Hologram. The demo build (`npm run build:demo`) still compiles.
+
+### Buttons
+
+No filled cobalt buttons anywhere: the app's restrained main button is the ink pill with the page colour as text, which follows every theme. Blue stays for links, focus rings, live dots and selection.
+
+- Outside the map (`f1a798a`): the boot and trouble pages' button (its hover went cobalt, and the dark themes made it pale blue with light text, under AA in Prism), Ask's send button, the skip link.
+- On the map, CSS only (`f12cf0c`): "Back to live", the tour's and the welcome card's main button, the replay's Play.
+- Kept blue on purpose: the switched-on filter chip in the thread list (a selection, not an action).

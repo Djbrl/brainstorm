@@ -20,6 +20,9 @@ await build({
     outDir: TMP, emptyOutDir: true, cssCodeSplit: false, assetsInlineLimit: 100_000_000, chunkSizeWarningLimit: 5_000,
     rollupOptions: { output: { inlineDynamicImports: true } },
   },
+  // One file has no chunks: the app's manualChunks (vite.config.ts) can't be combined with inlineDynamicImports, and a
+  // value of undefined here wouldn't replace it (vite's merge skips it), so it's taken out once the configs are merged.
+  plugins: [{ name: "rundown-share-no-chunks", config(c) { if (c.build?.rollupOptions?.output) delete c.build.rollupOptions.output.manualChunks; } }],
 });
 
 let html = readFileSync(join(TMP, "index.html"), "utf8");

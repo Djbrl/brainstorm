@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { closeSync, openSync, readdirSync, readSync, statSync } from "node:fs";
+import { closeSync, openSync, readSync, statSync, type Dirent } from "node:fs";
+import { readdir, stat } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import type { ElsewhereThread } from "../shared/contract";
 import { worktreeRepo } from "../shared/paths";
@@ -23,6 +24,13 @@ const LIVE_MS = 2 * 60_000;
 /** A thread waiting on you stays listed this long without a word from it. */
 const WAIT_MS = 2 * 60 * 60_000;
 const HEAD_BYTES = 64 * 1024;
+/** Files looked at at once. */
+const IO_CONCURRENCY = 32;
+
+async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>) {
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => { while (next < items.length) await fn(items[next++]); }));
+}
 
 const repoOf = (p: string) => real(worktreeRepo(real(p)));
 
@@ -42,37 +50,64 @@ function readAt(file: string, from: "head" | "tail", bytes = HEAD_BYTES): string
 export class ElsewhereService {
   private roots = new Map<string, string | null>(); // Claude Code project folder → its repo (decoded once)
   private cwds = new Map<string, string | null>();  // log file → where its thread runs (its first cwd)
+  /** Each folder's entries, kept while its mtime stays the same (a log growing doesn't change its folder's). */
+  private listings = new Map<string, { mtimeMs: number; entries: Dirent[] }>();
+  /** A call in progress: callers at the same moment share it. */
+  private pending?: Promise<ElsewhereThread[]>;
 
   constructor(private cfg: ConfigService, private listener: ListenerService, private attention: AttentionService, private store: StepsStore) {}
 
-  list(): ElsewhereThread[] {
+  /** A folder's entries (from the cache while the folder's mtime hasn't changed), or undefined if it can't be read. */
+  private async entries(dir: string): Promise<Dirent[] | undefined> {
+    let mtimeMs: number;
+    try { mtimeMs = (await stat(dir)).mtimeMs; } catch { this.listings.delete(dir); return undefined; }
+    const hit = this.listings.get(dir);
+    if (hit && hit.mtimeMs === mtimeMs) return hit.entries;
+    let entries: Dirent[];
+    try { entries = await readdir(dir, { withFileTypes: true }); } catch { return undefined; }
+    this.listings.set(dir, { mtimeMs, entries });
+    if (this.listings.size > 20_000) this.listings.delete(this.listings.keys().next().value!);
+    return entries;
+  }
+
+  list(): Promise<ElsewhereThread[]> {
+    return (this.pending ??= this.listNow().finally(() => { this.pending = undefined; }));
+  }
+
+  private async listNow(): Promise<ElsewhereThread[]> {
     const now = Date.now();
     const here = this.listener.scopeRoots().map(real);
     const isHere = (p: string) => here.some((r) => inside(real(p), r) || inside(repoOf(p), r));
     const out: ElsewhereThread[] = [];
 
-    // Claude Code: one folder per project, one log per thread (its subagents' logs in <thread>/subagents/).
-    let dirs: string[] = [];
-    try { dirs = readdirSync(this.cfg.claudeProjectsDir); } catch { /* no Claude Code here */ }
-    for (const d of dirs) {
+    // Claude Code: one folder per project, one log per thread (its subagents' logs in <thread>/subagents/). Folders
+    // are listed again only when they change; the logs are stat'ed, a few at a time, off the event loop.
+    const logs: { dir: string; d: string; name: string; sub: boolean }[] = [];
+    const isDir = (e: Dirent) => e.isDirectory() || e.isSymbolicLink();
+    const dirs = (await this.entries(this.cfg.claudeProjectsDir))?.filter(isDir).map((e) => e.name) ?? [];
+    await mapLimit(dirs, IO_CONCURRENCY, async (d) => {
       const dir = join(this.cfg.claudeProjectsDir, d);
-      let names: string[];
-      try { names = readdirSync(dir); } catch { continue; }
-      for (const name of names) {
-        if (!name.endsWith(".jsonl")) continue;
-        const file = join(dir, name);
-        const sid = basename(name, ".jsonl");
-        let st;
-        try { st = statSync(file); } catch { continue; }
-        const last = Math.max(st.mtimeMs, this.subagentsChanged(join(dir, sid)));
-        const state = this.stateOf(sid, last, now);
-        if (!state) continue;
-        const cwd = this.cwdOf(file);
-        const root = cwd ? repoOf(cwd) : this.rootOf(d);
-        if (!root || isHere(cwd ?? root) || /\/Library\/Application Support\//.test(root)) continue;
-        if (isIdleTranscript(file, st.size)) continue; // only slash commands so far: not a thread yet
-        out.push({ sessionId: sid, harness: "claude", title: this.claudeTitle(file, sid), root, project: basename(root), lastEventAt: new Date(last).toISOString(), state });
-      }
+      const entries = await this.entries(dir);
+      if (!entries) return;
+      const folders = new Set(entries.filter(isDir).map((e) => e.name));
+      for (const e of entries) if (e.name.endsWith(".jsonl") && !e.isDirectory()) logs.push({ dir, d, name: e.name, sub: folders.has(basename(e.name, ".jsonl")) });
+    });
+    const live: { file: string; d: string; sid: string; size: number; last: number; state: ElsewhereThread["state"] }[] = [];
+    await mapLimit(logs, IO_CONCURRENCY, async ({ dir, d, name, sub }) => {
+      const file = join(dir, name);
+      const sid = basename(name, ".jsonl");
+      let st;
+      try { st = await stat(file); } catch { return; }
+      const last = Math.max(st.mtimeMs, sub ? await this.subagentsChanged(join(dir, sid)) : 0);
+      const state = this.stateOf(sid, last, now);
+      if (state) live.push({ file, d, sid, size: st.size, last, state });
+    });
+    for (const { file, d, sid, size, last, state } of live) {
+      const cwd = this.cwdOf(file);
+      const root = cwd ? repoOf(cwd) : this.rootOf(d);
+      if (!root || isHere(cwd ?? root) || /\/Library\/Application Support\//.test(root)) continue;
+      if (isIdleTranscript(file, size)) continue; // only slash commands so far: not a thread yet
+      out.push({ sessionId: sid, harness: "claude", title: this.claudeTitle(file, sid), root, project: basename(root), lastEventAt: new Date(last).toISOString(), state });
     }
 
     // Codex: its live threads (their repo already worked out by the Codex reader).
@@ -108,12 +143,11 @@ export class ElsewhereService {
   }
 
   /** The newest change among a thread's subagents' logs (0 when it has none). */
-  private subagentsChanged(threadDir: string): number {
-    const sub = join(threadDir, "subagents");
-    let names: string[];
-    try { names = readdirSync(sub); } catch { return 0; }
+  private async subagentsChanged(threadDir: string): Promise<number> {
+    const entries = await this.entries(join(threadDir, "subagents"));
+    if (!entries) return 0;
     let max = 0;
-    for (const n of names) if (n.endsWith(".jsonl")) { try { max = Math.max(max, statSync(join(sub, n)).mtimeMs); } catch { /* gone */ } }
+    for (const e of entries) if (e.name.endsWith(".jsonl")) { try { max = Math.max(max, (await stat(join(threadDir, "subagents", e.name))).mtimeMs); } catch { /* gone */ } }
     return max;
   }
 

@@ -21,10 +21,10 @@
 .ask-form:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
 .ask-input { flex: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 15.5px; color: var(--ink); min-width: 0; padding: 6px 0; }
 .ask-input::placeholder { color: var(--ink-3); }
-.ask-send { width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--accent); color: #fff; display: grid; place-items: center; flex: none; transition: opacity .15s, transform .15s; }
+.ask-send { width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--ink); color: var(--bg); display: grid; place-items: center; flex: none; transition: opacity .15s, transform .15s; }
 .ask-send:disabled { opacity: .35; cursor: default; }
 .ask-send:not(:disabled):hover { transform: scale(1.05); }
-.ask-spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; animation: ask-spin .8s linear infinite; }
+.ask-spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid color-mix(in srgb, currentColor 40%, transparent); border-top-color: currentColor; animation: ask-spin .8s linear infinite; }
 
 .md p { margin: 0 0 10px; }
 .md p:last-child { margin-bottom: 0; }

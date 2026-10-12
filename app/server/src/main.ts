@@ -60,7 +60,7 @@ async function bootstrap() {
   }
 
   const version = config.version ?? "dev";
-  // For the log: the version and the commit it was built from ("0.8.1 (56eb7a5)"). server.json keeps the bare version.
+  // For the log: the version and the commit it was built from ("1.2.3 (abc1234)"). server.json keeps the bare version.
   const commit = buildCommit();
   const named = `${version}${commit ? ` (${commit})` : ""}`;
   const first = config.port;

@@ -115,7 +115,7 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
       this.dbs.db.prepare(`DELETE FROM attention_hooks WHERE at < ?`).run(since);
       for (const r of this.dbs.db.prepare(`SELECT session_id, signal, at FROM attention_hooks`).all() as { session_id: string; signal: string; at: number }[]) {
         try { this.saved.set(r.session_id, { ...JSON.parse(r.signal), at: r.at }); } catch { /* skip a bad row */ }
-        this.hooksAt = Math.max(this.hooksAt ?? 0, r.at);
+        this.heard(r.session_id, r.at);
       }
     });
     this.schedule(Date.now() + FIRST_SWEEP_MS);
@@ -147,7 +147,7 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
       for (const ms of QUIET_STEPS) consider(t.lastTs + ms + 1);
       if (t.hook) consider(t.hook.at + FORGET_MS + 1);
     }
-    if (this.hooksAt !== null) consider(this.hooksAt + HOOKS_TRUSTED_MS + 1);
+    for (const at of this.hooksAt.values()) consider(at + HOOKS_TRUSTED_MS + 1);
     return next;
   }
 
@@ -157,13 +157,22 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
     return [...this.last.values()].filter((a) => a.state !== "working" && a.state !== "idle").sort((a, b) => b.since.localeCompare(a.since)); // thinking included: pages show it
   }
 
-  /** When a hook last reached this server (null: never; then the log's guesses stand in for them). */
-  private hooksAt: number | null = null;
+  /** When a hook last reached this server, per thread. A thread that sends hooks is known by them; any other (Codex,
+   * a thread from before the plugin, another Claude Code without it) keeps the log's guesses. */
+  private hooksAt = new Map<string, number>();
+  private heard(sid: string, at: number) { if (at > (this.hooksAt.get(sid) ?? 0)) this.hooksAt.set(sid, at); }
+  private hooksTrusted(sid: string, now: number) {
+    const at = this.hooksAt.get(sid);
+    if (at === undefined) return false;
+    if (now - at < HOOKS_TRUSTED_MS) return true;
+    this.hooksAt.delete(sid);
+    return false;
+  }
 
   /** From the plugin's hooks (`fromHook` false: the same signal worked out from a log, Codex's task_complete). */
   signal(sig: HookSignal, fromHook = true) {
     if (!sig?.session_id || !sig.event) return;
-    if (fromHook) this.hooksAt = Date.now();
+    if (fromHook) this.heard(sig.session_id, Date.now());
     const t = this.tracker(sig.session_id);
     if (sig.event === "UserPromptSubmit") { t.hook = undefined; t.streak = null; }
     else t.hook = { ...sig, at: Date.now() };
@@ -282,7 +291,7 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
 
     // 3. An edit or a write that hasn't come back, with nothing else moving: most likely a permission prompt. Only
     // without the hooks: with them, a prompt is always announced (PermissionRequest), so a guess could only be wrong.
-    const hooks = this.hooksAt !== null && now - this.hooksAt < HOOKS_TRUSTED_MS;
+    const hooks = this.hooksTrusted(sid, now);
     const held = hooks ? undefined : pending.find((c) => INSTANT.has(c.tool ?? (c.kind === "edit" ? "Edit" : "")));
     if (held && quiet > QUIET_MS) return make("permission", false, Date.parse(held.ts), about(held));
 

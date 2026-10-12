@@ -92,13 +92,22 @@ test("a long read, search or web fetch is work, not a permission prompt (the mod
   assert.equal(att.list().find((a) => a.sessionId === "a")?.state ?? "working", "working");
 });
 
-test("with the plugin's hooks heard, a held edit isn't guessed to be a prompt (the hook would have said)", (ctx) => {
+test("with the plugin's hooks heard from a thread, its held edit isn't guessed to be a prompt (the hook would have said)", (ctx) => {
   const { att, store, session } = setup(ctx);
-  att.signal({ event: "UserPromptSubmit", session_id: "other" });
+  att.signal({ event: "UserPromptSubmit", session_id: "a" });
   session("a", iso(30_000));
   store({ sessionId: "a", kind: "prompt", text: "edit it", ts: iso(30_000) });
   store({ sessionId: "a", kind: "edit", tool: "Edit", toolUseId: "e1", ts: iso(20_000) });
   assert.notEqual(att.list().find((a) => a.sessionId === "a")?.state, "permission");
+});
+
+test("hooks from one thread don't stop the guesses for another (Codex, a thread from before the plugin)", (ctx) => {
+  const { att, store, session } = setup(ctx);
+  att.signal({ event: "UserPromptSubmit", session_id: "a" });
+  session("b", iso(30_000));
+  store({ sessionId: "b", kind: "prompt", text: "edit it", ts: iso(30_000) });
+  store({ sessionId: "b", kind: "edit", tool: "Edit", toolUseId: "e1", ts: iso(20_000) });
+  assert.deepEqual(att.list().filter((a) => a.sessionId === "b").map((a) => [a.state, a.sure]), [["permission", false]]);
 });
 
 test("threads outside the workspace are left out of the sweep", (ctx) => {

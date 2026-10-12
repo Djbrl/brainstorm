@@ -67,10 +67,15 @@ function headOf(fd: number, size: number): string | undefined {
   return createHash("sha1").update(buf.subarray(0, nl === -1 ? n : nl + 1)).digest("hex");
 }
 
-/** Read size per step of a file. */
-const CHUNK_BYTES = 4 * 1024 * 1024;
+/** Read size per step of a file (a thread's logs are merged by time: each chunk's lines are parsed as it's read, so
+ * a 4 MB chunk held the loop for 100+ ms). */
+const CHUNK_BYTES = 1024 * 1024;
 /** Lines stored per transaction, about: the server answers requests between batches. */
 const BATCH_BYTES = 1024 * 1024;
+/** …or fewer: a transaction that took longer than this halves the next one's size (lines with big results, a slow
+ * disk or CPU), one well under it doubles it again, so the loop never waits long. */
+const BATCH_MS = 40;
+const MIN_BATCH_BYTES = 32 * 1024;
 /** A longer line is skipped (with a warning) instead of buffered. The longest seen in real logs is 13 MB (a pasted image). */
 const MAX_LINE_BYTES = 16 * 1024 * 1024;
 const NL = 0x0a;
@@ -198,6 +203,7 @@ export class Tailer {
       let batch: Line[] = [];
       let bytes = 0;
       let commits = 0;
+      let target = this.batchBytes;
       for (;;) {
         let next: Cursor | undefined;
         for (const c of cursors) {
@@ -208,8 +214,12 @@ export class Tailer {
         const l = next.lines[next.next++];
         batch.push(l);
         bytes += l.end - l.start + 1;
-        if (bytes < this.batchBytes) continue;
+        if (bytes < target) continue;
+        const t0 = performance.now();
         if (stale() || !this.commitLines(batch)) return;
+        const ms = performance.now() - t0;
+        if (ms > BATCH_MS) target = Math.max(Math.min(MIN_BATCH_BYTES, this.batchBytes), target / 2);
+        else if (ms < BATCH_MS / 2) target = Math.min(this.batchBytes, target * 2);
         batch = [];
         bytes = 0;
         if (++commits % NOTICE_EVERY === 0) this.noticeStored();

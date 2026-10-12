@@ -55,6 +55,21 @@ const MAP_BROADCAST_OVER = 50;
 const MAP_BROADCAST_GAP_MS = 750;
 /** Files read at once. */
 export const IO_CONCURRENCY = 32;
+/** Work on a batch's files gives the loop back after this long (a branch switch changes thousands at once). */
+export const SLICE_MS = 15;
+
+/** A clock for slicing a long loop: `await slice.due()` yields to the loop once SLICE_MS has passed since the last time. */
+export function slicer(ms = SLICE_MS) {
+  let since = performance.now();
+  return {
+    async due(): Promise<boolean> {
+      if (performance.now() - since < ms) return false;
+      await new Promise<void>((r) => setImmediate(r));
+      since = performance.now();
+      return true;
+    },
+  };
+}
 
 export const posix = (rel: string) => (sep === "/" ? rel : rel.split(sep).join("/"));
 
@@ -200,12 +215,16 @@ export class LiveMap {
     const reads = await this.readFiles(c, root, sorted);
     if (this.host.cached(root) !== c || this.live !== live) return; // switched away meanwhile
 
-    // Apply: removals, then updates and additions. Each change goes on the bus with what the file was before.
+    // Apply: removals, then updates and additions. Each change goes on the bus with what the file was before. The
+    // reads and the imports are worked through in slices (slicer): the map may be switched away between them.
     const at = Date.now();
     const { removed, newFolders } = sorted;
+    const gone = () => this.host.cached(root) !== c || this.live !== live;
     this.applyRemovals(c, removed, at);
-    const { changed, added } = this.applyReads(c, root, reads, removed, at);
-    const edgesChanged = this.resolveAgain(c, root, paths, changed, added, removed);
+    const { changed, added } = await this.applyReads(c, root, reads, removed, at);
+    if (gone()) return;
+    const edgesChanged = await this.resolveAgain(c, root, paths, changed, added, removed);
+    if (gone()) return;
     countFiles(c);
     this.watchNewFolders(live, root, added, changed, newFolders);
     this.tellPages(c, root, changed, edgesChanged, removed);
@@ -291,10 +310,12 @@ export class LiveMap {
   }
 
   /** Files read: updated in place, or added to the map (and its modules); their imports read again. */
-  private applyReads(c: Cached, root: string, reads: (Read | null)[], removed: Set<string>, at: number): { changed: Set<string>; added: number } {
+  private async applyReads(c: Cached, root: string, reads: (Read | null)[], removed: Set<string>, at: number): Promise<{ changed: Set<string>; added: number }> {
     const changed = new Set<string>();
     let added = 0;
+    const slice = slicer();
     for (const r of reads) {
+      await slice.due();
       if (!r || removed.has(r.abs)) continue;
       if (r.content) {
         const before = snapshotOf(c, r.abs, c.byPath.has(r.abs) || c.unselected.has(r.abs));
@@ -323,13 +344,15 @@ export class LiveMap {
   /** Imports: when files came or went, every file's imports may resolve differently; otherwise only the changed files'.
    * A tsconfig changed: its aliases are read again and every import is resolved again. Returns the files whose
    * imports changed. */
-  private resolveAgain(c: Cached, root: string, paths: Set<string>, changed: Set<string>, added: number, removed: Set<string>): Set<string> {
+  private async resolveAgain(c: Cached, root: string, paths: Set<string>, changed: Set<string>, added: number, removed: Set<string>): Promise<Set<string>> {
     const configChanged = [...paths].some((p) => /^[tj]sconfig.*\.json$/.test(basename(p)));
     if (configChanged) this.imports.configsChanged();
     const setChanged = added > 0 || removed.size > 0 || configChanged;
     if (setChanged) this.imports.filesChanged(c.fileSet);
     const edgesChanged = new Set<string>();
-    for (const abs of setChanged ? c.specs.keys() : changed) {
+    const slice = slicer();
+    for (const abs of [...(setChanged ? c.specs.keys() : changed)]) {
+      if (await slice.due() && !c.specs.has(abs)) continue; // removed meanwhile
       const next = this.imports.resolveSpecs(root, abs, c.specs.get(abs) ?? [], c.fileSet);
       if (!sameSet(c.out.get(abs), next)) { c.out.set(abs, next); edgesChanged.add(abs); }
     }

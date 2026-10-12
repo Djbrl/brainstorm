@@ -14,7 +14,7 @@ import { type Signals, scoreFrom, selectFiles } from "./select";
 import { gitLastCommitTimes } from "./git-times";
 import { readMapped } from "./read-file";
 import { ImportResolver, parseImports } from "./imports";
-import { type Cached, type Read, IO_CONCURRENCY, LiveMap, countFiles, fillSnapshots, flattenEdges, mapLimit, posix } from "./live";
+import { type Cached, type Read, IO_CONCURRENCY, LiveMap, countFiles, fillSnapshots, flattenEdges, mapLimit, posix, slicer } from "./live";
 import { Presence } from "./presence";
 
 export { jsImports, stripComments } from "./imports";
@@ -141,10 +141,10 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
       return got.r && { abs, ...got.r };
     })).filter((r): r is Read => !!r);
     const done = (c: Cached) => { if (unread) c.map.unread = unread; return c; };
-    if (listing.rels.length <= maxFiles()) return done(this.assemble(root, listing, await readAll(listing.rels), listMs));
+    if (listing.rels.length <= maxFiles()) return done(await this.assemble(root, listing, await readAll(listing.rels), listMs));
     const sig = this.firstSignals(root, listing);
     const pool = await readAll(selectFiles(listing.rels, Math.min(listing.rels.length, 2 * maxFiles()), scoreFrom(sig)));
-    return done(this.assemble(root, listing, this.chooseFromPool(root, sig, pool), listMs));
+    return done(await this.assemble(root, listing, await this.chooseFromPool(root, sig, pool), listMs));
   }
 
   /** Before reading anything: when files changed (git, mtime, an agent's last step on it) and which ones agents touched. */
@@ -156,19 +156,22 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** The final files out of the pool, now that we know how central (imported by others in the pool) and big each one is. */
-  private chooseFromPool(root: string, sig: Signals, pool: Read[]): Read[] {
+  private async chooseFromPool(root: string, sig: Signals, pool: Read[]): Promise<Read[]> {
     const poolSet = new Set(pool.map((r) => r.abs));
     const importedBy = new Map<string, number>();
     const lines = new Map<string, number>();
-    const rels = pool.map((r) => {
+    const slice = slicer();
+    const rels: string[] = [];
+    for (const r of pool) {
+      await slice.due();
       const rel = posix(relative(root, r.abs));
       lines.set(rel, r.lines);
       for (const to of this.imports.resolveSpecs(root, r.abs, parseImports(r.abs, r.content), poolSet)) {
         const k = posix(relative(root, to));
         importedBy.set(k, (importedBy.get(k) ?? 0) + 1);
       }
-      return rel;
-    });
+      rels.push(rel);
+    }
     const chosen = new Set(selectFiles(rels, maxFiles(), scoreFrom({ ...sig, importedBy, lines })));
     return pool.filter((_, i) => chosen.has(rels[i]));
   }
@@ -188,8 +191,10 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     return out;
   }
 
-  /** The map from the chosen files, already read: modules, imports, edges, times from mtime and any commit times known (the rest come later). */
-  private assemble(root: string, listing: Listing, reads: Read[], listMs: number): Cached {
+  /** The map from the chosen files, already read: modules, imports, edges, times from mtime and any commit times known
+   * (the rest come later). Imports are parsed and resolved in slices (slicer): 3,000 files took 0.5 s in one go. */
+  private async assemble(root: string, listing: Listing, reads: Read[], listMs: number): Promise<Cached> {
+    const slice = slicer();
     const fileSet = new Set(reads.map((r) => r.abs));
     const nodes: FileNode[] = [];
     const byPath = new Map<string, FileNode>();
@@ -198,6 +203,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
     const gitTimes = new Map<string, number>();
     const chosen = new Set<string>();
     for (const r of reads) {
+      await slice.due();
       const rel = posix(relative(root, r.abs));
       chosen.add(rel);
       const moduleId = moduleOf(rel);
@@ -211,7 +217,7 @@ export class MapperService implements OnModuleInit, OnModuleDestroy {
       specs.set(r.abs, parseImports(r.abs, r.content));
     }
     const out = new Map<string, Set<string>>();
-    for (const [abs, s] of specs) out.set(abs, this.imports.resolveSpecs(root, abs, s, fileSet));
+    for (const [abs, s] of specs) { await slice.due(); out.set(abs, this.imports.resolveSpecs(root, abs, s, fileSet)); }
     const unselected = new Set(listing.rels.filter((rel) => !chosen.has(rel)).map((rel) => join(root, rel)));
     const map: ProjectMap = { root, files: nodes, edges: [], modules: [...moduleIds.values()], formerRoots: formerRoots(this.cfg.claudeProjectsDir, root), ...(listing.stopped ? { scanStopped: true } : {}) };
     const c: Cached = {

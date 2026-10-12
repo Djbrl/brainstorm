@@ -7,7 +7,7 @@
 // "last 15 steps" setting, counted in places) are lit and named, the rest fades: what it did up to there, not everything.
 // The camera follows it from site to site: on a small map it frames the site it's in. A click on a place opens its step (CoworkView).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-force-graph-2d";
+import type { NodeObject } from "react-force-graph-2d";
 import { hierarchy, pack } from "d3-hierarchy";
 import type { CoworkArea, CoworkEvent, CoworkPage, CoworkSite, CoworkSummary } from "@contract";
 import { AREA_NAME, HOME, HOME_NAME } from "./data";
@@ -24,6 +24,7 @@ import { sinceMs } from "../lib/visit";
 import { useStepWindow } from "../map/prefs";
 import { glide, GLIDE_MS, setOff, trailPath, type Glider } from "../map/tracer";
 import { useSize } from "../lib/hooks";
+import { useCanvasZoom } from "../map/useCanvasZoom";
 
 /** One circle of the places map. */
 export type PNode = NodeObject & {
@@ -78,6 +79,17 @@ function layout(data: CoworkSummary): PlacesGraph {
   return { id: ++builds, nodes, folders };
 }
 
+/** The place under a point (graph units) at zoom k: the one drawn last (on top) whose circle, at least 5 units wide, holds
+ *  it. Not the areas: they aren't places, a point on one goes to what's inside or to nothing. */
+export function placeUnder(g: PlacesGraph, x: number, y: number, k: number): PNode | null {
+  const slack = 1 / k;   // the library's hit map drew each circle one pixel wider
+  for (let i = g.nodes.length - 1; i >= 0; i--) {
+    const n = g.nodes[i];
+    if (n.kind !== "area" && Math.hypot(x - n.x, y - n.y) <= Math.max(n.r, 5) + slack) return n;
+  }
+  return null;
+}
+
 /** Which place a cowork event stands on: its page when the page has its own dot, else its site. */
 const placeOf = (e: CoworkEvent, ids: ReadonlySet<string>) => (ids.has(`${e.area}|${e.page}`) ? `${e.area}|${e.page}` : `${e.area}|${e.site}`);
 
@@ -98,16 +110,19 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
   letter: string;
 }) {
   const [wrapRef, size] = useSize<HTMLDivElement>();
-  const fg = useRef<ForceGraphMethods<PNode, never> | undefined>(undefined);
+  // The canvas and its camera (map/useCanvasZoom.ts), as on the code map: drawn only when something changes.
+  const frameRef = useRef<(ctx: CanvasRenderingContext2D, k: number) => void>(() => {});
+  const drawFrame = useCallback((ctx: CanvasRenderingContext2D, k: number) => frameRef.current(ctx, k), []);
+  const { canvasRef, ref: fg, canvas } = useCanvasZoom({ width: size.w, height: size.h, draw: drawFrame });
   const theme = useTheme();
   const tokens = useMemo(readTokens, [theme]);
   const graph = useMemo(() => layout(data), [data]);
   const graphRef = useRef(graph); graphRef.current = graph;
   const byId = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n])), [graph]);
   const ids = useMemo(() => new Set(byId.keys()), [byId]);
-  const cam = useCamera(fg as never, wrapRef);
+  const cam = useCamera(fg, wrapRef);
   const camRef = useRef<Camera>(cam); camRef.current = cam;
-  const redraw = useMemo(() => createRedraw(() => { const g = fg.current; if (g) g.zoom(g.zoom()); }), []);
+  const redraw = useMemo(() => createRedraw(() => fg.current?.redraw()), []);
   useEffect(() => () => redraw.stop(), [redraw]);
 
   // ---- where the thread is: Your computer, then the places of its events up to the cursor (all of them, live), in
@@ -284,31 +299,48 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
     redraw.drew(p < 1 ? Motion.Smooth : Motion.None);
   };
 
+  // One frame: the places in drawing order (the context saved before them, restored after each and at the end, as the
+  // graph library painted them), then the names, the trail and the marker.
+  frameRef.current = (ctx, k) => {
+    ctx.save();
+    for (const n of graphRef.current.nodes) { drawNode(n, ctx, k); ctx.restore(); }
+    ctx.restore();
+    endFrame(ctx, k);
+  };
+
+  // Pointing and clicking: the place under the pointer (placeUnder), worked out where the circles are now.
+  const onSelectRef = useRef(onSelect); onSelectRef.current = onSelect;
+  useEffect(() => {
+    if (!canvas) return;
+    canvas.style.cursor = "pointer";   // a place opens its step, the background closes it: everything is clickable
+    const at = (e: PointerEvent) => { const g = fg.current; if (!g) return null; const p = g.toGraph(e.clientX, e.clientY); return placeUnder(graphRef.current, p.x, p.y, g.zoom()); };
+    let down: { x: number; y: number } | null = null, moved = false;
+    const onMove = (e: PointerEvent) => {
+      if (down) { if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 1) moved = true; return; }
+      const n = at(e);
+      setHover(n ? n.id : null);
+    };
+    const onDown = (e: PointerEvent) => { if (e.button === 0) { down = { x: e.clientX, y: e.clientY }; moved = false; } };
+    const onUp = (e: PointerEvent) => {
+      const d = down; down = null;
+      if (!d || e.button !== 0 || moved) return;   // a drag pans: no click
+      const n = at(e);
+      onSelectRef.current(n ? n.id : null);
+    };
+    const onLeave = () => { down = null; setHover(null); };
+    canvas.addEventListener("pointermove", onMove);
+    canvas.addEventListener("pointerdown", onDown);
+    canvas.addEventListener("pointerup", onUp);
+    canvas.addEventListener("pointerleave", onLeave);
+    return () => {
+      canvas.removeEventListener("pointermove", onMove); canvas.removeEventListener("pointerdown", onDown);
+      canvas.removeEventListener("pointerup", onUp); canvas.removeEventListener("pointerleave", onLeave);
+    };
+  }, [canvas]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="cw-map" ref={wrapRef}>
-      <ForceGraph2D<PNode, never>
-        ref={fg as never}
-        width={size.w}
-        height={size.h}
-        graphData={{ nodes: graph.nodes, links: [] }}
-        backgroundColor="rgba(0,0,0,0)"
-        nodeRelSize={1}
-        nodeVal={(n) => (n as PNode).r ** 2}
-        nodeLabel={() => ""}
-        warmupTicks={0}
-        cooldownTicks={0}
-        enableNodeDrag={false}
-        nodeCanvasObject={(n, ctx, scale) => drawNode(n as PNode, ctx, scale)}
-        onRenderFramePost={endFrame}
-        onNodeHover={(n) => setHover(n && (n as PNode).kind !== "area" ? (n as PNode).id : null)}
-        onNodeClick={(n) => { if ((n as PNode).kind !== "area") onSelect((n as PNode).id); }}
-        onBackgroundClick={() => onSelect(null)}
-        nodePointerAreaPaint={(n, color, ctx) => {
-          const p = n as PNode;
-          if (p.kind === "area") return;   // the areas aren't places: clicks go through to what's inside
-          ctx.fillStyle = color; ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(p.r, 5), 0, Math.PI * 2); ctx.fill();
-        }}
-      />
+      <div className="force-graph-container"><canvas ref={canvasRef} /></div>
     </div>
   );
 }

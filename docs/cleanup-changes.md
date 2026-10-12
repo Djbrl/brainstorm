@@ -323,5 +323,76 @@ Behaviour should be the same. The audit found files too big to change safely (th
 - The cowork view still passes 440 as the panel width.
 - An older bug, not new: opening Places with no step leaves its list at the top with a gap, instead of scrolling to the thread's row.
 - Phase 6 (tests, release process) is not started.
+- On a fresh install, the first-run tour closes a thread that was opened from a link. This is how the tour already behaved.
+- The live store's `replay` flag still has its old name, though its check is now `isRecording()`.
 
 Review: no confirmed defects. The reviewer checked that stored settings keys, every server route and every CSS class are unchanged; that the server gets one shared steps store (no duplicate copies); that the launcher reads its options exactly as before; and that every new listener and timer is removed when its view closes. One possible issue, fixed: after a theme switch the Readmap could keep the old theme's colours for a few seconds, because it now draws only when the map does; it now reads the colours again as soon as the theme changes (`49e8069`). Noted as intended: a shared replay no longer shows the demo's preview banner or opens the setup screen.
+
+## Phase 6: tests, release process and performance
+
+Behaviour should be the same, only faster and lighter. This phase made the tests quicker and wider, wrote down how to release, and measured and trimmed the server and the web page where the audit found waste. Phase 6 is not reviewed yet (below).
+
+### What you might notice
+
+- Opening a project is faster. Threads from other places that touched the project's files appear about half a second later than before, instead of the whole server waiting for them.
+- The server log is quieter: about 11 lines at start instead of about 75. The start line shows the version and the build it came from.
+- Lower memory, on the server and in the page, most of all with big threads and big bursts of file changes.
+- Nothing else visible. Screens, links and shared files are the same.
+
+### Tests
+
+- **Server tests** went from 246 to 312 and run in parallel: about 9 seconds instead of 28. The old CommonJS tests are now TypeScript, and modules that had no tests got some (Ask's context, the Places classifier, usage, opening files, line diffs, the Markdown export). Commits `c86b546`, `06686d9`, `6a6c3bf`, `36b9c6a`.
+- **Golden tests** read invented Claude Code and Codex sessions into stored steps and compare the result. They use invented sessions only, no real people or projects. Commit `9628a31`.
+- **Privacy and map tests** run on an invented person and a scratch data folder, and the **security tests boot the real server** to check the guards. Commits `9d3452f`, `fab1bf1`.
+- **The audit's reproductions** were kept as tests wherever a fix landed with nothing guarding it. Commit `2dffd47`.
+- **Timing tests** now compare a quarter-size run and a full-size run in the same pass. They still catch the old slow e-mail pattern and hold when the machine is busy (this closes the Phase 5 note about two of them failing under load). The attention tests use a pretend clock, and fixed sleeps became waits for a condition where one exists. Commits `36b9c6a`, `6a6c3bf`.
+- **The web's first test suite** (vitest, 42 tests) covers the live store, the layout, the thread builder, the switcher, navigation and breakpoints. A randomized test found a real bug: when a file was removed and added again in one batch, other files kept their links to it. Fixed. Commit `bf43c76`.
+- What a user might notice: nothing, except the one fix above (stale links to a re-added file).
+
+### Tooling and release
+
+- **Node 22.13** is named as the version (`engines`, `.nvmrc`), both sides have a typecheck script, and a dev server leaves nothing behind. A dev server can read `app/.env` for a scratch data folder; the folder, data and port settings are documented. Commits `6bd6985`, `cac5e72`.
+- **Quieter log**: about 75 lines at start became about 11. Route lists and other detail appear only with `RUNDOWN_DEBUG`. No colour codes in files or with `NO_COLOR`. The start line shows the version and the commit it came from. The plugin's `server.js` is cut into lines of 500 characters so it reads and reviews well. Commits `2a185e7`, `4a556bb`.
+- **`build-plugin.mjs --check`** builds into a temporary folder and says whether `plugin/build` is up to date, without writing anything. Commit `b07f3b7`.
+- **`docs/release.md`** is the release checklist. It starts with `npm install` on both sides (vitest is new) and includes the web's tests. Commits `6da30e2`, `06627ee`.
+- What a user might notice: a shorter, calmer log.
+
+### Web speed
+
+Numbers are from a thread of 5,918 steps.
+
+- **Result pairing and islands**: pairing a tool result with its call, per live step, went from 1.9 ms to 0.09 ms. Rescanning for islands took 3.0 ms each time; now only new steps are read. The step panel finds its step by id. Commit `7fced19`.
+- **Memory**: after opening and closing 10 threads, the page's memory grew from 33 to 55 MB before; it now settles at 22 MB. The page lets go of closed threads' steps, of agents the server dropped, and of forgotten attention marks. Commit `99e6b99`.
+- **Redraws**: on a quiet project the map redrew 12 times in 30 seconds; now 0. It redraws for fading colours only while a file is recent. Commit `9fc6a53`.
+- **Allocations**: the label pass and the agents' drawing make nothing new on a frame that changes nothing. Over 10 seconds, 469 KB became 277 KB. Placement of labels is unchanged. Commit `372984b`.
+- **First download**: the same total, split into a smaller main part plus React. The graph library has its own file, so a change to the app no longer makes the browser fetch it again. Commit `f8eb566`.
+- **Trimmed edits**: edit views work without the edit's text in the step. Only an edit with no diff asks the server for the whole step. Commit `cd1f5c1`.
+- What a user might notice: a smoother map at rest, less memory over a long session, and quicker updates after a new version.
+
+### Server speed
+
+- **Steps list**: an edit's old and new texts are no longer sent twice. The list leaves them out when the diff already holds them, and `GET /api/steps/:id/input` returns the full text. On a 10,000-step bench thread that is mostly reads, the download went from 12.8 to 11.3 MB; edit-heavy threads save more. Shares, the Markdown export and Ask still use the full inputs. Commit `d6ef3fa`.
+- **File changes**: a change now carries its path, and the old and new texts are read only for a command that wrote the file. Memory for a burst of 2,000 changed files went from 151 to 43 MB, and what is kept is capped at 16 MB. Commit `b9193c7`.
+- **Stalls**: the map's first build, its live updates and the history import hand control back every 15 to 40 ms. On a burst of 4,000 changed files the longest stall went from 144 ms to under 50. The first map build stalled 487 ms; now under 50. Commit `ef06790`.
+- **Opening a project** no longer blocks 300 to 1,200 ms looking for visitor threads. They are found a page at a time just after, so they appear about half a second later. Commit `fa9df37`.
+- **Other projects' list** is read off the main loop, with a cache that is refreshed only when a folder changes. Commit `aab0e23`.
+- **Screenshots**: a 207 MB log is read 4 MB at a time. Memory for a thread with one screenshot at its end went from 501 MB to between 82 and 128 MB. Commit `5bb035e`.
+- **Attention check**: it ran every 2 seconds; it now runs when a thread's state can change. At rest that is 6 times a minute instead of 30. Its query went from 0.78 to 0.00 ms, and threads are indexed by their last step's time. Commit `f5c36f1`.
+- **Memory run**: a 30-minute run under a live writer found no leak. The notes are in the performance document. Commit `e8fac1a`.
+- What a user might notice: a faster start, no short freezes during big bursts of file changes, less memory.
+
+### Putting the work together
+
+- Two conflicts were resolved when the branches met: the trimmed steps list and the deferred visitors in the converted tests, and the attention tests, which now trigger the deadline-driven check instead of a 2-second timer. Commit `1bceded`.
+- The web's fetch for a trimmed edit pointed at a route that did not exist; it now uses the server's real one, and only for an edit with no diff, which the server never trims. Checked: a trimmed edit's diff shows in full. Commit `b7bfb7e`.
+
+### Left open (Phase 6)
+
+- Audit findings not fixed: a custom title marks a thread as active "now"; one thread's hook signal stops guessing for all threads; an unreadable log folder is skipped for good; shell calls inside comments count as edits.
+- Gaps the golden tests found: an image in a tool result leaves no note, and a resumed thread is not linked to the one it came from.
+- A few map tests still use fixed waits.
+- The server address is not yet the last line printed at start.
+- The graph library's own animation loop still runs at rest (a later `useCanvasZoom` branch).
+- The server does not check the hook's signature (from Phase 2).
+
+Review: pending

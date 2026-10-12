@@ -285,8 +285,43 @@ function receiverStart(s: string, end: number): number {
   }
 }
 
+/**
+ * The script with its comments blanked out (`# open('x', 'w')`, `// fs.rmSync('b')`, `/* … *\/`), same length and
+ * same lines, so a call named in a comment isn't read as one. Strings are kept: a `#` or `//` inside quotes isn't a
+ * comment. Perl's `$#array` isn't one either.
+ */
+export function blankComments(lang: Lang, src: string): string {
+  const out = src.split("");
+  const blank = (from: number, to: number) => { for (let k = from; k < to; k++) if (out[k] !== "\n") out[k] = " "; };
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === "'" || c === '"' || (c === "`" && lang === "js")) {
+      const triple = lang === "py" && src.startsWith(c.repeat(3), i);
+      i += triple ? 3 : 1;
+      while (i < src.length) {
+        if (src[i] === "\\") i += 2;
+        else if (triple ? src.startsWith(c.repeat(3), i) : src[i] === c) { i += triple ? 3 : 1; break; }
+        else if (!triple && src[i] === "\n" && lang !== "js" && lang !== "rb" && lang !== "pl") { i++; break; } // an unclosed Python string ends with its line
+        else i++;
+      }
+      continue;
+    }
+    let end = -1;
+    if (lang === "js" && c === "/" && src[i + 1] === "/") end = src.indexOf("\n", i);
+    else if (lang === "js" && c === "/" && src[i + 1] === "*") { const e = src.indexOf("*/", i + 2); end = e < 0 ? src.length : e + 2; }
+    else if (lang !== "js" && c === "#" && !(lang === "pl" && src[i - 1] === "$")) end = src.indexOf("\n", i);
+    else { i++; continue; }
+    if (end < 0) end = src.length;
+    blank(i, end);
+    i = end;
+  }
+  return out.join("");
+}
+
 /** The writes an inline script makes, in order of appearance. */
-export function scanScript(lang: Lang, src: string, dir: string | undefined): { at: number; w: CommandWrite }[] {
+export function scanScript(lang: Lang, code: string, dir: string | undefined): { at: number; w: CommandWrite }[] {
+  const src = blankComments(lang, code);
   const vars: Var[] = [];
   const ev = new Ev(src, lang, dir, vars);
   // Variables first, so a call can use `p = Path('app.vue')` from lines above it.

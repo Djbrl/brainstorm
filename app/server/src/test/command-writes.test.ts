@@ -411,3 +411,13 @@ test("an encoding in the mode is not a write mode", () => {
   assert.deepEqual(run(`ruby -e "File.open('a.txt', 'r:windows-1252') { |f| f.read }"`), []);
   assert.deepEqual(run(`ruby -e "File.open('a.txt', 'w:UTF-8') { |f| f << 1 }"`), w("/work/site/a.txt"));
 });
+
+test("a call named in a comment is not a write: shell comments, and comments inside inline scripts", () => {
+  for (const cmd of ["ls # rm x", "# rm x", "ls ;# rm x", "echo hi # > out", "true || # rm x\n ls", "bash -c 'ls # rm x'"]) assert.deepEqual(run(cmd), [], cmd);
+  assert.deepEqual(run("echo a#b > c"), w("/work/site/c")); // inside a word, # is text
+  assert.deepEqual(run("python3 - <<'PY'\n# open('nope.txt', 'w') is only a comment\nopen('yes.txt', 'w').write('#')  # os.remove('k')\nPY"), w("/work/site/yes.txt"));
+  assert.deepEqual(run("python3 -c \"import os # os.remove('k')\""), []);
+  assert.deepEqual(run("node -e \"// fs.writeFileSync('a.txt','x')\nfs.writeFileSync('b.txt', 'http://x') /* fs.rmSync('c') */\""), w("/work/site/b.txt"));
+  assert.deepEqual(run("perl -e '# unlink(\"p\")\nunlink(\"q\") if $#ARGV'"), ["delete /work/site/q"]);
+  assert.deepEqual(run("ruby -e '# File.write(\"r\", 1)\nFile.write(\"s#1\", 1)'"), w("/work/site/s#1"));
+});

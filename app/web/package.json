@@ -12,6 +12,7 @@
     "typecheck": "tsc -b",
     "preview": "vite preview",
     "build:share": "node scripts/build-share.mjs",
+    "build:demo": "tsc -b && node scripts/build-demo.mjs",
     "test": "vitest run"
   },
   "dependencies": {

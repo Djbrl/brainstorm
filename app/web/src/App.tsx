@@ -1,7 +1,7 @@
 // The shell: the header with where you are (project › thread › step), and the view for that place.
 // Each part reads only the slices it shows (useLiveSelector, useNavState), so a live message or a replay cursor move
 // re-renders the parts that changed, not the whole app.
-import { isRecording, shallowEqual, useLiveActions, useLiveSelector, useHarness, useLiveStep } from "./lib/live";
+import { DEMO, isRecording, shallowEqual, useLiveActions, useLiveSelector, useHarness, useLiveStep } from "./lib/live";
 import { harnessName } from "./lib/harness";
 import { GITHUB_URL, LANDING_URL } from "./lib/urls";
 import { END, NavProvider, useNavActions, useNavState } from "./lib/nav";
@@ -135,7 +135,7 @@ function Shell() {
         {kind === "shared" && thread && <PlayButton />}
         <div className="status">
           {local && <Elsewhere />}
-          {kind === "preview" && (
+          {DEMO && kind === "preview" && (
             <button className="ws-chip" title="Play back a recorded setup run" onClick={openSetup}>Setup preview</button>
           )}
           {local && state.setup?.root && (
@@ -154,7 +154,8 @@ function Shell() {
           )}
         </div>
       </header>
-      {kind === "preview" && (
+      {/* The hosted demo only (a demo build). */}
+      {DEMO && kind === "preview" && (
         <div className="preview-banner">
           A recording of a real Claude Code thread, played back. To see your own agents live,{" "}
           <a href={`${GITHUB_URL}#install-claude-code-plugin-preview`} target="_blank" rel="noopener">install the plugin</a>.

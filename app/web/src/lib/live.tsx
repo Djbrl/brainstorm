@@ -15,7 +15,6 @@
 // Selectors must not build new arrays/objects each call unless eq handles it. `state.map` is a
 // new object whenever any file changes (recency, active thread); for work that only depends on which files exist
 // (layout, path resolvers, the file tree) key memos on `state.structureVersion` instead.
-import { installSetupShim, startAgentPlayback } from "./preview";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AgentPresence, Attention, AskRequest, AskResponse, Edge, Harness, LiveToken, SetupStatus, ProjectMap, Replay, Session, Step, WsMessage } from "@contract";
 import { harnessOf, withHarness } from "./harness";
@@ -242,7 +241,7 @@ function applyBatch(base: LiveState, actions: Action[], ix: Indexes): LiveState 
         Object.values(byThread).forEach((l) => l.sort((x, y) => x.seq - y.seq));
         Object.assign(st(), {
           sessionsLoaded: true, replay: true, connected: true, sessions: sortSessions(a.data.sessions), steps: byThread, map: a.data.map,
-          structureVersion: s.structureVersion + 1, preview: !!(a.data.agentMoves?.length || a.data.setupPreview), shared: a.data.shared ?? null,
+          structureVersion: s.structureVersion + 1, preview: DEMO && !!(a.data.agentMoves?.length || a.data.setupPreview), shared: a.data.shared ?? null,
         });
         reindex(ix, s); sortNeeded = false; changedFrom.clear(); removed.clear();
         break;
@@ -422,6 +421,10 @@ export function createLiveStore(start: LiveState = initial): LiveStore {
   return store;
 }
 
+/** A demo build (VITE_DEMO=1, `npm run build:demo`): the hosted demo's playback (lib/preview.ts). Any other build leaves it
+ * out entirely: the constant is replaced at build time, so the import below is dropped. */
+export const DEMO = import.meta.env.VITE_DEMO === "1";
+
 // Hosted demo: built with VITE_REPLAY_URL=/replay.json so it opens straight into the recording.
 // Both can't change without a reload (links keep ?replay=, see nav.tsx), so they're read once.
 let replayUrlValue: string | null | undefined;
@@ -493,14 +496,18 @@ export function LiveProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const url = replayUrl(), inline = embeddedReplay();
     if (inline || url) {
-      let stopPlayback = () => {};
+      let stopPlayback = () => {}, gone = false;
       (inline ? Promise.resolve(inline) : get<Replay>(url!)).then((data: Replay) => {
         replayData = data; clockOffset = Math.max(0, Date.now() - Date.parse(data.exportedAt));
         store.dispatch({ type: "replay", data });
-        installSetupShim(data);
-        stopPlayback = startAgentPlayback(data, store.enqueue);
+        // The hosted demo's playback (agent moves, the setup run) is only in a demo build (npm run build:demo).
+        if (DEMO) void import("./preview").then(({ installSetupShim, startAgentPlayback }) => {
+          if (gone) return;
+          installSetupShim(data);
+          stopPlayback = startAgentPlayback(data, store.enqueue);
+        });
       });
-      return () => stopPlayback();
+      return () => { gone = true; stopPlayback(); };
     }
     loadAll(store);
     checkServerVersion();

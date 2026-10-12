@@ -1,12 +1,17 @@
-// A shared replay's map: only the touched files and a few around them. Run: cd app/server && npx tsc -p . && node --test dist/replay/
+// A shared replay's map: only the touched files and a few around them. An invented person (ana) and a scratch data
+// folder keep the answer the same on any machine.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { homedir } from "node:os";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { ProjectMap, Step } from "../shared/contract";
 import { forSharing } from "./privacy";
 import { slimMap, touchedFiles } from "./slim";
 
-const R = `${homedir()}/app`;
+process.env.RUNDOWN_DATA_DIR = mkdtempSync(join(tmpdir(), "rundown-slim-"));
+const ana = { homes: ["/Users/ana"], user: "ana", hosts: ["Anas-MacBook-Pro"], mailbox: null, name: null };
+const R = `${ana.homes[0]}/app`;
 const file = (rel: string, lastChangedAt = "2026-10-01T00:00:00.000Z") => ({ path: `${R}/${rel}`, module: rel.split("/")[0], lines: 10, lastChangedAt });
 const step = (filePath: string, seq = 1): Step => ({ id: `s${seq}`, sessionId: "t", seq, ts: "2026-10-08T00:00:00.000Z", kind: "edit", tool: "Edit", filePath });
 
@@ -28,7 +33,7 @@ function bigMap(): ProjectMap {
 
 test("keeps the touched files, their imports and folder, and drops the rest", () => {
   const map = bigMap();
-  const slim = slimMap(map, [step(`${R}/src/a.ts`), step(`${homedir()}/.claude/plans/x.md`, 2)]);
+  const slim = slimMap(map, [step(`${R}/src/a.ts`), step(`${ana.homes[0]}/.claude/plans/x.md`, 2)]);
   const paths = slim.files.map((f) => f.path.slice(R.length + 1)).sort();
   assert.deepEqual(paths, ["lib/used-by-a.ts", "lib/uses-a.ts", "src/a.ts", "src/b.ts", "src/c.ts"]);
   assert.equal(slim.edges.length, 2); // only the imports between kept files
@@ -58,7 +63,7 @@ test("a thread that touched no file still gets a few files", () => {
 });
 
 test("the slim map is still redacted when shared", () => {
-  const shared = forSharing(slimMap(bigMap(), [step(`${R}/src/a.ts`)]));
+  const shared = forSharing(slimMap(bigMap(), [step(`${R}/src/a.ts`)]), ana);
   assert.equal(shared.root, "~/app");
   assert.equal(shared.files.length, 5);
   assert.ok(shared.files.every((f) => f.path.startsWith("~/app/")));

@@ -399,6 +399,31 @@ Review: five plausible findings, all fixed, plus one the fixes ran into. The tou
 
 ## After the phases: the open items
 
+Six items left open by the phases, fixed on `cleanup/p7-server` (server, plugin hook script, one line of `docs/technical.md`; no web change).
+
+### What you might notice
+
+- "Needs you" guesses come back for threads without the plugin's hooks (Codex, older threads) even while another thread sends hooks.
+- A renamed thread read from history keeps its own times instead of reading "started today, running".
+- A log folder whose permissions are fixed shows its threads within a few minutes, without a restart.
+- Fewer phantom edits from scripts that mention a file call in a comment.
+- Risk badges (auth, .env, payment…) also on edits read from history, as on live ones.
+- Nothing visible from the hook signature; another program can no longer post fake hook messages.
+
+### Server and hooks
+
+- **Hooks are signed.** The hook signs each message with the secret it reads from `server.json` (HMAC of its time and body); the server answers 403 to an unsigned, wrongly signed or stale (over 2 minutes) message, and refuses all hooks, saying so once in the log, when it never wrote `server.json`. Why: any local program could post a fake permission prompt or clear one. Noticeable: no. Checked end to end with the launcher on a scratch copy of the plugin. Hooks and server must come from the same release. Commit `8dc574d`.
+- **A custom title doesn't stamp a thread with "now".** A title line read before any step creates the thread with no times; its first step sets them, and until then it isn't listed. Why: Claude Code writes that line without a time, so the current time stood in, and the thread's real steps could never move it back. Noticeable: older renamed threads read from history sit at their real time. Commit `9ecdc7c`.
+- **Hooks are trusted per thread.** A thread that has sent hooks is known by them; any other keeps the log-based permission guess. Why: one hook from any thread switched the guess off for every thread for a day. Noticeable: held edits in Codex threads are flagged again while Claude Code runs with the plugin. After a restart, a thread whose last hook was a new prompt guesses until its next hook. Commit `0c77db8`.
+- **An unreadable log folder is tried again.** The Claude source retries a folder the watcher couldn't enter after 5 s, then less and less often (up to every 5 minutes) while it belongs to the open project. Why: once skipped it stayed skipped until a restart (N13). Noticeable: only after fixing a folder's permissions. Commit `1ed253e`.
+- **Comments in inline scripts aren't read as calls.** `python3 - <<'PY'`, `node -e`, `ruby -e` and `perl -e` scripts have their comments blanked before the write and delete calls are matched; shell comments were already skipped. Why: `# open('x', 'w')` became an Edit step and put the file on the map (F1). Noticeable: fewer phantom edits. A call named inside a string literal is still read (the scanner redesign). Commit `4638b8e`.
+- **Risk flags where steps are stored.** The rules move from the reader module to `listener/risk.ts` and run when a step is stored, live or from history; the reader module is gone. Why: only live steps went through the reader, so the same edit had flags live and none from history. Heuristic labels and the web's `readerHeuristic` were already gone with Nemotron, so the web is unchanged. Checked on the golden fixtures and a risky-path copy of them: live, steps sent and stored are identical before and after; from history, edits now carry the same flags as live. Commit `0342f42`.
+
+### Left open
+
+- The web's `StepDetail.tsx` comment still points at `server/src/reader` for the risk rules (now `listener/risk.ts`): a web file, left for whoever touches it next.
+- A hook message can be replayed within its 2 minutes (no nonce); only a program that already saw it could.
+
 ### Hosted-demo code
 
 The product app carried code only the hosted demo (brainstorm-next) uses. It now lives in the demo's own build; the judged demo (brainstorm-demo-black) is untouched.

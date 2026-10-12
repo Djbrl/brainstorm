@@ -263,3 +263,65 @@ Behaviour should be the same. This puts rules that existed in several copies in 
 - Copies whose behaviour differs were kept on purpose (named in the commits above).
 - Phase 5 (split the large files, renames) and Phase 6 (tests, release process) are not started.
 - Merge to `main` happens only after all phases; pushes and release are the maintainer's.
+
+## Phase 5: split the large files and rename
+
+Behaviour should be the same. The audit found files too big to change safely (the listener at about 1130 lines, the mapper at about 930, the command parser at about 925, MapView at 622, the replay layer at 618, the themes at 405), and later fixes kept colliding in them. This phase cuts each into parts that do one job, and renames what was misnamed. Phase 5 was not separately reviewed.
+
+### What you might notice
+
+- Almost nothing. Screens are identical at rest in light, Prism and Hologram, at 1440, 800 and 420 px.
+- In the dark themes, hovers now follow the light ones: the current row keeps its highlight under the pointer, the current breadcrumb shows no hover, and the Places ‹ › buttons no longer flash grey.
+- In the light theme, a row hover is one shade different (#f4f4f7).
+- In Places, the step panel keeps its step while it slides closed, as on the Map.
+- Place names in Places are drawn the way the map draws its names; an edge may differ by a fraction of a pixel.
+- The map costs no more per frame, and about 30% fewer frame callbacks run, because the Readmap no longer has its own loop.
+- Old links and shared files still open: an old-style `/thread/<id>/step/<id>` link opens and plays, and a share file exported after the renames opens, plays and shows no errors.
+
+### Server
+
+- **Listener split** into the log reader (`tailer.ts`), the stored threads and steps (`step-store.ts`) and the open project's scope (`scope.ts`); the other modules now ask the step store instead of the listener. Answers to `/api/sessions`, a thread's steps and `/api/map` are byte for byte the same on the same logs. Nothing visible. Commit `89496d9`.
+- **Mapper split** into imports (`imports.ts`), the live map and its watch (`live.ts`) and the "working on it" marks (`presence.ts`); the long live-batch step now reads as named phases. `/api/map` is byte for byte the same on the same project. Nothing visible. Commit `161adc2`.
+- **Command parser split** into the shell reader (`shell-tokens.ts`), what each command does (`command-writes.ts`) and the inline-script scanner (`script-writes.ts`), with one option parser instead of five. The old and new builds give the same writes, reads and argv on about 172,000 commands. Nothing visible. Commit `ec0daff`.
+- **Markdown export** is three steps (collect, aggregate, render) instead of one long function. The report is byte for byte the same on two threads of about 5 MB each. Commit `e3efda5`.
+- **Launcher** reads its flags once and has one function per command. It printed the same lines in every case re-run: a fresh start, an older launcher leaving a newer server running, share with and without a session id, and stop twice. Commit `a464b51`.
+- **Skipped on purpose**: merging the `-c`/`-e` script-finding loop into the shared parser (it would change results), and edits carrying the parser that found them (no review finding asks for it).
+
+### Map
+
+- **Frame, pointer, redraw, open folders and node lookup** moved out of MapView into hooks of their own, replacing about fifteen mirrored refs. Nothing visible. Commit `199b291`.
+- **Camera** has one typed state and an explicit contract with the replay layer; the camera keys have their own hook and still use the shortcuts registry. Nothing visible. Commit `fd9e70f`.
+- **Replay layer** split into focus, follow and playback, and the glide, trail, pulse and ring drawing shared by the map, the replay and Places in one tracer. Nothing visible. Commit `1ffb98b`.
+- **Readmap** is drawn on the map's own frames and uses the camera's view maths, so at rest it does no work. Coming out of rest, its glide takes one frame's step, as before. Commit `426a810`.
+- **Themes**: the theme data stays in `themes.ts`; the drawing went to `marks.ts` and `routes.ts`; landings moved from a global into the map's frame caches. Nothing visible. Commit `3a9faba`.
+- **Places map** uses the map's label space and name drawing instead of its own copy. Place names may differ by a fraction of a pixel at the edges. Commit `de8bb1c`.
+
+### Shell and sidebar
+
+- **The shell decides first, then draws**: what kind of app it is and which screen to show are worked out once (`screen.ts`), and following an open thread moved to `LiveFollow.tsx`. A shared replay counts as shared even if its file carried preview extras; shares are made without them. Nothing visible. Commit `72d158b`.
+- **One row, one row window and one cursor scroll** for the Track, the folded card and Places' list. The Track draws up to 80 rows around the cursor at a chapter's end instead of fewer: more rows off screen, none visible. Commit `67357fc`.
+- **Sidebar**: whether it is open and the phone sheet are hooks of their own; opening it has one call instead of two spellings. Nothing visible. Commit `c210657`.
+- **Places uses the Map's step panel**, with a slot for its place header. The panel keeps its step while sliding closed and is inert while closed, which also helps keyboard and screen-reader users. Commit `1711a81`.
+- **CSS**: the footer's rules live in one file (`dock.css`), the panel and sidebar widths are tokens, and the greys are theme tokens, replacing 20-odd dark-theme overrides. Every token resolves to the old value in each theme except the hover changes listed above. Commit `fe5c7bf`.
+
+### Renames
+
+- **Web folders** say what they hold: `map/thread`, `step` and `places` (the server's `cowork/` folder keeps its name). Commit `49e4f34`.
+- **`nav.thread` and `isRecording()`** replace the three meanings of "replay". Commit `0ef66dd`.
+- **Packages** are `rundown-server` and `rundown-web`; the GitHub and landing addresses are one constant per side. The addresses themselves are unchanged. Commit `27f9f53`.
+- **URLs, routes, share files and stored settings keep their names**, so old links and shared files keep working.
+- The phone layout breakpoint lives in `lib/breakpoints.ts` (see Phase 4).
+- `technical.md` and the build log describe the new layout. Commit `50e8f32`.
+
+### Tests
+
+246 of 246 pass. Two timing tests in `regex-timing.test.cjs` fail under heavy machine load; they fail the same way on the code from before Phase 5, so this is not a regression. Phase 6 makes them sturdier.
+
+### Left open (Phase 5)
+
+- Places' list draws every row; the list is short.
+- The cowork view still passes 440 as the panel width.
+- An older bug, not new: opening Places with no step leaves its list at the top with a gap, instead of scrolling to the thread's row.
+- Phase 6 (tests, release process) is not started.
+
+Review: pending

@@ -3,92 +3,31 @@ import { StepsStore } from "../listener/step-store";
 import { MapperService } from "../mapper/mapper.service";
 import { AskService } from "../ask/ask.service";
 import { WorkspaceState } from "../core/workspace-state";
-import { ConfigService } from "../core/config.service";
-import { WorkspaceService } from "../workspace/workspace.service";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { inside } from "../core/paths";
-import type { Replay, Session, Step } from "../shared/contract";
-import { CODE_SEARCH_TOOLS } from "../shared/tools";
+import { resolve } from "node:path";
+import type { Replay, Session } from "../shared/contract";
 import { summarizePlaces } from "../cowork/cowork.service";
-
-type Move = NonNullable<Replay["agentMoves"]>[number];
-
-function actionOf(step: Step): string | undefined {
-  const t = step.tool ?? "";
-  if (step.kind === "edit") return t === "Write" ? "write" : "edit";
-  if (step.kind !== "tool_call") return undefined;
-  if (t === "Read") return "read";
-  if (CODE_SEARCH_TOOLS.has(t)) return "search";
-  return undefined; // runs, delegations etc. have no file to stand on
-}
 
 // Builds replays: the hosted demo's export (GET /api/replay) and shared replays (GET /api/share).
 @Injectable()
 export class ReplayService {
-  constructor(private store: StepsStore, private mapper: MapperService, private askService: AskService, private cfg: ConfigService, private state: WorkspaceState, private workspace: WorkspaceService) {}
-
-  /** Which subagent wrote each log line: uuid → {agentId, name}, from Claude Code's subagents/agent-<id>.jsonl (+ .meta.json). */
-  private subagentIndex(sessionId: string): Map<string, { id: string; name: string }> {
-    const index = new Map<string, { id: string; name: string }>();
-    let projects: string[] = [];
-    try { projects = readdirSync(this.cfg.claudeProjectsDir); } catch { return index; }
-    for (const proj of projects) {
-      const dir = join(this.cfg.claudeProjectsDir, proj, sessionId, "subagents");
-      if (!existsSync(dir)) continue;
-      for (const f of readdirSync(dir).filter((x) => x.endsWith(".jsonl"))) {
-        const id = f.replace(/^agent-/, "").replace(/\.jsonl$/, "");
-        let name = `Subagent ${id.slice(0, 6)}`;
-        try { name = (JSON.parse(readFileSync(join(dir, `agent-${id}.meta.json`), "utf8")) as { description?: string }).description || name; } catch { /* no meta */ }
-        for (const line of readFileSync(join(dir, f), "utf8").split("\n")) {
-          const m = /"uuid":"([^"]+)"/.exec(line);
-          if (m) index.set(m[1], { id, name });
-        }
-      }
-    }
-    return index;
-  }
-
-  private agentMoves(sessions: { id: string; title: string }[], steps: Step[], files: Set<string>, from?: string, to?: string): Move[] {
-    const moves: Move[] = [];
-    for (const s of sessions) {
-      const subs = this.subagentIndex(s.id);
-      for (const st of steps) {
-        if (st.sessionId !== s.id || !st.filePath || !files.has(st.filePath)) continue;
-        if ((from && st.ts < from) || (to && st.ts > to)) continue;
-        const action = actionOf(st);
-        if (!action) continue;
-        const sub = st.isSubagent ? subs.get(st.id.split(":")[0]) : undefined;
-        moves.push({
-          id: sub?.id ?? s.id, name: sub ? `Subagent · ${sub.name}` : s.title, isSubagent: !!sub,
-          sessionId: s.id, file: st.filePath, action, ts: st.ts,
-        });
-      }
-    }
-    return moves.sort((a, b) => a.ts.localeCompare(b.ts));
-  }
+  constructor(private store: StepsStore, private mapper: MapperService, private askService: AskService, private state: WorkspaceState) {}
 
   /**
-   * `until` (ISO time): the recording stops there (steps, agent moves, answers).
+   * The hosted demo's extras (agent moves, the setup run, a cut-off time) are added by app/scripts/record-demo.mjs.
    * `share`: a thread being shared (share.controller.ts), found by id even from another project, with the map of the
    * project the server worked out for it (share-root.ts), never one a link names.
    */
-  async build(sessionId?: string, root?: string, movesFrom?: string, movesTo?: string, preview?: string, until?: string, share?: { mapRoot: string }): Promise<Replay> {
+  async build(sessionId?: string, root?: string, share?: { mapRoot: string }): Promise<Replay> {
     const all = this.store.listSessions();
     const wanted = sessionId ? sessionId.split(",") : [];
     const sessions = !wanted.length ? all.slice(0, 1)
       : share ? wanted.map((id) => all.find((s) => s.id === id) ?? this.store.getSession(id)).filter((s): s is Session => !!s)
       : all.filter((s) => wanted.includes(s.id));
-    const steps = sessions.flatMap((s) => this.store.listSteps(s.id)).filter((st) => !until || st.ts <= until);
+    const steps = sessions.flatMap((s) => this.store.listSteps(s.id));
     // The open project only (or the same folder written another way): never a walk of any folder a link names.
     const map = await this.mapper.getMapAsync(share ? share.mapRoot : root && resolve(root) === resolve(this.state.root) ? root : this.state.root);
     const answers = this.askService.listAnswers();
     const cowork = Object.fromEntries(sessions.map((s) => [s.id, summarizePlaces([s.id], (id) => steps.filter((st) => st.sessionId === id))])); // Places, for the hosted demo
-    const base: Replay = { exportedAt: until ?? new Date().toISOString(), sessions: sessions.map((s) => ({ ...s, status: "idle" })), steps, map: { ...map, files: map.files.map(({ activeSessionId: _a, ...f }) => f) }, answers, cowork };
-    if (!preview) return base;
-    // Post-deadline preview extras: recorded agent moves and a recorded setup run (only this workspace, no other projects).
-    const status = this.workspace.status();
-    const suggestions = this.workspace.suggestions().filter((w) => inside(status.root ?? "", w.root));
-    return { ...base, agentMoves: this.agentMoves(sessions, steps, new Set(map.files.map((f) => f.path)), movesFrom, movesTo ?? until), setupPreview: { status, suggestions } };
+    return { exportedAt: new Date().toISOString(), sessions: sessions.map((s) => ({ ...s, status: "idle" })), steps, map: { ...map, files: map.files.map(({ activeSessionId: _a, ...f }) => f) }, answers, cowork };
   }
 }

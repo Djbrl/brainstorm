@@ -55,7 +55,7 @@ export class ShareController {
    *  secrets masked, no screenshots. */
   async sharedReplay(session: Session): Promise<Replay> {
     const steps = this.store.listSteps(session.id);
-    const raw = await this.replays.build(session.id, undefined, undefined, undefined, undefined, undefined, { mapRoot: shareMapRoot(session, steps, this.state.root) });
+    const raw = await this.replays.build(session.id, undefined, { mapRoot: shareMapRoot(session, steps, this.state.root) });
     const answers: Replay["answers"] = []; // a shared file carries no Ask answers: they were asked here, about this machine
     const shared = { title: session.title || "Untitled thread", createdAt: new Date().toISOString(), version: config.version ?? "dev" };
     const map = raw.map && slimMap(raw.map, raw.steps);

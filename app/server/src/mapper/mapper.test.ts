@@ -596,3 +596,19 @@ test("imports: an alias without * means that name only, and no tsconfig above th
     rmSync(outer, { recursive: true, force: true }); rmSync(projects, { recursive: true, force: true });
   }
 });
+
+test("live: a batch whose map was switched away stops at its next slice (an A → B → A switch can't leave two editing it)", async () => {
+  const { LiveMap, SLICE_MS } = await import("./live");
+  // Each changed file's event takes longer than a slice, so the loop yields after every file.
+  const spin = () => { const end = performance.now() + SLICE_MS + 5; while (performance.now() < end) { /* busy */ } };
+  const lm = new LiveMap({} as never, {} as never, {} as never, { emit: spin } as never, {} as never, new Logger("test"));
+  const c = { snapshots: new Map(), byPath: new Map(), unselected: new Set(), fileSet: new Set(), specs: new Map(), gitTimes: new Map(), map: { files: [], modules: [] } };
+  const reads = ["a", "b", "c", "d"].map((n) => ({ abs: `/r/src/${n}.ts`, lines: 1, content: `export const ${n} = 1;\n`, mtimeMs: 1 }));
+  let switched = false;
+  const run = (lm as unknown as { applyReads: (...a: unknown[]) => Promise<{ changed: Set<string> }> })
+    .applyReads(c, "/r", reads, new Set(), Date.now(), () => switched);
+  switched = true; // the switch lands while the batch yields
+  const { changed } = await run;
+  assert.equal(changed.size, 1); // the first file (read before the first yield), then nothing more
+  assert.equal(c.byPath.size, 1);
+});

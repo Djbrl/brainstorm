@@ -216,14 +216,16 @@ export class LiveMap {
     if (this.host.cached(root) !== c || this.live !== live) return; // switched away meanwhile
 
     // Apply: removals, then updates and additions. Each change goes on the bus with what the file was before. The
-    // reads and the imports are worked through in slices (slicer): the map may be switched away between them.
+    // reads and the imports are worked through in slices (slicer): the map may be switched away between them, and
+    // each stops at the first slice after that, so an old batch never edits the cached map alongside a newer one
+    // (a switch A → B → A starts a new Live on the same cached map).
     const at = Date.now();
     const { removed, newFolders } = sorted;
     const gone = () => this.host.cached(root) !== c || this.live !== live;
     this.applyRemovals(c, removed, at);
-    const { changed, added } = await this.applyReads(c, root, reads, removed, at);
+    const { changed, added } = await this.applyReads(c, root, reads, removed, at, gone);
     if (gone()) return;
-    const edgesChanged = await this.resolveAgain(c, root, paths, changed, added, removed);
+    const edgesChanged = await this.resolveAgain(c, root, paths, changed, added, removed, gone);
     if (gone()) return;
     countFiles(c);
     this.watchNewFolders(live, root, added, changed, newFolders);
@@ -310,12 +312,12 @@ export class LiveMap {
   }
 
   /** Files read: updated in place, or added to the map (and its modules); their imports read again. */
-  private async applyReads(c: Cached, root: string, reads: (Read | null)[], removed: Set<string>, at: number): Promise<{ changed: Set<string>; added: number }> {
+  private async applyReads(c: Cached, root: string, reads: (Read | null)[], removed: Set<string>, at: number, gone: () => boolean): Promise<{ changed: Set<string>; added: number }> {
     const changed = new Set<string>();
     let added = 0;
     const slice = slicer();
     for (const r of reads) {
-      await slice.due();
+      if (await slice.due() && gone()) break;
       if (!r || removed.has(r.abs)) continue;
       if (r.content) {
         const before = snapshotOf(c, r.abs, c.byPath.has(r.abs) || c.unselected.has(r.abs));
@@ -344,7 +346,7 @@ export class LiveMap {
   /** Imports: when files came or went, every file's imports may resolve differently; otherwise only the changed files'.
    * A tsconfig changed: its aliases are read again and every import is resolved again. Returns the files whose
    * imports changed. */
-  private async resolveAgain(c: Cached, root: string, paths: Set<string>, changed: Set<string>, added: number, removed: Set<string>): Promise<Set<string>> {
+  private async resolveAgain(c: Cached, root: string, paths: Set<string>, changed: Set<string>, added: number, removed: Set<string>, gone: () => boolean): Promise<Set<string>> {
     const configChanged = [...paths].some((p) => /^[tj]sconfig.*\.json$/.test(basename(p)));
     if (configChanged) this.imports.configsChanged();
     const setChanged = added > 0 || removed.size > 0 || configChanged;
@@ -352,7 +354,10 @@ export class LiveMap {
     const edgesChanged = new Set<string>();
     const slice = slicer();
     for (const abs of [...(setChanged ? c.specs.keys() : changed)]) {
-      if (await slice.due() && !c.specs.has(abs)) continue; // removed meanwhile
+      if (await slice.due()) {
+        if (gone()) return edgesChanged; // the caller sees it and stops
+        if (!c.specs.has(abs)) continue; // removed meanwhile
+      }
       const next = this.imports.resolveSpecs(root, abs, c.specs.get(abs) ?? [], c.fileSet);
       if (!sameSet(c.out.get(abs), next)) { c.out.set(abs, next); edgesChanged.add(abs); }
     }

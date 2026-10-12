@@ -1,5 +1,7 @@
 // The step panel's body: one step in full (its diff, text or tool view) and Ask.
 import { useEffect, useMemo, useState } from "react";
+import { ApiError, get } from "../lib/api";
+import { isRecording } from "../lib/live";
 import { Diff } from "../lib/Diff";
 import type { CommandEditInput, Step } from "@contract";
 import { AskBox } from "../ask/AskBox";
@@ -87,6 +89,41 @@ export function editPair(s: Step): { before: string; after: string } | null {
   return null;
 }
 
+// An edit's text may not be in the steps the page holds: the server sends an edit's change once, as `diff`, and leaves
+// old_string / new_string / content / edits out of its `input`. Every view reads the change through editPair, which
+// takes `diff` first, so that is all it needs. Only an edit with neither (none is made today) asks the server for the
+// whole step, once, when a view shows it: GET /api/steps/:id, if the server has that route (a 404 turns asking off).
+const fullSteps = new Map<string, Promise<Step | null>>();
+let fullStepRoute = true;
+/** Whether a view showing this edit has to fetch the whole step to show its change. */
+export const lacksChange = (s: Step) => s.kind === "edit" && !editPair(s) && inputOf(s).byCommand !== true;
+function fetchFullStep(id: string): Promise<Step | null> {
+  let p = fullSteps.get(id);
+  if (!p) {
+    p = get<Step>(`/api/steps/${encodeURIComponent(id)}`).catch((e: unknown) => {
+      if (e instanceof ApiError && e.status === 404) fullStepRoute = false;
+      fullSteps.delete(id);
+      return null;
+    });
+    if (fullSteps.size > 50) fullSteps.delete(fullSteps.keys().next().value!);
+    fullSteps.set(id, p);
+  }
+  return p;
+}
+/** editPair for a step a view shows, fetching the whole step when the page's copy lacks the change (see above). */
+export function useEditPair(step: Step | null | undefined): { before: string; after: string } | null {
+  const own = useMemo(() => (step?.kind === "edit" ? editPair(step) : null), [step]);
+  const want = !!step && !own && lacksChange(step) && fullStepRoute && !isRecording();
+  const [full, setFull] = useState<{ id: string; pair: { before: string; after: string } | null } | null>(null);
+  useEffect(() => {
+    if (!want || !step) return;
+    let live = true;
+    fetchFullStep(step.id).then((s) => { if (live) setFull({ id: step.id, pair: s ? editPair(s) : null }); });
+    return () => { live = false; };
+  }, [want, step?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  return own ?? (step && full?.id === step.id ? full.pair : null);
+}
+
 /** A file an agent changed by running a command (a script, sed -i, a redirect) instead of its edit tool: the server
  * saw it change (listener/command-edits.ts). The diff when it was watching; the command either way. */
 function CommandEditBody({ step }: { step: Step }) {
@@ -106,7 +143,7 @@ function EditBody({ step }: { step: Step }) {
 }
 
 function EditDiff({ step }: { step: Step }) {
-  const pair = useMemo(() => editPair(step), [step]);
+  const pair = useEditPair(step);
   const lines = pair ? pair.before.split("\n").length + pair.after.split("\n").length : 0;
   const [open, setOpen] = useState(lines <= BIG_DIFF);
   useEffect(() => setOpen(lines <= BIG_DIFF), [step.id, lines]);

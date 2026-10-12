@@ -7,7 +7,7 @@
 // Cheap on purpose: the outer part reads only the open thread and the pref; the body reads the cursor and the thread,
 // works out which step to show (a short scan back from the cursor), and the window itself re-renders only when that
 // step, its result or "now or before" changes. The diff is computed in the viewer's worker.
-import { memo, useDeferredValue, useEffect, useMemo, useRef } from "react";
+import { memo, useDeferredValue, useEffect, useRef } from "react";
 import type { Step } from "@contract";
 import { Diff } from "../../lib/Diff";
 import { useLiveSelector } from "../../lib/live";
@@ -15,7 +15,7 @@ import { useNavActions, useNavState, useReplayCursor } from "../../lib/nav";
 import { repoBase, repoRelative } from "../../lib/paths";
 import { THEMES, useTheme } from "../../lib/theme";
 import { actionOf, useThread, type Thread } from "../../lib/thread";
-import { diffStyles, editPair } from "../../step/StepDetail";
+import { diffStyles, useEditPair } from "../../step/StepDetail";
 import { Code, IMAGE, Shots } from "../../step/content/ToolView";
 import { cleanResult, parseNumbered } from "../../step/content/parse";
 import { basename, stepFile } from "../../step/format";
@@ -59,9 +59,8 @@ function momentAt(thread: Thread, index: number): Moment | null {
 }
 
 /** "Editing" now, "Edited" once the agent has moved on. */
-function verbOf(step: Step, now: boolean): string {
+function verbOf(step: Step, now: boolean, pair: { before: string; after: string } | null): string {
   if (step.kind !== "edit") return now ? "Reading" : "Read";
-  const pair = editPair(step);
   const writes = step.tool === "Write" || (!!pair && !pair.before && !!pair.after);
   return writes ? (now ? "Writing" : "Wrote") : now ? "Editing" : "Edited";
 }
@@ -86,7 +85,7 @@ function Body({ step, result }: { step: Step; result?: Step }) {
   // theme, and switching theme broke React's hook order (a blank page).
   const theme = useTheme();
   const dark = THEMES.find((t) => t.id === theme)?.dark ?? false;
-  const pair = useMemo(() => (step.kind === "edit" ? editPair(step) : null), [step]);
+  const pair = useEditPair(step);
   if (step.kind === "edit") {
     if (!pair) return <p className="peek-muted">No change recorded for this edit.</p>;
     const big = lines(pair.before).length + lines(pair.after).length > BIG;
@@ -109,9 +108,8 @@ function Body({ step, result }: { step: Step; result?: Step }) {
 }
 
 /** What a read covered: "Lines 40–120". */
-function rangeOf(step: Step, result?: Step): string | null {
+function rangeOf(step: Step, result: Step | undefined, pair: { before: string; after: string } | null): string | null {
   if (step.kind === "edit") {
-    const pair = editPair(step);
     if (!pair || !pair.before) return pair ? `${lines(pair.after).length} lines` : null;
     return null;
   }
@@ -124,9 +122,9 @@ function rangeOf(step: Step, result?: Step): string | null {
 const Window = memo(function Window({ sessionId, step, result, now, roots }: Moment & { sessionId: string; roots: string }) {
   const { openStep } = useNavActions();
   const path = stepFile(step) ?? "";
-  const pair = step.kind === "edit" ? editPair(step) : null;
+  const pair = useEditPair(step);
   const stat = pair && pair.before ? { add: lines(pair.after).length, del: lines(pair.before).length } : null;
-  const range = rangeOf(step, result);
+  const range = rangeOf(step, result, pair);
   const scroll = useRef<HTMLDivElement>(null);
 
   // A new step: back to the top, then to its first changed line once the diff has drawn (it renders after its worker).
@@ -154,7 +152,7 @@ const Window = memo(function Window({ sessionId, step, result, now, roots }: Mom
   return (
     <section className={`map-peek${now ? "" : " past"}`} aria-label="The file the agent is working on" aria-live="off">
       <header className="peek-head">
-        <span className={`peek-verb${step.kind === "edit" ? " edit" : ""}`}>{verbOf(step, now)}</span>
+        <span className={`peek-verb${step.kind === "edit" ? " edit" : ""}`}>{verbOf(step, now, pair)}</span>
         <button className="peek-file" onClick={() => openStep(sessionId, step.id)} title={`${path}\nOpen this step in full`}>
           <strong>{basename(path)}</strong>
           <span>{folderOf(path, roots)}</span>

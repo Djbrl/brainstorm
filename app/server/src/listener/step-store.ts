@@ -60,6 +60,8 @@ function prepare(db: DbService["db"]) {
     stepsJsonAfter: db.prepare(stepsJsonSql(`session_id = ? AND seq > ?`)),
     stepsJsonSlim: db.prepare(stepsJsonSql(`session_id = ?`, true)),
     stepsJsonSlimAfter: db.prepare(stepsJsonSql(`session_id = ? AND seq > ?`, true)),
+    stepsJsonPage: db.prepare(stepJsonRowsSql(`session_id = ? AND seq > ?`) + ` LIMIT ?`),
+    stepsJsonSlimPage: db.prepare(stepJsonRowsSql(`session_id = ? AND seq > ?`, true) + ` LIMIT ?`),
     stepInput: db.prepare(`SELECT input FROM steps WHERE id = ?`),
     stepTouches: db.prepare(`SELECT 1 FROM steps WHERE file_path = ? LIMIT 1`),
     stepPos: db.prepare(`SELECT session_id, seq FROM steps WHERE id = ?`),
@@ -182,6 +184,25 @@ export class StepsStore {
     const [all, after] = opts.slim ? [st.stepsJsonSlim, st.stepsJsonSlimAfter] : [st.stepsJson, st.stepsJsonAfter];
     const row = (afterSeq === undefined ? all.get(sessionId) : after.get(sessionId, afterSeq)) as { out: string };
     return row.out;
+  }
+
+  /** The same JSON text as listStepsJson, a page of `pageSize` steps at a time: `[`, the steps with their commas, `]`.
+   * GET /sessions/:id/steps sends it page by page, so a 10k-step thread (12 MB) is never one string in memory. */
+  *stepsJsonPages(sessionId: string, afterSeq?: number, opts: { slim?: boolean; pageSize?: number } = {}): Generator<string> {
+    const page = opts.slim ? this.st.stepsJsonSlimPage : this.st.stepsJsonPage;
+    const size = opts.pageSize ?? 500;
+    let seq = afterSeq ?? -Infinity, first = true;
+    yield "[";
+    for (;;) {
+      const rows = page.all(sessionId, Number.isFinite(seq) ? seq : Number.MIN_SAFE_INTEGER, size) as { j: string; seq: number }[];
+      if (!rows.length) break;
+      const text = rows.map((r) => r.j).join(",");
+      yield first ? text : "," + text;
+      first = false;
+      seq = rows[rows.length - 1].seq;
+      if (rows.length < size) break;
+    }
+    yield "]";
   }
 
   /** A step's whole input as `{"input":…}` JSON (`{}` when it has none), or undefined for an unknown step: what an
@@ -458,6 +479,9 @@ const trims = `kind = 'edit' AND diff IS NOT NULL AND diff != '' AND json_valid(
   AND (${TRIMMED_KEYS.map((k) => `json_type(input, '$.${k}') IS NOT NULL`).join(" OR ")})`;
 const SLIM_INPUT = `CASE WHEN ${trims} THEN json_remove(input, ${TRIMMED_KEYS.map((k) => `'$.${k}'`).join(", ")}) || ',"inputTrimmed":true' ELSE input END`;
 /** `slim`: edits leave out what their diff repeats (slimStep), for the page's steps list. */
+/** One row per step: its JSON (`j`) and its seq, in order. */
+const stepJsonRowsSql = (where: string, slim = false) =>
+  `SELECT ${STEP_JSON.replace("INPUT_SLOT", slim ? SLIM_INPUT : "input")} AS j, seq FROM steps WHERE ${where} ORDER BY seq ASC`;
 const stepsJsonSql = (where: string, slim = false) =>
   `SELECT '[' || coalesce(group_concat(j, ','), '') || ']' AS out FROM (SELECT ${STEP_JSON.replace("INPUT_SLOT", slim ? SLIM_INPUT : "input")} AS j FROM steps WHERE ${where} ORDER BY seq ASC)`;
 

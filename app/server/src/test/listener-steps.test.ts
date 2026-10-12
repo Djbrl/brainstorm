@@ -41,12 +41,18 @@ test("the steps JSON is byte for byte the serialized step objects, and afterSeq 
     assert.equal(L.store.listStepsJson("s1", after), JSON.stringify(L.store.listSteps("s1").filter((s) => s.seq > after)), `afterSeq ${after}`);
   }
   assert.equal(L.store.listStepsJson("nope"), "[]");
+  // Sent a page at a time: the same bytes, whatever the page size.
+  for (const pageSize of [1, 2, 3, 500]) for (const after of [undefined, -1, 2, 101]) for (const slim of [false, true]) {
+    assert.equal([...L.store.stepsJsonPages("s1", after, { slim, pageSize })].join(""), L.store.listStepsJson("s1", after, { slim }), `page ${pageSize} after ${after} slim ${slim}`);
+  }
+  assert.equal([...L.store.stepsJsonPages("nope")].join(""), "[]");
 
   // The controller sends the slim text (edits without what their diff repeats) as JSON; a bad afterSeq is ignored.
   const slim = L.store.listStepsJson("s1", undefined, { slim: true });
   assert.deepEqual(JSON.parse(slim), JSON.parse(JSON.stringify(L.store.listSteps("s1").map(slimStep))));
   const c = new SessionsController(L.store);
-  const res = () => ({ body: undefined as string | undefined, ct: undefined as string | undefined, type(t: string) { this.ct = t; return this; }, send(b: string) { this.body = b; return this; } });
+  const res = () => ({ body: undefined as string | undefined, ct: undefined as string | undefined, type(t: string) { this.ct = t; return this; }, send(b: string) { this.body = b; return this; },
+    write(b: string) { this.body = (this.body ?? "") + b; return true; }, end() { return this; }, on() { return this; }, once() { return this; }, removeListener() { return this; } });
   for (const [q, expected] of [[undefined, slim], ["3", L.store.listStepsJson("s1", 3, { slim: true })], ["abc", slim], ["", slim]]) {
     const r = res();
     c.steps("s1", q as string, r as never);

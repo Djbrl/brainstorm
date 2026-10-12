@@ -61,16 +61,34 @@ Rundown starts in the background when a Claude Code session starts, and reads Cl
 
 Summaries of files and labels written by a model are off in this release. They'll use the Claude Code you already have in a later version.
 
-## What it stores, and where
+## What it runs, stores and sends
 
-- Data: `~/.claude/plugins/data/rundown-rundown/` (`rundown-brainstorm` if you installed `rundown@brainstorm`): a SQLite database, the server log, `server.json`, `notices.json`. Uninstalling the plugin deletes it. If Claude Code doesn't set a plugin data folder, Rundown uses `~/.rundown` instead, and that folder stays after you uninstall (delete it yourself to remove your history).
-- Once a day, Rundown fetches its own version number from GitHub to tell you about updates. That request carries nothing about you or your code.
-- Anonymous usage stats, only if you say yes: the app asks once, and until then sends nothing. With a yes, once a day: a random install id, version, OS, map theme and counts of what you used; never code, paths, prompts or names. Kept 13 months. Change it, or delete what was sent, in Settings; `DO_NOT_TRACK=1` keeps it off for good. Details: [Usage stats](../README.md#usage-stats) and the [privacy page](https://brainstorm-landing.vercel.app/privacy.html).
-- The server listens on `127.0.0.1` only (port 4747, or the next free one), so other computers can't reach it. It refuses requests addressed to other host names, and its live feed needs a token only its own page can read, so other websites can't reach it. Other programs running on this computer can, like with any local server. Its page can't load anything from elsewhere (a Content Security Policy), and other sites can't frame it.
-- `server.json` (readable only by you) holds a random secret. The launcher and the hooks only talk to a server that proves it knows it, so nothing else that takes the port gets your data.
-- To show when a thread is waiting for you, the plugin's hooks tell the local server when Claude Code asks for a permission, shows a notification, finishes a turn or gets a new message (the tool's name and input, never the conversation). They only talk to `127.0.0.1`.
-- Nothing else is sent anywhere, except your questions to Claude if you set a key. Sharing only saves files on your computer; you decide where they go.
-- A shared file contains the thread's prompts, messages, commands and code changes, and the project's file list. Before it's saved, secrets are masked again, email addresses are masked, and your home folder, account name and computer name are replaced. Screenshots are never included. The file runs only its own code and loads nothing from the network. Read it before you send it anywhere.
+Everything Rundown does on your computer, and every time it talks to anything outside it.
+
+### What runs
+
+- **When a Claude Code session starts,** the `SessionStart` hook runs `scripts/hook.sh`, which checks for Node.js and runs `scripts/launch.mjs`. The launcher starts the Rundown server (`build/server.js`, run with your Node.js) in the background, or reuses the one already running, and prints at most one message for you (welcome, updated, an update available, or Node too old).
+- **While a session runs,** the `PermissionRequest`, `Notification`, `Stop` and `UserPromptSubmit` hooks run `scripts/signal.mjs` in the background. It sends the event (the tool's name and input, never the conversation) to the local server, signed with a secret only the server and the hooks know, so the map can show which thread is waiting for you.
+- **The skills** (`/rundown:open`, `/rundown:share`, `/rundown:stop`) may only run the launcher, nothing else.
+- **The server** reads Claude Code's and Codex's session logs (`~/.claude/projects`, `~/.codex`) and the files of the project you open, to draw the map. In a git project it runs read-only git commands there (the file list, recent commit times), with the repository's own helper programs turned off. It never writes to your project.
+- **When you ask it to,** it opens a file in your editor or shows it in Finder, and opens the map in your browser.
+
+### What it stores, and where
+
+- Data: `~/.claude/plugins/data/rundown-rundown/` (`rundown-brainstorm` if you installed `rundown@brainstorm`): a SQLite database (your threads' steps, read from the logs, with secrets masked), the server log, `server.json`, `notices.json` and `settings.json`. The folder and its files are readable only by you. Uninstalling the plugin deletes it. If Claude Code doesn't set a plugin data folder, Rundown uses `~/.rundown` instead, and that folder stays after you uninstall (delete it yourself to remove your history).
+- `server.json` holds a random secret. The launcher and the hooks only talk to a server that proves it knows it, and the server only accepts hook messages signed with it.
+
+### What it sends, and to whom
+
+- **Nothing about your code, prompts or files leaves your computer,** with the two exceptions below, both your choice.
+- **Update check (on by default, can be turned off):** once a day, Rundown fetches its own version number from GitHub (`raw.githubusercontent.com`) to tell you about updates. The request carries nothing about you or your code. Turn it off in Settings → Updates, or with `RUNDOWN_UPDATE_CHECK=0`.
+- **Usage stats (off until you say yes):** the app asks once. With a yes, once a day: a random install id, the version, the OS, the map theme and counts of what you used, sent to the landing site (`brainstorm-landing.vercel.app`); never code, paths, prompts or names. Kept 13 months. Change it, or delete what was sent, in Settings; `DO_NOT_TRACK=1` keeps it off for good. Details: [Usage stats](../README.md#usage-stats) and the [privacy page](https://brainstorm-landing.vercel.app/privacy).
+- **Questions to Claude (only if you set an API key):** when you ask about a step or a file, the question and the step or file it's about go to Anthropic's API with your key. Without a key, nothing is sent.
+- **Sharing** only saves files on your computer; you decide where they go. A shared file contains the thread's prompts, messages, commands and code changes, and the project's file list. Before it's saved, secrets are masked again, email addresses are masked, and your home folder, account name and computer name are replaced. Screenshots and Ask answers are never included. The file runs only its own code and loads nothing from the network. Read it before you send it anywhere.
+
+### Who can reach the server
+
+The server listens on `127.0.0.1` only (port 4747, or the next free one), so other computers can't reach it. It refuses requests addressed to other host names and writes from other websites, and its live feed needs a token only its own page can read. Other programs running on this computer can read from it, as with any local server. Its page loads nothing from elsewhere (a Content Security Policy), and other sites can't frame it.
 
 ## How it's built (for contributors)
 
@@ -93,4 +111,4 @@ Summaries of files and labels written by a model are off in this release. They'l
 
 If you installed it as `rundown@brainstorm`, use `/plugin uninstall rundown@brainstorm` and `/plugin marketplace remove brainstorm`.
 
-Run `/rundown:stop` first to stop the server. Uninstalling deletes Rundown's data folder, unless it is `~/.rundown` (see above), which stays.
+Run `/rundown:stop` first to stop the server. Uninstalling deletes Rundown's data folder, unless it is `~/.rundown` (see above), which stays. If you want to keep your settings, copy the data folder somewhere first.

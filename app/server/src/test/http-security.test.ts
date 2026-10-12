@@ -4,7 +4,9 @@
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { createHmac } from "node:crypto";
+import { DatabaseSync } from "../core/sqlite";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -116,4 +118,40 @@ test("the live feed refuses another site's page and a foreign Host", async () =>
   assert.equal(await opens({ host: "evil.example" }), false);
   assert.equal(await opens({ origin: `http://localhost:${port}` }), false); // a page needs the live token
   assert.equal(await opens({}), true); // a local tool
+});
+
+// ── the hooks' signature ──
+
+const secret = () => (JSON.parse(readFileSync(join(scratch, "data", "server.json"), "utf8")) as { secret: string }).secret;
+const signed = (body: string, ts = String(Date.now()), key = secret()) => ({
+  "content-type": "application/json", "x-rundown-hook": "1", "x-rundown-ts": ts,
+  "x-rundown-sig": createHmac("sha256", key).update(`hook:${ts}:`).update(body).digest("hex"),
+});
+const hookRow = (sid: string) => {
+  const db = new DatabaseSync(join(scratch, "data", "rundown.db"), { readOnly: true });
+  try { return db.prepare(`SELECT signal FROM attention_hooks WHERE session_id = ?`).get(sid); } finally { db.close(); }
+};
+
+test("a hook message is taken only signed with the secret in server.json, and recent", async () => {
+  const body = JSON.stringify({ event: "Stop", session_id: "signed-thread" });
+  assert.equal((await call("POST", "/api/hooks", { headers: signed(body), body })).status, 204);
+  assert.ok(hookRow("signed-thread"));
+  const forged = JSON.stringify({ event: "PermissionRequest", session_id: "forged-thread", tool_name: "Bash" });
+  const refused = {
+    unsigned: { "content-type": "application/json", "x-rundown-hook": "1" },
+    "another key": signed(forged, undefined, "0".repeat(64)),
+    "another body": signed(body),
+    "3 minutes old": signed(forged, String(Date.now() - 3 * 60_000)),
+    "3 minutes ahead": signed(forged, String(Date.now() + 3 * 60_000)),
+  };
+  for (const [what, headers] of Object.entries(refused)) assert.equal((await call("POST", "/api/hooks", { headers, body: forged })).status, 403, what);
+  assert.equal(hookRow("forged-thread"), undefined);
+});
+
+test("the plugin's hook script signs what it sends, and the server takes it", async () => {
+  const script = resolve(__dirname, "../../../../plugin/scripts/signal.mjs");
+  const child = spawn(process.execPath, [script], { env: { PATH: process.env.PATH, HOME: scratch, CLAUDE_PLUGIN_DATA: join(scratch, "data") }, stdio: ["pipe", "ignore", "ignore"] });
+  child.stdin!.end(JSON.stringify({ hook_event_name: "Notification", session_id: "from-the-script", notification_type: "idle_prompt", transcript_path: "/x" }));
+  await new Promise((r) => child.on("exit", r));
+  assert.deepEqual(JSON.parse((hookRow("from-the-script") as { signal: string }).signal), { event: "Notification", session_id: "from-the-script", notification_type: "idle_prompt" });
 });

@@ -24,9 +24,13 @@ async function main() {
     notification_type: h.notification_type, message: h.message,
     tool_name: h.tool_name, tool_input: h.tool_input, tool_use_id: h.tool_use_id,
   };
+  // Signed with the same secret (its time and the exact body), so the server knows the message is from a hook that can
+  // read server.json, not from any other program on this machine. The server refuses it after 2 minutes.
+  const text = JSON.stringify(body), ts = String(Date.now());
+  const sig = createHmac("sha256", secret).update(`hook:${ts}:`).update(text).digest("hex");
   await fetch(`http://127.0.0.1:${port}/api/hooks`, {
-    method: "POST", headers: { "content-type": "application/json", "x-rundown-hook": "1" },
-    body: JSON.stringify(body), signal: AbortSignal.timeout(1500),
+    method: "POST", headers: { "content-type": "application/json", "x-rundown-hook": "1", "x-rundown-ts": ts, "x-rundown-sig": sig },
+    body: text, signal: AbortSignal.timeout(1500),
   });
 }
 main().catch(() => {}).finally(() => process.exit(0));

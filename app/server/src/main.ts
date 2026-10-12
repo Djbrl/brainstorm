@@ -10,7 +10,7 @@ import type { NextFunction, Request, Response } from "express";
 import { AppModule } from "./app.module";
 import { dataDir, isLocalHost, isLocalWrite, pageCsp } from "./core/local";
 import { config, loadDevEnv } from "./core/config";
-import { SECRET } from "./core/secrets";
+import { shareSecret } from "./core/secrets";
 import { buildCommit } from "./core/build-info";
 import { serverLogger } from "./core/logger";
 
@@ -26,7 +26,7 @@ process.on("unhandledRejection", fatal("unhandled rejection"));
 loadDevEnv();
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger: serverLogger(), bodyParser: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger: serverLogger(), bodyParser: false, rawBody: true });
   app.useWebSocketAdapter(new WsAdapter(app));
   app.setGlobalPrefix("api");
 
@@ -36,7 +36,8 @@ async function bootstrap() {
   // not a JSON body (that needs a CORS preflight, which this server never answers), and its page's Origin isn't local.
   app.use((req: Request, res: Response, next: NextFunction) =>
     isLocalWrite(req.method, req.headers["content-type"], req.headers.origin) ? next() : res.status(403).send("Rundown only takes changes from its own page"));
-  app.useBodyParser("json"); // JSON only: no form parser, so a form posted from another site has nothing to say
+  app.useBodyParser("json"); // JSON only: no form parser, so a form posted from another site has nothing to say. The raw
+  // bytes are kept too (rawBody above): a hook signs the exact body it sends.
   // What the page may load: only this server. Another site can't frame it (clickjacking), and if text from a log ever
   // got into the page as code, it couldn't load or send anything elsewhere.
   app.use((req: Request, res: Response, next: NextFunction) => {
@@ -87,7 +88,7 @@ async function bootstrap() {
   process.once("SIGINT", () => shutdown("SIGINT"));
   if (config.pluginDataDir) {
     // 0600: the secret lets the launcher and the hooks check they talk to this server, not something else on the port.
-    const mine = { pid: process.pid, port, version, startedAt: new Date().toISOString(), secret: SECRET };
+    const mine = { pid: process.pid, port, version, startedAt: new Date().toISOString(), secret: shareSecret() };
     writeFileSync(state, JSON.stringify(mine), { mode: 0o600 });
     chmodSync(state, 0o600); // the mode above only applies to a new file
     // Up: the launcher that started us is done. Only its own lock (a token it gave us), never another launcher's.

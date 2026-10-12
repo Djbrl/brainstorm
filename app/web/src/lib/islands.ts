@@ -11,6 +11,7 @@ import { outOfWorktree } from "@shared/paths";
 import { isRecording } from "./live";
 import { repoBase, repoRelative } from "./paths";
 import { get } from "./api";
+import { sameStep } from "../step/format";
 import { createAtom } from "./store";
 
 export type Island = {
@@ -128,6 +129,39 @@ function names(rootsList: string[]): Map<string, string> {
   }));
 }
 
+type Touch = { edited?: string; at: string };
+/** Count one touch of an outside file (path → its last edit, and its last touch). `only`: a visitor's home project. */
+function addTouch(out: Map<string, Touch>, raw: string | undefined, ts: string, edit: boolean, only: string | null, map: ProjectMap | null, known: string[] | null) {
+  if (!isOutside(raw, map)) return;
+  if (/^\/(?:Users|home)(?:\/[^/]+)?\/?$/.test(raw)) return;   // the home folder itself (`ls ~`), not a file
+  const p = islandPath(raw);
+  if (only && projectOf(p, known) !== only) return;
+  const was = out.get(p);
+  out.set(p, { edited: edit && (!was?.edited || ts > was.edited) ? ts : was?.edited, at: !was || ts > was.at ? ts : was.at });
+}
+
+/** Per thread, the steps read so far and what they touched outside: a list that only grew is read from where it stopped. */
+const stepTouches = new Map<string, { steps: Step[]; map: ProjectMap | null; known: string[] | null; home: string | null; out: Map<string, Touch> }>();
+function stepsTouched(sid: string, steps: Step[] | undefined, map: ProjectMap | null, known: string[] | null, home: string | null): Map<string, Touch> {
+  if (!steps?.length) return new Map();
+  let c = stepTouches.get(sid);
+  stepTouches.delete(sid);
+  let from = 0;
+  // The same steps first (ids: a relabelled step is a new object with the same path), and nothing else changed.
+  if (c && c.map === map && c.known === known && c.home === home && steps.length >= c.steps.length
+    && c.steps.every((x, i) => sameStep(x, steps[i]))) from = c.steps.length;
+  else c = { steps, map, known, home, out: new Map() };
+  const out = from === steps.length ? c.out : new Map(c.out); // a new map when it changes: the memo above keys on it
+  for (let i = from; i < steps.length; i++) {
+    const s = steps[i];
+    if (s.filePath && (s.kind === "edit" || s.kind === "tool_call")) addTouch(out, s.filePath, s.ts, s.kind === "edit", home, map, known);
+    if (s.reads) for (const r of s.reads) addTouch(out, r, s.ts, false, home, map, known);   // what its commands read (cat, sed -n, grep…)
+  }
+  stepTouches.set(sid, { steps, map, known, home, out });
+  if (stepTouches.size > 4) stepTouches.delete(stepTouches.keys().next().value!);
+  return out;
+}
+
 /**
  * The islands for this frame: the outside files of the open thread's steps, and those the live agents on the map are on
  * or went through (a visitor's: only those in the project it comes from). Same files, same islands (and the same
@@ -135,30 +169,26 @@ function names(rootsList: string[]): Map<string, string> {
  */
 export function useIslands(map: ProjectMap | null, thread: Session | undefined, steps: Step[] | undefined, agents: AgentPresence[], sessions: Session[]): Island[] {
   const known = useRoots();
+  // What decides whether a path is outside, and whose: the project's folders (not its files: a file message makes a new
+  // map object, and the islands don't depend on it) and the projects known.
+  const root = map?.root ?? "", former = map?.formerRoots?.join("\n") ?? "";
+  const scope = useMemo(() => (map ? { root, files: [], edges: [], modules: [], formerRoots: map.formerRoots } as ProjectMap : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [!!map, root, former]);
+  const threadHome = homeOf(thread?.cwd, scope, known);
+  // The thread's steps, read once each: a live step adds to what the earlier ones gave (stepsTouched).
+  const fromSteps = useMemo(() => stepsTouched(thread?.id ?? "", steps, scope, known, threadHome), [thread?.id, steps, scope, known, threadHome]);
   const touched = useMemo(() => {
-    const out = new Map<string, { edited?: string; at: string }>(); // path → its last edit, and its last touch
-    const add = (raw: string | undefined, ts: string, edit: boolean, only: string | null) => {
-      if (!isOutside(raw, map)) return;
-      if (/^\/(?:Users|home)(?:\/[^/]+)?\/?$/.test(raw)) return;   // the home folder itself (`ls ~`), not a file
-      const p = islandPath(raw);
-      if (only && projectOf(p, known) !== only) return;
-      const was = out.get(p);
-      out.set(p, { edited: edit && (!was?.edited || ts > was.edited) ? ts : was?.edited, at: !was || ts > was.at ? ts : was.at });
-    };
-    const threadHome = homeOf(thread?.cwd, map, known);
-    for (const s of steps ?? []) {
-      if (s.filePath && (s.kind === "edit" || s.kind === "tool_call")) add(s.filePath, s.ts, s.kind === "edit", threadHome);
-      if (s.reads) for (const r of s.reads) add(r, s.ts, false, threadHome);   // what its commands read (cat, sed -n, grep…)
-    }
+    const out = new Map(fromSteps);
     const cwdOf = new Map(sessions.map((s) => [s.id, s.cwd]));
     for (const a of agents) {
-      const only = homeOf(cwdOf.get(a.sessionId), map, known);
-      add(a.file, a.ts, false, only);
-      for (const m of a.trail) add(m.file, m.ts, m.action === "edit" || m.action === "write", only);
+      const only = homeOf(cwdOf.get(a.sessionId), scope, known);
+      addTouch(out, a.file, a.ts, false, only, scope, known);
+      for (const m of a.trail) addTouch(out, m.file, m.ts, m.action === "edit" || m.action === "write", only, scope, known);
     }
     return out;
-  }, [map, thread?.cwd, steps, agents, sessions, known]);
-  const sig = [...touched].map(([p, t]) => `${p}@${t.edited ?? ""}`).sort().join("\n") + "|" + (known?.length ?? -1);
+  }, [fromSteps, agents, sessions, scope, known]);
+  const sig = useMemo(() => [...touched].map(([p, t]) => `${p}@${t.edited ?? ""}`).sort().join("\n") + "|" + (known?.length ?? -1), [touched, known]);
   return useMemo(() => {
     const by = new Map<string, { files: FileNode[]; at: string }>();
     for (const [path, t] of touched) {

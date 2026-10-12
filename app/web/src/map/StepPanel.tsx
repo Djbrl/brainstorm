@@ -6,11 +6,11 @@
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { KEEPS_OPEN, useClickAway, useLastShown } from "./panel";
 import type { Step } from "@contract";
-import { useLiveActions, useLiveSelector } from "../lib/live";
+import { useLiveActions, useLiveSelector, useLiveStep } from "../lib/live";
 import { useNavActions, useNavState, useReplayCursor } from "../lib/nav";
 import { useThread } from "../lib/thread";
 import { StepDetail } from "../step/StepDetail";
-import { isVisible, pairResults } from "../step/format";
+import { isVisible, pairingOf } from "../step/format";
 import "../step/follow.css";
 import "./map.css";
 
@@ -55,13 +55,17 @@ export function StepPanel({ header, back = "Back to the steps", onClose, follow 
   const close = onClose ?? closeStep;
   useClickAway(follow && !!stepId, KEEPS_OPEN, close);
 
-  const results = useMemo(() => pairResults(steps ?? []), [steps]);
-  let step: Step | undefined = stepId ? steps?.find((s) => s.id === stepId) : undefined;
+  // The step by id (no scan of the thread), its result, and for a result the call it answers (pairingOf: incremental).
+  const pairing = useMemo(() => (steps ? pairingOf(steps) : null), [steps]);
+  const opened = useLiveStep(stepId);
+  const answered = opened && opened.kind === "tool_result" ? pairing?.callOf.get(opened.id) : undefined;
+  const callStep = useLiveStep(answered);
+  let step: Step | undefined = opened;
   if (step && !isVisible(step) && steps) { // a tool result (or empty thinking): show the call it answers, or the step before
     const at = steps.indexOf(step);
-    const call = [...results.entries()].find(([, r]) => r.id === step!.id)?.[0];
-    step = (call && steps.find((s) => s.id === call)) || steps.slice(0, at).reverse().find(isVisible) || step;
+    step = callStep || steps.slice(0, at).reverse().find(isVisible) || step;
   }
+  const result = useLiveStep(step ? pairing?.resultOf.get(step.id) : undefined);
 
   // Keyboard: a step opened from the list (Enter on a row) takes the focus with it, so the next Tab is in the panel;
   // closing it (Esc, Back) gives the focus back to the list's row for that step.
@@ -79,7 +83,7 @@ export function StepPanel({ header, back = "Back to the steps", onClose, follow 
   }, [isOpen]);
 
   // While it slides out, it keeps showing the step it had.
-  const shown = useLastShown(step ? { step, result: results.get(step.id) } : null);
+  const shown = useLastShown(step ? { step, result } : null);
   return (
     <div className={`map-panel pl-panel ${step ? "open" : ""}`} aria-hidden={!step} inert={!step} ref={panel} tabIndex={-1}
       role="region" aria-label="Step" onFocus={() => { focusInside.current = true; }}

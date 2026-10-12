@@ -4,7 +4,7 @@
 // camera already follows.
 // Clicking a place opens its step in the side panel, the Map's StepPanel with the place in its header (and the same link: …/places/step/<id>).
 import { useCallback, useEffect, useRef } from "react";
-import { useLiveSelector } from "../lib/live";
+import { useLiveSelector, useLiveStep } from "../lib/live";
 import { useNavActions, useNavState, useReplayCursor } from "../lib/nav";
 import { initial } from "../map/agents";
 import { MapSidebar } from "../map/sidebar/MapSidebar";
@@ -52,8 +52,7 @@ export function PlacesView() {
   }, [navStep, !!data]);
 
   // The step in the panel (StepPanel shows it), and the other steps in the same place (to step through them).
-  const steps = useLiveSelector((s) => (thread ? s.steps[thread.sessionId] : undefined));
-  const step = stepId ? steps?.find((s) => s.id === stepId) : undefined;
+  const step = useLiveStep(stepId);
   const here = data && selected ? [...new Set(eventsAt(data, selected).map((e) => e.stepId))] : [];
   const pos = stepId ? here.indexOf(stepId) : -1;
   const place = data && selected ? eventsAt(data, selected).find((e) => e.stepId === stepId) : undefined;

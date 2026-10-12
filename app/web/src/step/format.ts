@@ -156,6 +156,39 @@ export function pairResults(steps: Step[]): Map<string, Step> {
   return out;
 }
 
+/** The same step, or the same one relabelled (the store replaces a step object when the reader labels it). */
+export const sameStep = (a: Step, b: Step) => a === b || (a.id === b.id && a.seq === b.seq && a.ts === b.ts);
+
+/** A thread's calls and results paired both ways, by step id: call → its result, result → its call. */
+export type Pairing = { resultOf: ReadonlyMap<string, string>; callOf: ReadonlyMap<string, string> };
+type Paired = { steps: Step[]; pairer: CallPairer; resultOf: Map<string, string>; callOf: Map<string, string> };
+/** Per thread, the pairing of the list seen last (most recently used last). */
+const pairings = new Map<string, Paired>();
+
+/**
+ * pairResults for a thread's list as it grows: a list that only added steps to the last one (the same ids first) pairs
+ * only the new ones, so a live step costs one step, not the whole thread. A pairing changes in place as its thread grows:
+ * read it, don't keep it.
+ */
+export function pairingOf(steps: Step[]): Pairing {
+  const sid = steps[0]?.sessionId ?? "";
+  let p = pairings.get(sid);
+  pairings.delete(sid);
+  let from = 0;
+  if (p && steps.length >= p.steps.length && p.steps.every((x, i) => sameStep(x, steps[i]))) from = p.steps.length;
+  else p = { steps, pairer: new CallPairer(), resultOf: new Map(), callOf: new Map() };
+  for (let i = from; i < steps.length; i++) {
+    const s = steps[i];
+    if (s.kind === "tool_call" || s.kind === "edit") p.pairer.call(s);
+    else if (s.kind === "tool_result") { const call = p.pairer.result(s); if (call) { p.resultOf.set(call.id, s.id); p.callOf.set(s.id, call.id); } }
+    else if (s.kind === "prompt" && !s.isSubagent) p.pairer.clear();
+  }
+  p.steps = steps;
+  pairings.set(sid, p);
+  if (pairings.size > 4) pairings.delete(pairings.keys().next().value!);
+  return { resultOf: p.resultOf, callOf: p.callOf };
+}
+
 export const isVisible = (s: Step) => s.kind !== "tool_result" && !(s.kind === "thinking" && !s.text?.trim()) && !(s.kind === "text" && !s.text?.trim() && !s.label);
 
 export const toolName = (t?: string) => (t ?? "").replace(/^mcp__.+?__/, "").replace(/_/g, " ");

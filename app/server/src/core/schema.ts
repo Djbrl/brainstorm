@@ -82,6 +82,11 @@ const MIGRATIONS: ((db: DatabaseSync) => void)[] = [
     if (!columns(db, "steps").includes("is_error")) db.exec(`ALTER TABLE steps ADD COLUMN is_error INTEGER NOT NULL DEFAULT 0`);
     db.exec(`UPDATE steps SET is_error = 1 WHERE kind = 'tool_result' AND input IS NOT NULL AND json_valid(input) AND json_extract(input, '$.isError') = 1`);
   },
+  // 3. The threads list is read newest first (StepsStore allSessions, ORDER BY last_event_at DESC): an index instead
+  // of a sort of every thread on each change.
+  (db) => {
+    db.exec(`CREATE INDEX IF NOT EXISTS sessions_last_event ON sessions(last_event_at)`);
+  },
 ];
 
 /** The number of migrations: a database at this user_version is up to date. */

@@ -40,6 +40,12 @@ const THINKING_MAX_MS = 5 * 60_000;
 const CATCH_UP = 600;
 /** Which threads belong to the open workspace is re-checked this often (the listener's list is costly to build). */
 const SCOPE_MS = 60_000;
+/** The sweep runs when the next thread's state can change with time (deadlines), and at least this often (threads
+ * whose history was just stored, which the bus doesn't carry); the first one this soon after boot. */
+const SWEEP_MAX_MS = 10_000;
+const FIRST_SWEEP_MS = 2_000;
+/** How long after a thread's last step its state can change by itself (the thresholds compute() reads). */
+const QUIET_STEPS = [4_000, QUIET_MS, WORKING_MS, THINKING_MAX_MS, FORGET_MS];
 
 
 type Tracker = {
@@ -77,6 +83,8 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
   private trackers = new Map<string, Tracker>();
   private last = new Map<string, Attention>();
   private timer?: NodeJS.Timeout;
+  /** When the scheduled sweep runs (ms). */
+  private timerAt = Infinity;
   /** Threads of the open workspace (from the listener), and every id already looked up, so a new one triggers a re-check. */
   private scope?: { at: number; visible: Set<string>; checked: Set<string> };
   private rechecked = new Set<string>(); // hidden threads that already forced a re-check by starting to work
@@ -110,10 +118,38 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
         this.hooksAt = Math.max(this.hooksAt ?? 0, r.at);
       }
     });
-    this.timer = setInterval(() => safely(this.log, "attention sweep", () => this.sweep()), 2_000);
+    this.schedule(Date.now() + FIRST_SWEEP_MS);
+  }
+  onModuleDestroy() { this.stopped = true; if (this.timer) clearTimeout(this.timer); }
+  private stopped = false;
+
+  /** Sweep at `at`, unless one is due sooner. */
+  private schedule(at: number) {
+    if (this.stopped || at >= this.timerAt) return;
+    if (this.timer) clearTimeout(this.timer);
+    this.timerAt = at;
+    this.timer = setTimeout(() => {
+      this.timer = undefined;
+      this.timerAt = Infinity;
+      safely(this.log, "attention sweep", () => this.sweep());
+      this.schedule(this.nextDeadline(Date.now()));
+    }, Math.max(0, at - Date.now()));
     this.timer.unref?.();
   }
-  onModuleDestroy() { if (this.timer) clearInterval(this.timer); }
+
+  /** The next moment a tracked thread's state can change by itself (a quiet threshold passes, the hooks stop being
+   * trusted), at most SWEEP_MAX_MS from now. */
+  private nextDeadline(now: number): number {
+    let next = now + SWEEP_MAX_MS;
+    const consider = (at: number) => { if (at > now && at < next) next = at; };
+    for (const t of this.trackers.values()) {
+      if (!t.lastTs) continue;
+      for (const ms of QUIET_STEPS) consider(t.lastTs + ms + 1);
+      if (t.hook) consider(t.hook.at + FORGET_MS + 1);
+    }
+    if (this.hooksAt !== null) consider(this.hooksAt + HOOKS_TRUSTED_MS + 1);
+    return next;
+  }
 
   /** Threads that need you or just finished, newest first. */
   list(): Attention[] {
@@ -181,6 +217,7 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
       this.scope.at = 0;
     }
     this.publish(s.sessionId);
+    this.schedule(this.nextDeadline(Date.now()));
   }
 
   private apply(t: Tracker, s: Step) {

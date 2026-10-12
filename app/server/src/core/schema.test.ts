@@ -37,4 +37,6 @@ test("a new database gets every table", () => {
   migrate(db);
   assert.equal(version(db), SCHEMA_VERSION);
   assert.ok(cols(db, "steps").includes("agent_id"));
+  const plan = db.prepare("EXPLAIN QUERY PLAN SELECT * FROM sessions ORDER BY last_event_at DESC").all().map((r) => String(r.detail)).join(" ");
+  assert.match(plan, /sessions_last_event/);
 });

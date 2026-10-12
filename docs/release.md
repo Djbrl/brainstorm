@@ -9,9 +9,11 @@ Never move the tag `hackathon-submission`, and never redeploy the judged demo (b
 From a clean `main` (`git status` shows nothing to commit):
 
 ```bash
-cd app/server && npm test && npm run typecheck
-cd ../web && npm run typecheck
+cd app/server && npm install && npm test && npm run typecheck
+cd ../web && npm install && npm run typecheck && npm test
 ```
+
+`npm install` first: the dependencies change from time to time (the web's tests need vitest, added in the cleanup's Phase 6).
 
 Everything passes, on Node 22.13 (`.nvmrc`) as well as on the Node you use day to day.
 

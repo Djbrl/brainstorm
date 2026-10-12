@@ -132,3 +132,19 @@ test("a sibling project whose folder name starts the same (app-backend, app.v2) 
   assert.deepEqual([...new Set(t.sent.filter((m) => m.type === "step").map((m) => (m as { step: { sessionId: string } }).step.sessionId))].sort(), ["own", "src"]);
   await t.close();
 });
+
+test("a custom title read before any step doesn't stamp the thread with now (its times come from its steps)", async () => {
+  const t = await makeListener({ root: "/work/demo-repo" });
+  const f = join(t.projectDir, "renamed.jsonl");
+  writeFileSync(f, JSON.stringify({ type: "custom-title", sessionId: "renamed", customTitle: "Named first" }) + "\n");
+  await t.readNow(f, true);
+  assert.equal(t.listener.store.listSessions().find((s) => s.id === "renamed"), undefined); // only a name: not listed yet
+  const steps = [line("prompt", { sessionId: "renamed", i: 1, text: "go" }), line("edit", { sessionId: "renamed", i: 2 })] as { timestamp: string }[];
+  appendFileSync(f, jsonl(steps));
+  await t.readNow(f, true);
+  const row = t.dbs.db.prepare(`SELECT title, started_at, last_event_at FROM sessions WHERE id = 'renamed'`).get() as Row;
+  assert.deepEqual([row.title, row.started_at, row.last_event_at], ["Named first", steps[0].timestamp, steps[1].timestamp]);
+  assert.ok(Date.parse(row.last_event_at) < Date.now() - 60_000);
+  assert.ok(t.listener.store.listSessions().some((s) => s.id === "renamed"));
+  await t.close();
+});

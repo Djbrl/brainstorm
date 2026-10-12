@@ -129,8 +129,9 @@ export class StepsStore {
     const rows = this.st.allSessions.all() as SessionRow[];
     // Titles stored before promptTitle() existed can still start with Claude Code's wrapper tags.
     const cleaned = rows.map((r) => (r.custom_title ? r : { ...r, title: promptTitle(r.title) ?? UNTITLED }));
-    // A thread where no agent did anything but answer a slash command (opening this app, /compact) isn't work to show.
-    const idle = (r: SessionRow) => !r.worked && (r.title.startsWith("/") || r.title === UNTITLED);
+    // A thread where no agent did anything but answer a slash command (opening this app, /compact) isn't work to show,
+    // nor one with only a name so far (a custom-title line, no step yet).
+    const idle = (r: SessionRow) => !r.last_event_at || (!r.worked && (r.title.startsWith("/") || r.title === UNTITLED));
     const shown = cleaned.filter((r) => !idle(r));
     if (!this.project.activeRoot) return shown;
     return shown.filter((r) => this.project.isWithinRoot(r.cwd) || this.project.visitors.has(r.id));
@@ -356,7 +357,7 @@ export class StepWriter {
     }
     const lastEventAt = !(Date.parse(row.last_event_at) >= Date.parse(ts)) ? ts : row.last_event_at; // as times, not strings
     // A thread starts with its earliest step (its logs aren't always read in time order).
-    if (Date.parse(ts) < Date.parse(row.started_at)) Object.assign(row, { started_at: ts, dirty: true });
+    if (!row.started_at || Date.parse(ts) < Date.parse(row.started_at)) Object.assign(row, { started_at: ts, dirty: true });
     const newCwd = cwd || row.cwd;
     const titleOrCwdChanged = title !== row.title || newCwd !== row.cwd;
     if (titleOrCwdChanged || lastEventAt !== row.last_event_at || titleSet !== row.title_set) {
@@ -368,11 +369,12 @@ export class StepWriter {
 
   setCustomTitle(b: Batch, sessionId: string, customTitle: string, harness: Harness) {
     const row = this.batchSession(b, sessionId);
-    const now = new Date().toISOString();
     const title = storedTitle(customTitle, Infinity);
     if (!row) {
+      // Claude Code writes a custom-title line without a time, and naming a thread isn't activity: no times until its
+      // first step (until then the thread isn't listed), so a rename read in a history backfill doesn't make it "now".
       b.sessions.set(sessionId, {
-        id: sessionId, cwd: "", title, started_at: now, last_event_at: now, custom_title: 1, title_set: 1, worked: 0,
+        id: sessionId, cwd: "", title, started_at: "", last_event_at: "", custom_title: 1, title_set: 1, worked: 0,
         harness, isNew: true, dirty: true,
       });
     } else {

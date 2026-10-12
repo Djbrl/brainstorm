@@ -185,7 +185,10 @@ async function start(port, lockToken) {
   const n = readNotices();
   if (!!n.startedWithoutSettings !== !SETTINGS) { if (SETTINGS) delete n.startedWithoutSettings; else n.startedWithoutSettings = true; writeNotices(n); }
   let died = null;
-  const child = spawn(process.execPath, [SERVER], { cwd: DATA, env, detached: true, windowsHide: true, stdio: ["ignore", out, out] });
+  // A young generation of 16 MB instead of Node's default (up to 64 MB a half on a 16 GB machine): the server's
+  // garbage is short-lived and small, and the bigger one cost about 100 MB of resident memory for no speed
+  // (docs/performance.md, "Memory").
+  const child = spawn(process.execPath, ["--max-semi-space-size=16", SERVER], { cwd: DATA, env, detached: true, windowsHide: true, stdio: ["ignore", out, out] });
   child.on("error", (e) => { died = e.message; });
   child.on("exit", (code) => { died ??= `exited with code ${code}`; });
   closeSync(out);

@@ -14,7 +14,7 @@ if (first.status !== 0) process.exit(first.status ?? 1);
 
 const children = [
   spawn(process.execPath, [tsc, "-p", ".", "-w", "--preserveWatchOutput"], { stdio: "inherit" }),
-  spawn(process.execPath, ["--watch", "--watch-preserve-output", "dist/main.js"], { stdio: "inherit" }),
+  spawn(process.execPath, ["--watch", "--watch-preserve-output", "--max-semi-space-size=16", "dist/main.js"], { stdio: "inherit" }),
 ];
 
 let stopping = false;

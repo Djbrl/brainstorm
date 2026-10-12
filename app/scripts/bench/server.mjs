@@ -70,7 +70,7 @@ export async function startServer({ port, dataDir, claudeDir, root, timeoutMs = 
     ...(process.env.RUNDOWN_MAX_FILES ? { RUNDOWN_MAX_FILES: process.env.RUNDOWN_MAX_FILES } : {}), // the map's file cap
   };
   const t0 = Date.now();
-  const child = spawn(process.execPath, [join(APP_DIR, "server/dist/main.js")], { env, stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn(process.execPath, ["--max-semi-space-size=16", join(APP_DIR, "server/dist/main.js")] /* as plugin/scripts/launch.mjs */, { env, stdio: ["ignore", "pipe", "pipe"] });
   const events = { spawnAt: t0 };
   const logLines = [];
   const onLine = (line) => {

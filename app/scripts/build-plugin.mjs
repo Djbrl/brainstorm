@@ -14,6 +14,11 @@ const outArg = process.argv.indexOf("--out");
 const OUT = outArg > 0 && process.argv[outArg + 1] ? resolve(process.argv[outArg + 1]) : resolve(APP, "../plugin/build");
 const TMP = `${OUT}.building-${process.pid}`;
 const run = (cmd, cwd) => execSync(cmd, { cwd, stdio: "inherit" });
+/** The commit the build comes from, "-dirty" when app/ has changes not committed: the server prints it at start. */
+function commitOf() {
+  const git = (args) => execSync(`git ${args}`, { cwd: APP, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  try { return git("rev-parse --short HEAD") + (git("status --porcelain -- .") ? "-dirty" : ""); } catch { return ""; }
+}
 
 rmSync(TMP, { recursive: true, force: true });
 mkdirSync(TMP, { recursive: true });
@@ -31,6 +36,10 @@ try {
     keepNames: true,
     minify: true,
     legalComments: "none",
+    // Minified, but in lines of at most 500 characters: a stack trace points at a line that can be read, and a release
+    // diff of server.js shows what changed instead of one changed line of 2 MB.
+    lineLimit: 500,
+    define: { __RUNDOWN_COMMIT__: JSON.stringify(commitOf()) },
     metafile: true, // which files went in: the licences below are theirs
     // Optional packages Nest and ws load only if installed; left out, they're skipped at runtime.
     external: [

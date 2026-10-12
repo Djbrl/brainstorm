@@ -11,6 +11,7 @@ import { AppModule } from "./app.module";
 import { dataDir, isLocalHost, isLocalWrite, pageCsp } from "./core/local";
 import { config, loadDevEnv } from "./core/config";
 import { SECRET } from "./core/secrets";
+import { buildCommit } from "./core/build-info";
 
 // An error nothing caught: written to the log (stderr, server.log under the plugin) before the server stops, so a crash
 // says why. Timers and listeners catch their own; this is the last resort, not a way to keep running half broken.
@@ -58,6 +59,9 @@ async function bootstrap() {
   }
 
   const version = config.version ?? "dev";
+  // For the log: the version and the commit it was built from ("0.8.1 (56eb7a5)"). server.json keeps the bare version.
+  const commit = buildCommit();
+  const named = `${version}${commit ? ` (${commit})` : ""}`;
   const first = config.port;
   // The plugin's server picks its own port: the one asked for if it's free, else the next ones (the launcher can't
   // reserve one for us: anything could take it before we bind). Dev keeps its fixed port.
@@ -73,7 +77,7 @@ async function bootstrap() {
   // On a stop (the launcher's SIGTERM, Ctrl-C, logout): close the app (and with it the database), and remove
   // server.json if it's still ours, so nobody finds a dead server there.
   const shutdown = (signal: string) => {
-    console.log(`Rundown ${version} (pid ${process.pid}) stopping on ${signal}`);
+    console.log(`Rundown ${named} (pid ${process.pid}) stopping on ${signal}`);
     setTimeout(() => process.exit(0), 3000).unref();
     try { if (config.pluginDataDir && JSON.parse(readFileSync(state, "utf8")).pid === process.pid) rmSync(state, { force: true }); } catch { /* not there */ }
     void app.close().catch(() => {}).finally(() => process.exit(0));
@@ -105,6 +109,6 @@ async function bootstrap() {
       try { writeFileSync(state, JSON.stringify(mine), { mode: 0o600 }); } catch { /* next minute */ }
     }, 60_000).unref();
   }
-  console.log(`Rundown ${version} on http://127.0.0.1:${port}  (api /api, ws /ws)`);
+  console.log(`Rundown ${named} on http://127.0.0.1:${port}  (api /api, ws /ws)`);
 }
 bootstrap();

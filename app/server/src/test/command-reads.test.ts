@@ -1,12 +1,11 @@
 // commandReads: the files a shell command reads, read from the command text (cases from a real review thread).
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const { join } = require("node:path");
-const { commandReads } = require(join(__dirname, "..", "dist", "listener", "command-writes.js"));
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { commandReads } from "../listener/command-writes";
 
 const CWD = "/work/repo";
 process.env.HOME = "/home/me";
-const run = (cmd, cwd = CWD) => commandReads(cmd, cwd);
+const run = (cmd: string, cwd = CWD) => commandReads(cmd, cwd);
 
 test("cat, head, tail, wc, nl, less: their operands", () => {
   assert.deepEqual(run("cat docs/technical.md"), ["/work/repo/docs/technical.md"]);

@@ -1,27 +1,31 @@
 // listSessions: the cached list must show exactly what the old query showed, before and after changes.
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const { writeFileSync, appendFileSync } = require("node:fs");
-const { join, resolve, sep, relative, basename } = require("node:path");
-const { makeListener, line, jsonl, dist } = require("./helpers.cjs");
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { writeFileSync, appendFileSync, mkdirSync } from "node:fs";
+import { join, basename } from "node:path";
+import { makeListener, line, jsonl, type TestListener } from "./helpers";
+import type { Session } from "../shared/contract";
+
+type Row = Record<string, any>;
+import { promptTitle, ListenerService } from "../listener/listener.service";
+import { migrate } from "../core/schema";
 
 /** The listing as it was computed before the cache (a scan of every step per call). */
-function legacyList(t) {
-  const { promptTitle } = require(dist("listener/listener.service.js"));
+function legacyList(t: TestListener) {
   const L = t.listener;
   const db = t.dbs.db;
-  const rows = db.prepare(`SELECT * FROM sessions ORDER BY last_event_at DESC`).all();
-  const sessions = rows.map((r) => L.store.rowToSession(r.custom_title ? r : { ...r, title: promptTitle(r.title) ?? "(untitled session)" }));
-  const worked = new Set(db.prepare(`SELECT DISTINCT session_id FROM steps WHERE kind IN ('tool_call', 'edit')`).all().map((r) => r.session_id));
-  const idle = (s) => !worked.has(s.id) && (s.title.startsWith("/") || s.title === "(untitled session)");
+  const rows = db.prepare(`SELECT * FROM sessions ORDER BY last_event_at DESC`).all() as Row[];
+  const sessions = rows.map((r) => (L.store as unknown as { rowToSession(r: Row): Session }).rowToSession(r.custom_title ? r : { ...r, title: promptTitle(r.title) ?? "(untitled session)" }));
+  const worked = new Set(db.prepare(`SELECT DISTINCT session_id FROM steps WHERE kind IN ('tool_call', 'edit')`).all().map((r) => (r as Row).session_id));
+  const idle = (s: Session) => !worked.has(s.id) && (s.title.startsWith("/") || s.title === "(untitled session)");
   const shown = sessions.filter((s) => !idle(s));
   return shown.filter((s) => L.project.isWithinRoot(s.cwd));
 }
 
 async function fixture() {
   const t = await makeListener({ root: "/work/demo-repo" });
-  const f = (id) => join(t.projectDir, `${id}.jsonl`);
-  const write = (id, lines) => writeFileSync(f(id), jsonl(lines));
+  const f = (id: string) => join(t.projectDir, `${id}.jsonl`);
+  const write = (id: string, lines: unknown[]) => writeFileSync(f(id), jsonl(lines));
   write("worked", [line("prompt", { sessionId: "worked", i: 1, text: "fix the bug" }), line("tool", { sessionId: "worked", i: 2 })]);
   write("slash", [line("prompt", { sessionId: "slash", i: 3, text: "<command-name>/compact</command-name>" }), line("text", { sessionId: "slash", i: 4 })]);
   write("untitled", [line("text", { sessionId: "untitled", i: 5 })]);
@@ -36,7 +40,7 @@ async function fixture() {
 test("the cached list matches the old query, and follows new steps, titles and workspace changes", async (ctx) => {
   const { t, f } = await fixture();
   const L = t.listener;
-  const ids = (list) => list.map((s) => s.id);
+  const ids = (list: Session[]) => list.map((s) => s.id);
   assert.deepEqual(L.store.listSessions(), legacyList(t));
   assert.deepEqual(ids(L.store.listSessions()).sort(), ["custom", "talk", "worked", "worktree"]);
 
@@ -56,21 +60,21 @@ test("the cached list matches the old query, and follows new steps, titles and w
   assert.deepEqual(L.store.listSessions(), legacyList(t));
 
   // Another workspace: the list follows.
-  L.setRoot("/elsewhere");
+  t.inner.setRoot("/elsewhere");
   assert.deepEqual(ids(L.store.listSessions()), ["outside"]);
   assert.deepEqual(L.store.listSessions(), legacyList(t));
-  L.setRoot("/work/demo-repo");
+  t.inner.setRoot("/work/demo-repo");
   assert.deepEqual(L.store.listSessions(), legacyList(t));
 
   // Status is worked out on each call, not cached.
   ctx.mock.timers.enable({ apis: ["Date"], now: Date.parse("2026-10-01T12:00:12Z") });
-  assert.equal(L.store.listSessions().find((s) => s.id === "talk").status, "running");
+  assert.equal(L.store.listSessions().find((s) => s.id === "talk")!.status, "running");
   ctx.mock.timers.tick(3 * 60_000);
-  assert.equal(L.store.listSessions().find((s) => s.id === "talk").status, "idle");
+  assert.equal(L.store.listSessions().find((s) => s.id === "talk")!.status, "idle");
   ctx.mock.timers.reset();
   // Returned objects are fresh: callers may change them.
-  L.store.listSessions()[0].title = "changed";
-  assert.notEqual(L.store.listSessions()[0].title, "changed");
+  L.store.listSessions()[0]!.title = "changed";
+  assert.notEqual(L.store.listSessions()[0]!.title, "changed");
   await t.close();
 });
 
@@ -78,14 +82,13 @@ test("the worked flag is filled in for a database from before it existed", async
   const { t } = await fixture();
   const expected = t.listener.store.listSessions();
   t.dbs.db.exec(`ALTER TABLE sessions DROP COLUMN worked; PRAGMA user_version = 0`);
-  require(dist("core/schema.js")).migrate(t.dbs.db);
-  const { ListenerService } = require(dist("listener/listener.service.js"));
+  migrate(t.dbs.db);
   const again = new ListenerService(t.dbs, t.bus, { broadcast() {} }, t.cfg, t.state);
   again.onModuleInit();
   await again.watcher.close();
-  again.tailer.offsets = t.listener.tailer.offsets;
+  (again.tailer as unknown as { offsets: unknown }).offsets = t.listener.tailer.offsets;
   assert.deepEqual(again.store.listSessions(), expected);
-  const worked = t.dbs.db.prepare(`SELECT id FROM sessions WHERE worked = 1 ORDER BY id`).all().map((r) => r.id);
+  const worked = t.dbs.db.prepare(`SELECT id FROM sessions WHERE worked = 1 ORDER BY id`).all().map((r) => (r as Row).id);
   assert.deepEqual(worked, ["outside", "worked"]);
   await t.close();
 });
@@ -101,32 +104,30 @@ test("a thread from another project that edits this one's files is a visitor her
   await t.readNow(f("orch"), true);
   assert.ok(ids().includes("orch"));
   // Opening the demo repo again finds it from the stored steps; its own project lists it as its own.
-  L.setRoot("/work/demo-repo");
+  t.inner.setRoot("/work/demo-repo");
   assert.ok(ids().includes("orch"));
-  assert.ok(L.scope().guests.ids.has("orch"));
-  L.setRoot("/orchestrator");
+  assert.ok(t.inner.scope().guests!.ids.has("orch"));
+  t.inner.setRoot("/orchestrator");
   assert.deepEqual(ids(), ["orch"]);
   await t.close();
 });
 
 test("a sibling project whose folder name starts the same (app-backend, app.v2) is not read; a subfolder is", async () => {
-  const { mkdirSync } = require("node:fs");
   const t = await makeListener({ root: "/work/demo-repo" });
   t.live();
-  t.listener.isListening = true;
-  const L = t.listener;
-  const files = {};
+  t.inner.isListening = true;
+  const files: Record<string, string> = {};
   for (const [id, cwd] of [["backend", "/work/demo-repo-backend"], ["v2", "/work/demo-repo.v2"], ["src", "/work/demo-repo/src"], ["own", "/work/demo-repo"]]) {
     const dir = join(t.cfg.claudeProjectsDir, cwd.replace(/[^A-Za-z0-9]/g, "-"));
     mkdirSync(dir, { recursive: true });
     files[id] = join(dir, `${id}.jsonl`);
     writeFileSync(files[id], jsonl([line("prompt", { sessionId: id, cwd, i: 1, text: `in ${id}` }), line("tool", { sessionId: id, cwd, i: 2 })]));
   }
-  const claude = L.sources.find((s) => s.harness === "claude");
-  assert.deepEqual(claude.list(L.scope()).map((f) => basename(f.path, ".jsonl")).sort(), ["own", "src"]);
+  const claude = t.inner.sources.find((s) => s.harness === "claude")!;
+  assert.deepEqual(claude.list(t.inner.scope()).map((f) => basename(f.path, ".jsonl")).sort(), ["own", "src"]);
   for (const f of Object.values(files)) await t.readNow(f);
-  const stored = t.dbs.db.prepare(`SELECT id FROM sessions ORDER BY id`).all().map((r) => r.id);
+  const stored = t.dbs.db.prepare(`SELECT id FROM sessions ORDER BY id`).all().map((r) => (r as Row).id);
   assert.deepEqual(stored, ["own", "src"]);
-  assert.deepEqual([...new Set(t.sent.filter((m) => m.type === "step").map((m) => m.step.sessionId))].sort(), ["own", "src"]);
+  assert.deepEqual([...new Set(t.sent.filter((m) => m.type === "step").map((m) => (m as { step: { sessionId: string } }).step.sessionId))].sort(), ["own", "src"]);
   await t.close();
 });

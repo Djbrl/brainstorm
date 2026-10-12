@@ -14,6 +14,9 @@ export function liveClientOk(host: string | undefined, origin: string | undefine
   return isLocalOrigin(origin) && liveTokenOk(token);
 }
 
+/** What services need of the gateway: tests hand them a plain `{ broadcast }`. */
+export type Broadcaster = Pick<EventsGateway, "broadcast">;
+
 /** Push-only websocket at /ws. Anyone can call broadcast(). Only Rundown's own page (or a local tool) may connect. */
 @WebSocketGateway({
   path: "/ws",

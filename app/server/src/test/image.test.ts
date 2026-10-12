@@ -1,20 +1,22 @@
 // GET /api/image: a picture an agent read, served from disk only under the guard rules (image.controller.ts).
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const { mkdirSync, symlinkSync, writeFileSync } = require("node:fs");
-const { join } = require("node:path");
-const { makeListener, dist, line, jsonl } = require("./helpers.cjs");
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { makeListener, line, jsonl } from "./helpers";
+import { ImageController } from "../image/image.controller";
+
+type Res = Parameters<ImageController["image"]>[1];
 
 const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
 
 function fakeRes() {
-  const r = { headers: {}, body: undefined, setHeader(k, v) { this.headers[k.toLowerCase()] = v; }, end(b) { this.body = b; } };
+  const r = { headers: {} as Record<string, unknown>, body: undefined as unknown, setHeader(k: string, v: unknown) { this.headers[k.toLowerCase()] = v; }, end(b: unknown) { this.body = b; } };
   return r;
 }
 
 async function setup() {
   const t = await makeListener();
-  const { ImageController } = require(dist("image/image.controller.js"));
   const ctl = new ImageController(t.listener.store);
   const dir = join(t.tmp, "pics");
   mkdirSync(dir);
@@ -28,11 +30,11 @@ async function setup() {
   ]));
   await t.readNow(f, true);
   // Same shape as what the Codex reader stores.
-  const ask = async (path, opts = {}) => {
+  const ask = async (path: string, opts: { site?: string; origin?: string; host?: string } = {}) => {
     const site = "site" in opts ? opts.site : "same-origin", origin = opts.origin, host = opts.host ?? "127.0.0.1:4000";
     const res = fakeRes();
-    try { await ctl.image(path, res, site, origin, host); return { status: 200, res }; }
-    catch (e) { return { status: e.getStatus?.() ?? 500, res }; }
+    try { await ctl.image(path, res as unknown as Res, site, origin, host); return { status: 200, res }; }
+    catch (e) { return { status: (e as { getStatus?: () => number }).getStatus?.() ?? 500, res }; }
   };
   return { t, files, ask };
 }
@@ -62,8 +64,8 @@ test("anything else is a plain 404", async () => {
     assert.equal((await ask(files.link)).status, 404, "a .png that is a link to a .txt");
     assert.equal((await ask(join(files.png, "..", "gone.png"))).status, 404, "not on disk");
     assert.equal((await ask("shot.png")).status, 404, "relative");
-    assert.equal((await ask(undefined)).status, 404);
-    assert.equal((await ask(["a", "b"])).status, 404);
+    assert.equal((await ask(undefined as unknown as string)).status, 404);
+    assert.equal((await ask(["a", "b"] as unknown as string)).status, 404);
     assert.equal((await ask(join(files.png, "..", "..", "pics", "other.png"))).status, 404, "resolves to an unreferenced file");
     assert.equal((await ask(files.png, { site: "cross-site" })).status, 404);
     assert.equal((await ask(files.png, { site: "same-site" })).status, 404);

@@ -1,15 +1,19 @@
 // Which subagent a step comes from (agent_id) is stored, read back on every path, and filled in once for older steps.
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const { mkdirSync, writeFileSync } = require("node:fs");
-const { join } = require("node:path");
-const { makeListener, line, jsonl, dist } = require("./helpers.cjs");
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import type { DatabaseSync } from "node:sqlite";
+import { makeListener, line, jsonl, type TestListener } from "./helpers";
+import { workSteps } from "../core/work-steps";
+import { backfillAgentIds } from "../listener/agent-ids";
+import { ListenerService } from "../listener/listener.service";
 
 /** A subagent's log line: same thread, marked as a sidechain with its agent id. */
-const sub = (agentId, kind, opts) => ({ ...line(kind, opts), isSidechain: true, agentId });
+const sub = (agentId: string, kind: Parameters<typeof line>[0], opts?: Parameters<typeof line>[1]) => ({ ...line(kind, opts), isSidechain: true, agentId });
 
 /** A thread with a main log and two subagents working at once, read as history. */
-async function threadWithSubagents(t) {
+async function threadWithSubagents(t: TestListener) {
   const main = join(t.projectDir, "s1.jsonl");
   writeFileSync(main, jsonl([
     line("prompt", { i: 0, text: "split the work" }),
@@ -35,11 +39,12 @@ async function threadWithSubagents(t) {
   return { main, a1, a2 };
 }
 
-const agentIds = (db) => Object.fromEntries(db.prepare(`SELECT id, agent_id FROM steps`).all().map((r) => [r.id, r.agent_id]));
+type Row = Record<string, any>;
+const agentIds = (db: DatabaseSync): Record<string, string | null> => Object.fromEntries((db.prepare(`SELECT id, agent_id FROM steps`).all() as Row[]).map((r) => [r.id, r.agent_id]));
 /** Every stored column but agent_id, and the offsets: what the backfill must leave alone. */
-const rest = (db) => ({
-  steps: db.prepare(`SELECT * FROM steps ORDER BY session_id, seq`).all().map(({ agent_id, ...r }) => ({ ...r })),
-  offsets: db.prepare(`SELECT * FROM listener_offsets ORDER BY file`).all().map((r) => ({ ...r })),
+const rest = (db: DatabaseSync) => ({
+  steps: (db.prepare(`SELECT * FROM steps ORDER BY session_id, seq`).all() as Row[]).map(({ agent_id: _agent, ...r }) => ({ ...r })),
+  offsets: (db.prepare(`SELECT * FROM listener_offsets ORDER BY file`).all() as Row[]).map((r) => ({ ...r })),
 });
 
 test("a subagent step's agentId is stored and read back on every path", async () => {
@@ -58,16 +63,15 @@ test("a subagent step's agentId is stored and read back on every path", async ()
   // The column, getStep, stepsBefore, the reader's backfill list, the JSON the web loads, the light steps.
   const ids = agentIds(t.dbs.db);
   for (const s of steps) assert.equal(ids[s.id], s.agentId ?? null);
-  for (const s of subs) assert.equal(L.store.getStep(s.id).agentId, s.agentId);
+  for (const s of subs) assert.equal(L.store.getStep(s.id)!.agentId, s.agentId);
   const last = steps[steps.length - 1];
   assert.deepEqual(L.store.stepsBefore(last.id, 100), steps.slice(0, -1));
   assert.ok(L.store.unlabeledSteps(100).filter((s) => s.isSubagent).every((s) => s.agentId));
   assert.equal(L.store.listStepsJson("s1"), JSON.stringify(steps));
   assert.equal(L.store.listStepsJson("s1", 4), JSON.stringify(steps.filter((s) => s.seq > 4)));
-  const { workSteps } = require(dist("core/work-steps.js"));
   const light = workSteps(t.dbs.db, "s1");
   assert.ok(light.length > 0);
-  for (const s of light) assert.equal(s.agentId, steps.find((x) => x.id === s.id).agentId);
+  for (const s of light) assert.equal(s.agentId, steps.find((x) => x.id === s.id)!.agentId);
   // Live, the step objects sent out carry it too.
   t.live();
   writeFileSync(join(t.projectDir, "s1", "subagents", "agent-a2.jsonl"), jsonl([sub("a2", "text", { i: 9, text: "done" })]), { flag: "a" });
@@ -85,7 +89,7 @@ test("the steps JSON of steps without an agent id is what it was before the colu
   // As before 5 Oct 2026: subagent steps stored without their id.
   t.dbs.db.exec(`UPDATE steps SET agent_id = NULL WHERE agent_id LIKE 'a2'`);
   // rowToStep as it was, key for key.
-  const before = (row) => ({
+  const before = (row: Row) => ({
     id: row.id, sessionId: row.session_id, seq: row.seq, ts: row.ts, kind: row.kind,
     text: row.text ?? undefined, tool: row.tool ?? undefined, input: row.input ? JSON.parse(row.input) : undefined,
     filePath: row.file_path ?? undefined, diff: row.diff ? JSON.parse(row.diff) : undefined,
@@ -93,10 +97,10 @@ test("the steps JSON of steps without an agent id is what it was before the colu
     isSubagent: !!row.is_subagent,
     ...(row.tool_use_id ? { toolUseId: row.tool_use_id } : {}),
   });
-  const rows = t.dbs.db.prepare(`SELECT * FROM steps WHERE session_id = 's1' ORDER BY seq`).all();
+  const rows = t.dbs.db.prepare(`SELECT * FROM steps WHERE session_id = 's1' ORDER BY seq`).all() as Row[];
   assert.equal(rows.filter((r) => r.agent_id === null).length, 3 + 3); // the main thread's three steps and a2's three
   // Today's: the same, with agentId after isSubagent when there is one.
-  const now = (r) => {
+  const now = (r: Row) => {
     const { toolUseId, ...head } = before(r);
     return { ...head, ...(r.agent_id ? { agentId: r.agent_id } : {}), ...(toolUseId ? { toolUseId } : {}) };
   };
@@ -108,7 +112,7 @@ test("the steps JSON of steps without an agent id is what it was before the colu
   const f = join(t.projectDir, "s2.jsonl");
   writeFileSync(f, jsonl([line("prompt", { sessionId: "s2", text: "hi" }), line("tool", { sessionId: "s2", i: 1 }), line("result", { sessionId: "s2", i: 2, input: "tu_1" }), line("edit", { sessionId: "s2", i: 3 })]));
   await t.readNow(f, true);
-  const rows2 = t.dbs.db.prepare(`SELECT * FROM steps WHERE session_id = 's2' ORDER BY seq`).all();
+  const rows2 = t.dbs.db.prepare(`SELECT * FROM steps WHERE session_id = 's2' ORDER BY seq`).all() as Row[];
   assert.equal(rows2.length, 4);
   assert.equal(t.listener.store.listStepsJson("s2"), JSON.stringify(rows2.map(before)));
   assert.ok(!t.listener.store.listStepsJson("s2").includes("agentId"));
@@ -128,7 +132,6 @@ test("the backfill gives older subagent steps their id from their logs, changes 
   db.prepare(`INSERT INTO steps (id, session_id, seq, ts, kind, text, is_subagent) VALUES ('gone-1:0', 's1', 50, 't', 'text', 'x', 1)`).run();
   const others = rest(db);
 
-  const { backfillAgentIds } = require(dist("listener/agent-ids.js"));
   // Small reads: lines cross chunk boundaries; one line is too long to have been stored and is skipped.
   const r = await backfillAgentIds(db, { chunkBytes: 97, maxLineBytes: 600 });
   const longLine = Object.entries(expected).filter(([id, a]) => a && !agentIds(db)[id]).map(([id]) => id);
@@ -160,7 +163,6 @@ test("only the part of a log that was stored is read, and a listener runs the pa
   // The log grew after it was read: the new lines aren't steps yet, they are left for the listener.
   writeFileSync(a1, jsonl([sub("a1", "text", { i: 20, text: "later" })]), { flag: "a" });
 
-  const { ListenerService } = require(dist("listener/listener.service.js"));
   const start = async () => {
     const l = new ListenerService(t.dbs, t.bus, { broadcast() {} }, t.cfg, t.state);
     l.onModuleInit();
@@ -170,11 +172,11 @@ test("only the part of a log that was stored is read, and a listener runs the pa
   };
   await start();
   assert.deepEqual(agentIds(db), expected);
-  assert.equal(db.prepare(`SELECT count(*) AS n FROM steps`).get().n, Object.keys(expected).length);
+  assert.equal((db.prepare(`SELECT count(*) AS n FROM steps`).get() as Row).n, Object.keys(expected).length);
   // Recorded as done: the next start doesn't run it again.
   const someSub = Object.keys(expected).find((id) => expected[id]);
-  db.prepare(`UPDATE steps SET agent_id = NULL WHERE id = ?`).run(someSub);
+  db.prepare(`UPDATE steps SET agent_id = NULL WHERE id = ?`).run(someSub!);
   await start();
-  assert.equal(agentIds(db)[someSub], null);
+  assert.equal(agentIds(db)[someSub!], null);
   await t.close();
 });

@@ -1,13 +1,13 @@
 // sanitizeText cuts long texts before masking them: what is kept must be masked exactly as if the whole text was.
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const { dist } = require("./helpers.cjs");
-require("reflect-metadata");
-const { sanitizeText } = require(dist("listener/listener.service.js"));
-const { maskSecrets } = require(dist("privacy/mask.js"));
+import "reflect-metadata";
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {  } from "./helpers";
+import { sanitizeText } from "../listener/listener.service";
+import { maskSecrets } from "../privacy/mask";
 
 /** The old way: mask all of it, then clip. */
-const reference = (s, limit) => { const m = maskSecrets(s); return m.length > limit ? m.slice(0, limit) + "\n…(truncated)" : m; };
+const reference = (s: string, limit: number) => { const m = maskSecrets(s); return m.length > limit ? m.slice(0, limit) + "\n…(truncated)" : m; };
 
 const SECRETS = [
   "sk-ant-api03-" + "A".repeat(90),
@@ -24,7 +24,7 @@ const SECRETS = [
   "--token " + "h".repeat(30),
 ];
 const PEM = "-----BEGIN RSA PRIVATE KEY-----\n" + "MIIEowIBAAKCAQEA7\n".repeat(200) + "-----END RSA PRIVATE KEY-----";
-const leaks = (out) => ["AAAAAAAAAA", "bbbbbbbbbb", "cccccccccc", "DDDDDDDDDD", "1111111111", "eeeeeeeeee", "SflKxwRJ", "ffffffffff", "hunter2", "horse battery", "gggggggggg", "hhhhhhhhhh", "MIIEowIBAAKCAQEA7"].filter((x) => out.includes(x));
+const leaks = (out: string) => ["AAAAAAAAAA", "bbbbbbbbbb", "cccccccccc", "DDDDDDDDDD", "1111111111", "eeeeeeeeee", "SflKxwRJ", "ffffffffff", "hunter2", "horse battery", "gggggggggg", "hhhhhhhhhh", "MIIEowIBAAKCAQEA7"].filter((x) => out.includes(x));
 
 test("short texts: unchanged behavior", () => {
   for (const s of ["", "hello", ...SECRETS, PEM]) assert.equal(sanitizeText(s, 20_000), reference(s, 20_000));
@@ -34,7 +34,7 @@ test("a secret across the cut, at every offset around it, for each kind of secre
   const limit = 2_000;
   // With line breaks the cut lands on one; without, on a space (inside "correct horse battery staple", say).
   for (const unit of ["lorem ipsum dolor sit amet\n", "lorem ipsum dolor sit amet "]) {
-    const filler = (n) => unit.repeat(Math.ceil(n / unit.length) + 1).slice(0, n);
+    const filler = (n: number) => unit.repeat(Math.ceil(n / unit.length) + 1).slice(0, n);
     for (const secret of [...SECRETS, PEM]) {
       for (let start = limit - 200; start <= limit + 1024 + 50; start += 7) {
         const s = filler(start) + "\n" + secret + " " + filler(6_000);
@@ -59,7 +59,7 @@ test("no line break or space near the cut (minified text), and keys that shrink 
 
 test("random texts with secrets around the cut: same output as masking everything", () => {
   let seed = 42;
-  const rnd = (n) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };
+  const rnd = (n: number) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };
   const words = ["the", "agent", "ran", "tests", "é", "日本", "🚀", "\n", "  ", "{\"a\":1}", "path/to/file.ts", "=", ":"];
   for (let k = 0; k < 400; k++) {
     const limit = [2_000, 20_000][rnd(2)];

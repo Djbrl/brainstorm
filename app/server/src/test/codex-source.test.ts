@@ -1,44 +1,53 @@
 // Reading Codex's session logs (listener/codex.source.ts): hand-made lines in the shapes Codex writes, made-up paths.
-require("reflect-metadata");
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const { writeFileSync, appendFileSync, mkdirSync, mkdtempSync, rmSync } = require("node:fs");
-const { tmpdir } = require("node:os");
-const { join } = require("node:path");
-const { makeListener, dist, line, jsonl, ts } = require("./helpers.cjs");
+import "reflect-metadata";
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { writeFileSync, appendFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { makeListener, line, jsonl, ts, internals, type TestListener } from "./helpers";
+import type { WsMessage } from "../shared/contract";
+import { DbService } from "../core/db.service";
+import { BusService } from "../core/bus.service";
+import { ConfigService } from "../core/config.service";
+import { ListenerService } from "../listener/listener.service";
+import { WorkspaceState } from "../core/workspace-state";
+import { agentName } from "../listener/agent-names";
 
 const ROOT = "/work/demo-repo";
+/** A stored step, its input read loosely (these tests look inside it). */
+type CStep = any;
 let n = 0;
 const uuid = () => `01a0c000-0000-7000-8000-${String(++n).padStart(12, "0")}`;
 
 /** A Codex thread's lines: `L.meta()` first, then items and model records, each with its time and ordinal. */
-function codex(id, { cwd = ROOT, version = "0.155.0-alpha.1", source = "vscode", extra = {} } = {}) {
+function codex(id: string, { cwd = ROOT, version = "0.155.0-alpha.1", source = "vscode" as unknown, extra = {} }: { cwd?: string; version?: string; source?: unknown; extra?: object } = {}) {
   let ord = 0;
   let i = 0;
-  const L = (type, payload) => ({ timestamp: ts(i++), ordinal: ord++, type, payload });
+  const L = (type: string, payload: any) => ({ timestamp: ts(i++), ordinal: ord++, type, payload });
   const turn = { id: "turn-1" };
   return {
     meta: () => L("session_meta", { id, session_id: id, timestamp: ts(0), cwd, originator: "Codex Desktop", cli_version: version, source, model_provider: "openai", base_instructions: { text: "You are Codex. SECRET-INSTRUCTIONS" }, git: { commit_hash: "abc", branch: "main", repository_url: "git@github.com:me/demo-repo.git" }, ...extra }),
     turn: (t = "turn-1", dir = cwd) => { turn.id = t; return [L("event_msg", { type: "task_started", turn_id: t }), L("turn_context", { cwd: dir, model: "gpt", approval_policy: "on-request" })]; },
-    item: (item) => L("event_msg", { type: "item_completed", thread_id: id, turn_id: turn.id, item }),
-    ri: (payload) => L("response_item", { ...payload, internal_chat_message_metadata_passthrough: { turn_id: turn.id } }),
-    raw: (type, payload) => L(type, payload),
+    item: (item: any) => L("event_msg", { type: "item_completed", thread_id: id, turn_id: turn.id, item }),
+    ri: (payload: any) => L("response_item", { ...payload, internal_chat_message_metadata_passthrough: { turn_id: turn.id } }),
+    raw: (type: string, payload: any) => L(type, payload),
   };
 }
 
-function file(t, id, lines, { dir = join(t.cfg.codexDir, "sessions", "2026", "10", "01") } = {}) {
+function file(t: TestListener, id: string, lines: unknown[], { dir = join(t.cfg.codexDir, "sessions", "2026", "10", "01") } = {}) {
   mkdirSync(dir, { recursive: true });
   const f = join(dir, `rollout-2026-10-01T12-00-00-${id}.jsonl`);
   writeFileSync(f, jsonl(lines));
   return f;
 }
 
-const steps = (t, id) => t.listener.store.listSteps(id);
-const calls = (ss) => ss.filter((s) => s.kind === "tool_call" || s.kind === "edit");
-const resultOf = (ss, call) => ss.find((s) => s.kind === "tool_result" && s.toolUseId === call.toolUseId);
+const steps = (t: TestListener, id: string): CStep[] => t.listener.store.listSteps(id);
+const calls = (ss: CStep[]) => ss.filter((s) => s.kind === "tool_call" || s.kind === "edit");
+const resultOf = (ss: CStep[], call: CStep) => ss.find((s) => s.kind === "tool_result" && s.toolUseId === call.toolUseId);
 
 /** A new-format thread: a prompt, Codex's own context turns, a read, a failing command, a search, edits, MCP, web. */
-function newThread(id, cwd = ROOT) {
+function newThread(id: string, cwd = ROOT) {
   const c = codex(id, { cwd });
   const userText = "fix the login bug";
   return [
@@ -197,8 +206,8 @@ test("scope: a thread in another folder isn't read; one in a Codex worktree of t
   assert.equal(steps(t, other).length, 0, "another project's thread isn't read");
   const listed = t.listener.store.listSessions();
   assert.deepEqual(listed.map((s) => s.id).sort(), [inWt, gone].sort());
-  assert.equal(listed.find((s) => s.id === inWt).cwd, ROOT);
-  assert.equal(listed.find((s) => s.id === gone).cwd, ROOT);
+  assert.equal(listed.find((s) => s.id === inWt)!.cwd, ROOT);
+  assert.equal(listed.find((s) => s.id === gone)!.cwd, ROOT);
   const ss = steps(t, inWt);
   const read = ss.find((s) => s.tool === "Read");
   assert.equal(read.filePath, "/work/demo-repo/app.vue");
@@ -212,8 +221,8 @@ test("scope: a thread in another folder isn't read; one in a Codex worktree of t
   const archived = join(t.cfg.codexDir, "archived_sessions");
   const arch = "01a0c950-b6a2-77f3-aab6-000000000007";
   const fa = file(t, arch, newThread(arch), { dir: archived });
-  const source = t.listener.sources.find((s) => s.harness === "codex");
-  const scope = t.listener.scope();
+  const source = t.inner.sources.find((s) => s.harness === "codex")!;
+  const scope = t.inner.scope();
   assert.deepEqual(source.list(scope).map((x) => x.path).sort(), [fw, fg, fa].sort());
   assert.equal(source.owns(fa), true);
   assert.equal(source.owns(join(t.tmp, "elsewhere.jsonl")), false);
@@ -365,8 +374,8 @@ test("watching: a new Codex thread is read live; no Codex folder at all is fine"
   // No ~/.codex: the listener still gets ready.
   const none = await makeListener({ root: ROOT, watch: true });
   const end = Date.now() + 10_000;
-  while (!none.listener.ready && Date.now() < end) await new Promise((r) => setTimeout(r, 20));
-  assert.equal(none.listener.ready, true);
+  while (!none.inner.ready && Date.now() < end) await new Promise((r) => setTimeout(r, 20));
+  assert.equal(none.inner.ready, true);
   await none.close();
 
   const tmp = mkdtempSync(join(tmpdir(), "bs-codex-"));
@@ -377,17 +386,13 @@ test("watching: a new Codex thread is read live; no Codex folder at all is fine"
   const day = join(tmp, "codex", "sessions", "2026", "10", "01");
   mkdirSync(day, { recursive: true });
   mkdirSync(process.env.RUNDOWN_CLAUDE_DIR, { recursive: true });
-  const { DbService } = require(dist("core/db.service.js"));
-  const { BusService } = require(dist("core/bus.service.js"));
-  const { ConfigService } = require(dist("core/config.service.js"));
-  const { ListenerService } = require(dist("listener/listener.service.js"));
-  const sent = [];
+  const sent: WsMessage[] = [];
   const dbs = new DbService();
-  const L = new ListenerService(dbs, new BusService(), { broadcast: (m) => sent.push(m) }, new ConfigService(), new (require(dist("core/workspace-state.js")).WorkspaceState)());
+  const L = new ListenerService(dbs, new BusService(), { broadcast: (m: WsMessage) => { sent.push(m); } }, new ConfigService(), new WorkspaceState());
   L.onModuleInit();
-  const until = async (cond) => { const e = Date.now() + 10_000; while (!cond()) { if (Date.now() > e) throw new Error("timed out"); await new Promise((r) => setTimeout(r, 20)); } };
+  const until = async (cond: () => boolean) => { const e = Date.now() + 10_000; while (!cond()) { if (Date.now() > e) throw new Error("timed out"); await new Promise((r) => setTimeout(r, 20)); } };
   try {
-    await until(() => L.ready);
+    await until(() => internals(L).ready);
     const id = "01a0c950-b6a2-77f3-aab6-000000000013";
     const lines = newThread(id);
     const f = join(day, `rollout-2026-10-01T12-00-00-${id}.jsonl`);
@@ -395,7 +400,7 @@ test("watching: a new Codex thread is read live; no Codex folder at all is fine"
     await until(() => L.store.listSessions().length === 1);
     appendFileSync(f, jsonl(lines.slice(7)));
     await until(() => L.store.listSteps(id).some((s) => s.tool === "WebSearch"));
-    assert.ok(sent.some((m) => m.type === "step" && m.step.tool === "Read"), "live steps are broadcast");
+    assert.ok(sent.some((m) => m.type === "step" && (m as Extract<WsMessage, { type: "step" }>).step.tool === "Read"), "live steps are broadcast");
   } finally {
     await L.onModuleDestroy();
     dbs.db.close();
@@ -408,7 +413,7 @@ test("a turn Codex finishes live tells attention it's your turn; one in history 
   const id = uuid();
   const c = codex(id);
   const f = file(t, id, [c.meta(), ...c.turn(), c.item({ type: "UserMessage", id: uuid(), content: [{ type: "text", text: "rename it" }] }), c.raw("event_msg", { type: "task_complete", turn_id: "turn-1" })]);
-  const ended = [];
+  const ended: string[] = [];
   t.bus.on("turn-ended", (e) => ended.push(e.sessionId));
   await t.readNow(f, true);
   assert.deepEqual(ended, [], "history isn't news");
@@ -433,7 +438,7 @@ test("the workspace picker's Codex projects: a Codex worktree counts as its repo
   file(t, s, [codex(s, { cwd: "/Users/me/Documents/Codex/2026-09-23" }).meta()]);
   const projects = t.listener.codexProjects();
   assert.deepEqual([...projects.keys()], [repo]);
-  assert.deepEqual(projects.get(repo).map((x) => x.id).sort(), [a, b].sort());
+  assert.deepEqual(projects.get(repo)!.map((x) => x.id).sort(), [a, b].sort());
   rmSync(repo, { recursive: true, force: true });
   await t.close();
 });
@@ -464,10 +469,10 @@ test("after a restart mid-call, a command's output still finds its call (one sca
   const c = codex(id, { version: "0.140.0" });
   const f = file(t, id, [c.meta(), ...c.turn(), c.ri({ type: "function_call", call_id: "call_r1", name: "shell_command", arguments: JSON.stringify({ command: "npm run build", workdir: ROOT }) })]);
   await t.readNow(f, true);
-  t.listener.codex.states.clear(); // as after a restart: nothing remembered of the file
+  (t.inner.codex as unknown as { states: Map<string, unknown> }).states.clear(); // as after a restart: nothing remembered of the file
   appendFileSync(f, jsonl([c.ri({ type: "function_call_output", call_id: "call_r1", output: "Exit code: 0\nWall time: 3 seconds\nOutput:\nbuilt\n" })]));
   await t.readNow(f, true);
-  const steps = t.listener.store.listSteps(id);
+  const steps: CStep[] = t.listener.store.listSteps(id);
   const call = steps.find((s) => s.kind === "tool_call" && s.tool === "Bash");
   assert.ok(call, "the command is stored");
   assert.equal(call.input.command, "npm run build");
@@ -485,9 +490,9 @@ test("when the Codex reader's version changes, its threads are read again from t
   await t.readNow(join(t.projectDir, "s1.jsonl"), true);
   assert.equal(t.listener.store.listSessions().length, 2);
   t.dbs.db.prepare("UPDATE source_versions SET version = 1 WHERE harness = 'codex'").run();
-  t.listener.rereadChangedSources();
+  t.inner.rereadChangedSources();
   assert.deepEqual(t.listener.store.listSessions().map((s) => s.harness), ["claude"]);
-  assert.equal(t.dbs.db.prepare("SELECT COUNT(*) AS n FROM listener_offsets WHERE file = ?").get(f).n, 0, "read again from the start");
+  assert.equal((t.dbs.db.prepare("SELECT COUNT(*) AS n FROM listener_offsets WHERE file = ?").get(f) as { n: number }).n, 0, "read again from the start");
   await t.readNow(f, true);
   assert.equal(t.listener.store.listSessions().length, 2);
   await t.close();
@@ -512,7 +517,7 @@ test("an interrupted turn tells attention it's your turn, like a finished one", 
   const id = uuid();
   const c = codex(id);
   const f = file(t, id, [c.meta(), ...c.turn(), c.item({ type: "UserMessage", id: uuid(), content: [{ type: "text", text: "go" }] })]);
-  const ended = [];
+  const ended: string[] = [];
   t.bus.on("turn-ended", (e) => ended.push(e.sessionId));
   await t.readNow(f, true);
   t.live();
@@ -542,6 +547,6 @@ test("spawn_agent is an Agent call in the parent, its message is the subagent's 
   assert.ok(resultOf(ss, agent));
   const first = ss.find((s) => s.kind === "prompt" && s.agentId === child);
   assert.equal(first?.text, "check the auth module");
-  assert.equal(require(dist("listener/agent-names.js")).agentName(child), "Euclid");
+  assert.equal(agentName(child), "Euclid");
   await t.close();
 });

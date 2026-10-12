@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 import type { Harness } from "../shared/contract";
 import type { DbService } from "../core/db.service";
-import type { EventsGateway } from "../core/events.gateway";
+import type { Broadcaster } from "../core/events.gateway";
 import type { LogSource, Scope, Sink } from "./source";
 import { newBatch, type Batch, type StepsStore, type StepWriter } from "./step-store";
 
@@ -107,7 +107,7 @@ export class Tailer {
     private dbs: DbService,
     private store: StepsStore,
     private writer: StepWriter,
-    private gateway: EventsGateway,
+    private gateway: Broadcaster,
     private host: TailerHost,
     private log: Logger,
   ) {

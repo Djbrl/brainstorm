@@ -1,9 +1,10 @@
 // GET /sessions/:id/steps sends the stored JSON without parsing it: the bytes must be what JSON.stringify(listSteps) gave.
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const { writeFileSync } = require("node:fs");
-const { join } = require("node:path");
-const { makeListener, line, jsonl, dist } = require("./helpers.cjs");
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { makeListener, line, jsonl } from "./helpers";
+import { SessionsController } from "../listener/sessions.controller";
 
 test("the steps JSON is byte for byte the serialized step objects, and afterSeq returns the tail", async () => {
   const t = await makeListener();
@@ -24,7 +25,7 @@ test("the steps JSON is byte for byte the serialized step objects, and afterSeq 
   await t.readNow(f, true);
   const L = t.listener;
   const steps = L.store.listSteps("s1");
-  assert.equal(steps.find((s) => s.id.startsWith("err-1")).isError, true); // Step.isError, set at ingestion
+  assert.equal(steps.find((s) => s.id.startsWith("err-1"))!.isError, true); // Step.isError, set at ingestion
   assert.equal(steps.filter((s) => s.isError).length, 1);
   L.store.updateStep(steps[1].id, { label: "Ran a command", risk: ["touches auth", odd] });
   L.store.updateStep(steps[0].id, { label: "" });
@@ -41,12 +42,11 @@ test("the steps JSON is byte for byte the serialized step objects, and afterSeq 
   assert.equal(L.store.listStepsJson("nope"), "[]");
 
   // The controller sends that text as JSON; a bad afterSeq is ignored.
-  const { SessionsController } = require(dist("listener/sessions.controller.js"));
   const c = new SessionsController(L.store);
-  const res = () => ({ body: undefined, ct: undefined, type(t) { this.ct = t; return this; }, send(b) { this.body = b; return this; } });
+  const res = () => ({ body: undefined as string | undefined, ct: undefined as string | undefined, type(t: string) { this.ct = t; return this; }, send(b: string) { this.body = b; return this; } });
   for (const [q, expected] of [[undefined, full], ["3", L.store.listStepsJson("s1", 3)], ["abc", full], ["", full]]) {
     const r = res();
-    c.steps("s1", q, r);
+    c.steps("s1", q as string, r as never);
     assert.equal(r.ct, "application/json");
     assert.equal(r.body, expected, `afterSeq=${q}`);
   }
@@ -62,7 +62,7 @@ test("updateStep can store a label without broadcasting it", async () => {
   t.listener.store.updateStep(step.id, { label: "quiet" }, { broadcast: false });
   const updates = () => t.sent.filter((m) => m.type === "step-update");
   assert.equal(updates().length, 0);
-  assert.equal(t.listener.store.getStep(step.id).label, "quiet");
+  assert.equal(t.listener.store.getStep(step.id)!.label, "quiet");
   t.listener.store.updateStep(step.id, { label: "loud", risk: ["x"] });
   assert.deepEqual(updates(), [{ type: "step-update", id: step.id, label: "loud", risk: ["x"] }]);
   await t.close();

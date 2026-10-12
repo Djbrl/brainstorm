@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { config } from "../core/config";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -44,11 +44,11 @@ export class AskService {
   private log = new Logger("Ask");
   constructor(
     private dbs: DbService,
-    private cfg: ConfigService,
-    private state: WorkspaceState,
-    private store: StepsStore,
-    private claude: ClaudeService,
-    private usage: UsageService,
+    @Inject(ConfigService) private cfg: Pick<ConfigService, "claude">,
+    @Inject(WorkspaceState) private state: Pick<WorkspaceState, "root">,
+    @Inject(StepsStore) private store: Pick<StepsStore, "getStep" | "listSessions" | "stepsBefore">,
+    @Inject(ClaudeService) private claude: Pick<ClaudeService, "complete">,
+    @Inject(UsageService) private usage: Pick<UsageService, "bump">,
   ) {}
 
   async ask(req: AskRequest): Promise<AskResponse> {

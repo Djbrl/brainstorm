@@ -1,12 +1,15 @@
 // Reading Claude Code logs: chunks, multibyte text, long lines, offsets, live vs history, rollback.
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const { writeFileSync, appendFileSync, statSync } = require("node:fs");
-const { join } = require("node:path");
-const { makeListener, line, jsonl } = require("./helpers.cjs");
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { writeFileSync, appendFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+import type { WsMessage } from "../shared/contract";
+import { makeListener, line, jsonl, type TestListener } from "./helpers";
 
-const rows = (t) => t.dbs.db.prepare(`SELECT id, session_id, seq, ts, kind, text, tool, input, file_path, diff, is_subagent, tool_use_id FROM steps ORDER BY session_id, seq`).all().map((r) => ({ ...r }));
-const offset = (t, f) => t.dbs.db.prepare(`SELECT offset FROM listener_offsets WHERE file = ?`).get(f)?.offset;
+type Row = Record<string, any>;
+
+const rows = (t: TestListener) => t.dbs.db.prepare(`SELECT id, session_id, seq, ts, kind, text, tool, input, file_path, diff, is_subagent, tool_use_id FROM steps ORDER BY session_id, seq`).all().map((r) => ({ ...r })) as Row[];
+const offset = (t: TestListener, f: string) => (t.dbs.db.prepare(`SELECT offset FROM listener_offsets WHERE file = ?`).get(f) as { offset: number } | undefined)?.offset;
 
 /** A thread with multibyte text everywhere (2-, 3- and 4-byte characters) so small chunks cut inside characters. */
 function thread(n = 40) {
@@ -106,13 +109,13 @@ test("history is stored quietly; what a file gains after it was listed goes out 
 test("a live file is broadcast in order, the session before its first step", async () => {
   const t = await makeListener();
   t.live();
-  t.listener.isListening = true;
+  t.inner.isListening = true;
   const f = join(t.projectDir, "s2.jsonl");
   writeFileSync(f, jsonl([line("prompt", { sessionId: "s2", i: 0, text: "go" }), line("tool", { sessionId: "s2", i: 1 }), line("text", { sessionId: "s2", i: 2 })]));
   await t.readNow(f);
   assert.deepEqual(t.sent.map((m) => m.type), ["session", "step", "step", "step"]);
-  assert.equal(t.sent[0].session.title, "go");
-  assert.deepEqual(t.sent.slice(1).map((m) => m.step.seq), [0, 1, 2]);
+  assert.equal((t.sent[0] as Extract<WsMessage, { type: "session" }>).session.title, "go");
+  assert.deepEqual(t.sent.slice(1).map((m) => (m as Extract<WsMessage, { type: "step" }>).step.seq), [0, 1, 2]);
   await t.close();
 });
 
@@ -129,18 +132,19 @@ test("a database error rolls the batch back: no rows, offset and seqs unchanged,
   t.listener.tailer.batchBytes = 1500;
   const f = join(t.projectDir, "s1.jsonl");
   writeFileSync(f, jsonl(lines));
-  const stmt = t.listener.store.st.insertStep;
+  const st = (t.listener.store as unknown as { st: { insertStep: { run: (...a: any[]) => unknown } } }).st;
+  const stmt = st.insertStep;
   const run = stmt.run.bind(stmt);
   let calls = 0;
-  t.listener.store.st.insertStep = { run: (...a) => { if (++calls === 8) { const e = new Error("disk I/O error"); e.code = "ERR_SQLITE_ERROR"; throw e; } return run(...a); } };
+  st.insertStep = { run: (...a: any[]) => { if (++calls === 8) { const e = Object.assign(new Error("disk I/O error"), { code: "ERR_SQLITE_ERROR" }); throw e; } return run(...a); } };
   await t.readNow(f, true);
   const partial = rows(t);
   const off = offset(t, f);
-  assert.ok(off > 0 && off < statSync(f).size, "stopped at a batch boundary");
+  assert.ok(off! > 0 && off! < statSync(f).size, "stopped at a batch boundary");
   assert.ok(partial.length > 0);
   assert.deepEqual(partial, expected.slice(0, partial.length));
-  assert.equal(t.listener.writer.nextSeq.get("s1"), partial.length);
-  t.listener.store.st.insertStep = stmt;
+  assert.equal((t.listener.writer as unknown as { nextSeq: Map<string, number> }).nextSeq.get("s1"), partial.length);
+  st.insertStep = stmt;
   await t.readNow(f, true);
   assert.deepEqual(rows(t), expected);
   assert.equal(offset(t, f), statSync(f).size);

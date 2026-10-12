@@ -1,13 +1,13 @@
 import { agentName } from "../listener/agent-names";
 import { errorLine, isErrorResult } from "../shared/failed";
 import { CODE_SEARCH_TOOLS, READ_TOOLS, SUBAGENT_TOOLS } from "../shared/tools";
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import type { AgentMove, AgentPresence, Step } from "../shared/contract";
 import { BusService } from "../core/bus.service";
 import { ConfigService } from "../core/config.service";
-import { EventsGateway } from "../core/events.gateway";
+import { EventsGateway, type Broadcaster } from "../core/events.gateway";
 import { safely } from "../core/safely";
 import { StepsStore } from "../listener/step-store";
 
@@ -67,7 +67,12 @@ export class AgentsService implements OnModuleInit, OnModuleDestroy {
   private timer?: NodeJS.Timeout;
 
   private log = new Logger("Agents");
-  constructor(private bus: BusService, private cfg: ConfigService, private gateway: EventsGateway, private store: StepsStore) {}
+  constructor(
+    private bus: BusService,
+    @Inject(ConfigService) private cfg: Pick<ConfigService, "claudeProjectsDir">,
+    @Inject(EventsGateway) private gateway: Broadcaster,
+    @Inject(StepsStore) private store: Pick<StepsStore, "getSession">,
+  ) {}
 
   onModuleInit() {
     this.bus.on("step", (s) => { try { this.onStep(s); } catch { /* never break the listener */ } });

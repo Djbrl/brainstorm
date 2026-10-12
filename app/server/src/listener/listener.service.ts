@@ -1,9 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from "@nestjs/common";
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from "@nestjs/common";
 import { HttpAdapterHost } from "@nestjs/core";
 import type { Harness } from "../shared/contract";
 import { DbService } from "../core/db.service";
 import { BusService } from "../core/bus.service";
-import { EventsGateway } from "../core/events.gateway";
+import { EventsGateway, type Broadcaster } from "../core/events.gateway";
 import { WorkspaceState } from "../core/workspace-state";
 import { ConfigService } from "../core/config.service";
 import { safely } from "../core/safely";
@@ -49,6 +49,13 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
     /** Every folder the sources watch (chokidar's getWatched, for tests). */
     getWatched: (): Record<string, string[]> => Object.assign({}, ...this.sources.map((s) => s.getWatched?.() ?? {})),
   };
+  /** For tests, which build the listener without Nest, close its watchers and read the log files themselves. */
+  readonly forTests = {
+    /** Steps go out as live activity from now on, as after the watchers' first scan. */
+    goLive: () => { this.ready = true; },
+    /** Read what `file` gained; `history` reads all of it quietly, as history. */
+    readNow: (file: string, history = false) => this.tailer.runFile(file, history ? Infinity : 0),
+  };
   /** Resolves once the HTTP server listens: history is read after that, so the app answers from the first second. */
   private listening!: Promise<void>;
   private isListening = false;
@@ -66,7 +73,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private dbs: DbService,
     private bus: BusService,
-    private gateway: EventsGateway,
+    @Inject(EventsGateway) private gateway: Broadcaster,
     private cfg: ConfigService,
     private state: WorkspaceState,
     @Optional() private adapterHost?: HttpAdapterHost,

@@ -1,8 +1,8 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { realpathSync } from "node:fs";
 import type { Harness, Session, Step } from "../shared/contract";
 import { DbService } from "../core/db.service";
-import { EventsGateway } from "../core/events.gateway";
+import { EventsGateway, type Broadcaster } from "../core/events.gateway";
 import { repoBase } from "./moved";
 import { ProjectScope } from "./scope";
 import type { NewStep } from "./source";
@@ -76,7 +76,7 @@ export class StepsStore {
   /** Threads to leave out although stored (the listener's sources: Claude's deleted in its desktop app). */
   private hiddenFilters: () => Iterable<((sessionId: string) => boolean) | undefined> = () => [];
 
-  constructor(dbs: DbService, private project: ProjectScope, private gateway: EventsGateway) {
+  constructor(dbs: DbService, private project: ProjectScope, @Inject(EventsGateway) private gateway: Broadcaster) {
     this.st = prepare(dbs.db);
   }
 

@@ -1,4 +1,4 @@
-import { Controller, Get, HttpException, Query, Res } from "@nestjs/common";
+import { Controller, Get, HttpException, Inject, Query, Res } from "@nestjs/common";
 import type { Response } from "express";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -35,7 +35,12 @@ const escHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<":
 // Sharing a thread: GET /api/share (one .html file anyone can open) and GET /api/export.md (a report).
 @Controller()
 export class ShareController {
-  constructor(private store: StepsStore, private replays: ReplayService, private usage: UsageService, private state: WorkspaceState) {}
+  constructor(
+    @Inject(StepsStore) private store: Pick<StepsStore, "getSession" | "listSessions" | "listSteps">,
+    @Inject(ReplayService) private replays: Pick<ReplayService, "build">,
+    @Inject(UsageService) private usage: Pick<UsageService, "bump">,
+    @Inject(WorkspaceState) private state: Pick<WorkspaceState, "root">,
+  ) {}
 
   /** The thread to share: the one asked for, or the newest one working in the open project (not one from another
    *  project that only visited it). */

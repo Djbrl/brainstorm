@@ -1,11 +1,12 @@
 // Which files a finished command is credited with (listener/command-edits.ts): by whole words, never another thread's
 // edit, nothing for a file that did not change or a folder the map ignores.
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const { mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } = require("node:fs");
-const { tmpdir } = require("node:os");
-const { join } = require("node:path");
-const { CommandEdits } = require(join(__dirname, "..", "dist", "listener", "command-edits.js"));
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { CommandEdits } from "../listener/command-edits";
+import type { Step } from "../shared/contract";
 
 const ROOT = realpathSync(mkdtempSync(join(tmpdir(), "bs-cmdrules-")));
 mkdirSync(join(ROOT, "src"));
@@ -13,20 +14,20 @@ for (const f of ["src/login.ts", "src/a.ts", ".env", "build", "keep.ts"]) writeF
 test.after(() => rmSync(ROOT, { recursive: true, force: true }));
 
 const T0 = Date.parse("2026-10-11T10:00:00Z");
-const iso = (ms) => new Date(T0 + ms).toISOString();
+const iso = (ms: number) => new Date(T0 + ms).toISOString();
 let n = 0;
 
 /** Runs `command` (thread `sid`, from +0 to +1 s) and returns the edited paths, relative to ROOT. */
-function run(ce, command, { sid = "s1", live = true } = {}) {
+function run(ce: CommandEdits, command: string, { sid = "s1", live = true }: { sid?: string; live?: boolean } = {}) {
   const id = `u${++n}`;
   const call = { id: `c${n}`, sessionId: sid, seq: n, ts: iso(0), kind: "tool_call", tool: "Bash", input: { command }, toolUseId: id };
   const result = { id: `r${n}`, sessionId: sid, seq: n + 1, ts: iso(1000), kind: "tool_result", toolUseId: id, text: "" };
-  ce.step(call, ROOT);
-  const done = ce.step(result, ROOT);
-  return ce.editsFor(done, iso(1000), live).filter((s) => s.kind === "edit").map((s) => s.filePath.slice(ROOT.length + 1));
+  ce.step(call as Step, ROOT);
+  const done = ce.step(result as Step, ROOT)!;
+  return ce.editsFor(done, iso(1000), live).filter((s) => s.kind === "edit").map((s) => s.filePath!.slice(ROOT.length + 1));
 }
 const make = () => new CommandEdits((p) => p.startsWith(ROOT), () => ROOT);
-const changed = (ce, rel, at = 500, before = "a", after = "b") => ce.fileChanged({ path: join(ROOT, rel), before, after, at: T0 + at });
+const changed = (ce: CommandEdits, rel: string, at = 500, before = "a", after = "b") => ce.fileChanged({ path: join(ROOT, rel), before, after, at: T0 + at });
 
 test("a changed file is matched to the command by whole words", () => {
   const ce = make();

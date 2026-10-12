@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, ForbiddenException, HttpCode, Post } from "@nestjs/common";
+import { BadRequestException, Body, Controller, ForbiddenException, HttpCode, Inject, Post } from "@nestjs/common";
 import { execFile } from "node:child_process";
 import { realpathSync, statSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, normalize } from "node:path";
@@ -32,7 +32,7 @@ export function openable(path: string, mode = 0): boolean {
 
 @Controller()
 export class OpenController {
-  constructor(private ws: WorkspaceService, private store: StepsStore) {}
+  constructor(@Inject(WorkspaceService) private ws: Pick<WorkspaceService, "status">, @Inject(StepsStore) private store: Pick<StepsStore, "listSessions">) {}
 
   @Post("open") @HttpCode(204)
   open(@Body() body: { path?: unknown }) {

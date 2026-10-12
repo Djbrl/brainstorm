@@ -1,21 +1,21 @@
 // One long input must not freeze the server: the pathological shapes of the regexes that were quadratic.
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const { dist } = require("./helpers.cjs");
-require("reflect-metadata");
-const { sanitizeText } = require(dist("listener/text.js"));
-const { commandWrites } = require(dist("listener/command-writes.js"));
-const { EMAIL, maskEmails } = require(dist("replay/privacy.js"));
-const { maskSecrets } = require(dist("privacy/mask.js"));
+import "reflect-metadata";
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {  } from "./helpers";
+import { sanitizeText } from "../listener/text";
+import { commandWrites } from "../listener/command-writes";
+import { EMAIL, maskEmails } from "../replay/privacy";
+import { maskSecrets } from "../privacy/mask";
 
 /** The time of `fn` in ms, after a warm-up call. */
-function time(fn) {
+function time(fn: () => unknown) {
   fn();
   const t0 = performance.now();
   const out = fn();
   return { ms: performance.now() - t0, out };
 }
-const fast = (name, fn, limit = 50) => {
+const fast = (name: string, fn: () => unknown, limit = 50) => {
   const { ms } = time(fn);
   assert.ok(ms < limit, `${name} took ${ms.toFixed(1)} ms`);
 };
@@ -34,7 +34,7 @@ test("sanitizeText: a key straddling the cut of a text with no break is still ma
 });
 
 test("email: a long run of word characters, and the 64-character local part", () => {
-  const swap = (s) => s.replace(EMAIL, "[email]");
+  const swap = (s: string) => s.replace(EMAIL, "[email]");
   fast("letters then @", () => swap("a".repeat(32_000) + "@")); // 64 steps a character, not the whole run
   fast("a@a.", () => swap("a@" + "a.".repeat(100_000)));
   fast("a long local part, widened back", () => maskEmails("a".repeat(32_000) + "@b.co " + "c".repeat(32_000)));
@@ -48,7 +48,7 @@ test("maskSecrets: 500 KB of a hyphenated run takes linear time", () => {
 });
 
 test("maskSecrets: the key-name, header, URL, command-line, .netrc, .pgpass and YAML rules take linear time", () => {
-  const run = (s) => s.repeat(Math.ceil(200_000 / s.length));
+  const run = (s: string) => s.repeat(Math.ceil(200_000 / s.length));
   const shapes = {
     "name=": run("a="), "name:": run("a:"), 'name="': run('a="'), "name='b ": run("a='b "), "password=x(": run("password=abc123("),
     "password: x ": run("password: x "), "pw: x line": run("pw: x\n"), "DB_PASS=": run("DB_PASS="), "api_key run": run("api_key"),

@@ -13,7 +13,7 @@ function setup() {
   let title = "Tidy the docs";
   let lookups = 0;
   const listener = { getSession: () => { lookups++; return { title } as Session; } };
-  const agents = new AgentsService(bus, { claudeProjectsDir: "/nonexistent" } as any, gateway as any, listener as any);
+  const agents = new AgentsService(bus, { claudeProjectsDir: "/nonexistent" }, gateway, listener);
   agents.onModuleInit(); // the bus wiring (its sweep timer is unref'd)
   let seq = 0;
   const step = (p: Partial<Step>): Step => ({ id: `s${seq}`, sessionId: "a", seq: seq++, ts: new Date().toISOString(), kind: "tool_call", ...p });

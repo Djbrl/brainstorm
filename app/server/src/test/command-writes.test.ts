@@ -1,15 +1,14 @@
 // commandWrites: the files a shell command writes or deletes, read from the command text.
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const { join } = require("node:path");
-const { commandWrites } = require(join(__dirname, "..", "dist", "listener", "command-writes.js"));
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { commandWrites } from "../listener/command-writes";
 
 const CWD = "/work/site";
 process.env.HOME = "/home/me";
 
 /** "write /a" / "delete /b" lines, so a case reads at a glance. */
-const run = (cmd, cwd = CWD) => commandWrites(cmd, cwd).map((w) => `${w.kind} ${w.path}`);
-const w = (...paths) => paths.map((p) => `write ${p}`);
+const run = (cmd: string, cwd = CWD) => commandWrites(cmd, cwd).map((w) => `${w.kind} ${w.path}`);
+const w = (...paths: string[]) => paths.map((p) => `write ${p}`);
 
 // ── redirects ──
 
@@ -239,7 +238,7 @@ test("garbage never throws", () => {
   for (const cmd of ["(((", ")))", "<<", "> ", "python3 - <<'PY'\nopen(", "node -e \"fs.writeFileSync(\"", "sed -i", "mv", "cp a", "'", "\"", "$(", "`", "perl -e", "git", "tee"]) {
     assert.doesNotThrow(() => commandWrites(cmd, CWD), cmd);
   }
-  assert.deepEqual(commandWrites(undefined, CWD), []);
+  assert.deepEqual(commandWrites(undefined as unknown as string, CWD), []);
 });
 
 // ── bash -c ──

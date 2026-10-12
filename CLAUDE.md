@@ -8,7 +8,7 @@ Brainstorm is a live map and replay of what AI agents do: every Claude Code sess
 | `plugin/` | The Claude Code plugin: hooks, scripts, and the built app in `plugin/build` | `plugin/README.md` |
 | `docs/` | How it works, what's planned, the build log | `docs/README.md` |
 
-The landing page (brainstorm-landing.vercel.app) and the hackathon video live in their own repositories since 12 Oct 2026: `rundown-site` and `rundown-video` (locally `~/rundown-site`, `~/rundown-video`).
+The landing page (rundown-dev.vercel.app) and the hackathon video live in their own repositories since 12 Oct 2026: `rundown-site` and `rundown-video` (locally `~/rundown-site`, `~/rundown-video`).
 
 ## Rules for every agent
 

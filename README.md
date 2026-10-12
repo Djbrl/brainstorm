@@ -32,7 +32,7 @@ Then start a new session in your project and run `/rundown:open`: the map opens 
 ## Try the live demo
 
 - **[brainstorm-next.vercel.app](https://brainstorm-next.vercel.app)**: a real recording of Claude Code agents (one lead and four subagents) building Rundown itself, played back. Open the thread to see what it touched, then its steps or its replay. Nothing to install.
-- **[brainstorm-landing.vercel.app](https://brainstorm-landing.vercel.app)**: what Rundown does, the roadmap, and the waitlist for the full release.
+- **[rundown-dev.vercel.app](https://rundown-dev.vercel.app)**: what Rundown does, the roadmap, and the waitlist for the full release.
 
 <!-- TODO: new screenshot -->
 
@@ -83,7 +83,7 @@ Off unless you say yes. The first time you use Rundown it asks, once, whether to
 | `tm` | The map theme in use |
 | `c` | Counts since the last report: app opened, threads opened, replays played, live follows, threads shared, questions asked, projects opened, agent sessions seen working, agent steps seen |
 
-The landing site that receives it adds the country from the request (two letters) and keeps no IP address. Reports are kept as empty files whose names hold the fields above, in a private store only the maintainer can read, and deleted after 13 months (a daily job, [`api/usage-prune.js`](https://github.com/Djbrl/rundown-site/blob/main/api/usage-prune.js) in the site's repository). The site's [privacy page](https://brainstorm-landing.vercel.app/privacy.html#usage-stats) says the same for people who don't read READMEs.
+The landing site that receives it adds the country from the request (two letters) and keeps no IP address. Reports are kept as empty files whose names hold the fields above, in a private store only the maintainer can read, and deleted after 13 months (a daily job, [`api/usage-prune.js`](https://github.com/Djbrl/rundown-site/blob/main/api/usage-prune.js) in the site's repository). The site's [privacy page](https://rundown-dev.vercel.app/privacy.html#usage-stats) says the same for people who don't read READMEs.
 
 **To turn it off:** Settings → Usage stats, or set `DO_NOT_TRACK=1` or `RUNDOWN_USAGE=off` in your environment (that also locks the setting off). Turned off, nothing is counted or sent. **To delete what was sent:** Settings → Usage stats → Delete the stats already sent (the site removes every report with your install id; [`api/usage-forget.js`](https://github.com/Djbrl/rundown-site/blob/main/api/usage-forget.js) in the site's repository). A development build (`npm run dev`) never sends anything. The code: [`app/server/src/usage/`](app/server/src/usage/) and [`api/usage.js`](https://github.com/Djbrl/rundown-site/blob/main/api/usage.js) in the site's repository.
 

@@ -379,7 +379,7 @@ export function shellEvents(cmd: string, result: string, resultFailed: boolean):
       if (/^(--version|-v|--help|-h|help)$/.test(sub)) continue;
       const deploys = !sub || sub.startsWith("-") || sub === "deploy";
       const prod = argv.includes("--prod");
-      // The alias ("brainstorm-landing.vercel.app") names the site better than the hashed deployment url.
+      // The alias ("rundown-dev.vercel.app") names the site better than the hashed deployment url.
       const alias = /Aliased[^\n]*?https?:\/\/([^\s"',]+)/.exec(result)?.[1] ?? /Production: https?:\/\/([^\s"',]+)/.exec(result)?.[1];
       if (deploys) out.push(svc("Vercel", alias ?? (prod ? "production" : "previews"), "write", prod ? `Deployed to production${alias ? ` (${alias})` : ""}` : "Deployed a preview", "deployed"));
       else if (sub === "alias" && (rest[0] === "set" || args.length >= 2)) out.push(svc("Vercel", "domains", "write", "Pointed a domain", "updated"));

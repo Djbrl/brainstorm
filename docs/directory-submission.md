@@ -17,10 +17,10 @@ The docs: [submit a plugin](https://claude.com/docs/plugins/submit), [pre-submis
 - **Short description:** A live map and replay of what your coding agents do: every session, every file and place they touch, and what broke. Runs on your machine.
 - **Long description:** Rundown follows your Claude Code (and Codex) sessions as they work. It draws your project as a map and moves each agent to the file it's on, keeps every step so you can replay a session, shows which thread is waiting for you, and lists the places an agent went outside the code (websites, local apps, services like GitHub and Vercel). You can open any step for its diff or output, ask Claude about it with your own API key, and save a session as one HTML file to share. Everything runs locally: a small server on 127.0.0.1 reads Claude Code's own session logs.
 - **Category:** Developer tools
-- **Homepage:** https://brainstorm-landing.vercel.app
+- **Homepage:** https://rundown-dev.vercel.app
 - **Support / contact:** sydjbrl@gmail.com (the address on the privacy page)
-- **Privacy policy:** https://brainstorm-landing.vercel.app/privacy
-- **Terms:** https://brainstorm-landing.vercel.app/terms
+- **Privacy policy:** https://rundown-dev.vercel.app/privacy
+- **Terms:** https://rundown-dev.vercel.app/terms
 - **License:** MIT (`LICENSE.md` in the plugin folder)
 
 ## Data handling

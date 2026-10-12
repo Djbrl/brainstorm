@@ -1,7 +1,7 @@
 // End to end with the file watcher: history read quietly after start, live lines broadcast, other projects not watched.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { writeFileSync, appendFileSync, mkdirSync, rmSync } from "node:fs";
+import { writeFileSync, appendFileSync, mkdirSync, rmSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { makeListener, line, jsonl, internals } from "./helpers";
 import type { WsMessage } from "../shared/contract";
@@ -13,6 +13,7 @@ import { BusService } from "../core/bus.service";
 import { ConfigService } from "../core/config.service";
 import { ListenerService } from "../listener/listener.service";
 import { WorkspaceState } from "../core/workspace-state";
+import { ClaudeSource } from "../listener/claude.source";
 
 const until = async (cond: () => boolean, ms = 10_000) => {
   const end = Date.now() + ms;
@@ -68,4 +69,25 @@ test("boot: history quietly once listening, then live steps; other projects' fol
   await until(() => sent.some((m) => m.type === "step" && (m as Step$).step.text === "over there"));
   await L.onModuleDestroy();
   rmSync(pre.tmp, { recursive: true, force: true });
+});
+
+test("a project log folder unreadable at boot is read once its permissions are fixed (tried again later)", async (ctx) => {
+  const root = "/work/locked-repo";
+  const pre = await makeListener({ root });
+  writeFileSync(join(pre.projectDir, "old.jsonl"), jsonl([line("prompt", { sessionId: "old", cwd: root, i: 0, text: "earlier work" }), line("tool", { sessionId: "old", cwd: root, i: 1 })]));
+  await pre.listener.onModuleDestroy();
+  pre.dbs.db.close();
+  chmodSync(pre.projectDir, 0o000);
+  const was = ClaudeSource.retryMs;
+  ClaudeSource.retryMs = 100;
+  ctx.after(() => { ClaudeSource.retryMs = was; chmodSync(pre.projectDir, 0o755); rmSync(pre.tmp, { recursive: true, force: true }); });
+
+  const L = new ListenerService(new DbService(), new BusService(), { broadcast: () => {} }, new ConfigService(), new WorkspaceState());
+  ctx.after(() => L.onModuleDestroy());
+  L.onModuleInit();
+  await until(() => internals(L).ready);
+  await new Promise((r) => setTimeout(r, 300)); // a few retries while it's still locked
+  assert.equal(L.store.listSessions().length, 0);
+  chmodSync(pre.projectDir, 0o755);
+  await until(() => L.store.listSessions().some((s) => s.id === "old"));
 });

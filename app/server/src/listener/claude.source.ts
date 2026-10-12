@@ -111,8 +111,35 @@ export class ClaudeSource implements LogSource {
     });
     this.watcher.on("add", (f) => on.add(f));
     this.watcher.on("change", (f) => on.change(f));
-    this.watcher.on("error", (e) => this.onError(e as Error));
+    this.watcher.on("error", (e) => { this.onError(e as Error); this.retryUnreadable(e as NodeJS.ErrnoException); });
     this.watcher.on("ready", () => { this.ready = true; on.ready(); });
+  }
+
+  /** First wait before trying an unreadable folder again (doubles each time, up to RETRY_MAX_MS). */
+  static retryMs = 5_000;
+  static readonly RETRY_MAX_MS = 5 * 60_000;
+  private retries = new Map<string, NodeJS.Timeout>();
+
+  /**
+   * A folder chokidar couldn't enter (EACCES: its permissions were wrong) is never entered again by chokidar, even once
+   * they're fixed: try it again later, less and less often, while it's still one we watch.
+   */
+  private retryUnreadable(e: NodeJS.ErrnoException, wait = ClaudeSource.retryMs) {
+    const path = (e as { path?: string }).path;
+    if ((e.code !== "EACCES" && e.code !== "EPERM") || !path || this.retries.has(path)) return;
+    const rel = relative(this.dir, path);
+    if (!rel || rel.startsWith("..")) return;
+    const t = setTimeout(() => {
+      this.retries.delete(path);
+      if (!this.watcher || !this.watches(rel.split(sep)[0])) return; // another project now: nothing to retry
+      try { readdirSync(path); } catch (err) {
+        return this.retryUnreadable(Object.assign(err as NodeJS.ErrnoException, { path }), Math.min(wait * 2, ClaudeSource.RETRY_MAX_MS));
+      }
+      this.watcher.unwatch(path);
+      this.watcher.add(path); // its logs come in as new files
+    }, wait);
+    t.unref?.();
+    this.retries.set(path, t);
   }
 
   /** Watch the matching project folders chokidar skipped (they didn't match before), stop watching the others. */
@@ -124,7 +151,11 @@ export class ClaudeSource implements LogSource {
     for (const d of [...this.watchedTop]) if (!this.watches(d)) { this.watchedTop.delete(d); this.watcher.unwatch(join(this.dir, d)); }
   }
 
-  async close() { await this.watcher?.close(); }
+  async close() {
+    for (const t of this.retries.values()) clearTimeout(t);
+    this.retries.clear();
+    await this.watcher?.close();
+  }
   getWatched() { return this.watcher?.getWatched() ?? {}; }
 
   private matchingDirs(): string[] {

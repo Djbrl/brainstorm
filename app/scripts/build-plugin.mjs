@@ -46,6 +46,8 @@ try {
     // Minified, but in lines of at most 500 characters: a stack trace points at a line that can be read, and a release
     // diff of server.js shows what changed instead of one changed line of 2 MB.
     lineLimit: 500,
+    // The bundled server never loads a .env (core/config.ts loadDevEnv), even when started without the launcher.
+    define: { __RUNDOWN_BUNDLED__: "true" },
     metafile: true, // which files went in: the licences below are theirs
     // Optional packages Nest and ws load only if installed; left out, they're skipped at runtime.
     external: [

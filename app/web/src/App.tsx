@@ -3,6 +3,7 @@
 // re-renders the parts that changed, not the whole app.
 import { isRecording, shallowEqual, useLiveActions, useLiveSelector, useHarness, useLiveStep } from "./lib/live";
 import { harnessName } from "./lib/harness";
+import { GITHUB_URL, LANDING_URL } from "./lib/urls";
 import { END, NavProvider, useNavActions, useNavState } from "./lib/nav";
 import { displayLabel } from "./step/format";
 import { LinkedLabel } from "./lib/links";
@@ -128,7 +129,7 @@ function Shell() {
     <div className={`shell ${kind === "preview" || kind === "shared" ? "has-banner" : ""}`}>
       <header className="topbar">
         {isRecording()
-          ? <a className="wordmark" href="https://brainstorm-landing.vercel.app" aria-label="Rundown home"><Logo label="Rundown home" /></a>
+          ? <a className="wordmark" href={LANDING_URL} aria-label="Rundown home"><Logo label="Rundown home" /></a>
           : <button className="wordmark" onClick={goHome} aria-label="Home" title="Home"><Logo /></button>}
         {!local ? <Crumbs project={project || (kind === "shared" ? "The whole map" : "")} /> : <div className="topbar-space" />}
         {kind === "shared" && thread && <PlayButton />}
@@ -156,14 +157,14 @@ function Shell() {
       {kind === "preview" && (
         <div className="preview-banner">
           A recording of a real Claude Code thread, played back. To see your own agents live,{" "}
-          <a href="https://github.com/Djbrl/brainstorm#install-claude-code-plugin-preview" target="_blank" rel="noopener">install the plugin</a>.
+          <a href={`${GITHUB_URL}#install-claude-code-plugin-preview`} target="_blank" rel="noopener">install the plugin</a>.
         </div>
       )}
       {state.shared && (
         <div className="preview-banner">
           A {harnessName(state.sharedBy ?? "claude")} session, shared from Rundown on {new Date(state.shared.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}.
           {" "}Press Play to watch it on the map. To follow your own agents,{" "}
-          <a href="https://github.com/Djbrl/brainstorm#install-claude-code-plugin-preview" target="_blank" rel="noopener">install Rundown</a>.
+          <a href={`${GITHUB_URL}#install-claude-code-plugin-preview`} target="_blank" rel="noopener">install Rundown</a>.
         </div>
       )}
       {offline && state.hasMap && <OfflineBanner />}

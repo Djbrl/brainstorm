@@ -5,6 +5,7 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { LANDING_URL } from "./urls";
 
 /** A setting, for app/.env.example: its variable, what it does, and an example value (shown commented out). `hidden`
  * ones are for the plugin's launcher, benchmarks and tests, and stay out of the example. */
@@ -71,7 +72,7 @@ export const config = {
   get maxFiles(): number { return Number(raw("RUNDOWN_MAX_FILES")); },
   get mapWatch(): string | undefined { return raw("RUNDOWN_MAP_WATCH"); },
   get updateCheckOff(): boolean { return raw("RUNDOWN_UPDATE_CHECK") === "0"; },
-  get usageUrl(): string { return raw("RUNDOWN_USAGE_URL") ?? "https://brainstorm-landing.vercel.app/api/usage"; },
+  get usageUrl(): string { return raw("RUNDOWN_USAGE_URL") ?? `${LANDING_URL}/api/usage`; },
   get usageDev(): boolean { return raw("RUNDOWN_USAGE_DEV") === "1"; },
   /** Why the usage counts are off whatever the setting says, or null. */
   get usageLocked(): string | null {

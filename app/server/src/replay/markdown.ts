@@ -1,4 +1,5 @@
 import { relativeTo } from "../core/paths";
+import { GITHUB_URL } from "../core/urls";
 import type { ProjectMap, Session, Step } from "../shared/contract";
 import { errorText, isErrorResult } from "../shared/failed";
 import { SUBAGENT_TOOLS } from "../shared/tools";
@@ -125,7 +126,7 @@ function render(session: Session, r: Report): string {
 
   const out: string[] = [];
   out.push(`# ${session.title || "Untitled thread"}`, "");
-  out.push(`Recorded with [Rundown](https://github.com/Djbrl/brainstorm) · ${dateOf(session.startedAt)}, ${timeOf(session.startedAt)} to ${timeOf(session.lastEventAt)} (${duration(session.startedAt, session.lastEventAt)})`, "");
+  out.push(`Recorded with [Rundown](${GITHUB_URL}) · ${dateOf(session.startedAt)}, ${timeOf(session.startedAt)} to ${timeOf(session.lastEventAt)} (${duration(session.startedAt, session.lastEventAt)})`, "");
   out.push([
     `${asked.length} request${asked.length === 1 ? "" : "s"}`,
     `${edits} edit${edits === 1 ? "" : "s"} to ${changed.size} file${changed.size === 1 ? "" : "s"}`,

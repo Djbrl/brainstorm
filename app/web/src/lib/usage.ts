@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { UpdatesStatus, UsageStatus } from "@contract";
 import { isRecording } from "./live";
 import { getTheme } from "./theme";
+import { LANDING_URL } from "./urls";
 import { get, post, put } from "./api";
 
 type WebEvent = "op" | "th" | "rp" | "lv";
@@ -17,7 +18,7 @@ export function track(name: WebEvent) {
 export type { UsageStatus, UpdatesStatus };
 
 /** Where the site says exactly what's sent, how long it's kept and how to have it deleted. */
-export const PRIVACY_URL = "https://brainstorm-landing.vercel.app/privacy.html#usage-stats";
+export const PRIVACY_URL = `${LANDING_URL}/privacy.html#usage-stats`;
 
 
 /** The setting: off until the person says yes (the app asks once), and off again with one click. */

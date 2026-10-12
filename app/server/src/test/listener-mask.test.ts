@@ -2,7 +2,6 @@
 import "reflect-metadata";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {  } from "./helpers";
 import { sanitizeText } from "../listener/listener.service";
 import { maskSecrets } from "../privacy/mask";
 

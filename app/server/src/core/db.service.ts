@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnApplicationShutdown } from "@nestjs/common";
-import { DatabaseSync, type StatementSync } from "node:sqlite";
+import { DatabaseSync, type StatementSync } from "./sqlite";
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { dataDir } from "./local";

@@ -1,4 +1,3 @@
-// Run: npx tsc -p . && node --test dist/
 import "reflect-metadata";
 import { test } from "node:test";
 import assert from "node:assert/strict";

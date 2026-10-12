@@ -1,28 +1,45 @@
 // One long input must not freeze the server: the pathological shapes of the regexes that were quadratic.
+//
+// Each shape is timed at a quarter of its size and at full size, in the same run: linear work takes about 4 times as
+// long, quadratic work 16 times. Comparing the two sizes (best of a few runs each, since load only ever adds time)
+// proves the same thing a fixed millisecond limit did, without failing when the machine is busy.
 import "reflect-metadata";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {  } from "./helpers";
 import { sanitizeText } from "../listener/text";
 import { commandWrites } from "../listener/command-writes";
 import { EMAIL, maskEmails } from "../replay/privacy";
 import { maskSecrets } from "../privacy/mask";
 
-/** The time of `fn` in ms, after a warm-up call. */
-function time(fn: () => unknown) {
-  fn();
-  const t0 = performance.now();
-  const out = fn();
-  return { ms: performance.now() - t0, out };
+/** The best of `runs` timings of `fn`, in ms. */
+function best(fn: () => unknown, runs = 3): number {
+  let min = Infinity;
+  for (let i = 0; i < runs; i++) {
+    const t0 = performance.now();
+    fn();
+    min = Math.min(min, performance.now() - t0);
+  }
+  return min;
 }
-const fast = (name: string, fn: () => unknown, limit = 50) => {
-  const { ms } = time(fn);
-  assert.ok(ms < limit, `${name} took ${ms.toFixed(1)} ms`);
+/** Under this, the full size is quick whatever the curve (a quadratic shape at these sizes takes seconds). */
+const QUICK_MS = 5;
+/** 4 times the input in under this many times the time: linear (4) or n log n passes, quadratic (16) fails. */
+const MAX_GROWTH = 8;
+
+/** `make(k)` builds the input at k times the shape's size and returns the work to time. */
+const fast = (name: string, make: (k: number) => () => unknown) => {
+  const small = make(0.25), full = make(1);
+  small(); full(); // warm up (the regex compiles, the JIT settles)
+  const a = best(small), b = best(full);
+  if (b < QUICK_MS) return;
+  assert.ok(b / Math.max(a, 0.01) < MAX_GROWTH, `${name}: ${a.toFixed(1)} ms at a quarter of the size, ${b.toFixed(1)} ms at full size (not linear)`);
 };
+/** `s` repeated to about n characters. */
+const rep = (s: string, n: number) => s.repeat(Math.max(1, Math.ceil(n / s.length)));
 
 test("sanitizeText: 500 KB with no space or line break is cut, not masked whole", () => {
-  fast("letters", () => sanitizeText("a".repeat(500_000)));
-  fast("sk- run", () => sanitizeText("sk-".repeat(166_000)));
+  fast("letters", (k) => { const s = rep("a", 500_000 * k); return () => sanitizeText(s); });
+  fast("sk- run", (k) => { const s = rep("sk-", 500_000 * k); return () => sanitizeText(s); });
 });
 
 test("sanitizeText: a key straddling the cut of a text with no break is still masked", () => {
@@ -35,43 +52,44 @@ test("sanitizeText: a key straddling the cut of a text with no break is still ma
 
 test("email: a long run of word characters, and the 64-character local part", () => {
   const swap = (s: string) => s.replace(EMAIL, "[email]");
-  fast("letters then @", () => swap("a".repeat(32_000) + "@")); // 64 steps a character, not the whole run
-  fast("a@a.", () => swap("a@" + "a.".repeat(100_000)));
-  fast("a long local part, widened back", () => maskEmails("a".repeat(32_000) + "@b.co " + "c".repeat(32_000)));
+  fast("letters then @", (k) => { const s = rep("a", 32_000 * k) + "@"; return () => swap(s); }); // 64 steps a character, not the whole run
+  fast("a@a.", (k) => { const s = "a@" + rep("a.", 200_000 * k); return () => swap(s); });
+  fast("a long local part, widened back", (k) => { const s = rep("a", 32_000 * k) + "@b.co " + rep("c", 32_000 * k); return () => maskEmails(s); });
   assert.equal(swap("mail ana.lee@example.com."), "mail [email].");
   assert.equal(maskEmails("x".repeat(80) + "@foo.org"), "[email]"); // an over-long local part is masked whole
   assert.equal(maskEmails("to " + "y".repeat(70) + "@foo.org, git@github.com:a/b and ana@x.io"), "to [email], git@github.com:a/b and [email]");
 });
 
 test("maskSecrets: 500 KB of a hyphenated run takes linear time", () => {
-  fast("sk-", () => maskSecrets("sk-".repeat(100_000)), 100);
+  fast("sk-", (k) => { const s = rep("sk-", 300_000 * k); return () => maskSecrets(s); });
 });
 
 test("maskSecrets: the key-name, header, URL, command-line, .netrc, .pgpass and YAML rules take linear time", () => {
-  const run = (s: string) => s.repeat(Math.ceil(200_000 / s.length));
-  const shapes = {
-    "name=": run("a="), "name:": run("a:"), 'name="': run('a="'), "name='b ": run("a='b "), "password=x(": run("password=abc123("),
-    "password: x ": run("password: x "), "pw: x line": run("pw: x\n"), "DB_PASS=": run("DB_PASS="), "api_key run": run("api_key"),
-    "open quote": 'password: "' + "x".repeat(200_000), "escapes in quotes": 'password: "' + "\\x".repeat(100_000),
-    "authorization": run("authorization: "), "authorization scheme": run("Authorization: Bearer x "),
-    "cookie": run("cookie: a="), "x-api-key": run("x-api-key: "), "Bearer": run("Bearer "), "?code=": run("?code="),
-    "scheme://": run("http://"), "scheme://user:": run("http://a:"), "scheme://key@": run("http://aaaaaaaaaaaaaaaaaaaaaaa1@"),
-    "slack": run("hooks.slack.com/services/"), "discord": run("discord.com/api/webhooks/12345/"),
-    "machine": run("machine a "), "machine login": run("machine a login b "), "password line": run("\n password "),
-    "docker login": run("docker login "), "sshpass": run("sshpass -x "), "mysql -p": run("mysql -p "),
-    "pgpass": run("a:1:b:c:"), "pgpass lines": run("a:1:b:c:d e\n"),
-    "yaml block keys": run("password: |\n"), "yaml block lines": "password: |\n" + run("  y\n"),
-    "letters then =": "a".repeat(200_000) + "=", "a-": run("a-"),
-  };
-  for (const [name, s] of Object.entries(shapes)) fast(name, () => maskSecrets(s), 100);
+  const N = 200_000;
+  /** Every shape at about n characters. */
+  const shapes = (n: number): Record<string, string> => ({
+    "name=": rep("a=", n), "name:": rep("a:", n), 'name="': rep('a="', n), "name='b ": rep("a='b ", n), "password=x(": rep("password=abc123(", n),
+    "password: x ": rep("password: x ", n), "pw: x line": rep("pw: x\n", n), "DB_PASS=": rep("DB_PASS=", n), "api_key run": rep("api_key", n),
+    "open quote": 'password: "' + rep("x", n), "escapes in quotes": 'password: "' + rep("\\x", n),
+    "authorization": rep("authorization: ", n), "authorization scheme": rep("Authorization: Bearer x ", n),
+    "cookie": rep("cookie: a=", n), "x-api-key": rep("x-api-key: ", n), "Bearer": rep("Bearer ", n), "?code=": rep("?code=", n),
+    "scheme://": rep("http://", n), "scheme://user:": rep("http://a:", n), "scheme://key@": rep("http://aaaaaaaaaaaaaaaaaaaaaaa1@", n),
+    "slack": rep("hooks.slack.com/services/", n), "discord": rep("discord.com/api/webhooks/12345/", n),
+    "machine": rep("machine a ", n), "machine login": rep("machine a login b ", n), "password line": rep("\n password ", n),
+    "docker login": rep("docker login ", n), "sshpass": rep("sshpass -x ", n), "mysql -p": rep("mysql -p ", n),
+    "pgpass": rep("a:1:b:c:", n), "pgpass lines": rep("a:1:b:c:d e\n", n),
+    "yaml block keys": rep("password: |\n", n), "yaml block lines": "password: |\n" + rep("  y\n", n),
+    "letters then =": rep("a", n) + "=", "a-": rep("a-", n),
+  });
+  for (const name of Object.keys(shapes(1))) fast(name, (k) => { const s = shapes(N * k)[name]; return () => maskSecrets(s); });
 });
 
 test("commandWrites: a long run of braces, open and spaces", () => {
-  fast("braces", () => commandWrites("echo > " + "{".repeat(65_536), "/w"));
-  fast("braces and commas", () => commandWrites("echo > " + "{,".repeat(32_768), "/w"));
-  fast("perl open", () => commandWrites("perl -e 'open" + " ".repeat(65_536) + "'", "/w"));
-  fast("patch header", () => commandWrites("apply_patch <<'EOF'\n*** Update File: a" + " ".repeat(65_536) + "b\nEOF", "/w"));
-  fast("patch move", () => commandWrites("apply_patch <<'EOF'\n*** Update File: a\n*** Move to: a" + " ".repeat(65_536) + "b\nEOF", "/w"));
+  fast("braces", (k) => { const c = "echo > " + rep("{", 65_536 * k); return () => commandWrites(c, "/w"); });
+  fast("braces and commas", (k) => { const c = "echo > " + rep("{,", 65_536 * k); return () => commandWrites(c, "/w"); });
+  fast("perl open", (k) => { const c = "perl -e 'open" + rep(" ", 65_536 * k) + "'"; return () => commandWrites(c, "/w"); });
+  fast("patch header", (k) => { const c = "apply_patch <<'EOF'\n*** Update File: a" + rep(" ", 65_536 * k) + "b\nEOF"; return () => commandWrites(c, "/w"); });
+  fast("patch move", (k) => { const c = "apply_patch <<'EOF'\n*** Update File: a\n*** Move to: a" + rep(" ", 65_536 * k) + "b\nEOF"; return () => commandWrites(c, "/w"); });
 });
 
 test("commandWrites: brace lists, perl open and patch headers still read", () => {

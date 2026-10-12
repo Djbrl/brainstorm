@@ -19,3 +19,4 @@ video/raw/
 .env.production
 *.pem
 .vercel/
+dist-test/

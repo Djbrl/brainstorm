@@ -1,5 +1,5 @@
 // Mapper tests: the shared ignore rule, the file selection past the cap, batching, the git readers, and live updates
-// end to end on a temporary repo. Run: cd app/server && npx tsc -p . && node --test dist/mapper/
+// end to end on a temporary repo.
 import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";

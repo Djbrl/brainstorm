@@ -1,0 +1,11 @@
+// The tests and the code they test, built into dist-test/ (npm test). The same layout as dist/ (src/ at its root), so
+// paths the code works out from its own folder are the same under both.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist-test",
+    "tsBuildInfoFile": "./dist-test/.tsbuildinfo"
+  },
+  "include": ["src"],
+  "exclude": []
+}

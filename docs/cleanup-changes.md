@@ -396,3 +396,14 @@ Numbers are from a thread of 5,918 steps.
 - The server does not check the hook's signature (from Phase 2).
 
 Review: five plausible findings, all fixed, plus one the fixes ran into. The tour now holds the steps of the thread it shows, so opening other threads during it can't empty its step card (`1eef045`); the agent picker, the map's islands and Places hold the open thread's steps too, and the file panel's recent steps are documented as covering the open thread and the last few let go of, since no server route answers that cheaply (`5b3605a`). A hook now moves the attention sweep to the thread's next deadline instead of leaving it up to 10 s late (`a539b84`). The plugin's bundled server decides at build time never to load a .env, even when started without its launcher (`8f86a54`). A live map update stops at its first slice after its map is switched away, so after a switch A → B → A an old update can't keep editing the map alongside the new one (`9add8be`). Found on the way: the plugin build failed at share.html since the graph library got its own chunk; the share build now drops that setting (`ad907c8`).
+
+## After the phases: the open items
+
+### Hosted-demo code
+
+The product app carried code only the hosted demo (brainstorm-next) uses. It now lives in the demo's own build; the judged demo (brainstorm-demo-black) is untouched.
+
+- **Recording**: `GET /api/replay` lost its recording parameters (`preview`, `movesFrom`, `movesTo`, `until`) and the server code behind them. `app/scripts/record-demo.mjs` makes the same file from the server's normal export: agent moves, the setup run, the cut-off time, the redaction and the home folder as `~` (that last step was done by hand). On the test fixture its file is byte for byte the old export. Commit `516df6c`.
+- **Demo build**: `lib/preview.ts` (agent playback, the setup run's stand-in for `/api/workspace`) and the "Setup preview" button and banner load only with `VITE_DEMO=1`. `npm run build:demo` builds the demo into `app/web/dist-demo/` with its recording as `replay.json`. Checked: the normal production bundle has none of the preview code (grep of the built JS), and the demo build, served locally, opens on the recording, moves the agents and plays the setup run like the build made the old way. Commit `4b0c0ce`.
+- **redact.json** stays: shared replays use it too. It is now documented (fields, what each one replaces) in [demo.md](demo.md), with the recording and build recipe. Commit `DOCS`.
+- What a user might notice: nothing. The product's bundle is a little smaller.

@@ -234,4 +234,4 @@ Screenshots that tools return (base64 JPEG or PNG in the result, about 30 KB eac
 
 ## Hosted demo
 
-`GET /api/replay` writes a `Replay` JSON. The web is built with `VITE_REPLAY_URL=/replay.json` and deployed as static files. The same UI then runs without a server and says "Recorded demo". Ask returns the saved answers. The judged hackathon demo (brainstorm-demo-black.vercel.app) is never redeployed.
+`GET /api/replay?sessionId=` writes a `Replay` JSON (redacted with the private `redact.json`). `app/scripts/record-demo.mjs` adds the demo's agent moves and recorded setup run, and `npm run build:demo` builds the web with `VITE_DEMO=1` (which brings in `lib/preview.ts`; other builds leave it out) and `VITE_REPLAY_URL=/replay.json`, as static files. The same UI then runs without a server and says "Recorded demo". Ask returns the saved answers. The judged hackathon demo (brainstorm-demo-black.vercel.app) is never redeployed. How to record and build: [demo.md](demo.md).

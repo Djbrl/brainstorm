@@ -107,7 +107,7 @@ export type WsMessage =
 - `GET /api/map?root=<abs path>`
 - `GET /api/history?root=`
 - `POST /api/ask`
-- `GET /api/replay?sessionId=` (exports a session, its map and its saved answers as JSON for the hosted demo)
+- `GET /api/replay?sessionId=` (exports a session, its map and its saved answers as JSON for the hosted demo; `app/scripts/record-demo.mjs` adds the demo's extras, see `docs/demo.md`)
 - `GET /api/export.md?root=` (stretch)
 
 ## Ownership and tasks

@@ -8,6 +8,7 @@ How Rundown works, what's planned, and how it was built. Keep every file short a
 | --- | --- |
 | [technical.md](technical.md) | Architecture, modules, reading the logs, the contract, API, storage, Ask, "Waiting for you", Places, the Track, privacy |
 | [run-locally.md](run-locally.md) | Running the server and web app from a clone |
+| [demo.md](demo.md) | The hosted demos: recording and building brainstorm-next, and the private redaction list |
 | [todo.md](todo.md) | The to-do list: what to build next, in order |
 | [graph-for-agents.md](graph-for-agents.md) | Saved for later: the import graph as a tool for agents (blast radius, likely files, collisions) |
 | [learn-tab.md](learn-tab.md) | Saved for later: a Learn tab where Claude walks you through the code on the map |

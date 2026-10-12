@@ -87,13 +87,13 @@ cd app/web && npm run typecheck       # the web
 ## 5. (Optional) Make your own hosted replay
 
 ```bash
-# with the server running; sessionId takes one or more comma-separated ids from /api/sessions
-curl -s "http://localhost:4000/api/replay?sessionId=<id1>,<id2>" -o app/web/public/replay.json
-cd app/web && VITE_REPLAY_URL=/replay.json npx vite build
-# deploy app/web/dist to any static host
+# with your server running on <port>; --session takes one or more comma-separated ids from /api/sessions
+RUNDOWN_DATA_DIR=<the server's data folder> node app/scripts/record-demo.mjs --server http://127.0.0.1:<port> --session <id1>,<id2>
+cd app/web && npm run build:demo
+# deploy app/web/dist-demo to any static host
 ```
 
-Check `replay.json` for anything private before publishing. Secrets are masked, but the file holds your prompts, the agents' messages and diffs. To share one thread with someone, use Share in the app instead: it makes one redacted HTML file.
+Check the recording for anything private before publishing. Secrets are masked, but the file holds your prompts, the agents' messages and diffs. To share one thread with someone, use Share in the app instead: it makes one redacted HTML file. The details, and the private redaction list: [demo.md](demo.md).
 
 ## Troubleshooting
 

@@ -10,15 +10,15 @@ import { initial } from "../map/agents";
 import { MapSidebar } from "../map/sidebar/MapSidebar";
 import { LensSwitch } from "../map/LensSwitch";
 import { usePlaceRows, usePlaceTimeline } from "./rows";
-import { Dock } from "../map/replay/ReplayBar";
-import { togglePlay } from "../map/replay/layer";
+import { Dock } from "../map/thread/Dock";
+import { togglePlay } from "../map/thread/ThreadLayer";
 import { useShortcut } from "../switch/shortcuts";
 import { HOME, eventsAt, placeOfStep, placeTitle, placesStore, useCowork, usePlaces, useSelectPlace } from "./data";
 import { StepPanel } from "../map/StepPanel";
 import { PlacesMap } from "./PlacesMap";
 import { NARROW, useMedia } from "../lib/breakpoints";
 import "../map/map.css";
-import "../follow/follow.css";
+import "../step/follow.css";
 import "./cowork.css";
 
 const PLACE_MS = 1100;   // a place's time on the player, at 1×

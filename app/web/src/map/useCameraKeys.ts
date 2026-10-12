@@ -4,12 +4,12 @@ import { useEffect, useRef, type RefObject } from "react";
 import type { ThreadReplay } from "../lib/nav";
 import { getCameraLock, setCameraLock } from "./prefs";
 import { keyRules, useShortcut, windowOpen } from "../switch/shortcuts";
-import type { ReplayLayerApi } from "./replay/layer";
+import type { ThreadLayerApi } from "./thread/ThreadLayer";
 import type { Camera } from "./camera";
 import type { AgentAnim } from "./agents";
 
 export function useCameraKeys({ camRef, replayRef, followRef, setFollowId, anim, replay, free }: {
-  camRef: RefObject<Camera>; replayRef: RefObject<ReplayLayerApi>;
+  camRef: RefObject<Camera>; replayRef: RefObject<ThreadLayerApi>;
   followRef: RefObject<string | null>; setFollowId: (id: string | null) => void;
   anim: RefObject<Map<string, AgentAnim>>; replay: ThreadReplay | null;
   /** The camera is yours now (a hand move): no automatic re-frame. */

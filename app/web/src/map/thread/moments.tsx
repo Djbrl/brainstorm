@@ -1,5 +1,5 @@
-// The parts the thread's three lists share: the Track (ReplaySteps), the folded sidebar's card (sidebar/NowCard) and
-// Places' list (cowork/PlaceSteps). One row (MomentRow), which rows to draw (useRowWindow), and the list and the
+// The parts the thread's three lists share: the Track (Track.tsx), the folded sidebar's card (sidebar/NowCard) and
+// Places' list (places/PlaceSteps). One row (MomentRow), which rows to draw (useRowWindow), and the list and the
 // cursor moving each other (useCursorScroll): scrolling the list moves the thread to the row at its middle, and the
 // thread moving brings its row to the middle, unless you scrolled just now.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type HTMLAttributes, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from "react";

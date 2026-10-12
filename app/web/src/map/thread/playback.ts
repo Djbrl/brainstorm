@@ -1,4 +1,4 @@
-// The replay's playback and keys (moved out of layer.ts): the timer that steps through the thread while it plays, at a
+// The replay's playback and keys (moved out of ThreadLayer.ts): the timer that steps through the thread while it plays, at a
 // pace per kind of moment; Space plays from where you are (with a thread open on the map); in the player ← → step and
 // Home / End go to the ends. Outside the player the arrows move the map (useCameraKeys).
 import { useEffect, useRef, type RefObject } from "react";
@@ -49,7 +49,7 @@ export function useReplayPlayback({ active, replay, thread, index, last, st, set
 
 /**
  * Play/pause from the step you're on. At the last one, play starts again from the first (`restart` goes there). Shared
- * by the keyboard and the ReplayBar (the map's and Places').
+ * by the keyboard and the Dock (the map's and Places').
  */
 export function togglePlay(playing: boolean, setPlaying: (p: boolean) => void, atEnd = false, restart?: () => void) {
   if (!playing && atEnd) restart?.();

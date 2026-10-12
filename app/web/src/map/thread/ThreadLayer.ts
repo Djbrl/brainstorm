@@ -21,7 +21,7 @@ export type NodePos = { x?: number; y?: number; r: number };
 export type { Look } from "./focus";
 export { togglePlay } from "./playback";
 
-export type ReplayLayerApi = {
+export type ThreadLayerApi = {
   /** True while a thread replay is on (nav.thread is set and its thread is loaded). */
   active: boolean;
   /** Alpha for a node during replay: 1 = normal, lower = dimmed (not touched by the thread). */
@@ -94,7 +94,7 @@ type Anim = { x: number; y: number; fromX: number; fromY: number; t0: number; fi
   cam: { x: number; y: number } | null; landedT0?: number };
 
 
-export function useReplayLayer({ nodeIndexRef, accent, font, camera, follow, land, liveShown }: {
+export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, land, liveShown }: {
   nodeIndexRef: RefObject<Map<string, NodePos>>;
   accent: string;
   font: string;
@@ -108,7 +108,7 @@ export function useReplayLayer({ nodeIndexRef, accent, font, camera, follow, lan
    *  it only if it's gone (the server forgets an agent after half an hour); looking back, the marker is drawn faint
    *  beside it (the past, under the agent now), at full strength only without it. */
   liveShown?: RefObject<boolean>;
-}): ReplayLayerApi {
+}): ThreadLayerApi {
   const replay = useReplay();
   const { setReplayIndex, setReplayPlaying, landReplay, setCursorStep } = useNavActions();
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");

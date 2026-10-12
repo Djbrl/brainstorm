@@ -9,7 +9,7 @@ import type { AgentPresence, Session } from "@contract";
 import { clock, useLiveSelector } from "../../lib/live";
 import { END, useNavActions, useNavState } from "../../lib/nav";
 import { track } from "../../lib/usage";
-import { relTime } from "../../follow/format";
+import { relTime } from "../../step/format";
 import { agentColor, baseName, initial, inkOn, shortName, verbIng } from "../agents";
 import { harnessName, harnessOf } from "../../lib/harness";
 import { visitorHome } from "../../lib/islands";

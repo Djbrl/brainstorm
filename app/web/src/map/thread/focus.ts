@@ -1,4 +1,4 @@
-// THE FOCUS of an open thread, in one place (moved out of layer.ts): which files are lit (and named) at the cursor, what
+// THE FOCUS of an open thread, in one place (moved out of ThreadLayer.ts): which files are lit (and named) at the cursor, what
 // every other file is, and how each file eases into and out of it. Read for every file on every frame, so the focus is
 // cached per cursor (the test compares fields and builds nothing) and the eased look per file.
 import { useCallback, useMemo, useRef, type RefObject } from "react";
@@ -17,7 +17,7 @@ export type Look = { alpha: number; tone: number; edited?: string; named?: boole
 type Target = { alpha: number; edited?: string; named?: boolean };
 /** The focus for the current cursor: the files in it, and what every other file is. */
 type Focus = { files: Map<string, Target>; rest: Target };
-/** Where the replay is: what the focus is worked out from (layer.ts keeps it up to date every render). */
+/** Where the replay is: what the focus is worked out from (ThreadLayer.ts keeps it up to date every render). */
 export type Cursor = { active: boolean; thread: Thread | null; index: number; mode: string };
 
 const DIM = 0.3;            // files out of focus: the thread never touched them, or not in the recent window (0.15 hid the map)

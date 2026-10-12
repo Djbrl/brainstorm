@@ -46,7 +46,7 @@ export const VERB_NAME: Record<CoworkVerb, string> = {
 /** `selected` is a place (or site) id on the map. The step its panel shows is the app's open step (lib/nav). */
 /** `row`: the list's row you went to (PlaceSteps), so several stretches in one moment of the thread can each be the one
  *  you're on: its index, the moment (the app's cursor), its newest event (null: a Your computer row) and its step (in
- *  the thread's step order, cowork/rows.ts). */
+ *  the thread's step order, places/rows.ts). */
 export type PlacesRow = { i: number; beat: number; event: string | null; step: number };
 type PlacesState = { data: CoworkSummary | null; selected: string | null; highlight: string | null; row?: PlacesRow | null };
 const places = createAtom<PlacesState>({ data: null, selected: null, highlight: null, row: null });

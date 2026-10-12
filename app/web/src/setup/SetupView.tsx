@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { SetupStatus, SetupStep, WorkspaceConflict, WorkspaceSuggestion } from "@contract";
 import { clock, useLiveSelector } from "../lib/live";
 import { ApiError, errorWords, get, post } from "../lib/api";
-import { relTime } from "../follow/format";
+import { relTime } from "../step/format";
 import { Logo } from "../Logo";
 import "./setup.css";
 

@@ -1,5 +1,5 @@
 // The tracer, shared by the three layers that draw one: the live agents (agents.tsx), the replay's marker
-// (replay/layer.ts) and the places map's marker (cowork/PlacesMap.tsx). A marker glides from stop to stop along the
+// (thread/ThreadLayer.ts) and the places map's marker (places/PlacesMap.tsx). A marker glides from stop to stop along the
 // theme's route, leaves a trail of segments behind it, and rings: a pulse on activity, a red ring on a failure, a slow
 // breath while it thinks. One copy of the timings and the strokes, so a theme's look reaches every layer.
 import type { MapStyle } from "./themes";

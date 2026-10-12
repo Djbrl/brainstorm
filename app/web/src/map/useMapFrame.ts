@@ -9,7 +9,7 @@ import { sinceMs } from "../lib/visit";
 import { mapPrefs } from "../lib/nav";
 import { tourHidesExtras } from "../lib/tour";
 import { drawAgents, type AgentRing } from "./agents";
-import type { ReplayLayerApi } from "./replay/layer";
+import type { ThreadLayerApi } from "./thread/ThreadLayer";
 import { drawQueuedLabels, LabelSpace, type QueuedLabel } from "./labels";
 import { mapStyle } from "./themes";
 import { spriteFrame } from "./sprites";
@@ -43,7 +43,7 @@ export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIn
   tween: Parameters<typeof stepTween>[0];
   graphRef: RefObject<Graph>; nodeIndexRef: RefObject<Map<string, GNode>>;
   resolveId: (file: string) => string | undefined;
-  replayRef: RefObject<ReplayLayerApi>;
+  replayRef: RefObject<ThreadLayerApi>;
   /** The live agents (useLiveAgents.ts). */
   live: Pick<ReturnType<typeof useLiveAgents>, "agentsRef" | "anim" | "waitingRef" | "thinkingRef" | "dimmedRef" | "moving">;
   followRef: RefObject<string | null>;

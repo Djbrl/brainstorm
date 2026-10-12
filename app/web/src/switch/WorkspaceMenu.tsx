@@ -6,7 +6,7 @@ import type { WorkspaceSuggestion } from "@contract";
 import { clock, useLiveActions } from "../lib/live";
 import { useNavActions } from "../lib/nav";
 import { enterProject } from "../lib/switcher";
-import { relTime } from "../follow/format";
+import { relTime } from "../step/format";
 import { get } from "../lib/api";
 
 const SHOWN = 8;

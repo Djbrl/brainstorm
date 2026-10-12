@@ -30,7 +30,7 @@ function withOutside(r: FileResolver, map: ProjectMap | null, home: string | nul
   }
   return w;
 }
-import { displayLabel, isVisible, realLabel } from "../follow/format";
+import { displayLabel, isVisible, realLabel } from "../step/format";
 
 export type BeatAction = "edit" | "read" | "other";
 export type ReplayDetail = "light" | "full";

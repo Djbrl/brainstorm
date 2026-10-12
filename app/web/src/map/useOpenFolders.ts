@@ -7,7 +7,7 @@ import type { GNode } from "./graph";
 
 export function useOpenFolders({ nodeIndex, selected, focusFile, footprint, sessionId, followId, agents, resolveId }: {
   nodeIndex: Map<string, GNode>; selected: string | null; focusFile: string | null;
-  /** The open thread's files in view (replay/layer.ts footprint), or null. */
+  /** The open thread's files in view (thread/ThreadLayer.ts footprint), or null. */
   footprint: string[] | null;
   sessionId: string | null; followId: string | null; agents: AgentPresence[];
   resolveId: (file: string) => string | undefined;

@@ -6,7 +6,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useNavActions, useNavState, useReplay, type ReplaySpeed } from "../../lib/nav";
 import { useThread, type Thread } from "../../lib/thread";
 import { chaptersOf } from "../../lib/chapters";
-import { togglePlay } from "./layer";
+import { togglePlay } from "./ThreadLayer";
 import "./replay.css";
 import "../dock.css";
 

@@ -4,7 +4,7 @@
 import { isRecording, shallowEqual, useLiveActions, useLiveSelector, useHarness, useLiveStep } from "./lib/live";
 import { harnessName } from "./lib/harness";
 import { END, NavProvider, useNavActions, useNavState } from "./lib/nav";
-import { displayLabel } from "./follow/format";
+import { displayLabel } from "./step/format";
 import { LinkedLabel } from "./lib/links";
 import { SetupView } from "./setup/SetupView";
 import { Welcome } from "./map/Welcome";
@@ -31,7 +31,7 @@ let mapChunk: Promise<typeof import("./map/MapView")> | null = null;
 const loadMapView = () => (mapChunk ??= import("./map/MapView").catch((e) => { mapChunk = null; throw e; }));
 loadMapView().catch(() => {}); // a failed prefetch is retried when the view mounts
 const MapView = lazy(() => loadMapView().then((m) => ({ default: m.MapView })));
-const PlacesView = lazy(() => import("./cowork/CoworkView").then((m) => ({ default: m.PlacesView })));
+const PlacesView = lazy(() => import("./places/CoworkView").then((m) => ({ default: m.PlacesView })));
 
 /** Project › Thread › Step: each part takes you back up to it. */
 function Crumbs({ project }: { project: string }) {

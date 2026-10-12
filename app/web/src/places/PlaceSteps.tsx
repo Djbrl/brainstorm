@@ -8,13 +8,13 @@
 import { useMemo } from "react";
 import { useNavState } from "../lib/nav";
 import { usePlaceRows } from "./rows";
-import { displayLabel } from "../follow/format";
+import { displayLabel } from "../step/format";
 import { injectedLabel } from "../lib/chapters";
 import { useLiveSelector } from "../lib/live";
 import { LinkedLabel } from "../lib/links";
 import { HOME_NAME, placesStore, runWords, usePlaces, useSelectPlace, type PlaceRun } from "./data";
-import { MomentRow, useCursorScroll } from "../map/replay/moments";
-import "../map/replay/replay.css"; // the row styles (.rp-list, .rp-m) it shares with the replay
+import { MomentRow, useCursorScroll } from "../map/thread/moments";
+import "../map/thread/replay.css"; // the row styles (.rp-list, .rp-m) it shares with the replay
 
 
 export function PlaceSteps() {

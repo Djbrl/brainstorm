@@ -15,13 +15,13 @@ import { useNavActions, useNavState, useReplayCursor } from "../../lib/nav";
 import { repoBase, repoRelative } from "../../lib/paths";
 import { THEMES, useTheme } from "../../lib/theme";
 import { actionOf, useThread, type Thread } from "../../lib/thread";
-import { diffStyles, editPair } from "../../follow/StepDetail";
-import { Code, IMAGE, Shots } from "../../follow/content/ToolView";
-import { cleanResult, parseNumbered } from "../../follow/content/parse";
-import { basename, stepFile } from "../../follow/format";
+import { diffStyles, editPair } from "../../step/StepDetail";
+import { Code, IMAGE, Shots } from "../../step/content/ToolView";
+import { cleanResult, parseNumbered } from "../../step/content/parse";
+import { basename, stepFile } from "../../step/format";
 import { setShowFile, useShowFile } from "../prefs";
-import { Icon } from "./ReplayBar";
-import "../../follow/follow.css";
+import { Icon } from "./Dock";
+import "../../step/follow.css";
 import "./peek.css";
 
 const LOOK_BACK = 400;   // beats scanned back from the cursor for the last file touched
@@ -189,7 +189,7 @@ function PeekBody({ sessionId, detail }: { sessionId: string; detail: Thread["de
 }
 
 /** Mounted by MapView. Shown while a thread on the map is followed live or replayed, unless turned off in Settings. */
-export function Peek() {
+export function FileWindow() {
   const on = useShowFile();
   const { thread, step, lens } = useNavState();
   if (!on || !thread || step || lens !== "map" || !(thread.live || thread.mode === "play")) return null;

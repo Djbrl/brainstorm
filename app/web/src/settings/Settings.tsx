@@ -72,7 +72,7 @@ export function SettingsButton() {
   );
 }
 
-/** How much of an open thread the map lights up and names (map/prefs.ts; the focus is in map/replay/layer.ts). */
+/** How much of an open thread the map lights up and names (map/prefs.ts; the focus is in map/thread/ThreadLayer.ts). */
 function WindowSetting() {
   const win = useStepWindow();
   return (
@@ -89,7 +89,7 @@ function WindowSetting() {
   );
 }
 
-/** While you follow or replay a thread: the file window (replay/Peek.tsx) and the dotted lines to the files it reads. */
+/** While you follow or replay a thread: the file window (thread/FileWindow.tsx) and the dotted lines to the files it reads. */
 function FollowSetting() {
   const file = useShowFile();
   const { showReads } = useNavState();

@@ -10,12 +10,12 @@ import { mapPrefs, useNavState, useReplay } from "../lib/nav";
 import { visibleAgents } from "./agents";
 import { TOUR_AGENT, useTour } from "../lib/tour";
 import { MapSidebar } from "./sidebar/MapSidebar";
-import { Dock } from "./replay/ReplayBar";
-import { Peek } from "./replay/Peek";
+import { Dock } from "./thread/Dock";
+import { FileWindow } from "./thread/FileWindow";
 import { useStepWindow } from "./prefs";
 import { StepPanel } from "./StepPanel";
 import { useSelectedFile } from "./useSelectedFile";
-import { useReplayLayer, type ReplayLayerApi } from "./replay/layer";
+import { useThreadLayer, type ThreadLayerApi } from "./thread/ThreadLayer";
 import { islandPath, isPlaceRoot, useIslands } from "../lib/islands";
 import { enterProject } from "../lib/switcher";
 import { focusAgent, setAgentFocus, useAgentFocus } from "../lib/agentFocus";
@@ -120,8 +120,8 @@ export function MapView() {
   // What drawing keeps between frames (drawNode.ts): ripples, colour batches, a marker's landings.
   const caches = useRef(newCaches());
   const land = useCallback((id: string, t: number) => { caches.current.landings.set(id, t); }, []);
-  const replayLayer = useReplayLayer({ nodeIndexRef, accent: tokens.accent, font: tokens.body, camera: camRef, follow: replayCam, land, liveShown });
-  const replayRef = useRef<ReplayLayerApi>(replayLayer); replayRef.current = replayLayer;
+  const replayLayer = useThreadLayer({ nodeIndexRef, accent: tokens.accent, font: tokens.body, camera: camRef, follow: replayCam, land, liveShown });
+  const replayRef = useRef<ThreadLayerApi>(replayLayer); replayRef.current = replayLayer;
   const openRef = useRef(!!replay); openRef.current = !!replay;
 
   // ---- the camera (useMapCamera.ts) ----
@@ -144,7 +144,7 @@ export function MapView() {
 
   // Faint: with a thread open, its agents you aren't watching (one followed, or one on its own: agentFocus, the others).
   // Looking back through it they stay as they are: solid where they are now, the replay's own marker faint where the
-  // thread was (replay/layer.ts).
+  // thread was (thread/ThreadLayer.ts).
   const focus = useAgentFocus(replay?.sessionId ?? null);
   dimmedRef.current = useMemo(() => {
     if (!replay) return new Set<string>();
@@ -312,7 +312,7 @@ export function MapView() {
           big={!small} onTrack={follow} onLook={lookAt} onHide={() => setReadmap(false)} frame={readmapFrame} kick={redraw.kick} />
       )}
 
-      <Peek />
+      <FileWindow />
       <Dock />
 
       <StepPanel />

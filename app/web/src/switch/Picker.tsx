@@ -7,7 +7,7 @@ import { useLiveActions, useLiveSelector, clock } from "../lib/live";
 import { useNavActions, useNavState } from "../lib/nav";
 import { attentionText, needsYou, yourTurn } from "../lib/attention";
 import { isCodex } from "../lib/harness";
-import { relTime } from "../follow/format";
+import { relTime } from "../step/format";
 import { jumpElsewhere, openThread, useElsewhere } from "../lib/switcher";
 import { elsewhereWord } from "./Elsewhere";
 

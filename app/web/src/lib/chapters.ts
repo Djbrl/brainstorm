@@ -5,7 +5,7 @@
 import type { Step } from "@contract";
 import { oneLine } from "@shared/text";
 import type { Beat, Thread } from "./thread";
-import { stripInjected } from "../follow/format";
+import { stripInjected } from "../step/format";
 
 export type Chapter = {
   index: number;

@@ -1,7 +1,7 @@
 // Drawing one frame of the map's files and import lines (moved out of MapView.tsx): plain functions of the
 // frame (Frame: what's asked once per frame) and of caches that live as long as the map. MapView calls them from
 // force-graph's frame callbacks.
-import type { Look } from "./replay/layer";
+import type { Look } from "./thread/ThreadLayer";
 import { drawName, textWidth, type LabelSpace, type QueuedLabel } from "./labels";
 import { Motion } from "./redraw";
 import { reachOf, type MapStyle, type RGB } from "./themes";

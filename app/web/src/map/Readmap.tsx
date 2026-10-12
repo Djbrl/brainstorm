@@ -15,12 +15,12 @@ import { boxOf, fitView, type Camera, type View } from "./camera";
 import type { Graph, GNode } from "./graph";
 import { mapStyle } from "./themes";
 import { useLiveSelector } from "../lib/live";
-import { folderOf } from "./replay/Peek";
-import { Icon } from "./replay/ReplayBar";
-import "./replay/peek.css";
+import { folderOf } from "./thread/FileWindow";
+import { Icon } from "./thread/Dock";
+import "./thread/peek.css";
 import "./readmap.css";
 
-// The picture, in CSS pixels: small beside a small map; on a big one as wide as the file window under it (replay/Peek),
+// The picture, in CSS pixels: small beside a small map; on a big one as wide as the file window under it (thread/FileWindow),
 // the two one column on the right.
 const SMALL = { w: 208, h: 132 }, BIG = { w: 358, h: 196 };
 const GLIDE = 0.28;          // seconds for the camera to (nearly) reach a new file
@@ -43,9 +43,9 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
   /** The agents the map draws this frame (where each one is comes from `anim`). */
   drawnRef: RefObject<AgentPresence[]>;
   cam: RefObject<Camera>;
-  /** The replay's marker, while it shows (replay/layer.ts), or null. */
+  /** The replay's marker, while it shows (thread/ThreadLayer.ts), or null. */
   subject: () => { x: number; y: number } | null;
-  /** Where the thread is now when no live agent is on the map (replay/layer.ts nowAt), or null: drawn solid. */
+  /** Where the thread is now when no live agent is on the map (thread/ThreadLayer.ts nowAt), or null: drawn solid. */
   now: () => { x: number; y: number } | null;
   /** The map's resolver and nodes, and whose reads count (the open thread's agents, or on the project overview only
    *  the one followed); null when reads are hidden (Settings). */
@@ -54,7 +54,7 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
   agents: AgentPresence[];
   followId: string | null;
   accent: string;
-  /** A big map: the picture as wide as the file window (replay/Peek) under it. */
+  /** A big map: the picture as wide as the file window (thread/FileWindow) under it. */
   big: boolean;
   onTrack: (id: string) => void;
   /** Show a point of the map (graph units) on the big map, as a hand move. */

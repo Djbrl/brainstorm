@@ -1,8 +1,8 @@
 // The window widths where the layout changes, and the reduced-motion setting, for the scripts. The CSS can't read these
 // constants, so the same numbers are written in its media queries; change one, change them all:
-//   NARROW (1100 px): map/map.css, map/lens.css, map/sidebar/sidebar.css, map/replay/replay.css
+//   NARROW (1100 px): map/map.css, map/lens.css, map/sidebar/sidebar.css, map/thread/replay.css
 //     (lens.css and sidebar.css also use `min-width: 441px`, the first width above PHONE)
-//   PHONE (440 px):   map/map.css, map/lens.css, map/readmap.css, map/sidebar/sidebar.css, map/replay/replay.css,
+//   PHONE (440 px):   map/map.css, map/lens.css, map/readmap.css, map/sidebar/sidebar.css, map/thread/replay.css,
 //                     map/tour/tour.css
 import { useSyncExternalStore } from "react";
 

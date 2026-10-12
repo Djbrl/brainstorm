@@ -1,6 +1,6 @@
 // The folded sidebar with a thread open: its Track, folded down to a few lines in the top-left
 // corner. The moment the thread is on (the newest while it follows live) as the Track's highlighted row, the ones before
-// it fading out above, the next one below when you look back, always four rows of the same height; the same words and dots as the Track (ReplaySteps'
+// it fading out above, the next one below when you look back, always four rows of the same height; the same words and dots as the Track (Track.tsx'
 // textOf). The newest moment's dot breathes while the thread works (only that one: a moment you scroll back to keeps
 // its own colour). Beside them a scroller, as plain as a scroll bar: where
 // you are in the thread (its start at the top, now at the bottom); click or drag it to go there. Clicking the rows, or
@@ -12,9 +12,9 @@ import { useNavActions, useNavState, useReplayCursor } from "../../lib/nav";
 import { useLiveSelector } from "../../lib/live";
 import { useThread } from "../../lib/thread";
 import { needsYou, yourTurn } from "../../lib/attention";
-import { textOf } from "../replay/ReplaySteps";
+import { textOf } from "../thread/Track";
 import { reducedMotion } from "../../lib/breakpoints";
-import { MomentRow, useRowWindow } from "../replay/moments";
+import { MomentRow, useRowWindow } from "../thread/moments";
 
 const NOTCH = 40;   // px of wheel per moment (a mouse notch, or a stretch of a trackpad's glide)
 const ROWS = 4;     // moments on the card

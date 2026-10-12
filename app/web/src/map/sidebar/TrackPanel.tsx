@@ -10,10 +10,10 @@ import { focusAgent, useAgentFocus, useThreadAgents } from "../../lib/agentFocus
 import { useTheme } from "../../lib/theme";
 import { agentColor, initial, inkOn } from "../agents";
 import { readTokens } from "../color";
-import { ReplaySteps } from "../replay/ReplaySteps";
-import { ShareMenu } from "../replay/ReplayBar";
+import { Track } from "../thread/Track";
+import { ShareMenu } from "../thread/Dock";
 import { isRecording } from "../../lib/live";
-import { PlaceSteps } from "../../cowork/PlaceSteps";
+import { PlaceSteps } from "../../places/PlaceSteps";
 
 export function TrackPanel({ onBack }: { onBack?: () => void }) {
   const nav = useNavActions();
@@ -33,7 +33,7 @@ export function TrackPanel({ onBack }: { onBack?: () => void }) {
         {!isRecording() && <ShareMenu sessionId={thread.sessionId} className="track-share" />}
       </div>
       {lens !== "places" && <AgentPicker title={session?.title} />}
-      {lens === "places" ? <PlaceSteps /> : <ReplaySteps />}
+      {lens === "places" ? <PlaceSteps /> : <Track />}
       {session?.status === "running" && !thread.live && thread.mode !== "play" && <BackToLive onBack={() => nav.setReplayLive(true)} />}
     </div>
   );

@@ -8,7 +8,7 @@ import { hierarchy, pack, type HierarchyNode } from "d3-hierarchy";
 import type { NodeObject } from "react-force-graph-2d";
 import type { FileNode, ProjectMap } from "@contract";
 import { isPlaceRoot, type Island } from "../lib/islands";
-import type { Look } from "./replay/layer";
+import type { Look } from "./thread/ThreadLayer";
 import type { StampMemo } from "./sprites";
 import { mapStyle, reachOf, type MapStyle, type RGB } from "./themes";
 import { ease } from "./util";

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { ThreadReplay } from "../lib/nav";
 import { getCameraLock } from "./prefs";
-import type { ReplayLayerApi } from "./replay/layer";
+import type { ThreadLayerApi } from "./thread/ThreadLayer";
 import { boxOf, fitView, type Camera, type ReplayCamera, type View } from "./camera";
 import { useCameraKeys } from "./useCameraKeys";
 import type { AgentAnim } from "./agents";
@@ -30,10 +30,10 @@ type CameraState = {
 export function useMapCamera({ cam, camRef, replayCam, nodeIndex, nodeIndexRef, replayRef, replayActive, replay, step, selected, selectedRef, setSelected,
   resolveId, anim, hasNodes, focusFile, setFocusFile, smallRef }: {
   cam: Camera; camRef: RefObject<Camera>;
-  /** What the replay layer's camera follow asks of this camera (replay/layer.ts): filled in here. */
+  /** What the replay layer's camera follow asks of this camera (thread/ThreadLayer.ts): filled in here. */
   replayCam: RefObject<ReplayCamera>;
   nodeIndex: Map<string, GNode>; nodeIndexRef: RefObject<Map<string, GNode>>;
-  replayRef: RefObject<ReplayLayerApi>; replayActive: boolean; replay: ThreadReplay | null; step: string | null;
+  replayRef: RefObject<ThreadLayerApi>; replayActive: boolean; replay: ThreadReplay | null; step: string | null;
   selected: string | null; selectedRef: RefObject<string | null>; setSelected: (id: string | null) => void;
   resolveId: (file: string) => string | undefined; anim: RefObject<Map<string, AgentAnim>>; hasNodes: boolean;
   focusFile: string | null; setFocusFile: (f: string | null) => void;

@@ -9,9 +9,9 @@ import type { Step } from "@contract";
 import { useLiveActions, useLiveSelector } from "../lib/live";
 import { useNavActions, useNavState, useReplayCursor } from "../lib/nav";
 import { useThread } from "../lib/thread";
-import { StepDetail } from "../follow/StepDetail";
-import { isVisible, pairResults } from "../follow/format";
-import "../follow/follow.css";
+import { StepDetail } from "../step/StepDetail";
+import { isVisible, pairResults } from "../step/format";
+import "../step/follow.css";
 import "./map.css";
 
 type StepPanelProps = {

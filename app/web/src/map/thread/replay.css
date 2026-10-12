@@ -59,7 +59,7 @@
 @media (max-width: 440px) { .rp-share-menu { width: min(330px, calc(100vw - 32px)); } }
 
 
-/* ---------- chapters: one section per message you typed (ReplaySteps) ---------- */
+/* ---------- chapters: one section per message you typed (Track.tsx) ---------- */
 .rp-chapters { padding: 4px 0 40%; -webkit-mask-image: none; mask-image: none; }
 .rp-ch { display: flex; flex-direction: column; }
 /* Your messages are bubbles, set in from the right like a chat; the agent's work is the thin line of moments under each,
@@ -165,7 +165,7 @@
   .rp-player .rp-speed { margin-left: auto; }
 }
 
-/* ---------- long Track lists: an open chapter draws only the rows near the view and the cursor (ReplaySteps) ---------- */
+/* ---------- long Track lists: an open chapter draws only the rows near the view and the cursor (Track.tsx) ---------- */
 /* Every row is drawn for real (no placeholder height), so the empty space standing in for the others adds up exactly. */
 .rp-ch-moments .rp-m { content-visibility: visible; flex: none; }
 .rp-m-gap { flex: none; }

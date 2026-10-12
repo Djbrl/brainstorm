@@ -2,7 +2,7 @@
 // The time is saved when the page is hidden or closed, and read once per tab: looking at the map or reloading doesn't
 // move the line, coming back later in a new tab does. Per browser; a blocked storage means every visit counts as the first.
 
-import { relTime } from "../follow/format";
+import { relTime } from "../step/format";
 import { readStored, writeStored } from "./store";
 
 const KEY = "rundown-last-seen";

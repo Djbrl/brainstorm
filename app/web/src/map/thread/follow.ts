@@ -1,4 +1,4 @@
-// The replay's camera follow (moved out of layer.ts). Locked: the marker stays in the middle of the part of the map no
+// The replay's camera follow (moved out of ThreadLayer.ts). Locked: the marker stays in the middle of the part of the map no
 // panel covers (easing, never snapping); the wheel and pinch still zoom, and the zoom stays where you put it. Unlocked:
 // the camera stays where it is; when the marker leaves the view, the map's camera frames the recent window again
 // (`follow.onLost`), unless you moved the camera since it last framed it. The loop runs only while there is something to

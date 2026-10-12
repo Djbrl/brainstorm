@@ -87,7 +87,7 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
   rightInset?: number;
   /** A small map (the Claude app's browser pane): the camera frames the site the thread is in. */
   small: boolean;
-  /** A step's place in the thread, step by step (cowork/rows.ts usePlaceTimeline), and how many steps it has (after
+  /** A step's place in the thread, step by step (places/rows.ts usePlaceTimeline), and how many steps it has (after
    *  its last trip out, it's back on Your computer). */
   beatOf: (stepId: string) => number | undefined;
   beats: number;

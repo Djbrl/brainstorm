@@ -47,7 +47,7 @@ Full pitch and features: `../docs/archive/hackathon/plan.md`. Judges score on wo
 | Lead | `server/src/{main,app.module,types}.ts`, `server/src/core/`, `web/src/{App,main}.tsx`, `web/src/lib/`, `web/src/styles.css` |
 | A: Live | `server/src/listener/` |
 | B: Map + Nemotron | `server/src/mapper/`, `server/src/reader/`, `server/src/llm/nemotron.service.ts` |
-| C: Web Follow + Ask UI | `web/src/follow/`, `web/src/ask/` |
+| C: Web Follow + Ask UI | `web/src/step/`, `web/src/ask/` |
 | D: Web Map + Ask server | `web/src/map/`, `server/src/ask/`, `server/src/llm/claude.service.ts`, `server/src/privacy/` |
 
 **Nemotron is live** (14:20). Read `../docs/archive/hackathon/nemotron.md` before calling it: connection, rules, code snippet and prompts.

@@ -12,7 +12,7 @@ import { harnessName } from "../../lib/harness";
 import { useNavActions, useNavState, useReplayCursor } from "../../lib/nav";
 import { beatLabel, useThread, type Beat, type Thread } from "../../lib/thread";
 import { chapterAt, chaptersOf, injectedLabel, type Chapter } from "../../lib/chapters";
-import { timeIn } from "../../follow/format";
+import { timeIn } from "../../step/format";
 import { LinkedLabel } from "../../lib/links";
 import { attentionText, needsYou, yourTurn } from "../../lib/attention";
 import { agentFocusOf, streamOf, useAgentFocus, useThreadAgents } from "../../lib/agentFocus";
@@ -106,7 +106,7 @@ const Moments = memo(function Moments({ beats, from, last, index, rowH, onPick, 
   return <div className="rp-ch-moments" ref={box}>{out}</div>;
 });
 
-export function ReplaySteps() {
+export function Track() {
   const { thread: openThread } = useNavState();
   const { setReplayIndex, setReplayPlaying, setReplayDetail, openStep } = useNavActions();
   const cursor = useReplayCursor();

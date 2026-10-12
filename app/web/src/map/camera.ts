@@ -38,7 +38,7 @@ export function measureSafe(host: HTMLElement): Safe {
     if (el.offsetWidth >= w - 2) sheet = Math.max(sheet, h - el.offsetTop + GAP);
     else right = Math.max(right, el.offsetWidth + GAP);
   }
-  // The file window (replay/Peek.tsx): the tracer and the thread's files keep to its left, never under it.
+  // The file window (thread/FileWindow.tsx): the tracer and the thread's files keep to its left, never under it.
   for (const el of scope.querySelectorAll(FLOAT_RIGHT)) { const b = el.getBoundingClientRect(); if (shown(b)) right = Math.max(right, r.right - b.left + GAP); }
   // Top and bottom bands count only where they reach into the space between the side panels.
   const x0 = r.left + left, x1 = r.right - right;
@@ -116,7 +116,7 @@ export type Camera = {
   touch: () => void;
 };
 
-/** What the replay layer's camera follow (replay/layer.ts) asks of the map's camera (useMapCamera.ts fills it in). */
+/** What the replay layer's camera follow (thread/ThreadLayer.ts) asks of the map's camera (useMapCamera.ts fills it in). */
 export type ReplayCamera = {
   /** Unlocked camera: the tracer left the view. The map frames the recent window again, unless you moved the camera. */
   onLost: (() => void) | null;

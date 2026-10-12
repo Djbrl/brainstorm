@@ -1,6 +1,6 @@
 // One set of numbers for a thread, said the same way in every view:
 // - a step is one thing in the thread's step list (what the agent did or said, and your messages); tool results and
-//   empty thinking are part of the step they answer, not steps of their own (follow/format's isVisible);
+//   empty thinking are part of the step they answer, not steps of their own (step/format's isVisible);
 // - files: "Changed N files (N new) · read N more". Changed = every file the agent edited or wrote, anywhere; new =
 //   the ones its Write created; read = files it opened and didn't change. A repo file counts once, whichever checkout
 //   (worktree, old location) the agent used;
@@ -8,7 +8,7 @@
 import { useEffect, useMemo } from "react";
 import type { ProjectMap, Step } from "@contract";
 import { useLiveActions, useLiveSelector } from "./live";
-import { isVisible } from "../follow/format";
+import { isVisible } from "../step/format";
 import { BREAK_MS, stepTime, worked } from "./chapters";
 import { actionOf, onlyRelabelled } from "./thread";
 import { CallPairer } from "@shared/pairing";

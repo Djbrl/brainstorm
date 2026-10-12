@@ -170,6 +170,7 @@ export class AttentionService implements OnModuleInit, OnModuleDestroy {
     if (fromHook) this.store(sig.session_id, t.hook);
     // Hooks come from every project's sessions: pages hear about the open workspace's (another's is in GET /api/elsewhere).
     if (this.inScope(new Set([sig.session_id]), Date.now()).has(sig.session_id)) this.publish(sig.session_id);
+    this.schedule(this.nextDeadline(Date.now())); // a new tracker or hook can bring the next deadline forward
   }
 
   /** The last thing a hook said about a thread, any project's (for threads in other projects: GET /api/elsewhere). */

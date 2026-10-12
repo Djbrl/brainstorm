@@ -186,3 +186,12 @@ test("a permission prompt survives a project switch and a restart, until the log
   third.onModuleInit();
   assert.equal(third.hookOf("a"), undefined);
 });
+
+test("a hook brings the next sweep forward to the thread's next deadline", (ctx) => {
+  const { att, store, session, sweep } = setup(ctx);
+  sweep(); // the first sweep: nothing tracked, the next one is 10 s away
+  session("a", iso(0));
+  store({ sessionId: "a", kind: "tool_call", tool: "Bash", toolUseId: "t1", ts: iso(0) });
+  att.signal({ event: "Notification", session_id: "a", notification_type: "idle_prompt" });
+  assert.equal((att as unknown as { timerAt: number }).timerAt, Date.now() + 4_001); // the 4-second quiet step, not 10 s later
+});

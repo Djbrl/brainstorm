@@ -261,7 +261,7 @@ Behaviour should be the same. This puts rules that existed in several copies in 
 ### Left open (Phase 4)
 
 - Copies whose behaviour differs were kept on purpose (named in the commits above).
-- Phase 5 (split the large files, renames) and Phase 6 (tests, release process) are not started.
+- Phase 5 (split the large files, renames) and Phase 6 (tests, release process) followed; see below.
 - Merge to `main` happens only after all phases; pushes and release are the maintainer's.
 
 ## Phase 5: split the large files and rename
@@ -322,7 +322,7 @@ Behaviour should be the same. The audit found files too big to change safely (th
 - Places' list draws every row; the list is short.
 - The cowork view still passes 440 as the panel width.
 - An older bug, not new: opening Places with no step leaves its list at the top with a gap, instead of scrolling to the thread's row.
-- Phase 6 (tests, release process) is not started.
+- Phase 6 (tests, release process) followed; see below.
 - On a fresh install, the first-run tour closes a thread that was opened from a link. This is how the tour already behaved.
 - The live store's `replay` flag still has its old name, though its check is now `isRecording()`.
 

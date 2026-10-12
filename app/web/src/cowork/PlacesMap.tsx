@@ -19,7 +19,7 @@ import { platform } from "../map/routes";
 import { css, readTokens, recencyRGB } from "../map/color";
 import { createRedraw, Motion } from "../map/redraw";
 import { useTheme } from "../lib/theme";
-import { clock, isReplay } from "../lib/live";
+import { clock, isRecording } from "../lib/live";
 import { sinceMs } from "../lib/visit";
 import { useStepWindow } from "../map/prefs";
 import { glide, GLIDE_MS, setOff, trailPath, type Glider } from "../map/tracer";
@@ -204,7 +204,7 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
   const pointed = (n: PNode) => !active || n === active || n.up === active || active.up === n || (active.kind === "page" && n.up === active.up);
   const lit = (n: PNode) => pointed(n) && (!focus || n.kind === "area" || n.kind === "home" || focus.has(n.id));
   const st = mapStyle();
-  const recorded = isReplay();
+  const recorded = isRecording();
   useEffect(() => { redraw.kick(); }, [graph, hover, highlight, selected, theme, here, nowAt, focus, size.w, size.h, redraw]);
 
   const drawNode = (n: PNode, ctx: CanvasRenderingContext2D, scale: number) => {

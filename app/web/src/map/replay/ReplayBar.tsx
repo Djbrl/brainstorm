@@ -119,7 +119,7 @@ function Player({ steps }: { steps?: Steps }) {
  * switches are in Settings and on keys (L, M). On Places its ‹ › go place by place (CoworkView).
  */
 export function Dock({ steps }: { steps?: Steps } = {}) {
-  const { replay } = useNavState();
-  if (replay?.mode !== "play") return null;
+  const { thread } = useNavState();
+  if (thread?.mode !== "play") return null;
   return <div className="dock"><Player steps={steps} /></div>;
 }

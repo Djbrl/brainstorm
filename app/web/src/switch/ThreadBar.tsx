@@ -12,9 +12,9 @@ import { LensSwitch } from "../map/LensSwitch";
 import "./switch.css";
 
 export function ThreadBar({ project, onFind, onHelp, onAllProjects }: { project: string; onFind: () => void; onHelp: () => void; onAllProjects: () => void }) {
-  const { replay } = useNavState();
+  const { thread } = useNavState();
   const nav = useNavActions();
-  const openId = replay?.sessionId ?? null;
+  const openId = thread?.sessionId ?? null;
   const root = useLiveSelector((s) => s.setup?.root ?? "");
   const tabs = useBarThreads(openId);
 

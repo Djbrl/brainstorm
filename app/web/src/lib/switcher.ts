@@ -3,7 +3,7 @@
 // (GET /api/elsewhere, asked every few seconds while the page is in view).
 import { useEffect, useMemo } from "react";
 import type { Attention, ElsewhereThread, Session } from "@contract";
-import { isReplay, useLiveSelector, shallowEqual } from "./live";
+import { isRecording, useLiveSelector, shallowEqual } from "./live";
 import { needsYou, yourTurn } from "./attention";
 import { END, type NavActions } from "./nav";
 import { track } from "./usage";
@@ -104,7 +104,7 @@ const onVisible = () => { if (document.visibilityState === "visible" && pollers)
 /** Threads at work in the person's other projects (empty in a replay or a shared file). */
 export function useElsewhere(): ElsewhereThread[] {
   useEffect(() => {
-    if (isReplay()) return;
+    if (isRecording()) return;
     if (pollers++ === 0) { poll(); document.addEventListener("visibilitychange", onVisible); }
     return () => {
       if (--pollers === 0) { if (timer) clearTimeout(timer); timer = undefined; document.removeEventListener("visibilitychange", onVisible); }

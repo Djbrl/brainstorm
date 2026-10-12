@@ -5,9 +5,9 @@ import { useNavActions, useNavState } from "../lib/nav";
 import "./lens.css";
 
 export function LensSwitch({ inBar }: { inBar?: boolean } = {}) {
-  const { lens, replay } = useNavState();
+  const { lens, thread } = useNavState();
   const { setLens } = useNavActions();
-  if (!replay) return null; // views of one thread: they appear once a thread is open
+  if (!thread) return null; // views of one thread: they appear once a thread is open
   return (
     <div className={`lens-switch${inBar ? " in-bar" : ""}`} role="tablist" aria-label="View">
       <button role="tab" aria-selected={lens === "map"} onClick={() => setLens("map")}>Map</button>

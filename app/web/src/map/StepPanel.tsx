@@ -27,16 +27,16 @@ type StepPanelProps = {
 
 export function StepPanel({ header, back = "Back to the steps", onClose, follow = true }: StepPanelProps = {}) {
   const { loadSteps } = useLiveActions();
-  const { replay, step: stepId } = useNavState();
+  const { thread: openThread, step: stepId } = useNavState();
   const { showStep, closeStep } = useNavActions();
-  const index = useReplayCursor((c) => (replay ? c.index : undefined));
-  const sid = replay?.sessionId;
+  const index = useReplayCursor((c) => (openThread ? c.index : undefined));
+  const sid = openThread?.sessionId;
   const steps = useLiveSelector((s) => (sid ? s.steps[sid] : undefined));
   useEffect(() => { if (sid && stepId && !steps) loadSteps(sid); }, [sid, stepId, steps, loadSteps]);
-  const thread = useThread(sid ?? null, replay?.detail ?? "light");
+  const thread = useThread(sid ?? null, openThread?.detail ?? "light");
 
   // Follow the cursor: when the replay moves to another moment (scrolling the list, scrubbing), show its step.
-  const pending = !!replay?.atStep; // a step was just opened: the cursor is on its way there
+  const pending = !!openThread?.atStep; // a step was just opened: the cursor is on its way there
   const stepRef = useRef(stepId); stepRef.current = stepId;
   const lastIndex = useRef(index);
   useEffect(() => {

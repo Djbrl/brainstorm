@@ -19,9 +19,9 @@ import "../map/replay/replay.css"; // the row styles (.rp-list, .rp-m) it shares
 
 export function PlaceSteps() {
   const { data, selected } = usePlaces();
-  const { replay, step: stepId } = useNavState();
+  const { thread, step: stepId } = useNavState();
   const selectPlace = useSelectPlace();
-  const steps = useLiveSelector((st) => (replay ? st.steps[replay.sessionId] : undefined));
+  const steps = useLiveSelector((st) => (thread ? st.steps[thread.sessionId] : undefined));
   const stepById = useMemo(() => new Map((steps ?? []).map((x) => [x.id, x])), [steps]);
   const { rows, at, go } = usePlaceRows();
   const runs = rows.flatMap((r) => (r.run ? [r.run] : []));

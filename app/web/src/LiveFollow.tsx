@@ -11,19 +11,19 @@ import { useThread, type ReplayDetail, type Thread } from "./lib/thread";
  * The parts that build the thread are mounted only while they're needed.
  */
 export function LiveFollow() {
-  const { replay } = useNavState();
-  const sid = replay?.sessionId;
+  const { thread } = useNavState();
+  const sid = thread?.sessionId;
   const running = useLiveSelector((s) => !!sid && s.sessions.find((x) => x.id === sid)?.status === "running");
-  if (!replay) return null;
+  if (!thread) return null;
   // A step opened (a row, a link): the cursor lands on it first, on any lens, and only then may it follow live again.
-  if (replay.atStep) return <LandStep sessionId={replay.sessionId} detail={replay.detail} stepId={replay.atStep} />;
-  if (replay.live) return <FollowNewest sessionId={replay.sessionId} detail={replay.detail} />;
+  if (thread.atStep) return <LandStep sessionId={thread.sessionId} detail={thread.detail} stepId={thread.atStep} />;
+  if (thread.live) return <FollowNewest sessionId={thread.sessionId} detail={thread.detail} />;
   // Live is a state, not a switch: a running thread you bring back to its newest step (scrolling, stepping, playing)
   // follows it live again; moving off it is looking back.
   return (
     <>
-      <KeepCursor sessionId={replay.sessionId} detail={replay.detail} />
-      {running && <FollowAtEnd sessionId={replay.sessionId} detail={replay.detail} />}
+      <KeepCursor sessionId={thread.sessionId} detail={thread.detail} />
+      {running && <FollowAtEnd sessionId={thread.sessionId} detail={thread.detail} />}
     </>
   );
 }

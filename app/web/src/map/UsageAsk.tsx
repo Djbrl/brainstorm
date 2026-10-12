@@ -3,14 +3,14 @@
 // until the person answers yes (server usage/usage.service.ts). Saying no is as easy as saying yes, and Settings can
 // change it later. Not on a replay (the hosted demo, a shared file) or a development build, which never sends.
 import { useState } from "react";
-import { isReplay } from "../lib/live";
+import { isRecording } from "../lib/live";
 import { PRIVACY_URL, useUsageSetting } from "../lib/usage";
 import "./usage-ask.css";
 
 export function UsageAsk() {
   const { status, set } = useUsageSetting();
   const [done, setDone] = useState(false);
-  if (isReplay() || done || !status || status.asked || status.locked || !status.sends) return null;
+  if (isRecording() || done || !status || status.asked || status.locked || !status.sends) return null;
   const answer = (yes: boolean) => { set(yes); setDone(true); };
   return (
     <section className="usage-ask" role="region" aria-labelledby="usage-ask-title">

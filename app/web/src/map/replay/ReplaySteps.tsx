@@ -7,7 +7,7 @@
 // around what you see and around the cursor (every row is one line, the same height), with empty space standing in
 // for the rest, so the scroll bar, the follow and the center line work as if they were all there.
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { isReplay, useHarness, useLiveSelector } from "../../lib/live";
+import { isRecording, useHarness, useLiveSelector } from "../../lib/live";
 import { harnessName } from "../../lib/harness";
 import { useNavActions, useNavState, useReplayCursor } from "../../lib/nav";
 import { beatLabel, useThread, type Beat, type Thread } from "../../lib/thread";
@@ -107,11 +107,11 @@ const Moments = memo(function Moments({ beats, from, last, index, rowH, onPick, 
 });
 
 export function ReplaySteps() {
-  const { replay } = useNavState();
+  const { thread: openThread } = useNavState();
   const { setReplayIndex, setReplayPlaying, setReplayDetail, openStep } = useNavActions();
   const cursor = useReplayCursor();
-  const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
-  const sid = replay?.sessionId ?? null;
+  const thread = useThread(openThread?.sessionId ?? null, openThread?.detail ?? "light");
+  const sid = openThread?.sessionId ?? null;
   // Showing everyone: a subagent's moments carry its mark (one agent on its own needs none).
   const agents = useThreadAgents(sid), focus = useAgentFocus(sid), theme = useTheme();
   const whoOf = useMemo(() => {
@@ -119,20 +119,20 @@ export function ReplaySteps() {
     const by = new Map(agents.filter((a) => a.isSubagent).map((a) => [a.id, { name: a.name, color: agentColor(a, accent), letter: initial(a) }]));
     return (b: Beat): Who | undefined => (focus || !sid || !b.step.isSubagent ? undefined : by.get(streamOf(b.step, sid)));
   }, [agents, focus, sid, theme]);
-  if (!replay) return null;
+  if (!openThread) return null;
   if (!thread) return <div className="rp-steps"><p className="rp-quiet rp-pad"><Loading /></p></div>;
   if (!thread.beats.length) return <div className="rp-steps"><p className="rp-quiet rp-pad">This thread has no steps yet.</p></div>;
   const len = thread.beats.length;
   return (
-    <TrackList thread={thread} sessionId={replay.sessionId} whoOf={whoOf} index={Math.min(cursor.index, Math.max(0, len - 1))} playing={!!cursor.playing}
-      full={replay.detail === "full"} setReplayIndex={setReplayIndex} setReplayPlaying={setReplayPlaying} setReplayDetail={setReplayDetail} openStep={openStep} />
+    <TrackList thread={thread} sessionId={openThread.sessionId} whoOf={whoOf} index={Math.min(cursor.index, Math.max(0, len - 1))} playing={!!cursor.playing}
+      full={openThread.detail === "full"} setReplayIndex={setReplayIndex} setReplayPlaying={setReplayPlaying} setReplayDetail={setReplayDetail} openStep={openStep} />
   );
 }
 
 /** While the steps load; a recorded demo that has none for this thread says so. */
 function Loading() {
   const any = useLiveSelector((s) => s.sessions.length > 0);
-  return <>{isReplay() && any ? "No steps were recorded for this thread." : "Loading steps…"}</>;
+  return <>{isRecording() && any ? "No steps were recorded for this thread." : "Loading steps…"}</>;
 }
 
 type TrackProps = {
@@ -266,7 +266,7 @@ function WaitingRow({ sessionId, onOpen, hidden }: { sessionId: string; onOpen: 
   if (a?.state === "thinking") return <ThinkingRow since={a.since} />;
   if (!a || !(needsYou(a) || yourTurn(a))) {
     // At rest: the agent stopped (its marker stays where it last was on the map). Not while it's running.
-    if (!session || session.status === "running" || isReplay()) return null;
+    if (!session || session.status === "running" || isRecording()) return null;
     return (
       <div className="rp-waiting stopped" role="status">
         <b aria-hidden="true" />

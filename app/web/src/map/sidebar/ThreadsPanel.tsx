@@ -43,7 +43,7 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
   const now = clock();
   const allSessions = useLiveSelector((s) => s.sessions);
   const map = useLiveSelector((s) => s.map);
-  const { replay, hiddenAgents } = useNavState();
+  const { thread, hiddenAgents } = useNavState();
   const { toggleAgent, setHiddenAgents, startReplay } = useNavActions();
   const [all, setAll] = useState(false);
   // Sections you folded, remembered in this browser.
@@ -65,7 +65,7 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
 
   // Clicking a thread opens it at the end, on the lens you're on, and a running one keeps following its newest step.
   const select = (s: Session) => {
-    if (replay?.sessionId === s.id) { onShowThread?.(); return; } // the open thread: back to it
+    if (thread?.sessionId === s.id) { onShowThread?.(); return; } // the open thread: back to it
     const running = s.status === "running";
     startReplay(s.id, running ? 0 : END, { live: running });
     track("th");
@@ -85,14 +85,14 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
   }
   const groups = [...sections.values()].filter((g) => g.list.length);
   const SHORT = 5;
-  const cut = (list: Session[]) => (all || list.length <= SHORT + 1 ? list : list.filter((x, i) => i < SHORT || x.id === replay?.sessionId));
+  const cut = (list: Session[]) => (all || list.length <= SHORT + 1 ? list : list.filter((x, i) => i < SHORT || x.id === thread?.sessionId));
   const hidden = groups.reduce((n, g) => n + (closed.has(g.key) ? 0 : g.list.length - cut(g.list).length), 0);
 
   const row = (session: Session) => (
     <ThreadRow
       key={session.id}
       session={session}
-      selected={replay?.sessionId === session.id}
+      selected={thread?.sessionId === session.id}
       agents={agents.filter((a) => a.sessionId === session.id)}
       accent={accent}
       followId={followId}
@@ -111,7 +111,7 @@ export function ThreadsPanel({ agents, accent, followId, onFollow, onFocusFile, 
       {groups.map((g) => {
         const shut = closed.has(g.key);
         // Folded: only the open thread stays, so you still see where you are.
-        const list = shut ? g.list.filter((x) => x.id === replay?.sessionId) : cut(g.list);
+        const list = shut ? g.list.filter((x) => x.id === thread?.sessionId) : cut(g.list);
         return (
           <section key={g.key} className={`sidebar-thread-group${shut ? " shut" : ""}`}>
             <h3>

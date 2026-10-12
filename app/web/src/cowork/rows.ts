@@ -16,15 +16,15 @@ export type PlaceRow = { run?: PlaceRun; start: number; to: number; moments: num
  * in the steps, and which moment holds a step.
  */
 export function usePlaceTimeline() {
-  const { replay } = useNavState();
-  const sid = replay?.sessionId ?? null;
-  const light = useThread(sid, replay?.detail ?? "light");
+  const { thread } = useNavState();
+  const sid = thread?.sessionId ?? null;
+  const light = useThread(sid, thread?.detail ?? "light");
   const full = useThread(sid, "full");
   const index = useReplayCursor((c) => c.index);
   const stepOf = (id: string) => full?.stepBeat.get(id);
   /** The step the cursor is at, in the full thread's order (live: past the end). */
   let pos = Infinity;
-  if (!replay?.live && light && light.beats.length) {
+  if (!thread?.live && light && light.beats.length) {
     const b = light.beats[Math.min(index, light.beats.length - 1)], last = b.steps[b.steps.length - 1];
     pos = (last && full?.stepBeat.get(last.id)) ?? 0;
   }
@@ -33,10 +33,10 @@ export function usePlaceTimeline() {
 
 export function usePlaceRows() {
   const { data, row: picked } = usePlaces();
-  const { replay } = useNavState();
+  const { thread } = useNavState();
   const { full, light, index, pos, stepOf, steps } = usePlaceTimeline();
   const { setReplayIndex, setReplayPlaying } = useNavActions();
-  useLiveSelector((s) => (replay ? s.steps[replay.sessionId] : undefined));   // a new step: rows again
+  useLiveSelector((s) => (thread ? s.steps[thread.sessionId] : undefined));   // a new step: rows again
   const runs = data ? placeRuns(data.events) : [];
   const rows: PlaceRow[] = [];
   let prev = -1;
@@ -55,7 +55,7 @@ export function usePlaceRows() {
   // end of a running thread puts it back on live, and that's still the row you picked, not the last); live, the last
   // row; else the last row that starts by the cursor's step.
   if (picked && rows[picked.i] && picked.beat === index) at = picked.i;
-  else if (replay?.live) at = rows.length - 1;
+  else if (thread?.live) at = rows.length - 1;
   else for (let i = 0; i < rows.length; i++) if (rows[i].start <= pos) at = i;
   /** Go to a row: paused (by hand), or still playing (the player's own steps). The app's cursor goes to the moment
    *  holding its step. */

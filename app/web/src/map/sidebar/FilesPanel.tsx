@@ -38,16 +38,16 @@ export function FilesPanel({ map, onFocusFile, hidden = false }: {
 }) {
   useNow(20000);
   const now = clock();
-  const { replay } = useNavState();
+  const { thread: openThread } = useNavState();
   const shared = useLiveSelector((s) => !!s.shared);
-  const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
+  const thread = useThread(openThread?.sessionId ?? null, openThread?.detail ?? "light");
   const [search, setSearch] = useState("");
   const [touchedOnly, setTouchedOnly] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const built = useFileTree(map);
   const tree = built?.root ?? null;
-  const touched = replay ? thread?.touched ?? null : null;
+  const touched = openThread ? thread?.touched ?? null : null;
   // The box answers every key at once; the tree follows when there's time (typing never waits on a 20,000-file filter).
   const query = useDeferredValue(search);
   const filtering = query.trim().length > 0 || touchedOnly;
@@ -95,7 +95,7 @@ export function FilesPanel({ map, onFocusFile, hidden = false }: {
           {!!map.unread && `${map.unread.toLocaleString()} file${map.unread === 1 ? "" : "s"} took too long to read (kept only in the cloud?) and ${map.unread === 1 ? "isn't" : "aren't"} on the map.`}
         </p>
       )}
-      {replay && (
+      {openThread && (
         <button className={`sidebar-chip ${touchedOnly ? "active" : ""}`} aria-pressed={touchedOnly} onClick={() => setTouchedOnly((v) => !v)}>
           Touched by this thread
         </button>

@@ -2,7 +2,7 @@
 // counts and sends one report a day, if the setting is on. A replay (the hosted demo, a shared file) counts nothing.
 import { useCallback, useEffect, useState } from "react";
 import type { UpdatesStatus, UsageStatus } from "@contract";
-import { isReplay } from "./live";
+import { isRecording } from "./live";
 import { getTheme } from "./theme";
 import { get, post, put } from "./api";
 
@@ -10,7 +10,7 @@ type WebEvent = "op" | "th" | "rp" | "lv";
 
 /** One use: app opened (with the theme in use), thread opened, replay played, live follow. Fire and forget. */
 export function track(name: WebEvent) {
-  if (isReplay()) return;
+  if (isRecording()) return;
   post("/api/usage/event", name === "op" ? { name, theme: getTheme() } : { name }, { keepalive: true }).catch(() => { /* offline or an older server: nothing to do */ });
 }
 
@@ -24,7 +24,7 @@ export const PRIVACY_URL = "https://brainstorm-landing.vercel.app/privacy.html#u
 export function useUsageSetting() {
   const [status, setStatus] = useState<UsageStatus | null>(null);
   useEffect(() => {
-    if (isReplay()) return;
+    if (isRecording()) return;
     get<UsageStatus>("/api/usage").then(setStatus, () => setStatus(null));
   }, []);
   const set = useCallback((enabled: boolean) => {
@@ -42,7 +42,7 @@ export function useUsageSetting() {
 export function useUpdatesSetting() {
   const [status, setStatus] = useState<UpdatesStatus | null>(null);
   useEffect(() => {
-    if (isReplay()) return;
+    if (isRecording()) return;
     get<UpdatesStatus>("/api/updates").then(setStatus, () => setStatus(null));
   }, []);
   const toggle = useCallback(() => {

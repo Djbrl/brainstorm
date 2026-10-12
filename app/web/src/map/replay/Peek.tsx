@@ -191,7 +191,7 @@ function PeekBody({ sessionId, detail }: { sessionId: string; detail: Thread["de
 /** Mounted by MapView. Shown while a thread on the map is followed live or replayed, unless turned off in Settings. */
 export function Peek() {
   const on = useShowFile();
-  const { replay, step, lens } = useNavState();
-  if (!on || !replay || step || lens !== "map" || !(replay.live || replay.mode === "play")) return null;
-  return <PeekBody sessionId={replay.sessionId} detail={replay.detail} />;
+  const { thread, step, lens } = useNavState();
+  if (!on || !thread || step || lens !== "map" || !(thread.live || thread.mode === "play")) return null;
+  return <PeekBody sessionId={thread.sessionId} detail={thread.detail} />;
 }

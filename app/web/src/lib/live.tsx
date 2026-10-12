@@ -309,7 +309,7 @@ export function createLiveStore(start: LiveState = initial): LiveStore {
   const catching = new Map<string, boolean>();
   let generation = 0; // bumps on reload: answers for the previous workspace are dropped
   const loadSteps = (sessionId: string) => {
-    if (isReplay() || loading.has(sessionId)) return;
+    if (isRecording() || loading.has(sessionId)) return;
     loading.add(sessionId);
     const gen = generation;
     get<Step[]>(`/api/sessions/${encodeURIComponent(sessionId)}/steps`)
@@ -324,7 +324,7 @@ export function createLiveStore(start: LiveState = initial): LiveStore {
       });
   };
   const catchUp = (sessionId: string) => {
-    if (isReplay() || loading.has(sessionId) || !state.steps[sessionId]) return;
+    if (isRecording() || loading.has(sessionId) || !state.steps[sessionId]) return;
     if (catching.has(sessionId)) { catching.set(sessionId, true); return; }
     catching.set(sessionId, false);
     const gen = generation;
@@ -339,7 +339,7 @@ export function createLiveStore(start: LiveState = initial): LiveStore {
       });
   };
   let loadedRoot: string | null | undefined; // the project the data was loaded for (undefined: not known yet)
-  const reload = () => { if (isReplay()) return; generation++; loadedRoot = undefined; loading.clear(); early.clear(); catching.clear(); dispatch({ type: "reset" }); loadAll(store); };
+  const reload = () => { if (isRecording()) return; generation++; loadedRoot = undefined; loading.clear(); early.clear(); catching.clear(); dispatch({ type: "reset" }); loadAll(store); };
   const checkRoot = (root: string | null) => {
     if (loadedRoot !== undefined && root !== loadedRoot && root) reload(); // another project than the one shown
     else if (loadedRoot === undefined || root) loadedRoot = root;
@@ -372,7 +372,7 @@ function embeddedReplay(): Replay | null {
 }
 let replayMode: boolean | undefined;
 /** A recording (hosted demo or shared file) rather than the live app. Read once, then a constant. */
-export const isReplay = () => (replayMode ??= !!embeddedReplay() || !!replayUrl());
+export const isRecording = () => (replayMode ??= !!embeddedReplay() || !!replayUrl());
 
 let replayData: Replay | null = null;
 /** Places of a recorded thread (the hosted demos have no server to ask). */

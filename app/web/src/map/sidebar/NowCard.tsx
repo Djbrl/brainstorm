@@ -22,16 +22,16 @@ const ROW_H = 31;   // a row and the gap under it (sidebar.css .sn-m): how far t
 const SLIDE_MS = 170;
 
 export function NowCard({ onOpen }: { onOpen: () => void }) {
-  const { replay } = useNavState();
-  const sid = replay?.sessionId ?? null;
-  const thread = useThread(sid, replay?.detail ?? "light");
+  const { thread: openThread } = useNavState();
+  const sid = openThread?.sessionId ?? null;
+  const thread = useThread(sid, openThread?.detail ?? "light");
   const index = useReplayCursor((c) => c.index);
   const running = useLiveSelector((s) => !!sid && s.sessions.find((x) => x.id === sid)?.status === "running");
   const attn = useLiveSelector((s) => (sid ? s.attention[sid] : undefined));
   const { setReplayIndex, setThreadMode, setReplayPlaying } = useNavActions();
 
   // Going to a moment by hand (the wheel, the line): into the replay, paused there.
-  const now = useRef({ len: 0, mode: replay?.mode }); now.current = { len: thread?.beats.length ?? 0, mode: replay?.mode };
+  const now = useRef({ len: 0, mode: openThread?.mode }); now.current = { len: thread?.beats.length ?? 0, mode: openThread?.mode };
   const go = useRef((_to: (i: number) => number) => {});
   go.current = (to) => {
     const { len, mode } = now.current;
@@ -59,7 +59,7 @@ export function NowCard({ onOpen }: { onOpen: () => void }) {
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [!!replay]);
+  }, [!!openThread]);
   const beats = thread?.beats ?? [];
   const at = Math.min(index, beats.length - 1);
   // Always the same four rows (fewer only in a thread that short), so the card keeps its height as you scroll: the
@@ -77,7 +77,7 @@ export function NowCard({ onOpen }: { onOpen: () => void }) {
     el.getAnimations().forEach((a) => a.cancel());
     el.animate([{ transform: `translateY(${d * ROW_H}px)` }, { transform: "none" }], { duration: SLIDE_MS, easing: "cubic-bezier(.2,.7,.25,1)" });
   }, [start]);
-  if (!replay) return null;
+  if (!openThread) return null;
 
   const rows = shown ? Array.from({ length: shown[1] - shown[0] }, (_, k) => start + k) : [];
   const working = running && !needsYou(attn) && !yourTurn(attn);

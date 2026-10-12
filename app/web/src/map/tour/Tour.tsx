@@ -23,8 +23,8 @@ export function Tour() {
   const { loadSteps } = useLiveActions();
   const sessions = useLiveSelector((s) => s.sessions);
   const actions = useNavActions();
-  const { replay, lens } = useNavState();
-  const nav = { ...actions, replay, lens };
+  const { thread, lens } = useNavState();
+  const nav = { ...actions, thread, lens };
   const usage = useUsageSetting();
   useEffect(() => { tourStore.load(); }, []);
 
@@ -74,12 +74,12 @@ export function Tour() {
     const timers: ReturnType<typeof setTimeout>[] = [];
     const narrow = matches(NARROW);
     switch (step) {
-      case "hello": n.closeStep(); if (n.replay) n.stopReplay(); if (n.lens !== "map") n.setLens("map"); break;
-      case "threads": n.closeStep(); if (n.replay) n.stopReplay(); sidebar({ open: true, tab: "threads" }); break;
-      case "steps": if (latest && n.replay?.sessionId !== latest.id) n.startReplay(latest.id, END); n.closeStep(); sidebar({ open: true, tab: "threads" }); break;
+      case "hello": n.closeStep(); if (n.thread) n.stopReplay(); if (n.lens !== "map") n.setLens("map"); break;
+      case "threads": n.closeStep(); if (n.thread) n.stopReplay(); sidebar({ open: true, tab: "threads" }); break;
+      case "steps": if (latest && n.thread?.sessionId !== latest.id) n.startReplay(latest.id, END); n.closeStep(); sidebar({ open: true, tab: "threads" }); break;
       case "step": if (latest && shown) n.openStep(latest.id, shown.id); break;
       case "files": n.closeStep(); sidebar({ open: true, tab: "files" }); break;
-      case "map": n.closeStep(); if (n.replay) n.stopReplay(); sidebar({ tab: "threads", ...(narrow ? { open: false } : {}) }); break;
+      case "map": n.closeStep(); if (n.thread) n.stopReplay(); sidebar({ tab: "threads", ...(narrow ? { open: false } : {}) }); break;
       default: break;
     }
     return () => timers.forEach(clearTimeout);

@@ -8,7 +8,7 @@
 import { useEffect, useMemo } from "react";
 import type { AgentPresence, FileNode, ProjectMap, Session, Step } from "@contract";
 import { outOfWorktree } from "@shared/paths";
-import { isReplay } from "./live";
+import { isRecording } from "./live";
 import { repoBase, repoRelative } from "./paths";
 import { get } from "./api";
 import { createAtom } from "./store";
@@ -73,7 +73,7 @@ export const isPlaceRoot = (root: string) => placeNames.has(root);
 const roots = createAtom<string[] | null>(null);
 let asked = false;
 function loadRoots() {
-  if (asked || isReplay()) return;
+  if (asked || isRecording()) return;
   asked = true;
   get<{ root: string }[]>("/api/workspace/suggestions")
     .then((list) => roots.set(list.map((s) => s.root.replace(/\/+$/, "")).sort((a, b) => b.length - a.length)))

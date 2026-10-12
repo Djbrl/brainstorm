@@ -1,7 +1,7 @@
 // Every call to the local server goes through here: one place that checks the answer and turns a failure into an
 // ApiError the page can show in plain words (the setup view, the crash screen).
 import type { AskRequest, AskResponse } from "@contract";
-import { replayAnswer, isReplay } from "./live";
+import { replayAnswer, isRecording } from "./live";
 
 /** A request that failed: the server said no (`status`), or it couldn't be reached (`status` 0). */
 export class ApiError extends Error {
@@ -60,6 +60,6 @@ export const errorWords = (e: unknown, fallback: string) =>
   e instanceof ApiError ? (e.said ?? (e.status ? fallback : e.message)) : e instanceof Error && e.message ? e.message : fallback;
 
 export async function ask(req: AskRequest): Promise<AskResponse> {
-  if (isReplay()) return replayAnswer(req);
+  if (isRecording()) return replayAnswer(req);
   return post<AskResponse>("/api/ask", req);
 }

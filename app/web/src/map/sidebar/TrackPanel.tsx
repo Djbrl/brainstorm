@@ -12,15 +12,15 @@ import { agentColor, initial, inkOn } from "../agents";
 import { readTokens } from "../color";
 import { ReplaySteps } from "../replay/ReplaySteps";
 import { ShareMenu } from "../replay/ReplayBar";
-import { isReplay } from "../../lib/live";
+import { isRecording } from "../../lib/live";
 import { PlaceSteps } from "../../cowork/PlaceSteps";
 
 export function TrackPanel({ onBack }: { onBack?: () => void }) {
   const nav = useNavActions();
-  const { replay, lens } = useNavState();
-  const sid = replay?.sessionId;
+  const { thread, lens } = useNavState();
+  const sid = thread?.sessionId;
   const session = useLiveSelector((s) => (sid ? s.sessions.find((x) => x.id === sid) : undefined));
-  if (!replay) return null;
+  if (!thread) return null;
   return (
     <div className="sidebar-track">
       <div className="track-head">
@@ -30,11 +30,11 @@ export function TrackPanel({ onBack }: { onBack?: () => void }) {
           </button>
         )}
         <h2 className="sidebar-track-title" title={session?.title}>{session?.title || "Untitled thread"}</h2>
-        {!isReplay() && <ShareMenu sessionId={replay.sessionId} className="track-share" />}
+        {!isRecording() && <ShareMenu sessionId={thread.sessionId} className="track-share" />}
       </div>
       {lens !== "places" && <AgentPicker title={session?.title} />}
       {lens === "places" ? <PlaceSteps /> : <ReplaySteps />}
-      {session?.status === "running" && !replay.live && replay.mode !== "play" && <BackToLive onBack={() => nav.setReplayLive(true)} />}
+      {session?.status === "running" && !thread.live && thread.mode !== "play" && <BackToLive onBack={() => nav.setReplayLive(true)} />}
     </div>
   );
 }
@@ -55,8 +55,8 @@ function BackToLive({ onBack }: { onBack: () => void }) {
 /** Everyone, or one agent's steps on their own (the map then shows only that agent's files). Only with subagents. */
 function AgentPicker({ title }: { title?: string }) {
   const nav = useNavActions();
-  const { replay } = useNavState();
-  const sid = replay?.sessionId ?? null;
+  const { thread } = useNavState();
+  const sid = thread?.sessionId ?? null;
   const agents = useThreadAgents(sid);
   const focus = useAgentFocus(sid);
   const steps = useLiveSelector((s) => (sid ? s.steps[sid] : undefined));
@@ -75,7 +75,7 @@ function AgentPicker({ title }: { title?: string }) {
     measure();
   }, [focus, agents.length]);
   if (agents.length < 2) return null;
-  const pick = (id: string | null) => focusAgent(nav, replay, steps, id === focus ? null : id);
+  const pick = (id: string | null) => focusAgent(nav, thread, steps, id === focus ? null : id);
   return (
     <div className={`track-agents${more.left ? " more-left" : ""}${more.right ? " more-right" : ""}`} role="radiogroup" aria-label="Whose steps"
       ref={row} onScroll={measure} onWheel={(e) => { const el = row.current; if (el && Math.abs(e.deltaY) > Math.abs(e.deltaX)) el.scrollLeft += e.deltaY; }}>

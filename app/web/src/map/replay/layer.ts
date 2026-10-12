@@ -22,7 +22,7 @@ export type { Look } from "./focus";
 export { togglePlay } from "./playback";
 
 export type ReplayLayerApi = {
-  /** True while a thread replay is on (nav.replay is set and its thread is loaded). */
+  /** True while a thread replay is on (nav.thread is set and its thread is loaded). */
   active: boolean;
   /** Alpha for a node during replay: 1 = normal, lower = dimmed (not touched by the thread). */
   nodeAlpha: (id: string) => number;

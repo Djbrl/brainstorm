@@ -1,7 +1,7 @@
 // The shell: the header with where you are (project › thread › step), and the view for that place.
 // Each part reads only the slices it shows (useLiveSelector, useNavState), so a live message or a replay cursor move
 // re-renders the parts that changed, not the whole app.
-import { isReplay, shallowEqual, useLiveActions, useLiveSelector, useHarness, useLiveStep } from "./lib/live";
+import { isRecording, shallowEqual, useLiveActions, useLiveSelector, useHarness, useLiveStep } from "./lib/live";
 import { harnessName } from "./lib/harness";
 import { END, NavProvider, useNavActions, useNavState } from "./lib/nav";
 import { displayLabel } from "./follow/format";
@@ -35,23 +35,23 @@ const PlacesView = lazy(() => import("./cowork/CoworkView").then((m) => ({ defau
 
 /** Project › Thread › Step: each part takes you back up to it. */
 function Crumbs({ project }: { project: string }) {
-  const { replay, step } = useNavState();
+  const { thread, step } = useNavState();
   const { stopReplay, closeStep, setThreadMode } = useNavActions();
-  const sid = replay?.sessionId;
+  const sid = thread?.sessionId;
   const title = useLiveSelector((s) => (sid ? s.sessions.find((x) => x.id === sid)?.title : undefined));
   const codex = useHarness(sid) === "codex";
-  const st = useLiveStep(replay && step ? step : null);
+  const st = useLiveStep(thread && step ? step : null);
   return (
     <nav className="crumbs" aria-label="Where you are">
       {/* No project name (the server out of reach): no empty crumb. */}
-      {project && (replay ? <button onClick={stopReplay}>{project}</button> : <span aria-current="page">{project}</span>)}
-      {replay && <>
+      {project && (thread ? <button onClick={stopReplay}>{project}</button> : <span aria-current="page">{project}</span>)}
+      {thread && <>
         {project && <span className="sep" aria-hidden="true">›</span>}
         {step ? <button onClick={closeStep}>{title || "Thread"}</button>
           : <button className="here" aria-current="page" onClick={() => setThreadMode("steps")}>{title || "Thread"}</button>}
         {codex && <span className="crumb-harness" title="This thread ran in Codex">Codex</span>}
       </>}
-      {replay && step && <>
+      {thread && step && <>
         <span className="sep" aria-hidden="true">›</span>
         <span className="here" aria-current="page" title={st && st.sessionId === sid ? displayLabel(st) : undefined}>{st && st.sessionId === sid ? <LinkedLabel text={displayLabel(st)} max={36} /> : "Step"}</span>
       </>}
@@ -69,9 +69,9 @@ function AttentionAlerts() {
 function Shell() {
   useEffect(() => { track("op"); }, []); // one "app opened" for the usage stats (counts nothing in a replay)
   const { reload } = useLiveActions();
-  const { lens, replay, file, step, focusFile } = useNavState();
+  const { lens, thread, file, step, focusFile } = useNavState();
   const { back, stopReplay, selectFile, setFocusFile } = useNavActions();
-  const replayId = replay?.sessionId ?? null;
+  const replayId = thread?.sessionId ?? null;
   const state = useLiveSelector((s) => ({
     replay: s.replay, preview: s.preview, shared: s.shared, connected: s.connected, setup: s.setup,
     sharedBy: s.shared ? s.sessions[0]?.harness ?? "claude" : null, // a shared replay holds one thread
@@ -103,7 +103,7 @@ function Shell() {
   const kind = kindOf({ replay: state.replay, preview: state.preview, shared: !!state.shared });
   const screen = screenOf({
     kind, booting, picking, setupOpen, noProject: !!state.setup && !state.setup.root, offline, hasMap: state.hasMap,
-    thread: !!replay, missing: state.missing, lens,
+    thread: !!thread, missing: state.missing, lens,
   });
   const local = kind === "local";
 
@@ -120,18 +120,18 @@ function Shell() {
   // The logo: home, the project as it opens (no thread, file or step), as if Esc were pressed until nothing is left to
   // close; already there, the page loads again.
   const goHome = () => {
-    if (!replay && !file && !step && !focusFile && lens === "map") { location.reload(); return; }
+    if (!thread && !file && !step && !focusFile && lens === "map") { location.reload(); return; }
     stopReplay(); selectFile(null); setFocusFile(null);
   };
 
   return (
     <div className={`shell ${kind === "preview" || kind === "shared" ? "has-banner" : ""}`}>
       <header className="topbar">
-        {isReplay()
+        {isRecording()
           ? <a className="wordmark" href="https://brainstorm-landing.vercel.app" aria-label="Rundown home"><Logo label="Rundown home" /></a>
           : <button className="wordmark" onClick={goHome} aria-label="Home" title="Home"><Logo /></button>}
         {!local ? <Crumbs project={project || (kind === "shared" ? "The whole map" : "")} /> : <div className="topbar-space" />}
-        {kind === "shared" && replay && <PlayButton />}
+        {kind === "shared" && thread && <PlayButton />}
         <div className="status">
           {local && <Elsewhere />}
           {kind === "preview" && (
@@ -172,8 +172,8 @@ function Shell() {
       {kind === "shared" && <OpenShared />}
       <LiveFollow />
       {/* The hosted demo keeps its one welcome card; your own Rundown has the tour (its last step asks about usage stats). */}
-      {isReplay() ? !replay && kind !== "shared" && <Welcome /> : kind !== "shared" && kind !== "preview" && <><Tour /><AfterTour /></>}
-      <main className="view"><Crashed where="the map" key={`${replay?.sessionId ?? ""}|${lens}`}><Suspense fallback={<Loading />}>{
+      {isRecording() ? !thread && kind !== "shared" && <Welcome /> : kind !== "shared" && kind !== "preview" && <><Tour /><AfterTour /></>}
+      <main className="view"><Crashed where="the map" key={`${thread?.sessionId ?? ""}|${lens}`}><Suspense fallback={<Loading />}>{
         screen === "offline" ? <Offline />
           : screen === "missing" ? <MissingThread onBack={stopReplay} />
           : screen === "places" ? <PlacesView />
@@ -188,7 +188,7 @@ function Shell() {
  * Gives up after a while so a server that doesn't answer shows the app (and its "Connecting…") instead.
  */
 function useBooting(): boolean {
-  const ready = useLiveSelector((s) => (isReplay() ? s.replay : !!s.setup && (!s.setup.root || !!s.map)));
+  const ready = useLiveSelector((s) => (isRecording() ? s.replay : !!s.setup && (!s.setup.root || !!s.map)));
   const [waited, setWaited] = useState(false);
   useEffect(() => { if (ready) return; const t = setTimeout(() => setWaited(true), 8000); return () => clearTimeout(t); }, [ready]);
   return !ready && !waited;
@@ -215,14 +215,14 @@ function Loading() {
 /** A shared replay holds one thread: it opens on that thread's footprint (unless its link names a place). */
 function OpenShared() {
   const first = useLiveSelector((s) => s.sessions[0]?.id);
-  const { replay } = useNavState();
+  const { thread } = useNavState();
   const { startReplay } = useNavActions();
   const done = useRef(false);
   useEffect(() => {
     if (!first || done.current) return;
     done.current = true;
-    if (!replay) startReplay(first, 0);
-  }, [first, replay, startReplay]);
+    if (!thread) startReplay(first, 0);
+  }, [first, thread, startReplay]);
   return null;
 }
 

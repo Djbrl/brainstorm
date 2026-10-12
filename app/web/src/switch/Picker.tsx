@@ -17,7 +17,7 @@ export function Picker({ onClose }: { onClose: () => void }) {
   const sessions = useLiveSelector((s) => s.sessions);
   const attention = useLiveSelector((s) => s.attention);
   const elsewhere = useElsewhere();
-  const { replay } = useNavState();
+  const { thread } = useNavState();
   const nav = useNavActions();
   const { reload } = useLiveActions();
   const [q, setQ] = useState("");
@@ -43,7 +43,7 @@ export function Picker({ onClose }: { onClose: () => void }) {
   const choose = (it: Item | undefined) => {
     if (!it) return;
     onClose();
-    if (it.kind === "here") { if (it.s.id !== replay?.sessionId) openThread(nav, it.s); }
+    if (it.kind === "here") { if (it.s.id !== thread?.sessionId) openThread(nav, it.s); }
     else jumpElsewhere(it.t, nav, reload).catch(() => {});
   };
 
@@ -73,7 +73,7 @@ export function Picker({ onClose }: { onClose: () => void }) {
               {i === firstElse && <h3 className="picker-head">In your other projects</h3>}
               <button id={`picker-${i}`} data-i={i} role="option" aria-selected={i === at} className={`picker-item ${i === at ? "on" : ""}`}
                 onPointerMove={() => setAt(i)} onClick={() => choose(it)}>
-                {it.kind === "here" ? <HereRow s={it.s} open={it.s.id === replay?.sessionId} a={attention[it.s.id]} now={now} /> : <ElseRow t={it.t} />}
+                {it.kind === "here" ? <HereRow s={it.s} open={it.s.id === thread?.sessionId} a={attention[it.s.id]} now={now} /> : <ElseRow t={it.t} />}
               </button>
             </li>
           ))}

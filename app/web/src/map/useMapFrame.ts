@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useRef, type RefObject } from "react";
 import type { NodeObject, ForceGraphMethods } from "react-force-graph-2d";
 import type { FileNode } from "@contract";
-import { clock, isReplay } from "../lib/live";
+import { clock, isRecording } from "../lib/live";
 import { sinceMs } from "../lib/visit";
 import { mapPrefs } from "../lib/nav";
 import { tourHidesExtras } from "../lib/tour";
@@ -23,7 +23,7 @@ import type { Size } from "../lib/hooks";
 
 /** A recording (the hosted demo) or a shared replay: fixed for the page's life, read once (it parses the URL). */
 let replayed: boolean | undefined;
-const recorded = () => (replayed ??= isReplay());
+const recorded = () => (replayed ??= isRecording());
 
 /** What the frame reads from the view, as of its last render (MapView's useLatest). */
 export type FrameInputs = {

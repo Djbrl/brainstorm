@@ -14,7 +14,7 @@
 // The state lives in a small external store; every action changes it in one step. Reading it:
 //   useNavActions()           every setter (startReplay, openStep, back…). Never changes, so it never re-renders you.
 //   useNavState()             where you are (thread, step, file, lens, hidden agents, reads) without the replay cursor:
-//                             its `replay` has no `index`/`playing`. Moving through a replay doesn't re-render you.
+//                             its `thread` has no `index`/`playing`. Moving through a replay doesn't re-render you.
 //   useReplayCursor(sel?)     the cursor { index, playing }, or a slice of it (e.g. c => c.index === 0).
 //   useNavSelector(sel, eq?)  any slice of the raw state.
 //   useReplay()               the open thread with its cursor: renders again as the cursor moves (the views that draw it).
@@ -59,7 +59,7 @@ type Nav = {
   selectFile: (rel: string | null) => void;
 
   /** The open thread, or null on the project overview. */
-  replay: ThreadReplay | null;
+  thread: ThreadReplay | null;
   /** Open a thread: its steps unless `mode` says otherwise, landing on a beat index or on the beat holding a step id. `live` follows its newest step; `lens` switches the view too. */
   startReplay: (sessionId: string, at?: number | string, opts?: { live?: boolean; mode?: ThreadMode; lens?: Lens }) => void;
   /** Show more or less of the open thread (steps → play). */
@@ -123,7 +123,7 @@ export type NavData = {
   showReads: boolean;
 };
 /** Where you are, without the replay cursor. */
-export type NavState = Omit<NavData, "thread" | "cursor" | "cursorStep"> & { replay: OpenThread | null };
+export type NavState = Omit<NavData, "cursor" | "cursorStep">;
 
 type NavStore = {
   get: () => NavData;
@@ -183,7 +183,7 @@ function readPlace(): Place {
 const hrefFor = (p: Place) => (hashMode ? `${location.pathname}${keptQuery()}#${pathFor(p)}` : `${pathFor(p)}${keptQuery()}`);
 const hereHref = () => (hashMode ? `${location.pathname}${location.search}${location.hash || "#/"}` : `${location.pathname}${location.search}`);
 
-/** The open thread with its cursor, as Nav's `replay`. */
+/** The open thread with its cursor, as Nav's `thread`. */
 const joinReplay = (t: OpenThread | null, c: ReplayCursor): ThreadReplay | null => (t ? { ...t, index: c.index, playing: c.playing } : null);
 
 function createNavStore(): NavStore {
@@ -340,7 +340,7 @@ export function useNavSelector<T>(select: (d: NavData) => T, eq?: (a: T, b: T) =
   return useStoreSelector(useStore(), select, eq);
 }
 
-const placeOf = (d: NavData): NavState => ({ focusFile: d.focusFile, file: d.file, step: d.step, lens: d.lens, replay: d.thread, hiddenAgents: d.hiddenAgents, showReads: d.showReads });
+const placeOf = (d: NavData): NavState => ({ focusFile: d.focusFile, file: d.file, step: d.step, lens: d.lens, thread: d.thread, hiddenAgents: d.hiddenAgents, showReads: d.showReads });
 /** Where you are, without the replay cursor: moving through a replay doesn't re-render you. */
 export function useNavState(): NavState {
   return useStoreSelector(useStore(), placeOf, shallowEqual);

@@ -1,7 +1,7 @@
 // The first visit: one card that says what you're looking at, and one choice. Nothing plays until you
 // ask for it. Shown once per browser (and on the hosted demo, once per visitor).
 import { useRef, useState } from "react";
-import { isReplay, useLiveSelector } from "../lib/live";
+import { isRecording, useLiveSelector } from "../lib/live";
 import { useNavActions } from "../lib/nav";
 import { useDialogFocus } from "../lib/useDialogFocus";
 import { markWelcomed, welcomed } from "../lib/visit";
@@ -24,7 +24,7 @@ export function Welcome() {
     startReplay(latest.id, 0, { mode: "play" });
     setReplayPlaying(true);
   };
-  const demo = isReplay();
+  const demo = isRecording();
   return (
     <div className="welcome" role="dialog" aria-modal="true" aria-labelledby="welcome-title" tabIndex={-1} ref={card}>
       <h2 id="welcome-title">{demo ? "A recorded thread" : "This is your project"}</h2>

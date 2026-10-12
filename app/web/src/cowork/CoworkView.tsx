@@ -24,13 +24,13 @@ import "./cowork.css";
 const PLACE_MS = 1100;   // a place's time on the player, at 1×
 
 export function PlacesView() {
-  const { replay, step: navStep } = useNavState();
+  const { thread, step: navStep } = useNavState();
   const { setLens, openStep, setReplayPlaying, setThreadMode } = useNavActions();
-  const session = useLiveSelector((s) => s.sessions.find((x) => x.id === replay?.sessionId));
+  const session = useLiveSelector((s) => s.sessions.find((x) => x.id === thread?.sessionId));
   const running = session?.status === "running";
   const connected = useLiveSelector((s) => s.connected);
   const agents = useLiveSelector((s) => s.agents), map = useLiveSelector((s) => s.map);
-  const { data, error } = useCowork(replay?.sessionId ?? null, running, connected); // a recording is "connected" once loaded
+  const { data, error } = useCowork(thread?.sessionId ?? null, running, connected); // a recording is "connected" once loaded
   const { selected, highlight, row: pickedRow } = usePlaces();
   const selectPlace = useSelectPlace();
 
@@ -39,7 +39,7 @@ export function PlacesView() {
   const stepId = navStep;
   const navRef = useRef({ setReplayPlaying, setThreadMode });
   navRef.current = { setReplayPlaying, setThreadMode };
-  useEffect(() => { placesStore.set({ data, selected: null, highlight: null }); }, [replay?.sessionId, !!data]);
+  useEffect(() => { placesStore.set({ data, selected: null, highlight: null }); }, [thread?.sessionId, !!data]);
   useEffect(() => { if (data) placesStore.set({ data }); }, [data]);
   useEffect(() => () => placesStore.set({ data: null, selected: null, highlight: null }), []);
   // The app's step, with its place picked if the one picked doesn't hold it (a link opens on its place).
@@ -52,7 +52,7 @@ export function PlacesView() {
   }, [navStep, !!data]);
 
   // The step in the panel (StepPanel shows it), and the other steps in the same place (to step through them).
-  const steps = useLiveSelector((s) => (replay ? s.steps[replay.sessionId] : undefined));
+  const steps = useLiveSelector((s) => (thread ? s.steps[thread.sessionId] : undefined));
   const step = stepId ? steps?.find((s) => s.id === stepId) : undefined;
   const here = data && selected ? [...new Set(eventsAt(data, selected).map((e) => e.stepId))] : [];
   const pos = stepId ? here.indexOf(stepId) : -1;
@@ -69,26 +69,26 @@ export function PlacesView() {
   // in the player ← → go one place back or forward, Home and End the first and the last ----
   const { rows, at, go } = usePlaceRows();
   const playing = useReplayCursor((c) => c.playing);
-  const now = useRef({ rows, at, go, playing, replay }); now.current = { rows, at, go, playing, replay };
+  const now = useRef({ rows, at, go, playing, thread }); now.current = { rows, at, go, playing, thread };
   useEffect(() => {
-    if (!playing || !replay) return;
+    if (!playing || !thread) return;
     if (at >= rows.length - 1) { navRef.current.setReplayPlaying(false); return; }
-    const t = setTimeout(() => now.current.go(now.current.at + 1, true), PLACE_MS / (replay.speed ?? 1));
+    const t = setTimeout(() => now.current.go(now.current.at + 1, true), PLACE_MS / (thread.speed ?? 1));
     return () => clearTimeout(t);
-  }, [playing, at, rows.length, replay?.speed]);
+  }, [playing, at, rows.length, thread?.speed]);
   useShortcut("play", (e) => {
-    const { rows: rs, at: i, go: to, playing: p, replay: r } = now.current;
+    const { rows: rs, at: i, go: to, playing: p, thread: r } = now.current;
     if (!r || !rs.length || (e?.target as HTMLElement | null)?.tagName === "BUTTON") return false;
     if (r.mode !== "play") navRef.current.setThreadMode("play");
     togglePlay(p, navRef.current.setReplayPlaying, i >= rs.length - 1, () => to(0));   // at the end: from the start
   });
   useShortcut("player.step", (e) => {
-    const { rows: rs, at: i, go: to, replay: r } = now.current;
+    const { rows: rs, at: i, go: to, thread: r } = now.current;
     if (!e || !r || !rs.length || r.mode !== "play") return false;
     to(e.key === "ArrowLeft" ? Math.max(0, i - 1) : Math.min(rs.length - 1, i + 1));
   });
   useShortcut("player.ends", (e) => {
-    const { rows: rs, go: to, replay: r } = now.current;
+    const { rows: rs, go: to, thread: r } = now.current;
     if (!e || !r || !rs.length || r.mode !== "play") return false;
     to(e.key === "Home" ? 0 : rs.length - 1);
   });
@@ -96,23 +96,23 @@ export function PlacesView() {
   return (
     <div className="map-wrap cw-wrap">
       {data && data.events.length > 0 && (
-        <PlacesMap key={replay?.sessionId} data={data} selected={selected} highlight={highlight} rightInset={step ? 440 : 0}
+        <PlacesMap key={thread?.sessionId} data={data} selected={selected} highlight={highlight} rightInset={step ? 440 : 0}
           onSelect={(id) => (id === HOME ? setLens("map") : selectPlace(id))} small={small} beatOf={beatOf} beats={timeline.steps}
           cursor={pickedRow && pickedRow.beat === timeline.index ? pickedRow.step : timeline.pos}
-          until={pickedRow && pickedRow.beat === timeline.index ? pickedRow.event : undefined} live={!!replay?.live}
+          until={pickedRow && pickedRow.beat === timeline.index ? pickedRow.event : undefined} live={!!thread?.live}
           letter={initial({ name: session?.title ?? "", isSubagent: false })} />
       )}
       <MapSidebar agents={Object.values(agents)} accent="#2563eb" followId={null} onFollow={() => setLens("map")} onFocusFile={() => setLens("map")} map={map} />
       <LensSwitch />
       {data && rows.length > 0 && <Dock steps={{ at, count: rows.length, go, noun: "place" }} />}
-      {!replay && <p className="cw-note">Pick a thread to see where it went outside the code.</p>}
-      {replay && error && <p className="cw-note">The places couldn't load. Check that Rundown is still running.</p>}
+      {!thread && <p className="cw-note">Pick a thread to see where it went outside the code.</p>}
+      {thread && error && <p className="cw-note">The places couldn't load. Check that Rundown is still running.</p>}
       <StepPanel follow={false} back="Back to the places" onClose={() => selectPlace(null)} header={step && here.length > 1 && (
         <div className="pl-panel-nav">
           <span>{place ? placeTitle(place) : ""}</span>
           <span className="pl-panel-count">{pos + 1} of {here.length} here</span>
-          <button onClick={() => pos > 0 && replay && openStep(replay.sessionId, here[pos - 1])} disabled={pos <= 0} aria-label="Previous step here">‹</button>
-          <button onClick={() => pos < here.length - 1 && replay && openStep(replay.sessionId, here[pos + 1])} disabled={pos >= here.length - 1} aria-label="Next step here">›</button>
+          <button onClick={() => pos > 0 && thread && openStep(thread.sessionId, here[pos - 1])} disabled={pos <= 0} aria-label="Previous step here">‹</button>
+          <button onClick={() => pos < here.length - 1 && thread && openStep(thread.sessionId, here[pos + 1])} disabled={pos >= here.length - 1} aria-label="Next step here">›</button>
         </div>
       )} />
     </div>

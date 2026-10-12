@@ -46,9 +46,9 @@ const TAB_KEY = "rundown-sidebar-tab";
 const loadTab = (): Tab => (readStored(TAB_KEY) === "files" ? "files" : "threads");
 
 export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, map, file, picked, onCloseFile }: MapSidebarProps) {
-  const { replay, file: fileLink } = useNavState();
+  const { thread: openThread, file: fileLink } = useNavState();
   // A file link opens on Files, a thread link on the thread.
-  const [tab, setTab] = useState<Tab>(() => (fileLink ? "files" : replay ? "threads" : loadTab()));
+  const [tab, setTab] = useState<Tab>(() => (fileLink ? "files" : openThread ? "threads" : loadTab()));
   // Threads with a thread open: the thread, or (after its back arrow) the list.
   const [listing, setListing] = useState(false);
   const { narrow, phone, over, leaving, collapsed, setCollapsed, setOpen, setOver, setOverNow } = useSidebarFold();
@@ -56,7 +56,7 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
   useEffect(() => writeStored(TAB_KEY, tab), [tab]); // storage blocked: the tab resets on reload
   // Opening a thread shows it under Threads; closing it, the list. On a phone the thread opens below the map, which
   // keeps the top of the screen like a video (the "pip" sheet): scroll its steps back and still see the agents work.
-  const thread = replay?.sessionId ?? null;
+  const thread = openThread?.sessionId ?? null;
   const opened = useRef(false); // the first render already picked its tab
   useEffect(() => {
     if (opened.current && thread) setTab("threads");

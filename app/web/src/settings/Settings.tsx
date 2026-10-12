@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNotifyPref } from "../lib/attention";
-import { isReplay } from "../lib/live";
+import { isRecording } from "../lib/live";
 import { setTheme, THEMES, useTheme } from "../lib/theme";
 import { setShowFile, setStepWindow, STEP_WINDOWS, useShowFile, useStepWindow } from "../map/prefs";
 import { useNavActions, useNavState } from "../lib/nav";
@@ -143,7 +143,7 @@ function EditorSetting() {
 /** Desktop notifications when a thread needs you (attention). Local app only: a replay has no live agents. */
 function NotifySetting() {
   const { on, toggle, supported } = useNotifyPref();
-  if (!supported || isReplay()) return null;
+  if (!supported || isRecording()) return null;
   const blocked = typeof Notification !== "undefined" && Notification.permission === "denied";
   return (
     <section className="set-sec">
@@ -159,7 +159,7 @@ function NotifySetting() {
 /** Update notifications (lib/usage.ts, server updates/updates.service.ts): on by default, separate from the usage stats. */
 function UpdatesSetting() {
   const { status, toggle } = useUpdatesSetting();
-  if (!status || isReplay()) return null;
+  if (!status || isRecording()) return null;
   const note = status.locked ? `Off: ${status.locked}`
     : "Rundown checks GitHub once a day for a new version number. It sends nothing about you.";
   return (
@@ -178,7 +178,7 @@ function UpdatesSetting() {
 function UsageSetting() {
   const { status, toggle, forget } = useUsageSetting();
   const [forgot, setForgot] = useState<"" | "busy" | "done" | "failed">("");
-  if (!status || isReplay()) return null;
+  if (!status || isRecording()) return null;
   const note = status.locked ? `Off: ${status.locked}`
     : !status.sends ? "Nothing is sent from a development build"
     : "Once a day: how much you used Rundown (counts only), its version, your OS and country. Never code, paths, prompts or names. Kept 13 months.";

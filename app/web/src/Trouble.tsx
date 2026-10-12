@@ -2,18 +2,18 @@
 // forever or goes blank: the server out of reach (useOffline, Offline, OfflineBanner) and a crash while drawing the
 // page (Crashed, an error boundary).
 import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from "react";
-import { isReplay, useLiveSelector } from "./lib/live";
+import { isRecording, useLiveSelector } from "./lib/live";
 
 /** The server hasn't answered for a few seconds (a blip while it restarts after an update doesn't count). */
 export function useOffline(after = 4000): boolean {
   const connected = useLiveSelector((s) => s.connected);
   const [long, setLong] = useState(false);
   useEffect(() => {
-    if (connected || isReplay()) { setLong(false); return; }
+    if (connected || isRecording()) { setLong(false); return; }
     const t = setTimeout(() => setLong(true), after);
     return () => clearTimeout(t);
   }, [connected, after]);
-  return long && !isReplay();
+  return long && !isRecording();
 }
 
 const AWAY = "Rundown starts with your Claude Code sessions. If it doesn't come back within a minute, start a new Claude Code session, which starts it again.";

@@ -1,7 +1,7 @@
 // Loads GET /api/cowork?sessionId= for one thread and shapes it for the view: change groups, verb names, area names.
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CoworkArea, CoworkEvent, CoworkSummary, CoworkVerb } from "@contract";
-import { isReplay, replayCowork } from "../lib/live";
+import { isRecording, replayCowork } from "../lib/live";
 import { get } from "../lib/api";
 import { usePoll } from "../lib/hooks";
 import { createAtom } from "../lib/store";
@@ -21,7 +21,7 @@ export function useCowork(sessionId: string | null, running: boolean, loaded = t
   useEffect(() => {
     setData(null);
     if (!sessionId || !loaded) return;
-    if (isReplay()) {                                   // hosted demo: the recording carries each thread's places
+    if (isRecording()) {                                   // hosted demo: the recording carries each thread's places
       setData(replayCowork(sessionId) ?? { areas: { web: 0, local: 0, services: 0, apps: 0 }, codeSteps: 0, sites: [], pages: [], events: [] });
       return;
     }
@@ -30,7 +30,7 @@ export function useCowork(sessionId: string | null, running: boolean, loaded = t
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, running, loaded]);
   // While it runs: again every 8 s, but not while the tab is hidden (once more when it shows again).
-  usePoll(load, 8000, !!sessionId && loaded && running && !isReplay(), [sessionId]);
+  usePoll(load, 8000, !!sessionId && loaded && running && !isRecording(), [sessionId]);
   return { data, error };
 }
 

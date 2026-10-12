@@ -13,7 +13,7 @@ export function Keys({ finding, setFinding, help, setHelp }: {
   finding: boolean; setFinding: (v: boolean) => void;
   help: boolean; setHelp: (v: boolean | ((h: boolean) => boolean)) => void;
 }) {
-  const { replay, lens } = useNavState();
+  const { thread, lens } = useNavState();
   const { setLens } = useNavActions();
   const [toast, setToast] = useState<string | null>(null);
   const toastT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -27,7 +27,7 @@ export function Keys({ finding, setFinding, help, setHelp }: {
     const on = !getCameraLock(); setCameraLock(on); say(on ? "Camera locked on the agent" : "Camera free");
   });
   useShortcut("readmap", () => { if (finding || lens !== "map") return false; setReadmap(!getReadmap()); });
-  useShortcut("lens", () => { if (finding || !replay) return false; setLens(lens === "places" ? "map" : "places"); });
+  useShortcut("lens", () => { if (finding || !thread) return false; setLens(lens === "places" ? "map" : "places"); });
 
   return <>
     {finding && <Picker onClose={() => setFinding(false)} />}

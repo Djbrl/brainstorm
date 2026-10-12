@@ -7,7 +7,6 @@
 // "last 15 steps" setting, counted in places) are lit and named, the rest fades: what it did up to there, not everything.
 // The camera follows it from site to site: on a small map it frames the site it's in. A click on a place opens its step (CoworkView).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { NodeObject } from "react-force-graph-2d";
 import { hierarchy, pack } from "d3-hierarchy";
 import type { CoworkArea, CoworkEvent, CoworkPage, CoworkSite, CoworkSummary } from "@contract";
 import { AREA_NAME, HOME, HOME_NAME } from "./data";
@@ -27,7 +26,7 @@ import { useSize } from "../lib/hooks";
 import { useCanvasZoom } from "../map/useCanvasZoom";
 
 /** One circle of the places map. */
-export type PNode = NodeObject & {
+export type PNode = {
   id: string; kind: "area" | "site" | "page" | "home"; area: CoworkArea; label: string; r: number; x: number; y: number;
   events: number; changes: number; failed: number; lastTs?: string;
   up?: PNode;

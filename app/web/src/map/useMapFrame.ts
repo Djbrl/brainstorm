@@ -2,7 +2,6 @@
 // is open), drawNode (each file, drawNode.ts), endFrame (the dots, import lines, names, the replay's tracer, the agents,
 // and whether another frame must follow: redraw.ts). Moved out of MapView.tsx; it owns what drawing keeps between frames.
 import { useCallback, useEffect, useRef, type RefObject } from "react";
-import type { NodeObject } from "react-force-graph-2d";
 import type { ZoomApi } from "./useCanvasZoom";
 import type { FileNode } from "@contract";
 import { clock, isRecording } from "../lib/live";
@@ -108,8 +107,8 @@ export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIn
     if (sig !== vis.current.sig) { vis.current.sig = sig; vis.current.ver++; }
   }, [resolveId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const drawNode = useCallback((node: NodeObject, ctx: CanvasRenderingContext2D, scale: number) => {
-    drawFile(ctx, node as GNode, scale, frame.current, caches.current);
+  const drawNode = useCallback((node: GNode, ctx: CanvasRenderingContext2D, scale: number) => {
+    drawFile(ctx, node, scale, frame.current, caches.current);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- names: the space they may take (labels.ts), then the open folders' names (drawNode.ts) ----

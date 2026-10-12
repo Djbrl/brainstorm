@@ -5,7 +5,6 @@
 // new places (TWEEN_MS).
 import { useMemo, useRef } from "react";
 import { hierarchy, pack, type HierarchyNode } from "d3-hierarchy";
-import type { NodeObject } from "react-force-graph-2d";
 import type { FileNode, ProjectMap } from "@contract";
 import { isPlaceRoot, type Island } from "../lib/islands";
 import type { Look } from "./thread/ThreadLayer";
@@ -19,7 +18,9 @@ export type Dir = { rel: string; name: string; depth: number; files: FileNode[];
   island?: string;
   /** The island holding the projects past the first few ("+ 12 more projects"): no project of its own. */
   more?: boolean };
-export type GNode = NodeObject & {
+export type GNode = {
+  /** Where it is drawn (graph units); fx, fy: where the layout put it (the same, kept as the graph library had them). */
+  x?: number; y?: number; fx?: number; fy?: number;
   id: string; file: FileNode; r: number;
   /** A folder's circle (its id is the folder's path ending in "/"); files have none. */
   dir?: Dir;

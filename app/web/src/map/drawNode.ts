@@ -7,7 +7,7 @@ import { Motion } from "./redraw";
 import { reachOf, type MapStyle, type RGB } from "./themes";
 import { CUBE_STILL_PX, drawCube, drawGlobe, drawStation, stampCube, stampGlobe, stampStation } from "./marks";
 import { metroPoints, octagonPath, polyPath, upTo, type Pt2 } from "./routes";
-import { css, mixRGB, recencyRGB, same, steps, type Tokens } from "./color";
+import { css, mixRGB, recencyAt, recencyRGB, same, steps, type Tokens } from "./color";
 import type { GLink, GNode } from "./graph";
 import { reducedMotion } from "../lib/breakpoints";
 import { easeOut, hashString } from "./util";
@@ -114,7 +114,9 @@ const RING_EASE = 0.12;  // seconds for the "editing now" ring to (nearly) fade 
 const ownColour = (n: GNode, F: Frame) => {
   if (n.cAt !== n.file.lastChangedAt || n.cEp !== F.epoch || !n.c) {
     const was = n.c, edited = n.cAt !== undefined && n.cAt !== n.file.lastChangedAt;
-    n.c = recencyRGB(F.tokens, n.file.lastChangedAt, F.now, F.recorded, F.since); n.css = css(n.c);
+    // The time is parsed once per change, not on every recency step.
+    if (n.cAt !== n.file.lastChangedAt || n.cMs === undefined) n.cMs = n.file.lastChangedAt ? Date.parse(n.file.lastChangedAt) : undefined;
+    n.c = n.cMs === undefined ? F.tokens.cool : recencyAt(F.tokens, n.cMs, F.now, F.recorded, F.since); n.css = css(n.c);
     // A new edit eases the colour in from what it was (the slow fade with time needs none: it moves in small steps).
     if (edited && was && !same(was, n.c)) { n.cFrom = easedColour(n, F) ?? was; n.cT0 = F.t; }
     n.cAt = n.file.lastChangedAt; n.cEp = F.epoch;

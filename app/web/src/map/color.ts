@@ -39,14 +39,19 @@ export type Tokens = ReturnType<typeof readTokens>;
  * lib/visit.ts), quiet otherwise. A recording (the hosted demo) has no "last visit": there, warm fades out over an hour.
  */
 export function recencyRGB(t: Tokens, iso: string | undefined, now: number, recorded: boolean, since: number): RGB {
-  if (!iso) return t.cool;
-  const at = Date.parse(iso), age = now - at;
+  return iso ? recencyAt(t, Date.parse(iso), now, recorded, since) : t.cool;
+}
+/** recencyRGB for a time already parsed (ms; NaN when it doesn't parse). */
+export function recencyAt(t: Tokens, at: number, now: number, recorded: boolean, since: number): RGB {
+  const age = now - at;
   if (!(age >= 0)) return t.hot;
   // In 1/32 steps (a few seconds each): the same few colours for every file, so their drawings can be reused (sprites.ts).
   if (age < 5 * MIN) return mixRGB(t.hot, t.warm, steps((age / (5 * MIN)) ** 1.5));
   if (recorded) return age < HOUR ? mixRGB(t.warm, t.cool, steps((age - 5 * MIN) / (HOUR - 5 * MIN))) : t.cool;
   return at > since ? t.warm : t.cool;
 }
+/** How long after a change a file's colour keeps moving (then it stays put until the next change). */
+export const fadesFor = (recorded: boolean) => (recorded ? HOUR : 5 * MIN);
 export const steps = (k: number, n = 32) => Math.round(k * n) / n;
 export const css = (c: RGB) => `rgb(${c.join(",")})`;
 export const same = (a: RGB, b: RGB) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];

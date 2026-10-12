@@ -32,7 +32,7 @@ export type GNode = NodeObject & {
   /** How much its names show (0…1): they wait until the folder it's in has let go of its own name (fold.ts). */
   said?: number;
   // Kept per file between frames (perf-canvas): its colour, its focus look this frame, its cube's turn.
-  cAt?: string; cEp?: number; c?: RGB; css?: string;
+  cAt?: string; cMs?: number; cEp?: number; c?: RGB; css?: string;
   // Transitions (drawNode.ts): the colour it had when it changed and since when; how much its "editing now" ring shows.
   cFrom?: RGB; cT0?: number; ringA?: number; ringT?: number;
   /** On an island (outside the project): an open thread's focus doesn't dim it. */

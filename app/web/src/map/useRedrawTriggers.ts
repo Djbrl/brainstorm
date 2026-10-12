@@ -7,6 +7,8 @@ import { clearTextWidths } from "./labels";
 import { clearSprites } from "./sprites";
 import { RIPPLE_MS, type Caches } from "./drawNode";
 import type { Redraw } from "./redraw";
+import { fadesFor } from "./color";
+import { clock, isRecording } from "../lib/live";
 
 export function useRedrawTriggers({ redraw, caches, files, tokens, tween, graph, picture, step, agents }: {
   redraw: Redraw; caches: RefObject<Caches>; files: FileNode[] | undefined; tokens: unknown;
@@ -44,9 +46,19 @@ export function useRedrawTriggers({ redraw, caches, files, tokens, tween, graph,
   }, [files, redraw, caches]);
 
   // ---- colours: kept per file, worked out again when its time changes, and every few seconds (recency fades) ----
+  // Only while a file on the map (or an island) is recent enough for its colour to still move: a map at rest draws
+  // nothing every five seconds. A look over every file's time every five seconds (strings: no parsing) is a few µs.
   const epoch = useRef(0);
+  const latest = useRef({ files, graph }); latest.current = { files, graph };
   useEffect(() => {
-    const t = setInterval(() => { epoch.current++; redraw.kick(); }, 5000);
+    const window = fadesFor(isRecording()) + 10_000;
+    const t = setInterval(() => {
+      const { files: fs, graph: g } = latest.current;
+      let last = "";
+      for (const f of fs ?? []) if (f.lastChangedAt && f.lastChangedAt > last) last = f.lastChangedAt;
+      for (const n of (g as { nodes?: { file?: FileNode }[] } | null)?.nodes ?? []) { const at = n.file?.lastChangedAt; if (at && at > last) last = at; }
+      if (last && clock() - Date.parse(last) < window) { epoch.current++; redraw.kick(); }
+    }, 5000);
     return () => clearInterval(t);
   }, [redraw]);
   useEffect(() => { epoch.current++; clearSprites(); }, [tokens]);

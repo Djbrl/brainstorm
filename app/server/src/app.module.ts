@@ -3,7 +3,6 @@ import { CoreModule } from "./core/core.module";
 import { LlmModule } from "./llm/llm.module";
 import { ListenerModule } from "./listener/listener.module";
 import { MapperModule } from "./mapper/mapper.module";
-import { ReaderModule } from "./reader/reader.module";
 import { AskModule } from "./ask/ask.module";
 import { ReplayModule } from "./replay/replay.module";
 import { WorkspaceModule } from "./workspace/workspace.module";
@@ -20,5 +19,5 @@ import { ElsewhereModule } from "./elsewhere/elsewhere.module";
 import { UsageModule } from "./usage/usage.module";
 import { UpdatesModule } from "./updates/updates.module";
 import { OnboardingModule } from "./onboarding/onboarding.controller";
-@Module({ imports: [CoreModule, UsageModule, UpdatesModule, LlmModule, ListenerModule, MapperModule, ReaderModule, AskModule, ReplayModule, WorkspaceModule, AgentsModule, CoworkModule, ShotsModule, AttentionModule, OpenModule, ImageModule, ElsewhereModule, OnboardingModule], controllers: [HealthController] })
+@Module({ imports: [CoreModule, UsageModule, UpdatesModule, LlmModule, ListenerModule, MapperModule, AskModule, ReplayModule, WorkspaceModule, AgentsModule, CoworkModule, ShotsModule, AttentionModule, OpenModule, ImageModule, ElsewhereModule, OnboardingModule], controllers: [HealthController] })
 export class AppModule {}

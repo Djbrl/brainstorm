@@ -8,6 +8,7 @@ import { ProjectScope } from "./scope";
 import type { NewStep } from "./source";
 import { promptTitle, storedTitle, titleOfPrompt, UNTITLED } from "./text";
 import { commandReads } from "./command-writes";
+import { riskOf } from "./risk";
 
 // The stored threads and steps. StepsStore is what the other modules read (threads, steps, labels); StepWriter is how
 // the listener stores what the sources parse, a chunk (a Batch) per transaction.
@@ -394,10 +395,13 @@ export class StepWriter {
   }
 }
 
-/** A step with its keys in the order rowToStep gives them: the object sent live serializes like the stored one. */
+/** A step with its keys in the order rowToStep gives them: the object sent live serializes like the stored one. An
+ * edit gets its risk flags here (risk.ts), the one place every stored step passes, live or from history. */
 export function inStoredOrder(s: NewStep, seq: number): Step {
   const out: Record<string, unknown> = { id: s.id, sessionId: s.sessionId, seq, ts: s.ts, kind: s.kind };
-  for (const k of ["text", "tool", "input", "filePath", "diff", "label", "risk"] as const) if (s[k] !== undefined) out[k] = s[k];
+  const risk = s.risk ?? riskOf(s);
+  for (const k of ["text", "tool", "input", "filePath", "diff", "label"] as const) if (s[k] !== undefined) out[k] = s[k];
+  if (risk) out.risk = risk;
   out.isSubagent = !!s.isSubagent;
   if (s.agentId) out.agentId = s.agentId;
   if (s.toolUseId) out.toolUseId = s.toolUseId;

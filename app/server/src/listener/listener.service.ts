@@ -336,7 +336,7 @@ export class ListenerService implements OnModuleInit, OnModuleDestroy {
   // ---- broadcast ----
 
   /** After the commit: new threads and title changes (once the server is up), live steps in order. Each step goes to
-   * the bus first, then over the socket as the same object (the reader adds its label to it in between). */
+   * the bus first, then over the socket as the same object. */
   private announce(b: Batch) {
     for (const ev of b.events) {
       try {

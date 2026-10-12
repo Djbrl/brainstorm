@@ -1,12 +1,12 @@
 import { Injectable, Logger } from "@nestjs/common";
 import type { Session, Step } from "../shared/contract";
 
-/** In-process events between modules. Listener emits, reader/mapper react. */
+/** In-process events between modules. Listener emits, the mapper and others react. */
 export type BusEvents = {
   "session": [Session];
-  "step": [Step];                               // new step stored (listener → reader, mapper)
+  "step": [Step];                               // new step stored (listener → attention, agents, usage)
   "file-touched": [{ path: string; sessionId: string; ts: string }]; // an agent edited a file (listener → mapper)
-  "workspace": [{ root: string }];               // the active workspace changed (workspace → listener, mapper, reader)
+  "workspace": [{ root: string }];               // the active workspace changed (workspace → listener, mapper, attention, agents, usage)
   "files-changed": [{ root: string }];          // the mapper saw files change in the project
   "turn-ended": [{ sessionId: string }];        // an agent finished its turn, from its log (listener → attention)
   // a mapped file changed on disk: what it was (null: unknown, "": it didn't exist) and is (null: deleted) (mapper → listener)

@@ -76,3 +76,20 @@ test("updateStep can store a label without broadcasting it", async () => {
   assert.deepEqual(updates(), [{ type: "step-update", id: step.id, label: "loud", risk: ["x"] }]);
   await t.close();
 });
+
+test("an edit gets its risk flags when stored, from history as live, and the live message matches the stored step", async () => {
+  const t = await makeListener({ root: "/work/demo-repo" });
+  const auth = { file_path: "/work/demo-repo/src/auth/login.ts", old_string: "a", new_string: "b" };
+  const old = join(t.projectDir, "old.jsonl");
+  writeFileSync(old, jsonl([line("prompt", { sessionId: "old", i: 1 }), line("edit", { sessionId: "old", i: 2, input: auth })]));
+  await t.readNow(old, true);
+  assert.deepEqual(t.listener.store.listSteps("old").find((s) => s.kind === "edit")?.risk, ["touches auth"]);
+  t.live();
+  const now = join(t.projectDir, "now.jsonl");
+  writeFileSync(now, jsonl([line("prompt", { sessionId: "now", i: 3 }), line("edit", { sessionId: "now", i: 4, input: { ...auth, file_path: "/work/demo-repo/.env" } })]));
+  await t.readNow(now);
+  const sent = t.sent.find((m) => m.type === "step" && m.step.kind === "edit") as { step: { risk?: string[] } } | undefined;
+  assert.deepEqual(sent?.step.risk, ["touches .env"]);
+  assert.equal(JSON.stringify(sent?.step), JSON.stringify(t.listener.store.listSteps("now").find((s) => s.kind === "edit")));
+  await t.close();
+});

@@ -95,10 +95,11 @@ export function flattenEdges(c: Cached) {
   c.map.edges = edges;
 }
 
-/** A file's content deflated, in a buffer of its own size: zlib hands back a 16 KB chunk even for a few hundred bytes,
- * so 3,000 kept files held about 48 MB instead of 3 MB. */
+/** A file's content deflated, in a buffer of its own size. zlib's default output chunk is 16 KB even for a few hundred
+ * bytes: kept, 3,000 files held about 48 MB instead of 3 MB, and even copied, the chunks waited for a GC in malloc'd
+ * memory (3,000 files: about 23 MB that stayed resident). 1 KB chunks, concatenated when there are more, cost no time. */
 export function deflate(content: string | Buffer): Buffer {
-  const z = deflateRawSync(content, { level: 1 });
+  const z = deflateRawSync(content, { level: 1, chunkSize: 1024 });
   return z.buffer.byteLength > z.length * 2 ? Buffer.copyBytesFrom(z) : z;
 }
 

@@ -218,7 +218,7 @@ Mostly deletions. Same branch, then reviewed.
 
 ## Phase 4: one copy of each rule
 
-Behaviour should be the same. This puts rules that existed in several copies in one place. Phase 4 was not separately reviewed.
+Behaviour should be the same. This puts rules that existed in several copies in one place. Phase 4 was reviewed (see the review notes at the top).
 
 ### What you might notice
 
@@ -266,7 +266,7 @@ Behaviour should be the same. This puts rules that existed in several copies in 
 
 ## Phase 5: split the large files and rename
 
-Behaviour should be the same. The audit found files too big to change safely (the listener at about 1130 lines, the mapper at about 930, the command parser at about 925, MapView at 622, the replay layer at 618, the themes at 405), and later fixes kept colliding in them. This phase cuts each into parts that do one job, and renames what was misnamed. Phase 5 was not separately reviewed.
+Behaviour should be the same. The audit found files too big to change safely (the listener at about 1130 lines, the mapper at about 930, the command parser at about 925, MapView at 622, the replay layer at 618, the themes at 405), and later fixes kept colliding in them. This phase cuts each into parts that do one job, and renames what was misnamed. Phase 5 was reviewed (below).
 
 ### What you might notice
 
@@ -324,4 +324,4 @@ Behaviour should be the same. The audit found files too big to change safely (th
 - An older bug, not new: opening Places with no step leaves its list at the top with a gap, instead of scrolling to the thread's row.
 - Phase 6 (tests, release process) is not started.
 
-Review: pending
+Review: no confirmed defects. The reviewer checked that stored settings keys, every server route and every CSS class are unchanged; that the server gets one shared steps store (no duplicate copies); that the launcher reads its options exactly as before; and that every new listener and timer is removed when its view closes. One possible issue, fixed: after a theme switch the Readmap could keep the old theme's colours for a few seconds, because it now draws only when the map does; it now reads the colours again as soon as the theme changes (`49e8069`). Noted as intended: a shared replay no longer shows the demo's preview banner or opens the setup screen.

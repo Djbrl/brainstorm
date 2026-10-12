@@ -1,5 +1,5 @@
 // Display helpers for steps and sessions.
-import { clock } from "../lib/live";
+import { clock, onStepsEvicted } from "../lib/live";
 import type { Step } from "@contract";
 import { CallPairer } from "@shared/pairing";
 import { commandLabel, toolLabel } from "@shared/labels";
@@ -164,6 +164,7 @@ export type Pairing = { resultOf: ReadonlyMap<string, string>; callOf: ReadonlyM
 type Paired = { steps: Step[]; pairer: CallPairer; resultOf: Map<string, string>; callOf: Map<string, string> };
 /** Per thread, the pairing of the list seen last (most recently used last). */
 const pairings = new Map<string, Paired>();
+onStepsEvicted((ids) => { for (const sid of ids) pairings.delete(sid); });
 
 /**
  * pairResults for a thread's list as it grows: a list that only added steps to the last one (the same ids first) pairs

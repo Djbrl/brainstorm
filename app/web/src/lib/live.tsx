@@ -53,6 +53,10 @@ type Action =
   | { type: "agents"; agents: AgentPresence[] }
   | { type: "attention-all"; list: Attention[] }
   | { type: "reset" }
+  /** Let go of these threads' steps (no view holds them; see LiveStore.hold). */
+  | { type: "evict"; sessionIds: string[] }
+  /** Forget agents the server dropped (it does so quietly, after AGENT_DROP_MS without a move). */
+  | { type: "sweep"; now: number }
   | { type: "replay"; data: Replay }
   | WsMessage;
 
@@ -72,6 +76,10 @@ type Indexes = {
  * logged for minutes) or with a long command running is running, not idle. Applied after every batch that changes either.
  */
 const BUSY = new Set(["thinking", "working"]);
+/** The server forgets an agent this long after its last move (agents.service.ts DROP_MS), without saying so. */
+export const AGENT_DROP_MS = 30 * 60_000;
+/** Threads no view holds whose steps stay loaded (the last ones let go of), so going back to one is instant. */
+export const KEEP_UNHELD = 2;
 
 function indexMap(ix: Indexes, map: ProjectMap | null) {
   ix.fileAt.clear(); ix.edgesFrom.clear();
@@ -199,8 +207,30 @@ function applyBatch(base: LiveState, actions: Action[], ix: Indexes): LiveState 
       }
       case "agents": st().agents = Object.fromEntries(a.agents.map((g) => [g.id, g])); owned.add(s.agents); break;
       case "agent": (st().agents = own(s.agents, (o) => ({ ...o })))[a.agent.id] = a.agent; break;
-      case "attention-all": st().attention = Object.fromEntries(a.list.map((x) => [x.sessionId, x])); owned.add(s.attention); statusCheck = true; break;
-      case "attention": (st().attention = own(s.attention, (o) => ({ ...o })))[a.attention.sessionId] = a.attention; statusCheck = true; break;
+      case "sweep": {
+        if (s.replay) break; // a recording's agents run on the recording's clock
+        for (const [id, g] of Object.entries(s.agents)) if (a.now - Date.parse(g.ts) > AGENT_DROP_MS) delete (st().agents = own(s.agents, (o) => ({ ...o })))[id];
+        break;
+      }
+      // An "idle" attention is what the server sends as it forgets a thread (and says no more than no entry): not kept.
+      case "attention-all": st().attention = Object.fromEntries(a.list.filter((x) => x.state !== "idle").map((x) => [x.sessionId, x])); owned.add(s.attention); statusCheck = true; break;
+      case "attention": {
+        const sid = a.attention.sessionId;
+        if (a.attention.state !== "idle") (st().attention = own(s.attention, (o) => ({ ...o })))[sid] = a.attention;
+        else if (s.attention[sid]) delete (st().attention = own(s.attention, (o) => ({ ...o })))[sid];
+        statusCheck = true;
+        break;
+      }
+      case "evict": {
+        for (const sid of a.sessionIds) {
+          const list = s.steps[sid];
+          if (!list) continue;
+          for (const x of list) if (ix.stepAt.get(x.id)?.sid === sid) ix.stepAt.delete(x.id);
+          ix.through.delete(sid);
+          delete steps()[sid];
+        }
+        break;
+      }
       case "setup": st().setup = a.status; break;
       case "reset":
         Object.assign(st(), { sessions: [], steps: {}, map: null, agents: {}, attention: {}, sessionsLoaded: false, structureVersion: s.structureVersion + 1 });
@@ -264,7 +294,16 @@ export type LiveStore = {
   generation: () => number;
   /** The server's project as it says now (a setup message, a reconnect): reloads when it isn't the one loaded. */
   checkRoot: (root: string | null) => void;
+  /**
+   * A view needs this thread's steps: they stay loaded until it lets go (the function returned). Threads no view holds
+   * are let go of, but for the last KEEP_UNHELD (a day of opening threads would otherwise keep every one in memory).
+   */
+  hold: (sessionId: string) => () => void;
 };
+
+/** Called with the threads whose steps the store let go of: caches kept per thread (builders, counters) drop them too. */
+const evictListeners = new Set<(sessionIds: string[]) => void>();
+export function onStepsEvicted(fn: (sessionIds: string[]) => void) { evictListeners.add(fn); }
 
 export function createLiveStore(start: LiveState = initial): LiveStore {
   let state = start;
@@ -355,7 +394,31 @@ export function createLiveStore(start: LiveState = initial): LiveStore {
     const at = ix.stepAt.get(id), st = at && state.steps[at.sid]?.[at.i];
     return st && st.id === id ? st : undefined;
   };
-  const store: LiveStore = { get: () => state, subscribe, dispatch, enqueue, stepOf, loadSteps, catchUp, reload, generation: () => generation, checkRoot };
+  const held = new Map<string, number>();
+  let letGo: string[] = []; // threads let go of, most recent first
+  const evict = () => {
+    if (state.replay || isRecording()) return; // a recording can't fetch them again
+    letGo = letGo.filter((sid) => !held.has(sid)).slice(0, KEEP_UNHELD);
+    const out = Object.keys(state.steps).filter((sid) => !held.has(sid) && !letGo.includes(sid));
+    if (!out.length) return;
+    dispatch({ type: "evict", sessionIds: out });
+    for (const fn of evictListeners) fn(out);
+  };
+  const hold = (sid: string) => {
+    held.set(sid, (held.get(sid) ?? 0) + 1);
+    let done = false;
+    return () => {
+      if (done) return;
+      done = true;
+      const n = (held.get(sid) ?? 1) - 1;
+      if (n > 0) { held.set(sid, n); return; }
+      held.delete(sid);
+      letGo = [sid, ...letGo.filter((x) => x !== sid)];
+      // After the views that take over (the next thread opened in the same commit) have held theirs.
+      setTimeout(evict, 0);
+    };
+  };
+  const store: LiveStore = { get: () => state, subscribe, dispatch, enqueue, stepOf, loadSteps, catchUp, reload, generation: () => generation, checkRoot, hold };
   return store;
 }
 
@@ -441,6 +504,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
     }
     loadAll(store);
     checkServerVersion();
+    const sweep = setInterval(() => store.dispatch({ type: "sweep", now: Date.now() }), 60_000);
 
     let ws: WebSocket | null = null;
     let stop = false, opened = false;
@@ -477,7 +541,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       };
     };
     connect();
-    return () => { stop = true; ws?.close(); };
+    return () => { stop = true; ws?.close(); clearInterval(sweep); };
   }, [store]);
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
@@ -502,6 +566,15 @@ export const useHarness = (sessionId?: string | null): Harness =>
 export function useLiveActions(): Pick<LiveStore, "loadSteps" | "reload"> {
   const store = useStore();
   return useMemo(() => ({ loadSteps: store.loadSteps, reload: store.reload }), [store]);
+}
+
+/** A thread's steps, loaded if needed and held while the component is mounted (see LiveStore.hold). */
+export function useThreadSteps(sessionId: string | null | undefined): Step[] | undefined {
+  const store = useStore();
+  const steps = useStoreSelector(store, (s) => (sessionId ? s.steps[sessionId] : undefined));
+  useEffect(() => (sessionId ? store.hold(sessionId) : undefined), [store, sessionId]);
+  useEffect(() => { if (sessionId && !steps) store.loadSteps(sessionId); }, [store, sessionId, steps]);
+  return steps;
 }
 
 /** One step by id (undefined until its thread is loaded). */

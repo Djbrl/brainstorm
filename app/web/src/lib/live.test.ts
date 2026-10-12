@@ -1,8 +1,9 @@
 // The live store's reducer: messages applied in batches, with indexes kept beside the state. Each case checks the
 // state against what the messages mean, and that untouched parts keep their identity (what the selectors rely on).
 import { describe, expect, it } from "vitest";
+import type { AgentPresence } from "@contract";
 import type { FileNode, ProjectMap, Step } from "@contract";
-import { createLiveStore } from "./live";
+import { AGENT_DROP_MS, createLiveStore, KEEP_UNHELD, onStepsEvicted } from "./live";
 import { int, pick, rng, session } from "../test/fixtures";
 
 const file = (path: string, over: Partial<FileNode> = {}): FileNode => ({ path, module: ".", lines: 10, ...over });
@@ -115,5 +116,34 @@ describe("live store", () => {
     st.dispatch({ type: "reset" });
     expect(st.get()).toMatchObject({ sessions: [], steps: {}, map: null, agents: {}, attention: {}, sessionsLoaded: false });
     expect(st.stepOf("a-0")).toBeUndefined();
+  });
+
+  it("lets go of threads no view holds, but for the last few let go of", async () => {
+    const st = createLiveStore(), evicted: string[] = [];
+    onStepsEvicted((ids) => evicted.push(...ids));
+    const ids = ["t0", "t1", "t2", "t3", "t4"];
+    for (const id of ids) st.dispatch({ type: "steps", sessionId: id, steps: [step(id, 0)] });
+    const open = st.hold("t4");
+    for (const id of ids.slice(0, 4)) st.hold(id)(); // opened and closed, in this order
+    await new Promise((r) => setTimeout(r, 0));
+    const kept = Object.keys(st.get().steps).sort();
+    expect(KEEP_UNHELD).toBe(2);
+    expect(kept).toEqual(["t2", "t3", "t4"]); // the one open, and the last two closed
+    expect(evicted).toEqual(expect.arrayContaining(["t0", "t1"]));
+    expect(st.stepOf("t0-0")).toBeUndefined();
+    expect(st.stepOf("t4-0")?.id).toBe("t4-0");
+    open();
+  });
+
+  it("forgets agents the server dropped, and attention it let go of", () => {
+    const st = createLiveStore();
+    const agent = (id: string, ts: string): AgentPresence => ({ id, sessionId: id, name: id, isSubagent: false, ts, active: false, trail: [] });
+    const now = Date.parse("2026-10-11T12:00:00Z");
+    st.dispatch({ type: "agents", agents: [agent("old", new Date(now - AGENT_DROP_MS - 1000).toISOString()), agent("new", new Date(now - 60_000).toISOString())] });
+    st.dispatch({ type: "sweep", now });
+    expect(Object.keys(st.get().agents)).toEqual(["new"]);
+    st.dispatch({ type: "attention", attention: { sessionId: "a", state: "done", since: "2026-10-11T11:00:00Z", sure: true } });
+    st.dispatch({ type: "attention", attention: { sessionId: "a", state: "idle", since: "2026-10-11T11:30:00Z", sure: true } });
+    expect(st.get().attention).toEqual({});
   });
 });

@@ -4,11 +4,11 @@
 // (messages, thinking, commands, browser, subagents, results) folds into one summary beat with counts.
 // Full detail: every step is a beat. Either way the tracer moves on edits (TRACER_MOVES_ON), and before the first edit
 // on reads (an agent that only reads still goes somewhere); a command's reads (`reads`) count as reads of its beat.
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import type { Step } from "@contract";
 import { isErrorResult } from "@shared/failed";
 import { READ_TOOLS, SEARCH_TOOLS, SUBAGENT_TOOLS } from "@shared/tools";
-import { useLiveActions, useLiveSelector } from "./live";
+import { onStepsEvicted, useLiveSelector, useThreadSteps } from "./live";
 import { stepsOf, useAgentFocus } from "./agentFocus";
 import { makeFileResolver, type FileResolver } from "./paths";
 import { islandPath, isOutside, knownRoots, projectOf, visitorHome } from "./islands";
@@ -408,6 +408,8 @@ function beatOf(d: Draft, index: number): Beat {
 const built = new WeakMap<Step[], Map<string, { resolve: FileResolver; thread: Thread }>>();
 const builders = new Map<string, ThreadBuilder>(); // most recently used last
 const MAX_BUILDERS = 8;
+// A thread the store let go of: its builders (which hold its whole list) go too.
+onStepsEvicted((ids) => { for (const key of [...builders.keys()]) if (ids.includes(key.split("\n")[1])) builders.delete(key); });
 
 export function buildThread(sessionId: string, steps: Step[], resolve: FileResolver, detail: ReplayDetail = "light", agent?: string | null): Thread {
   const key = `${detail}\n${sessionId}\n${agent ?? ""}`;
@@ -432,12 +434,10 @@ const structureVersion = (state: object) => (state as { structureVersion?: numbe
 
 /** The thread for a session, built against the current map. Loads the session's steps if needed (live app). */
 export function useThread(sessionId: string | null, detail: ReplayDetail = "light"): Thread | null {
-  const { loadSteps } = useLiveActions();
-  const all = useLiveSelector((s) => (sessionId ? s.steps[sessionId] : undefined));
+  const all = useThreadSteps(sessionId);
   // One agent on its own (lib/agentFocus.ts): the thread of its steps only, in every view.
   const agent = useAgentFocus(sessionId);
   const steps = all && agent ? stepsOf(all, sessionId!, agent) : all;
-  useEffect(() => { if (sessionId && !all) loadSteps(sessionId); }, [sessionId, all, loadSteps]);
   // No session: no resolver (it would index every file of the map for nothing).
   const map = useLiveSelector((s) => (sessionId ? s.map : null));
   const version = useLiveSelector(structureVersion);

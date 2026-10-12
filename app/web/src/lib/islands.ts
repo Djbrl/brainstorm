@@ -8,7 +8,7 @@
 import { useEffect, useMemo } from "react";
 import type { AgentPresence, FileNode, ProjectMap, Session, Step } from "@contract";
 import { outOfWorktree } from "@shared/paths";
-import { isRecording } from "./live";
+import { isRecording, onStepsEvicted } from "./live";
 import { repoBase, repoRelative } from "./paths";
 import { get } from "./api";
 import { sameStep } from "../step/format";
@@ -142,6 +142,7 @@ function addTouch(out: Map<string, Touch>, raw: string | undefined, ts: string, 
 
 /** Per thread, the steps read so far and what they touched outside: a list that only grew is read from where it stopped. */
 const stepTouches = new Map<string, { steps: Step[]; map: ProjectMap | null; known: string[] | null; home: string | null; out: Map<string, Touch> }>();
+onStepsEvicted((ids) => { for (const sid of ids) stepTouches.delete(sid); });
 function stepsTouched(sid: string, steps: Step[] | undefined, map: ProjectMap | null, known: string[] | null, home: string | null): Map<string, Touch> {
   if (!steps?.length) return new Map();
   let c = stepTouches.get(sid);

@@ -5,9 +5,9 @@
 //   the ones its Write created; read = files it opened and didn't change. A repo file counts once, whichever checkout
 //   (worktree, old location) the agent used;
 // - "worked X": active time, pauses over 30 minutes left out (lib/chapters activeMs).
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import type { ProjectMap, Step } from "@contract";
-import { useLiveActions, useLiveSelector } from "./live";
+import { onStepsEvicted, useLiveSelector, useThreadSteps } from "./live";
 import { isVisible } from "../step/format";
 import { BREAK_MS, stepTime, worked } from "./chapters";
 import { actionOf, onlyRelabelled } from "./thread";
@@ -123,6 +123,8 @@ class Counter {
 const numbersSeen = new WeakMap<Step[], Map<string, ThreadNumbers>>();
 const counters = new Map<string, Counter>(); // most recently used last
 const MAX_COUNTERS = 8;
+// A thread the store let go of: its counters (which hold its whole list) go too.
+onStepsEvicted((ids) => { for (const key of [...counters.keys()]) if (ids.includes(key.slice(key.lastIndexOf("\n") + 1))) counters.delete(key); });
 
 /** The thread's numbers. Shared by every view that asks for the same steps: don't change them. */
 export function threadNumbers(steps: Step[], map: ProjectMap | null): ThreadNumbers {
@@ -147,10 +149,8 @@ export function threadNumbers(steps: Step[], map: ProjectMap | null): ThreadNumb
 
 /** A thread's numbers, from its steps (loaded if needed). Null until the steps are in. */
 export function useThreadNumbers(sessionId: string | null): ThreadNumbers | null {
-  const { loadSteps } = useLiveActions();
-  const steps = useLiveSelector((s) => (sessionId ? s.steps[sessionId] : undefined));
+  const steps = useThreadSteps(sessionId);
   const map = useLiveSelector((s) => s.map);
-  useEffect(() => { if (sessionId && !steps) loadSteps(sessionId); }, [sessionId, steps, loadSteps]);
   return useMemo(() => (steps ? threadNumbers(steps, map) : null), [steps, map]);
 }
 

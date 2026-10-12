@@ -282,3 +282,34 @@ agents, reader, mapper, bus).
    how the plugin ships. The app now uses the computer's own fonts (San Francisco, Segoe UI). The landing page keeps
    Cabinet Grotesk and Satoshi through the Fontshare service, which the license allows for a website.
 6. **`?mockmap`: decided 5 Oct, deleted** (`map/mock.ts`, a fake 32-file map with fake agents from the hackathon).
+
+## Memory (12 Oct 2026, `perf/memory`)
+
+How much memory the server holds, measured on the bench's generated repos with the 10k-step thread: boot on a new
+database (the thread read for the first time), restart, serve the thread once and three times at once, every API call,
+then 5 minutes of the live writer. RSS is what `ps` shows. Same machine as above, light load.
+
+**Where it went.** A server with an empty project already sits at about 150 MB (Node, Nest, code pages, a 50 MB
+JavaScript heap). On top of that, on the 20k repo: Node's young generation, which grows to 128 MB on a 16 GB machine
+and stays; 48 MB of deflated file copies (each in a 16 KB zlib chunk, even for a few hundred bytes) and 20 MB more of
+those chunks left in malloc; and the whole thread's JSON built as one 12 MB string, copied three or four times per
+request. SQLite's memory-mapped file was only 17 MB here, and turning it off made the page cache hold the same pages
+instead (no RSS saved, slightly slower), so it stays.
+
+**What changed.** The server starts with `--max-semi-space-size=16` (plugin launcher, dev runner, `npm start`, the
+bench); file copies are deflated in 1 KB chunks and kept at their own size; `/steps` is sent 500 steps at a time.
+
+| | 1k files | 5k files | 20k files |
+| --- | --- | --- | --- |
+| After a restart, quiet | 212 → 194 MB | 382 → 254 MB | 384 → 283 MB |
+| Serving the 10k thread, once / three at once | 245 / 306 → 205 / 221 MB | 434 / 457 → 265 / 279 MB | 437 / 473 → 296 / 325 MB |
+| Live writer, after 2–5 minutes | 171–174 → 123–125 MB | 141–231 → 161–216 MB | 397–401 → 185–208 MB |
+| Peak over the whole run | 353 → 230 MB | 553 → 291 MB | 537 → 350 MB |
+| JavaScript heap / external, after GC | 27 / 19 → 26 / 8 MB | 42 / 51 → 42 / 20 MB | 60 / 51 → 61 / 20 MB |
+| Cold import, `/steps`, `/map` | 3.0 s, 95 ms, 5 ms → 2.9 s, 89 ms, 5 ms | 3.8 s, 98, 15 → 3.8 s, 94, 14 | 4.0 s, 97, 10 → 4.0 s, 91, 10 |
+
+Restart times were the same with and without the flag in repeated runs (465–563 ms against 481–1,034 ms).
+
+**What to claim.** Steady, with an agent working: about 125 MB on a small project and about 200 MB on a 5k–20k-file
+one. Right after it starts or while it sends a long thread, 200–330 MB, with peaks up to about 350 MB on a 20,000-file
+repo (the map build). macOS compresses idle memory, so single readings vary by tens of MB.

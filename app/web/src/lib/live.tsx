@@ -170,7 +170,14 @@ function applyBatch(base: LiveState, actions: Action[], ix: Indexes): LiveState 
         if (!s.map) break;
         const i = ix.fileAt.get(a.file.path);
         const list = files();
-        if (i === undefined) { ix.fileAt.set(a.file.path, list.length); list.push(a.file); s.structureVersion++; removed.delete(a.file.path); }
+        if (i === undefined) {
+          ix.fileAt.set(a.file.path, list.length); list.push(a.file); s.structureVersion++;
+          // Removed earlier in this batch: the imports of it go now, as they would have in a batch of their own.
+          if (removed.delete(a.file.path)) for (const [from, l] of ix.edgesFrom) {
+            const kept = l.filter((e) => e.to !== a.file.path);
+            if (kept.length !== l.length) { if (kept.length) ix.edgesFrom.set(from, kept); else ix.edgesFrom.delete(from); changedFrom.add(from); }
+          }
+        }
         else { if (a.file.module !== list[i].module) s.structureVersion++; list[i] = { ...list[i], ...a.file }; }
         if (a.edges && !sameEdges(ix.edgesFrom.get(a.file.path) ?? [], a.edges)) {
           if (a.edges.length) ix.edgesFrom.set(a.file.path, a.edges); else ix.edgesFrom.delete(a.file.path);

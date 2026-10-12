@@ -125,7 +125,7 @@ export type NavData = {
 /** Where you are, without the replay cursor. */
 export type NavState = Omit<NavData, "cursor" | "cursorStep">;
 
-type NavStore = {
+export type NavStore = {
   get: () => NavData;
   subscribe: (l: () => void) => () => void;
   actions: NavActions;
@@ -141,7 +141,7 @@ const loadHidden = () => new Set(readStoredJson<string[]>(HIDDEN_KEY, []));
 
 // ---- links ----
 
-type Place = { thread: string | null; step: string | null; lens: Lens; file?: string | null };
+export type Place = { thread: string | null; step: string | null; lens: Lens; file?: string | null };
 const hashMode = typeof location !== "undefined" && location.protocol === "file:"; // a shared .html opened from disk
 
 /** The query a hosted demo needs on every link (?replay=…), kept as is. */
@@ -167,7 +167,7 @@ function safeDecode(s: string): string {
   try { return decodeURIComponent(s); } catch { return s; }
 }
 
-function readPlace(): Place {
+export function readPlace(): Place {
   const raw = hashMode ? location.hash.replace(/^#/, "") || "/" : location.pathname;
   const m = /^(?:\/thread\/([^/]+)(?:\/(map|track|places))?(?:\/step\/([^/]+))?)?(?:\/file\/(.+?))?\/?$/.exec(raw);
   if (m && (m[1] || m[4])) {
@@ -186,7 +186,7 @@ const hereHref = () => (hashMode ? `${location.pathname}${location.search}${loca
 /** The open thread with its cursor, as Nav's `thread`. */
 const joinReplay = (t: OpenThread | null, c: ReplayCursor): ThreadReplay | null => (t ? { ...t, index: c.index, playing: c.playing } : null);
 
-function createNavStore(): NavStore {
+export function createNavStore(): NavStore {
   const first = readPlace();
   let data: NavData = {
     focusFile: null,

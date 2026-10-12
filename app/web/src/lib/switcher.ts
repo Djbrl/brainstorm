@@ -58,28 +58,34 @@ const MAX_TABS = 9;
 export function useBarThreads(openId: string | null): BarThread[] {
   const { sessions, attention, root } = useLiveSelector((s) => ({ sessions: s.sessions, attention: s.attention, root: s.setup?.root ?? "" }), shallowEqual);
   const mine = recent.use()[root], shut = closed.use()[root];
-  return useMemo(() => {
-    const now = Date.now();
-    const lately = new Map((mine ?? []).filter((x) => now - x.at < RECENT_MS).map((x) => [x.id, x.at]));
-    const gone = new Set((shut ?? []).filter((x) => now - x.at < RECENT_MS).map((x) => x.id));
-    const rank = (s: Session) => {
-      const a = attention[s.id];
-      if (s.id === openId) return 0;
-      if (needsYou(a)) return 1;
-      if (s.status === "running") return 2;
-      if (yourTurn(a)) return 3;
-      return 4;
-    };
-    const picked = sessions
-      .filter((s) => s.id === openId || needsYou(attention[s.id])
-        || (!gone.has(s.id) && (s.status === "running" || yourTurn(attention[s.id]) || lately.has(s.id))))
-      .sort((a, b) => rank(a) - rank(b) || (lately.get(b.id) ?? 0) - (lately.get(a.id) ?? 0) || b.lastEventAt.localeCompare(a.lastEventAt))
-      .slice(0, MAX_TABS);
-    return picked
-      .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
-      .map((session) => ({ session, attention: attention[session.id] }));
-  }, [sessions, attention, mine, shut, openId]);
+  return useMemo(() => barThreads(sessions, attention, mine, shut, openId, Date.now()), [sessions, attention, mine, shut, openId]);
 }
+
+/** The rules of useBarThreads, on plain data (`mine`: the threads opened lately, `shut`: those closed, at `now`). */
+export function barThreads(sessions: Session[], attention: Record<string, Attention>, mine: { id: string; at: number }[] | undefined,
+  shut: { id: string; at: number }[] | undefined, openId: string | null, now: number): BarThread[] {
+  const lately = new Map((mine ?? []).filter((x) => now - x.at < RECENT_MS).map((x) => [x.id, x.at]));
+  const gone = new Set((shut ?? []).filter((x) => now - x.at < RECENT_MS).map((x) => x.id));
+  const rank = (s: Session) => {
+    const a = attention[s.id];
+    if (s.id === openId) return 0;
+    if (needsYou(a)) return 1;
+    if (s.status === "running") return 2;
+    if (yourTurn(a)) return 3;
+    return 4;
+  };
+  const picked = sessions
+    .filter((s) => s.id === openId || needsYou(attention[s.id])
+      || (!gone.has(s.id) && (s.status === "running" || yourTurn(attention[s.id]) || lately.has(s.id))))
+    .sort((a, b) => rank(a) - rank(b) || (lately.get(b.id) ?? 0) - (lately.get(a.id) ?? 0) || b.lastEventAt.localeCompare(a.lastEventAt))
+    .slice(0, MAX_TABS);
+  return picked
+    .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
+    .map((session) => ({ session, attention: attention[session.id] }));
+}
+
+/** The threads opened lately and closed, for a project (as useBarThreads reads them). */
+export const rememberedThreads = (root: string) => ({ mine: recent.get()[root], shut: closed.get()[root] });
 
 // ---- threads at work in other projects ----
 

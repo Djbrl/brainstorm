@@ -41,15 +41,21 @@ The docs: [submit a plugin](https://claude.com/docs/plugins/submit), [pre-submis
 - No permission changes: the plugin adds hooks and three skills; the skills may only run the plugin's own launcher.
 - No obfuscated code: `build/` is a bundle of the TypeScript source in the same repository (`app/server`, `app/web`), rebuilt with `node app/scripts/build-plugin.mjs`; `--check` proves the committed build matches the source.
 
-## Notes for the reviewer (for the items the checklist holds)
+## Notes for the reviewer
 
-Paste into the submission's notes field.
+The portal's validation (12 Oct 2026, main @ e75db3f) found no blocks: 8 policy holds and 3 warnings. The icon warning is fixed by `plugin/.claude-plugin/icon.png` (add it before the first save: the portal takes the icon only once). Paste the rest into the submission's notes field.
 
-> **Bundled build.** `plugin/build/server.js` and `plugin/build/share.html` are esbuild/Vite bundles of the readable TypeScript source in the same repository (`app/server`, `app/web`), not hand-minified code. `node app/scripts/build-plugin.mjs --check` rebuilds into a temporary folder and confirms the committed build is identical. Two files exceed 256 KiB for that reason.
+> **ALLOWED_TOOLS_BROAD (skills/open, share, stop).** Each skill's only shell line runs the plugin's own launcher (`node "${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs" --open | --share | --stop …`), and `allowed-tools` is scoped to exactly that script, so `/rundown:open` doesn't ask for permission each time. It cannot run any other command.
 >
-> **Local server.** The SessionStart hook starts a local HTTP server bound to 127.0.0.1 only. It refuses other host names and cross-site writes, requires a token for its live feed, and only accepts hook messages signed with a per-install secret. It serves the map UI the user opens in their browser or the desktop app's browser pane.
+> **MCP_FORWARDS_CREDENTIAL_ENV (scripts/launch.mjs, plugin.json).** The only credential is the optional Anthropic API key, declared as a `sensitive` userConfig option. The launcher passes `CLAUDE_PLUGIN_OPTION_ANTHROPIC_API_KEY` to the local Rundown server it starts (127.0.0.1), whose Ask feature sends it to Anthropic's API only. The `raw.githubusercontent.com` URL in the same file is the daily version check (a GET of the plugin's own `plugin.json`, no headers or data, can be turned off); the key never goes there. The launcher builds the server's environment from an allowlist, so no other environment variable (a shell `ANTHROPIC_API_KEY` included) reaches it.
 >
-> **Scripts.** `plugin/scripts/hook.sh` (POSIX sh) checks for Node.js and runs `launch.mjs`; `signal.mjs` forwards hook events to the local server. All hook commands use `${CLAUDE_PLUGIN_ROOT}` paths; no inline `node -e`.
+> **BINARIES_NOT_INSPECTED (build/server.js, build/share.html).** These are esbuild/Vite bundles of the readable TypeScript source in the same repository (`app/server`, `app/web`), not hand-minified code. `node app/scripts/build-plugin.mjs --check` rebuilds into a temporary folder and confirms the committed build is identical, file by file. `build/THIRD_PARTY_NOTICES.md` lists the bundled packages.
+>
+> **COMMAND_SCRIPT_NOT_FOLLOWED.** `scripts/hook.sh` (POSIX sh) only checks that Node.js 22.13+ is installed and runs `scripts/launch.mjs`; `scripts/signal.mjs` posts hook events (tool name and input, signed with a per-install secret) to the local server on 127.0.0.1. Neither downloads or installs anything.
+>
+> **RUNTIME_FETCH_EXEC (build/web/assets/bash-*.js, index-*.js).** False positives: the first is the syntax highlighter's grammar for shell code, the second contains the app's classifier that recognises commands an agent ran (for example `curl … | sh`) to label them in the UI. Both only match text; nothing in the web app downloads or executes anything.
+>
+> **Local server.** The SessionStart hook starts a local HTTP server bound to 127.0.0.1 only. It refuses other host names and cross-site writes, requires a token for its live feed, and only accepts hook messages signed with the per-install secret. It serves the map UI the user opens in their browser or in the Claude desktop app's browser pane. Everything it reads, stores and sends is listed in `plugin/README.md` → "What it runs, stores and sends".
 
 ## If the review blocks on the build or the folder
 

@@ -92,15 +92,17 @@ export function editPair(s: Step): { before: string; after: string } | null {
 // An edit's text may not be in the steps the page holds: the server sends an edit's change once, as `diff`, and leaves
 // old_string / new_string / content / edits out of its `input`. Every view reads the change through editPair, which
 // takes `diff` first, so that is all it needs. Only an edit with neither (none is made today) asks the server for the
-// whole step, once, when a view shows it: GET /api/steps/:id, if the server has that route (a 404 turns asking off).
+// step's whole input, once, when a view shows it: GET /api/steps/:id/input (the server marks a trimmed edit
+// `inputTrimmed`; a 404 turns asking off).
 const fullSteps = new Map<string, Promise<Step | null>>();
 let fullStepRoute = true;
 /** Whether a view showing this edit has to fetch the whole step to show its change. */
 export const lacksChange = (s: Step) => s.kind === "edit" && !editPair(s) && inputOf(s).byCommand !== true;
-function fetchFullStep(id: string): Promise<Step | null> {
+function fetchFullStep(step: Step): Promise<Step | null> {
+  const id = step.id;
   let p = fullSteps.get(id);
   if (!p) {
-    p = get<Step>(`/api/steps/${encodeURIComponent(id)}`).catch((e: unknown) => {
+    p = get<{ input?: Step["input"] }>(`/api/steps/${encodeURIComponent(id)}/input`).then((r) => (r.input ? { ...step, input: r.input } : null)).catch((e: unknown) => {
       if (e instanceof ApiError && e.status === 404) fullStepRoute = false;
       fullSteps.delete(id);
       return null;
@@ -118,7 +120,7 @@ export function useEditPair(step: Step | null | undefined): { before: string; af
   useEffect(() => {
     if (!want || !step) return;
     let live = true;
-    fetchFullStep(step.id).then((s) => { if (live) setFull({ id: step.id, pair: s ? editPair(s) : null }); });
+    fetchFullStep(step).then((s) => { if (live) setFull({ id: step.id, pair: s ? editPair(s) : null }); });
     return () => { live = false; };
   }, [want, step?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   return own ?? (step && full?.id === step.id ? full.pair : null);

@@ -12,7 +12,12 @@ export type Box = { x0: number; y0: number; x1: number; y1: number; own?: string
 class Grid {
   private cells = new Map<number, Box[]>();
   private cell = 40;
-  reset(cell: number) { this.cells.clear(); this.cell = Math.max(1e-6, cell); }
+  /** Empties the grid. Same cell size: the cells' lists are kept (emptied), so a frame doesn't make them again. */
+  reset(cell: number) {
+    const c = Math.max(1e-6, cell);
+    if (c !== this.cell || this.cells.size > 4096) { this.cells.clear(); this.cell = c; return; }
+    for (const l of this.cells.values()) l.length = 0;
+  }
   hits(b: Box, own?: string) {
     const c = this.cell, i1 = Math.floor(b.x1 / c), j0 = Math.floor(b.y0 / c), j1 = Math.floor(b.y1 / c);
     for (let i = Math.floor(b.x0 / c); i <= i1; i++) for (let j = j0; j <= j1; j++) {
@@ -42,8 +47,17 @@ export class LabelSpace {
   private names = new Grid();
   private files = new Grid();
   private filesKey: string | null = null;
+  private pool: Box[] = [];
+  private used = 0;
   /** A new frame. `cell`: the grid's cell size in graph units (about 48px on screen suits names). */
-  reset(cell = 40) { this.names.reset(cell); }
+  reset(cell = 40) { this.names.reset(cell); this.used = 0; }
+  /** A box for this frame only (reused on the next one): for names and footprints added this frame. */
+  box(x0: number, x1: number, y0: number, y1: number, own?: string): Box {
+    const b = this.pool[this.used] ?? (this.pool[this.used] = { x0: 0, y0: 0, x1: 0, y1: 0 });
+    this.used++;
+    b.x0 = x0; b.x1 = x1; b.y0 = y0; b.y1 = y1; b.own = own;
+    return b;
+  }
   /** The files' footprints: `fill` adds them, only when `key` differs from the last frame's. */
   fileLayer(key: string, cell: number, fill: (add: (id: string, x: number, y: number, r: number) => void) => void) {
     if (key === this.filesKey) return;
@@ -57,7 +71,7 @@ export class LabelSpace {
   /** Takes the box if it's free (or `force`d) and says whether the label may be drawn. */
   claim(b: Box, force = false, own?: string) { if (!force && this.hits(b, own)) return false; this.add(b); return true; }
   /** A file's footprint for this frame only (the selected file's ring, wider than its mark). */
-  file(id: string, x: number, y: number, r: number) { this.names.add({ x0: x - r, x1: x + r, y0: y - r, y1: y + r, own: id }); }
+  file(id: string, x: number, y: number, r: number) { this.names.add(this.box(x - r, x + r, y - r, y + r, id)); }
 }
 
 // ---------- text widths, measured once per font ----------
@@ -103,20 +117,23 @@ export type QueuedLabel = {
  */
 export function drawQueuedLabels(ctx: CanvasRenderingContext2D, queue: QueuedLabel[], space: LabelSpace) {
   if (!queue.length) return;
-  const keep: QueuedLabel[] = [];
-  queue.sort((a, b) => b.prio - a.prio);
+  // Nothing made per frame: the kept list, the probe box and the boxes taken are reused (a frame names hundreds of files).
+  const keep = kept;
+  keep.length = 0;
+  queue.sort(byPrio);
   for (const l of queue) {
     // Air around a name, wider to the sides: two names in a row shouldn't read as one.
     const on = bucket(l.size * l.scale), w = textWidth(ctx, l.text, l.weight, l.family, on, on) / l.scale, px = 6 / l.scale, py = 2.5 / l.scale, g = 3 / l.scale, f = l.at;
-    const box = (x: number, y: number): Box => ({ x0: x - w / 2 - px, x1: x + w / 2 + px, y0: y - py, y1: y + l.size + py });
-    let sx = l.x, sy = l.y, ok = !space.hits(box(sx, sy), f?.id);
-    if (!ok && f) {
-      const spots: [number, number][] = [[f.x, f.y - f.r - g - l.size], [f.x + f.r + g + w / 2, f.y - l.size / 2], [f.x - f.r - g - w / 2, f.y - l.size / 2]];
-      for (const [x, y] of spots) if (!space.hits(box(x, y), f.id)) { sx = x; sy = y; ok = true; break; }
+    let sx = l.x, sy = l.y, ok = !space.hits(at(sx, sy, w, px, py, l.size), f?.id);
+    // Then above it, right of it, left of it.
+    for (let k = 0; !ok && f && k < 3; k++) {
+      const x = k === 0 ? f.x : k === 1 ? f.x + f.r + g + w / 2 : f.x - f.r - g - w / 2, y = k === 0 ? f.y - f.r - g - l.size : f.y - l.size / 2;
+      if (!space.hits(at(x, y, w, px, py, l.size), f.id)) { sx = x; sy = y; ok = true; }
     }
     if (!ok && !l.must) continue;
     if (!ok) { sx = l.x; sy = l.y; }
-    space.add(box(sx, sy));
+    at(sx, sy, w, px, py, l.size);
+    space.add(space.box(probe.x0, probe.x1, probe.y0, probe.y1));
     l.x = sx; l.y = sy;
     keep.push(l);
   }
@@ -135,6 +152,15 @@ export function drawQueuedLabels(ctx: CanvasRenderingContext2D, queue: QueuedLab
   ctx.restore();
 }
 
+const kept: QueuedLabel[] = [];
+const probe: Box = { x0: 0, y0: 0, x1: 0, y1: 0 };
+/** The probe box for a name `w` wide whose top centre is at (x, y), with its air around it. */
+const at = (x: number, y: number, w: number, px: number, py: number, size: number) => {
+  probe.x0 = x - w / 2 - px; probe.x1 = x + w / 2 + px; probe.y0 = y - py; probe.y1 = y + size + py;
+  return probe;
+};
+const byPrio = (a: QueuedLabel, b: QueuedLabel) => b.prio - a.prio;
+
 /** A name with its outline, `px` pixels on screen, its top centre at graph point (x, y): stamped like the file names. */
 export function drawName(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, px: number, weight: number, family: string, ink: string, halo: string, alpha: number) {
   const s = nameSprite(ctx, { text, x, y, size: px, scale: 1, alpha, weight, family, ink, halo, prio: 0, forced: false });
@@ -151,7 +177,7 @@ export function drawName(ctx: CanvasRenderingContext2D, text: string, x: number,
 function nameSprite(ctx: CanvasRenderingContext2D, l: QueuedLabel): Sprite | null {
   const px = bucket(l.size * l.scale), halo = 1.5, w = textWidth(ctx, l.text, l.weight, l.family, px, px);
   const W = Math.ceil(w + 2 * halo + 2), H = Math.ceil(px * 1.3 + 2 * halo + 2), ox = W / 2, oy = halo + 1;
-  return sprite(`name|${l.text}|${l.weight}|${l.family}|${l.ink}|${l.halo}|${px}`, W, H, ox, oy, (c) => {
+  return sprite(nameKey(l.text, l.weight, l.family, l.ink, l.halo, px), W, H, ox, oy, (c) => {
     c.font = `${l.weight} ${px}px ${l.family}`;
     c.textAlign = "center"; c.textBaseline = "top";
     c.lineJoin = "round"; c.lineWidth = 2 * halo; c.strokeStyle = l.halo;
@@ -159,4 +185,18 @@ function nameSprite(ctx: CanvasRenderingContext2D, l: QueuedLabel): Sprite | nul
     c.fillStyle = l.ink;
     c.fillText(l.text, ox, oy);
   });
+}
+
+/** A name's sprite key, made once per look (not a new string per name per frame). */
+type KeyMemo = { weight: number; family: string; ink: string; halo: string; px: number; key: string };
+const nameKeys = new Map<string, KeyMemo[]>();
+function nameKey(text: string, weight: number, family: string, ink: string, halo: string, px: number): string {
+  let l = nameKeys.get(text);
+  if (l) for (const m of l) if (m.weight === weight && m.px === px && m.ink === ink && m.halo === halo && m.family === family) return m.key;
+  if (nameKeys.size > 5000) { nameKeys.clear(); l = undefined; }
+  const key = `name|${text}|${weight}|${family}|${ink}|${halo}|${px}`;
+  if (!l) nameKeys.set(text, (l = []));
+  if (l.length > 16) l.length = 0;
+  l.push({ weight, family, ink, halo, px, key });
+  return key;
 }

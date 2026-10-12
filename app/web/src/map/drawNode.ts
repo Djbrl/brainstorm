@@ -427,7 +427,8 @@ const folderName = (n: GNode) => {
   return segs.length > 1 && /^(src|lib|test|tests|app|components|utils|internal|pkg)$/.test(last) ? segs.slice(-2).join("/") : last;
 };
 /** A queued file's label, built in full (only for the ones that may be drawn this frame). */
-export function labelFor(n: GNode, prio: number, F: Frame): QueuedLabel {
+/** `out`: a label to fill instead of a new one (the frame keeps a pool of them). */
+export function labelFor(n: GNode, prio: number, F: Frame, out?: QueuedLabel): QueuedLabel {
   const st = F.st, tokens = F.tokens, scale = F.scale, r = n.r, x = n.x!, y = n.y!;
   const active = !!n.file.activeSessionId, isSel = n.id === F.sel, isHover = n.id === F.hover;
   const look = n.lf === F.id ? n.lk ?? null : null, alpha = look?.alpha ?? 1;
@@ -436,14 +437,14 @@ export function labelFor(n: GNode, prio: number, F: Frame): QueuedLabel {
   const fs = Math.max(11, Math.min(14, 11 + r * scale * 0.08)) / scale;
   // Clear of what the theme draws (a cube's corners, a globe's ring) and of the selection ring.
   const ringR = n.dir ? r : Math.max(reachOf(r, active, st), isSel || isHover ? (st.node === "dot" ? r : r * 1.35 + 2 / scale) : 0);
-  return {
-    text: (n.bn ??= n.dir ? folderName(n) : baseName(n.id)), x, y: y + ringR + 3 / scale, size: fs, scale,
-    alpha: isSel || isHover ? 1 : (inFocus ? Math.max(alpha, 0.8) : alpha) * (n.said ?? 1) * (n.dir ? Math.max(0, 1 - (n.open ?? 0) * 3) : 1),
-    at: { id: n.id, x, y, r: ringR }, must: isSel || isHover,
-    weight: isSel || (active && !focusing) ? 600 : 500, family: st.labelFont ?? tokens.body,
-    ink: isSel || (active && !focusing) || isHover || (inFocus && look!.edited) ? st.fileInk : st.fileInkQuiet, halo: st.halo,
-    prio, forced,
-  };
+  const l = out ?? ({ at: { id: "", x: 0, y: 0, r: 0 } } as QueuedLabel), at = l.at ?? (l.at = { id: "", x: 0, y: 0, r: 0 });
+  l.text = (n.bn ??= n.dir ? folderName(n) : baseName(n.id)); l.x = x; l.y = y + ringR + 3 / scale; l.size = fs; l.scale = scale;
+  l.alpha = isSel || isHover ? 1 : (inFocus ? Math.max(alpha, 0.8) : alpha) * (n.said ?? 1) * (n.dir ? Math.max(0, 1 - (n.open ?? 0) * 3) : 1);
+  at.id = n.id; at.x = x; at.y = y; at.r = ringR; l.must = isSel || isHover;
+  l.weight = isSel || (active && !focusing) ? 600 : 500; l.family = st.labelFont ?? tokens.body;
+  l.ink = isSel || (active && !focusing) || isHover || (inFocus && look!.edited) ? st.fileInk : st.fileInkQuiet; l.halo = st.halo;
+  l.prio = prio; l.forced = forced;
+  return l;
 }
 
 /** The batched dots (drawFile), each colour in one fill: a circle, or a square as big when it's under a pixel. */

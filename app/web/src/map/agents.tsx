@@ -4,7 +4,7 @@ import { clock } from "../lib/live";
 import { mapStyle, type RGB } from "./themes";
 import { drawMarker } from "./marks";
 import { drawTrip, platform } from "./routes";
-import { css, hex, mixRGB, rgbOf, same } from "./color";
+import { hex, mixRGB, rgbOf, same } from "./color";
 import { hashString } from "./util";
 import { drawPulse, drawThinkRing, ERR_PULSE_MS, ERROR_RED, glide, PULSE_MS, setOff, trailPath } from "./tracer";
 export { ERROR_RED } from "./tracer";
@@ -75,6 +75,16 @@ export type AgentAnim = {
   // Changing state eases (STATE_EASE): the marker's colour (its own, error red, greyed at rest), the thinking and
   // waiting rings fading in and out; `easing` while any is still on its way (useLiveAgents keeps the frames coming).
   col?: RGB; thinkA?: number; waitA?: number; easeT?: number; easing?: boolean;
+  // Kept between frames so a frame allocates nothing for an agent that didn't change (drawAgents):
+  /** What its trail gave, for the trail object it came with (a new one per agent message) and the resolver. */
+  read?: { trail: AgentPresence["trail"]; resolveId: (file: string) => string | undefined; was: string | undefined; anchor: string;
+    files: string[]; key: string; reads: string[] };
+  /** The colour it eases toward, for its state's colour and whether it rests. */
+  want?: { color: string; resting: boolean; rgb: RGB };
+  /** The marker's CSS colour, for the rounded colour it was made from (r << 16 | g << 8 | b). */
+  markCss?: string; markKey?: number;
+  /** Its trail's points this frame (reused). */
+  pts?: Pt[];
 };
 type Pt = { x: number; y: number; r: number };
 const READ_MS = 1500;
@@ -85,8 +95,10 @@ const STATE_EASE = 0.16;    // seconds for a marker to (nearly) take its new sta
 const REST_GREY: RGB = [176, 180, 190];   // at rest, the marker's colour turns this much toward grey (REST_MIX)
 const REST_MIX = 0.55;
 const toward = (a: number, b: number, f: number) => (Math.abs(b - a) < 0.01 ? b : a + (b - a) * f);
-const easeRGB = (a: RGB, b: RGB, f: number): RGB =>
-  a.map((v, i) => (Math.abs(b[i] - v) < 0.5 ? b[i] : v + (b[i] - v) * f)) as RGB;
+/** Eases `a` toward `b`, in place. */
+const easeRGB = (a: RGB, b: RGB, f: number) => {
+  for (let i = 0; i < 3; i++) a[i] = Math.abs(b[i] - a[i]) < 0.5 ? b[i] : a[i] + (b[i] - a[i]) * f;
+};
 const WAIT_AMBER = "#f59e0b";
 const WAIT_TEXT = "#9a5800";      // on a light outline
 const WAIT_TEXT_DARK = "#ffc56b"; // on a dark one (Prism, Hologram)
@@ -161,20 +173,27 @@ export function drawAgents(opts: {
   const now = clock();
   const style = mapStyle(), font = style.marker === "badge" ? style.labelFont ?? opts.font : opts.font;   // Metro names agents in its own type
 
-  // Fan out agents standing on the same file.
-  const groups = new Map<string, AgentPresence[]>();
+  // Fan out agents standing on the same file (the groups and their lists are kept from frame to frame).
+  for (const l of groups.values()) l.length = 0;
   for (const a of agents) {
-    const was = anim.get(a.id)?.file;
-    const key = anchorFile(a, resolveId, was && resolve(was) ? was : undefined);
+    const st0 = anim.get(a.id), was = st0?.file, w = was && resolve(was) ? was : undefined;
+    // Where it stands only changes with its trail (a new object per message), the resolver, or where it was.
+    const r = st0?.read;
+    const key = r && r.trail === a.trail && r.resolveId === resolveId && r.was === w ? r.anchor : anchorFile(a, resolveId, w);
+    if (st0) { if (r && r.trail === a.trail && r.resolveId === resolveId) { r.was = w; r.anchor = key; } else st0.read = undefined; }
     if (!key) continue;
-    (groups.get(key) ?? groups.set(key, []).get(key)!).push(a);
+    const l = groups.get(key);
+    if (l) l.push(a); else groups.set(key, [a]);
   }
+  if (groups.size > 64) for (const [k, l] of groups) if (!l.length) groups.delete(k);
 
   for (const [key, group] of groups) {
-    group.sort((a, b) => a.id.localeCompare(b.id));
+    if (!group.length) continue;
+    if (group.length > 1) group.sort(byId);
     const node = resolve(key);
     if (!node) continue;
-    group.forEach((a, i) => {
+    for (let i = 0; i < group.length; i++) {
+      const a = group[i];
       const angle = -Math.PI / 4 + i * ((Math.PI * 2) / Math.max(group.length, 5));
       const dist = node.r + 11 / scale;
       const tx = node.x + Math.cos(angle) * dist, ty = node.y + Math.sin(angle) * dist;
@@ -190,9 +209,11 @@ export function drawAgents(opts: {
       const target = agentAlpha(a, now, !!waiting?.has(a.id) || thinks, !!keep) * (dimmed?.has(a.id) ? DIM : 1);
       st.alpha += (target - st.alpha) * 0.08;
 
-      // New trail entries: reads become lines of sight. Activity with no new file becomes a pulse.
+      // New trail entries: reads become lines of sight. Activity with no new file becomes a pulse. A trail already
+      // read (the same object: no message since) has nothing new.
       let fresh = false;
-      for (const m of a.trail) {
+      const known = st.read?.trail === a.trail && st.read.resolveId === resolveId ? st.read : undefined;
+      if (!known) for (const m of a.trail) {
         const k = `${m.file}|${m.action}|${m.ts}`;
         if (st.seen.has(k)) continue;
         st.seen.add(k); fresh = true;
@@ -202,34 +223,44 @@ export function drawAgents(opts: {
       if (a.errorAt && a.errorAt !== st.lastErr) { st.lastErr = a.errorAt; if (Date.now() - Date.parse(a.errorAt) < 10_000) st.errT0 = t; }
       st.lastTs = a.ts; st.seeded = true;
       if (st.seen.size > 200) st.seen = new Set([...st.seen].slice(-60));
-      if (st.alpha < 0.01) { st.easing = false; return; }
+      // What its trail gives (the files it wrote, those it read lately), once per trail.
+      const rd = known && known.key === key ? known : (st.read = {
+        trail: a.trail, resolveId, was: st.read?.was, anchor: key, key, files: writtenFiles(a, resolveId), reads: recentReads(a, resolveId, key),
+      });
+      if (st.alpha < 0.01) { st.easing = false; continue; }
 
       const erring = t - st.errT0 < ERR_MS;
       const color = erring ? ERROR_RED : agentColor(a, accent);
       // Its state's colour, eased: its own while it works or thinks, red on an error, greyed once it rests.
       const resting = !a.active && !thinks && !waiting?.has(a.id) && !erring && !keep;   // with its thread open it keeps its colour
-      const want = resting ? mixRGB(rgbOf(color), REST_GREY, REST_MIX) : rgbOf(color);
+      if (st.want?.color !== color || st.want.resting !== resting) st.want = { color, resting, rgb: resting ? mixRGB(rgbOf(color), REST_GREY, REST_MIX) : rgbOf(color) };
+      const want = st.want.rgb;
       const f = 1 - Math.exp(-Math.min(0.1, Math.max(0, (t - (st.easeT ?? t)) / 1000)) / STATE_EASE);
       st.easeT = t;
       // Eased in fractions and rounded only for the CSS string: rounding each frame would stall a channel a few
       // units short of its target (the step is ~0.1 at 60 fps), and the map would keep redrawing for nothing.
-      st.col = st.col ? easeRGB(st.col, want, f) : want;
+      if (st.col) easeRGB(st.col, want, f); else st.col = [want[0], want[1], want[2]];
       st.thinkA = toward(st.thinkA ?? (thinks ? 1 : 0), thinks ? 1 : 0, f);
       st.waitA = toward(st.waitA ?? (waiting?.has(a.id) ? 1 : 0), waiting?.has(a.id) ? 1 : 0, f);
       st.easing = !same(st.col, want) || (st.thinkA > 0 && st.thinkA < 1) || (st.waitA > 0 && st.waitA < 1);
-      const markCss = css(st.col.map(Math.round) as RGB);
+      const r0 = Math.round(st.col[0]), g0 = Math.round(st.col[1]), b0 = Math.round(st.col[2]), mk = (r0 << 16) | (g0 << 8) | b0;
+      if (st.markKey !== mk || !st.markCss) { st.markKey = mk; st.markCss = `rgb(${r0},${g0},${b0})`; }
+      const markCss = st.markCss;
 
       // Trail through the last distinct files it wrote, newest strongest.
-      const files: string[] = [];
-      for (const m of a.trail) {
-        if (!isWrite(m.action)) continue;
-        const id = resolveId(m.file);
-        if (id && files[files.length - 1] !== id) files.push(id);
-      }
       // Metro: through the marker's stops by each file, so the track it rode is the one it leaves.
-      const pts = files.slice(-7).map((f) => resolve(f)).filter((x): x is Pt => !!x)
-        .map((n) => (style.route !== "glide" ? { ...platform(n.x, n.y, n.r, scale, angle), r: 0 } : n));
-      if (pts.length) pts[pts.length - 1] = { x: st.x, y: st.y, r: 0 }; // end at the marker
+      const pts = (st.pts ??= []);
+      let np = 0;
+      for (let k = Math.max(0, rd.files.length - 7); k < rd.files.length; k++) {
+        const n = resolve(rd.files[k]);
+        if (!n) continue;
+        const q = pts[np] ?? (pts[np] = { x: 0, y: 0, r: 0 });
+        np++;
+        if (style.route !== "glide") { const pl = platform(n.x, n.y, n.r, scale, angle); q.x = pl.x; q.y = pl.y; q.r = 0; }
+        else { q.x = n.x; q.y = n.y; q.r = n.r; }
+      }
+      pts.length = np;
+      if (np) { const q = pts[np - 1]; q.x = st.x; q.y = st.y; q.r = 0; } // end at the marker
       if (pts.length > 1 && (!quiet || followId === a.id)) {
         ctx.lineCap = "round";
         for (let k = 0; k < pts.length - 1; k++) {
@@ -252,24 +283,27 @@ export function drawAgents(opts: {
       // What it read lately: a dotted line from the marker to each of the last few files it read (not the one it stands
       // on), the newest strongest, until it reads others. Writes are the solid trail above.
       if (showReads && (!quiet || followId === a.id)) {
-        const reads = recentReads(a, resolveId, key);
-        ctx.setLineDash([2.2 / scale, 3.6 / scale]);
-        ctx.lineCap = "round";
-        ctx.strokeStyle = color;
-        reads.forEach((id, j) => {
-          const n = resolve(id);
-          if (!n) return;
-          const dx = n.x - st.x, dy = n.y - st.y, d = Math.hypot(dx, dy), stop = Math.max(0, d - n.r - 2 / scale);
-          if (stop < 6 / scale) return;
-          ctx.globalAlpha = st.alpha * (0.62 - j * 0.12);
-          ctx.lineWidth = 1.4 / scale;
-          ctx.beginPath(); ctx.moveTo(st.x, st.y); ctx.lineTo(st.x + (dx / d) * stop, st.y + (dy / d) * stop); ctx.stroke();
-        });
-        ctx.setLineDash([]);
+        const reads = rd.reads;
+        if (reads.length) {
+          dash[0] = 2.2 / scale; dash[1] = 3.6 / scale;
+          ctx.setLineDash(dash);
+          ctx.lineCap = "round";
+          ctx.strokeStyle = color;
+          for (let j = 0; j < reads.length; j++) {
+            const n = resolve(reads[j]);
+            if (!n) continue;
+            const dx = n.x - st.x, dy = n.y - st.y, d = Math.hypot(dx, dy), stop = Math.max(0, d - n.r - 2 / scale);
+            if (stop < 6 / scale) continue;
+            ctx.globalAlpha = st.alpha * (0.62 - j * 0.12);
+            ctx.lineWidth = 1.4 / scale;
+            ctx.beginPath(); ctx.moveTo(st.x, st.y); ctx.lineTo(st.x + (dx / d) * stop, st.y + (dy / d) * stop); ctx.stroke();
+          }
+          ctx.setLineDash(NO_DASH);
+        }
       }
 
       // A read as it happens: a thin line from the marker to the file read and a small ring on it, fading out.
-      st.flashes = st.flashes.filter((f) => t - f.t0 < READ_MS);
+      if (st.flashes.length) { let kept = 0; for (const fl of st.flashes) if (t - fl.t0 < READ_MS) st.flashes[kept++] = fl; st.flashes.length = kept; }
       if (showReads && (!quiet || followId === a.id)) for (const f of st.flashes) {
         const id = resolveId(f.file);
         const n = id ? resolve(id) : undefined;
@@ -331,6 +365,20 @@ export function drawAgents(opts: {
         ctx.fillText(label, lx, ly);
       }
       ctx.globalAlpha = 1;
-    });
+    }
   }
+}
+
+const groups = new Map<string, AgentPresence[]>();
+const byId = (a: AgentPresence, b: AgentPresence) => a.id.localeCompare(b.id);
+const dash = [0, 0], NO_DASH: number[] = [];
+/** The last distinct files an agent wrote (map node ids), oldest first. */
+function writtenFiles(a: AgentPresence, resolveId: (file: string) => string | undefined): string[] {
+  const files: string[] = [];
+  for (const m of a.trail) {
+    if (!isWrite(m.action)) continue;
+    const id = resolveId(m.file);
+    if (id && files[files.length - 1] !== id) files.push(id);
+  }
+  return files;
 }

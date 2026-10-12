@@ -58,6 +58,16 @@ export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIn
   const space = useRef(new LabelSpace());         // taken this frame: files, replay badges, folder names, file names
   const markedRef = useRef<string | null>(null);  // the file the replay's marker names this frame
   const ringsOut = useRef<AgentRing[]>([]);
+  const labelBufs = useRef({ order: [] as number[], queue: [] as QueuedLabel[], pool: [] as QueuedLabel[] });
+  // drawAgents' options: one object, refilled each frame; its two callbacks made once.
+  const agentOpts = useRef<Parameters<typeof drawAgents>[0]>(null as never);
+  agentOpts.current ??= {
+    ctx: null as never, scale: 1, agents: [], anim: new Map(), accent: "", font: "", hoverFile: null, followId: null,
+    resolveId: () => undefined, showReads: true,
+    land: (id, t) => caches.current.landings.set(id, t),
+    // The node itself (it has x, y and r): read only.
+    resolve: (id) => { const n = nodeIndexRef.current.get(id); return n && n.x !== undefined && n.y !== undefined ? n as { x: number; y: number; r: number } : undefined; },
+  };
   const frame = useRef<Frame>(null as never);
   frame.current ??= { id: 0, scale: 1, x0: -Infinity, y0: -Infinity, x1: Infinity, y1: Infinity, now: 0, t: 0, st: mapStyle(),
     sel: null, hover: null, coolCss: "", looks: true, anyLook: false, lookSum: 0, motion: Motion.None, labN: [], labP: [],
@@ -141,23 +151,27 @@ export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIn
     const F = frame.current, I = inputs.current, tokens = I.tokens;
     // File names go on after every file is drawn, so no circle covers a name (the selected one's last, on top).
     // The file the replay's marker names (drawModules) isn't named twice. Only the most important ones are placed.
-    const named = markedRef.current, order = F.labN.map((_, i) => i);
+    // The lists and labels are kept from frame to frame (refilled, not made again).
+    const L = labelBufs.current, order = L.order, queue = L.queue, named = markedRef.current;
+    order.length = F.labN.length;
+    for (let i = 0; i < order.length; i++) order[i] = i;
     if (order.length > FILE_LABELS_MAX) { order.sort((a, b) => F.labP[b] - F.labP[a]); order.length = FILE_LABELS_MAX; }
-    const queue: QueuedLabel[] = [];
+    queue.length = 0;
+    let used = 0;
     for (const i of order) {
-      const l = labelFor(F.labN[i], F.labP[i], F);
-      if (named && l.at?.id === named && !l.must) continue;
+      const l = labelFor(F.labN[i], F.labP[i], F, L.pool[used]);
+      if (named && l.at?.id === named && !l.must) { L.pool[used] = l; continue; }
+      L.pool[used++] = l;
       queue.push(l);
     }
     drawQueuedLabels(ctx, queue, space.current);
     replayRef.current.draw(ctx, scale);
-    drawAgents({
-      ctx, scale, agents: live.agentsRef.current, anim: live.anim.current, accent: tokens.accent, font: tokens.body,
-      hoverFile: I.hover, followId: followRef.current, resolveId, showReads: mapPrefs.showReads && !tourHidesExtras(), quiet: !I.open, waiting: live.waitingRef.current,
-      thinking: live.thinkingRef.current, keep: I.open, dimmed: live.dimmedRef.current, rings: ringsOut.current = [],
-      land: (id, t) => caches.current.landings.set(id, t),
-      resolve: (id) => { const n = nodeIndexRef.current.get(id); return n && n.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y, r: n.r } : undefined; },
-    });
+    const A = agentOpts.current;
+    A.ctx = ctx; A.scale = scale; A.agents = live.agentsRef.current; A.anim = live.anim.current; A.accent = tokens.accent; A.font = tokens.body;
+    A.hoverFile = I.hover; A.followId = followRef.current; A.resolveId = resolveId; A.showReads = mapPrefs.showReads && !tourHidesExtras();
+    A.quiet = !I.open; A.waiting = live.waitingRef.current; A.thinking = live.thinkingRef.current; A.keep = I.open; A.dimmed = live.dimmedRef.current;
+    ringsOut.current.length = 0; A.rings = ringsOut.current;
+    drawAgents(A);
     syncRings(ringLayer.current, ringsOut.current);
   }, [resolveId]); // eslint-disable-line react-hooks/exhaustive-deps
 

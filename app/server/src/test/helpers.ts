@@ -20,6 +20,7 @@ export interface ListenerInternals {
   codex?: CodexSource;
   log: { log(m: string): void; warn(m: string): void };
   scope(): Scope;
+  project: { visitorsFound: Promise<void> };
   setRoot(root: string): void;
   rereadChangedSources(): void;
   backfillForNewFilter(): void;

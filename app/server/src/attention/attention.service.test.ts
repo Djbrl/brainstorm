@@ -1,4 +1,4 @@
-// Attention on a mocked clock: Date and the service's 2-second sweep timer are node:test's mock timers, so "quiet for
+// Attention on a mocked clock: Date and the service's sweep timer (set for the next deadline) are node:test's mock timers, so "quiet for
 // 3 hours" is a jump of the clock and a sweep is the real timer firing, not a call into the service's private sweep().
 import "reflect-metadata";
 import { test, type TestContext } from "node:test";
@@ -15,7 +15,7 @@ const iso = (msAgo: number) => new Date(Date.now() - msAgo).toISOString();
 const NOW = Date.parse("2026-10-01T12:00:00.000Z");
 
 function setup(ctx: TestContext, visible = ["a", "b"]) {
-  ctx.mock.timers.enable({ apis: ["Date", "setInterval"], now: NOW });
+  ctx.mock.timers.enable({ apis: ["Date", "setTimeout"], now: NOW });
   process.env.RUNDOWN_DATA_DIR = mkdtempSync(join(tmpdir(), "bs-attention-"));
   const dbs = new DbService();
   const sent: Attention[] = [];
@@ -34,8 +34,10 @@ function setup(ctx: TestContext, visible = ["a", "b"]) {
       .run(id, s.sessionId, seq++, s.ts, s.kind, s.text ?? null, s.tool ?? null, s.input ? JSON.stringify(s.input) : null, s.toolUseId ?? null, s.isSubagent ? 1 : 0, s.agentId ?? null);
     return { ...s, id, seq: seq - 1 } as Step;
   };
+  // The sweep runs at the next moment a thread can change by itself (a deadline timer): this fires it once.
+  const nextSweep = () => (att as unknown as { timerAt: number }).timerAt;
   return { att, sent, store, session, listed: () => listed, /** The sweep timer fires once. */
-    sweep: () => ctx.mock.timers.tick(2_000),
+    sweep: () => ctx.mock.timers.tick(Number.isFinite(nextSweep()) ? Math.max(0, nextSweep() - Date.now()) : 0),
     /** The clock jumps (no sweep runs on the way). */
     later: (ms: number) => ctx.mock.timers.setTime(Date.now() + ms),
     bus };

@@ -54,11 +54,11 @@ test("the steps JSON is byte for byte the serialized step objects, and afterSeq 
     assert.equal(r.body, expected, `afterSeq=${q}`);
   }
   // The whole input of a trimmed edit, on its own.
-  const edit = L.store.listSteps("s1").find((s) => s.kind === "edit");
+  const edit = L.store.listSteps("s1").find((s) => s.kind === "edit")!;
   const r = res();
-  c.input(edit.id, r);
-  assert.deepEqual(JSON.parse(r.body), { input: edit.input });
-  assert.throws(() => c.input("nope", res()), /Not Found/);
+  c.input(edit.id, r as never);
+  assert.deepEqual(JSON.parse(r.body!), { input: edit.input });
+  assert.throws(() => c.input("nope", res() as never), /Not Found/);
   await t.close();
 });
 

@@ -16,7 +16,7 @@ import { LinkedLabel } from "../lib/links";
 
 const BIG_DIFF = 400; // lines; above this the diff starts collapsed
 
-/** How worrying each risk flag from the reader is (server/src/reader computeRisk): red, amber, or quiet grey if unknown. */
+/** How worrying each risk flag from the reader is (server/src/listener/risk.ts computeRisk): red, amber, or quiet grey if unknown. */
 const RISK_LEVEL: Record<string, "high" | "mid"> = {
   "possible secret": "high", "touches .env": "high", "deleted test": "high",
   "touches auth": "mid", "touches payment": "mid", "large deletion": "mid",

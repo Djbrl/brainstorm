@@ -1,12 +1,12 @@
 // Pointing and clicking on the map's canvas, worked out against where the circles are this frame (graph.ts hitAt),
-// not force-graph's hit map (repainted at most every 0.8 s). A click is a press and release less than 5 px apart: a
+// not a hit map painted now and then (the graph library's was repainted at most every 0.8 s). A click is a press and release less than 5 px apart: a
 // trackpad's wobble still clicks, a pan doesn't. Moved out of MapView.tsx.
 import { useEffect, type RefObject } from "react";
-import type { ForceGraphMethods } from "react-force-graph-2d";
+import type { ZoomApi } from "./useCanvasZoom";
 import { hitAt, type Graph, type GNode } from "./graph";
 
 export function useCanvasPointer({ wrapRef, fg, graphRef, hasCanvas, hover, onHover, onClick, onMiss }: {
-  wrapRef: RefObject<HTMLElement | null>; fg: RefObject<ForceGraphMethods<GNode, never> | undefined>; graphRef: RefObject<Graph>;
+  wrapRef: RefObject<HTMLElement | null>; fg: RefObject<ZoomApi | undefined>; graphRef: RefObject<Graph>;
   /** The canvas is mounted (the map has nodes): the listeners go on it. */
   hasCanvas: boolean;
   /** The node under the pointer now (to set it only when it changes). */

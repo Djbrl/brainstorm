@@ -4,7 +4,6 @@
 import { LensSwitch } from "./LensSwitch";
 import { clock } from "../lib/live";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from "react-force-graph-2d";
 import type { ProjectMap } from "@contract";
 import { mapPrefs, useNavState, useReplay } from "../lib/nav";
 import { visibleAgents } from "./agents";
@@ -30,6 +29,7 @@ import { useFoldOn } from "./fold";
 import { newCaches } from "./drawNode";
 import { useMapFrame } from "./useMapFrame";
 import { useCanvasPointer } from "./useCanvasPointer";
+import { useCanvasZoom } from "./useCanvasZoom";
 import { useRedrawTriggers } from "./useRedrawTriggers";
 import { useOpenFolders } from "./useOpenFolders";
 import { useNodeResolver } from "./useNodeResolver";
@@ -89,16 +89,19 @@ export function MapView() {
   const [wrapRef, size] = useSize<HTMLDivElement>();
   const small = size.w < SMALL_MAP;
   const smallRef = useRef(small); smallRef.current = small;
-  const fg = useRef<ForceGraphMethods<GNode, never> | undefined>(undefined);
+  // The canvas and its camera (useCanvasZoom.ts): it draws only when asked, so the map rests when nothing moves.
+  const frameRef = useRef<(ctx: CanvasRenderingContext2D, k: number) => void>(() => {});
+  const drawFrame = useCallback((ctx: CanvasRenderingContext2D, k: number) => frameRef.current(ctx, k), []);
+  const { canvasRef, ref: fg } = useCanvasZoom({ width: size.w, height: size.h, draw: drawFrame });
   const tokens = useMemo(readTokens, [theme]);   // each theme sets its own colours (themes.css)
   const stepWindow = useStepWindow();
   const [hover, setHover] = useState<string | null>(null);
   // The camera works in the part of the canvas the sidebar, the side panels, the lens pill and the player leave free.
-  const cam = useCamera(fg as never, wrapRef);
+  const cam = useCamera(fg, wrapRef);
   const camRef = useRef<Camera>(cam); camRef.current = cam;
 
   // ---- redraws: only while something moves (redraw.ts) ----
-  const redraw = useMemo(() => createRedraw(() => { const g = fg.current; if (g) g.zoom(g.zoom()); }), []);
+  const redraw = useMemo(() => createRedraw(() => fg.current?.redraw()), []);
   useEffect(() => () => redraw.stop(), [redraw]);
 
   // ---- live agents ----
@@ -232,6 +235,16 @@ export function MapView() {
   const { startFrame, drawNode, endFrame } = useMapFrame({
     fg, inputs, epoch, caches, tween, graphRef, nodeIndexRef, resolveId, replayRef, live, followRef, ringLayer, readmap: readmapFrame, redraw, files: map?.files ?? null,
   });
+  // One frame: what it knows, each file in drawing order, then everything over the files. The context is saved before
+  // the files and restored after each one and at the end, as the graph library painted them (each file starts from the
+  // state the frame set up or the one before it left).
+  frameRef.current = (ctx, k) => {
+    startFrame(ctx, k);
+    ctx.save();
+    for (const n of graphRef.current.data.nodes) { drawNode(n, ctx, k); ctx.restore(); }
+    ctx.restore();
+    endFrame(ctx, k);
+  };
 
   // A closed folder: the camera goes into it (which opens it, fold.ts). A file: selected, or let go if it already was.
   const nav = useNavActions();
@@ -275,24 +288,8 @@ export function MapView() {
           </div>
         )
       ) : (
-        <ForceGraph2D<GNode, never>
-          ref={fg as never}
-          width={size.w}
-          height={size.h}
-          graphData={graph.data}
-          backgroundColor="rgba(0,0,0,0)"
-          nodeId="id"
-          nodeRelSize={1}
-          nodeVal={nodeVal}
-          nodeLabel={noLabel}
-          nodeCanvasObject={drawNode}
-          onRenderFramePre={startFrame}
-          onRenderFramePost={endFrame}
-          warmupTicks={0}
-          cooldownTicks={0}
-          enableNodeDrag={false}
-          enablePointerInteraction={false}
-        />
+        // The class is the one the graph library gave its canvas's box: the themes' overlays and the edge fade use it.
+        <div className="force-graph-container"><canvas ref={canvasRef} /></div>
       )}
       {/* Agents' breathing rings (thinking, waiting on you), over the canvas: CSS animates them, the map rests. */}
       <div className="agent-rings" ref={ringLayer} aria-hidden="true" />
@@ -320,8 +317,6 @@ export function MapView() {
   );
 }
 
-const nodeVal = (n: NodeObject) => (n as GNode).r * (n as GNode).r;
-const noLabel = () => "";
 
 /**
  * A big project past the file cap (mapper/ignore.ts): the map says it shows some of the files, not all, until you close

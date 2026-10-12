@@ -1,8 +1,9 @@
-// One frame of the map, in force-graph's three callbacks: startFrame (what the frame knows: the clock, the view, what
+// One frame of the map, in three parts (MapView calls them for each frame useCanvasZoom draws): startFrame (what the frame knows: the clock, the view, what
 // is open), drawNode (each file, drawNode.ts), endFrame (the dots, import lines, names, the replay's tracer, the agents,
 // and whether another frame must follow: redraw.ts). Moved out of MapView.tsx; it owns what drawing keeps between frames.
 import { useCallback, useEffect, useRef, type RefObject } from "react";
-import type { NodeObject, ForceGraphMethods } from "react-force-graph-2d";
+import type { NodeObject } from "react-force-graph-2d";
+import type { ZoomApi } from "./useCanvasZoom";
 import type { FileNode } from "@contract";
 import { clock, isRecording } from "../lib/live";
 import { sinceMs } from "../lib/visit";
@@ -37,7 +38,7 @@ export type FrameInputs = {
 };
 
 export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIndexRef, resolveId, replayRef, live, followRef, ringLayer, readmap, redraw, files }: {
-  fg: RefObject<ForceGraphMethods<GNode, never> | undefined>;
+  fg: RefObject<ZoomApi | undefined>;
   inputs: { readonly current: FrameInputs };
   epoch: RefObject<number>; caches: RefObject<Caches>;
   tween: Parameters<typeof stepTween>[0];

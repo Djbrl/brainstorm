@@ -1,11 +1,11 @@
 // When the map canvas redraws.
 //
-// force-graph redraws a frame only when it has to (the camera moved, the canvas resized):
-// its autoPauseRedraw. Everything else that changes the picture comes from us: an agent gliding, a replay step, a file
+// The canvas (useCanvasZoom.ts) redraws a frame by itself only when it has to (the camera moved, the canvas resized).
+// Everything else that changes the picture comes from us: an agent gliding, a replay step, a file
 // fading into a thread's focus, a ripple, a Prism cube turning, a hover, new data. This keeps frames coming for exactly
 // as long as one of those runs, and lets the canvas rest (no work at all) when nothing moves.
 //
-// How a frame is asked for: zoom(zoom()), a camera move that goes nowhere, is force-graph's public way to mark it dirty.
+// How a frame is asked for: the canvas's redraw() (one frame on the next animation frame).
 
 /** What the last drawn frame still had moving: nothing, something smooth (every frame), or only slow motion. */
 export const Motion = { None: 0, Smooth: 1, Slow: 2 } as const;

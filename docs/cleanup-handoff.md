@@ -5,7 +5,7 @@ All six phases of the audit's plan are done on `cleanup/phase-2` (181 commits on
 - **Every change, with its why and what you might notice:** `docs/cleanup-changes.md`.
 - **The audit and the to-do list:** the Claude Doc "Rundown code audit", https://claude.ai/code/artifact/767fb401-b9b7-4bfb-936c-03fc5129868a (Phases 2 to 4 ticked).
 - **Full reports and probes:** branch `claude/review` (keep it local: it documents the holes and the computer name).
-- **Fixer brief:** `docs/cleanup-fix-brief.md`. **Release checklist:** `docs/release.md`.
+- **Release checklist:** `docs/release.md`.
 
 Checks at the end: server 314/314 tests, web 42/42 (vitest), both typechecks clean, `build-plugin.mjs --check` builds and reports `plugin/build` as out of date (expected until the release rebuild).
 

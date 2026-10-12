@@ -19,6 +19,7 @@ import { isIdleTranscript } from "./threads";
 import { walkCandidates } from "../mapper/list-files";
 import { config } from "../core/config";
 import { safely } from "../core/safely";
+import { plural } from "../shared/text";
 
 const execFileP = promisify(execFile);
 /** On a case-insensitive disk (macOS) "~/Proj" still opens after a rename to "~/proj": the name as the disk spells it now, when only the case differs. */
@@ -339,7 +340,7 @@ export class WorkspaceService implements OnModuleInit, OnModuleDestroy {
     if (stats) {
       return {
         id: "imports", label, state: "done",
-        detail: `${stats.edges} imports across ${stats.modules} modules`,
+        detail: `${plural(stats.edges, "import")} across ${plural(stats.modules, "module")}`,
       };
     }
     if (this.mapper.isBuilding(root)) return { id: "imports", label, state: "running" };

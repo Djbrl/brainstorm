@@ -30,9 +30,11 @@ export function Welcome() {
       <h2 id="welcome-title">{demo ? "A recorded thread" : "This is your project"}</h2>
       <p>
         Each dot is a file, grouped by folder. When an agent works, it shows up here as a dot moving between the files
-        it reads and changes.{demo ? " This one is a recording: Claude Code and two subagents fixing a bug in a small trail-finder app." : ""}
+        it reads and changes.{demo ? " This one is a recording: Claude Code and its subagents adding a feature to a small trail-finder app." : ""}
       </p>
-      <p className="welcome-sub">Your threads are on the left. Open one to see what it touched, then its steps or its replay.</p>
+      <p className="welcome-sub">{demo
+        ? "The thread is open: its steps are on the left, what it touched is lit on the map. Click a step to see it, press Space to play it, P for the places it went outside the code, ? for every key."
+        : "Your threads are on the left. Open one to see what it touched, then its steps or its replay."}</p>
       <div className="welcome-actions">
         {latest && <button className="welcome-primary" onClick={watch}>{demo ? "Watch the replay" : "Watch your latest thread"}</button>}
         <button className="welcome-quiet" onClick={close}>Look around</button>

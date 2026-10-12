@@ -4,6 +4,8 @@
 // pill) are hidden until the step that shows them (`:root[data-tour]`, tour.css), and an example agent can walk the map.
 import type { AgentPresence } from "@contract";
 import { ApiError, get, put } from "./api";
+import { isRecording } from "./live";
+import { readStored, writeStored } from "./store";
 import { createAtom, useStoreSelector } from "./store";
 
 export type TourStep = "hello" | "threads" | "steps" | "step" | "files" | "map" | "readmap" | "keys" | "stats" | "end";
@@ -41,6 +43,12 @@ export const tourStore = {
   },
   /** Whether the server says this install had it; starts it if not. */
   load: () => {
+    if (isRecording()) {                     // the hosted demo: once per visitor, in this browser
+      if (tour.get().done !== null) return;
+      const done = readStored(DEMO_TOUR) === "1";
+      set({ done, ...(done ? {} : { step: "hello" as TourStep }) });
+      return;
+    }
     get<{ done: boolean }>("/api/onboarding").catch((e: unknown) => { if (e instanceof ApiError && e.status) return null; throw e; }).then((r) => {
       if (tour.get().done !== null) return;
       // An older server without the route: count it as done, so nothing nags.
@@ -50,7 +58,10 @@ export const tourStore = {
   },
 };
 
+const DEMO_TOUR = "rundown-demo-tour";
+
 function save(done: boolean) {
+  if (isRecording()) { writeStored(DEMO_TOUR, done ? "1" : "0"); return; }
   put("/api/onboarding", { done })
     .catch(() => { /* offline: it shows again next time, which is fine */ });
 }

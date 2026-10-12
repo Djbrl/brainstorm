@@ -58,7 +58,9 @@ const MAX_TABS = 9;
 export function useBarThreads(openId: string | null): BarThread[] {
   const { sessions, attention, root } = useLiveSelector((s) => ({ sessions: s.sessions, attention: s.attention, root: s.setup?.root ?? "" }), shallowEqual);
   const mine = recent.use()[root], shut = closed.use()[root];
-  return useMemo(() => barThreads(sessions, attention, mine, shut, openId, Date.now()), [sessions, attention, mine, shut, openId]);
+  return useMemo(() => isRecording()                      // a recording: its few threads are the tabs
+    ? sessions.slice(0, MAX_TABS).sort((a, b) => a.startedAt.localeCompare(b.startedAt)).map((session) => ({ session, attention: attention[session.id] }))
+    : barThreads(sessions, attention, mine, shut, openId, Date.now()), [sessions, attention, mine, shut, openId]);
 }
 
 /** The rules of useBarThreads, on plain data (`mine`: the threads opened lately, `shut`: those closed, at `now`). */

@@ -60,6 +60,25 @@ function Crumbs({ project }: { project: string }) {
   );
 }
 
+/**
+ * The hosted demo opens on its thread: its steps in the sidebar and what it touched on the map, once, when the
+ * recording is in and no link names another thread. A click on a step opens it; Space or the welcome card plays it.
+ */
+function DemoOpen() {
+  const { thread } = useNavState();
+  const { startReplay } = useNavActions();
+  const sessions = useLiveSelector((s) => s.sessions);
+  const done = useRef(false);
+  useEffect(() => {
+    if (done.current || !sessions.length) return;
+    done.current = true;
+    if (thread) return;
+    const latest = [...sessions].sort((a, b) => b.lastEventAt.localeCompare(a.lastEventAt))[0];
+    startReplay(latest.id, END);
+  }, [sessions, thread, startReplay]);
+  return null;
+}
+
 /** Mounted once: the tab title and notifications for threads that need you (on its own, so the shell doesn't re-render with every live change). */
 function AttentionAlerts() {
   const { startReplay } = useNavActions();
@@ -107,6 +126,8 @@ function Shell() {
     thread: !!thread, missing: state.missing, lens,
   });
   const local = kind === "local";
+  // The hosted demo shows the thread bar and the keys as your own Rundown does (it's the same app, playing a recording).
+  const board = local || (DEMO && kind === "preview");
 
   if (screen === "loading") return <Loading />;
   if (screen === "setup") {
@@ -169,12 +190,13 @@ function Shell() {
         </div>
       )}
       {offline && state.hasMap && <OfflineBanner />}
-      {local && <ThreadBar project={project} onFind={() => setFinding(true)} onHelp={() => setHelp(true)} onAllProjects={openSetup} />}
-      {local && <Keys finding={finding} setFinding={setFinding} help={help} setHelp={setHelp} />}
+      {board && <ThreadBar project={project} onFind={() => setFinding(true)} onHelp={() => setHelp(true)} onAllProjects={openSetup} />}
+      {board && <Keys finding={finding} setFinding={setFinding} help={help} setHelp={setHelp} />}
       {kind === "shared" && <OpenShared />}
       <LiveFollow />
+      {DEMO && kind === "preview" && <DemoOpen />}
       {/* The hosted demo keeps its one welcome card; your own Rundown has the tour (its last step asks about usage stats). */}
-      {isRecording() ? !thread && kind !== "shared" && <Welcome /> : kind !== "shared" && kind !== "preview" && <><Tour /><AfterTour /></>}
+      {DEMO && kind === "preview" ? <Tour /> : isRecording() ? !thread && kind !== "shared" && <Welcome /> : kind !== "shared" && kind !== "preview" && <><Tour /><AfterTour /></>}
       <main className="view"><Crashed where="the map" key={`${thread?.sessionId ?? ""}|${lens}`}><Suspense fallback={<Loading />}>{
         screen === "offline" ? <Offline />
           : screen === "missing" ? <MissingThread onBack={stopReplay} />

@@ -22,11 +22,16 @@ const KEEP_MS = 3 * 60_000;
 /** A change this long before a command's start, or after its result, still counts (clock and watcher delays). */
 const SLACK_BEFORE_MS = 1_000;
 const SLACK_AFTER_MS = 2_500;
+/** Changes kept, at most: their count, and the bytes they hold (deflated copies of the files, before and after). */
+const MAX_CHANGES = 2_000;
+const MAX_CHANGE_BYTES = 16 * 1024 * 1024;
 /** Commands remembered while their result hasn't come (history can leave some without one). */
 const MAX_CALLS = 2_000;
 
 type Call = { sessionId: string; command: string; cwd: string; start: number; isSubagent: boolean; agentId?: string };
-type Change = { path: string; before: string | null; after: string | null; at: number };
+/** A change on disk. `before` and `after` may be getters that decompress (mapper/live.ts fileChange): read only for the
+ * files a command wrote. `bytes`: what it holds. */
+type Change = { path: string; readonly before: string | null; readonly after: string | null; at: number; bytes?: number };
 
 export class CommandEdits {
   private calls = new Map<string, Call>();
@@ -37,6 +42,7 @@ export class CommandEdits {
   /** Every thread's last edit of a path (tool or command): a file another thread edited isn't credited to this one. */
   private edited = new Map<string, Map<string, number>>();
   private changes: Change[] = [];
+  private changeBytes = 0;
 
   /** `inProject`: whether a path is part of the open project (writes elsewhere, like /tmp, aren't the project's).
    * `root`: the open project's folder (to tell the folders the map ignores, and what it can show).
@@ -46,9 +52,19 @@ export class CommandEdits {
 
   /** A change on disk, from the mapper. */
   fileChanged(c: Change) {
+    const size = (x: Change) => x.bytes ?? 0;
     this.changes.push(c);
+    this.changeBytes += size(c);
     const old = c.at - KEEP_MS;
-    if (this.changes.length > 2_000 || this.changes[0].at < old) this.changes = this.changes.filter((x) => x.at >= old).slice(-2_000);
+    if (this.changes.length > MAX_CHANGES || this.changes[0].at < old || this.changeBytes > MAX_CHANGE_BYTES) {
+      let keep = this.changes.filter((x) => x.at >= old).slice(-MAX_CHANGES);
+      let bytes = keep.reduce((n, x) => n + size(x), 0);
+      let drop = 0;
+      while (bytes > MAX_CHANGE_BYTES && drop < keep.length - 1) bytes -= size(keep[drop++]); // oldest first; the newest stays
+      if (drop) keep = keep.slice(drop);
+      this.changes = keep;
+      this.changeBytes = bytes;
+    }
   }
 
   /** Every stored step goes through here. Returns the command a result finishes, if any: the caller asks `editsFor` then
@@ -102,15 +118,22 @@ export class CommandEdits {
       const p = resolve(w.path);
       if (this.inProject(p) && !insideGit(p) && !ignored(p)) writes.set(p, { kind: w.kind, ...(w.from ? { from: w.from } : {}) });
     }
-    // Live: what changed on disk while it ran, first and last state per file.
-    const seen = new Map<string, { before: string | null; after: string | null }>();
+    // Live: what changed on disk while it ran, the first and last change per file (their content read only if needed).
+    const span = new Map<string, { first: Change; last: Change }>();
     if (live) {
       const from = call.start - SLACK_BEFORE_MS, to = call.end + SLACK_AFTER_MS;
       for (const c of this.changes) {
         if (c.at < from || c.at > to) continue;
-        const had = seen.get(c.path);
-        seen.set(c.path, { before: had ? had.before : c.before, after: c.after });
+        const had = span.get(c.path);
+        span.set(c.path, { first: had ? had.first : c, last: c });
       }
+    }
+    const seen = new Map<string, { readonly before: string | null; readonly after: string | null }>();
+    for (const [path, { first, last }] of span) {
+      let b: string | null | undefined, a: string | null | undefined;
+      seen.set(path, { get before() { return b === undefined ? (b = first.before) : b; }, get after() { return a === undefined ? (a = last.after) : a; } });
+    }
+    if (live) {
       // A file the command names that changed while it ran (a formatter, a codegen script given the file): counted too.
       // Matched by whole words (`.env.example` does not name `.env`; `build` in `npm run build` names no file).
       const words = shellArgv(call.command).flat();

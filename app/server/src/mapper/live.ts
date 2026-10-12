@@ -93,11 +93,21 @@ export function fillSnapshots(c: Cached, reads: Read[]) {
   setImmediate(step);
 }
 
-/** What a file was when last read: "" for one that wasn't there, null when unknown (too big, or not kept yet). */
-function snapshotOf(c: Cached, abs: string, known: boolean): string | null {
-  const z = c.snapshots.get(abs);
-  if (z) return inflateRawSync(z).toString("utf8");
-  return known ? null : "";
+/** What a file was when last read, deflated: "" for one that wasn't there, null when unknown (too big, or not kept yet). */
+function snapshotOf(c: Cached, abs: string, known: boolean): Buffer | "" | null {
+  return c.snapshots.get(abs) ?? (known ? null : "");
+}
+
+const inflated = (z: Buffer | "" | null) => (z === null || z === "" ? z : inflateRawSync(z).toString("utf8"));
+
+/** A "file-content" event: the path and time, with what the file was and is read only when asked (a command that
+ * names the file: listener/command-edits.ts), from the deflated snapshots it keeps. `bytes` is what it holds. */
+export function fileChange(path: string, at: number, before: Buffer | "" | null, after: Buffer | null) {
+  return {
+    path, at, bytes: (before ? before.length : 0) + (after ? after.length : 0),
+    get before() { return inflated(before); },
+    get after() { return inflated(after); },
+  };
 }
 
 function lastChangedAt(c: Cached, root: string, abs: string, mtimeMs: number): string {
@@ -273,7 +283,7 @@ export class LiveMap {
   private applyRemovals(c: Cached, removed: Set<string>, at: number) {
     this.presence.clear(removed);
     for (const abs of removed) {
-      this.bus.emit("file-content", { path: abs, before: snapshotOf(c, abs, true), after: null, at });
+      this.bus.emit("file-content", fileChange(abs, at, snapshotOf(c, abs, true), null));
       c.snapshots.delete(abs);
       c.byPath.delete(abs); c.fileSet.delete(abs); c.specs.delete(abs); c.out.delete(abs);
     }
@@ -288,8 +298,9 @@ export class LiveMap {
       if (!r || removed.has(r.abs)) continue;
       if (r.content) {
         const before = snapshotOf(c, r.abs, c.byPath.has(r.abs) || c.unselected.has(r.abs));
-        if (before !== r.content) this.bus.emit("file-content", { path: r.abs, before, after: r.content, at });
-        c.snapshots.set(r.abs, deflateRawSync(r.content, { level: 1 }));
+        const after = deflateRawSync(r.content, { level: 1 }); // deflate is deterministic: same bytes, same content
+        if (!(before instanceof Buffer && before.equals(after))) this.bus.emit("file-content", fileChange(r.abs, at, before, after));
+        c.snapshots.set(r.abs, after);
       }
       const changedAt = lastChangedAt(c, root, r.abs, r.mtimeMs);
       let node = c.byPath.get(r.abs);

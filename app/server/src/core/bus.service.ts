@@ -12,7 +12,8 @@ export type BusEvents = {
   // a mapped file changed on disk: what it was (null: unknown, "": it didn't exist) and is (null: deleted) (mapper → listener)
   // a map was built: the folders its .gitignore excludes (undefined: not a git repo), kept up to date in place (mapper → listener)
   "map-rules": [{ root: string; ignoredDirs: Set<string> | undefined }];
-  "file-content": [{ path: string; before: string | null; after: string | null; at: number }];
+  // before/after are read on demand (getters over deflated copies, mapper/live.ts fileChange); bytes: what it holds
+  "file-content": [{ path: string; before: string | null; after: string | null; at: number; bytes?: number }];
 };
 
 type Fn = (...args: any[]) => unknown;

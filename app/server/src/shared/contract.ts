@@ -17,6 +17,8 @@ export type Step = {
   agentId?: string;     // subagent id (from its log); absent for the main session thread. Older steps get it from their logs once.
   toolUseId?: string;   // tool_call/edit: the call's tool_use id; tool_result: the id it answers. Absent on steps stored by early versions.
   reads?: string[];     // a shell command (tool_call, Bash): the files it reads by its text (`cat`, `sed -n`, `grep`…), absolute; not stored, worked out when read
+  inputTrimmed?: true;  // GET /api/sessions/:id/steps only: an edit whose diff is set, sent without the texts its input repeats
+                        // (old_string, new_string, content, edits); the whole input is GET /api/steps/:id/input.
   isError?: boolean;    // tool_result: the tool said it failed. Read by isErrorResult (shared/failed.ts), as is input.isError, where stored steps keep it.
 };
 /** The input of an edit a shell command made (a script, sed -i, a redirect): the server saw the file change

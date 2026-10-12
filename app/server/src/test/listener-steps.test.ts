@@ -5,6 +5,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { makeListener, line, jsonl } from "./helpers";
 import { SessionsController } from "../listener/sessions.controller";
+import { slimStep } from "../listener/step-store";
 
 test("the steps JSON is byte for byte the serialized step objects, and afterSeq returns the tail", async () => {
   const t = await makeListener();
@@ -41,15 +42,23 @@ test("the steps JSON is byte for byte the serialized step objects, and afterSeq 
   }
   assert.equal(L.store.listStepsJson("nope"), "[]");
 
-  // The controller sends that text as JSON; a bad afterSeq is ignored.
+  // The controller sends the slim text (edits without what their diff repeats) as JSON; a bad afterSeq is ignored.
+  const slim = L.store.listStepsJson("s1", undefined, { slim: true });
+  assert.deepEqual(JSON.parse(slim), JSON.parse(JSON.stringify(L.store.listSteps("s1").map(slimStep))));
   const c = new SessionsController(L.store);
   const res = () => ({ body: undefined as string | undefined, ct: undefined as string | undefined, type(t: string) { this.ct = t; return this; }, send(b: string) { this.body = b; return this; } });
-  for (const [q, expected] of [[undefined, full], ["3", L.store.listStepsJson("s1", 3)], ["abc", full], ["", full]]) {
+  for (const [q, expected] of [[undefined, slim], ["3", L.store.listStepsJson("s1", 3, { slim: true })], ["abc", slim], ["", slim]]) {
     const r = res();
     c.steps("s1", q as string, r as never);
     assert.equal(r.ct, "application/json");
     assert.equal(r.body, expected, `afterSeq=${q}`);
   }
+  // The whole input of a trimmed edit, on its own.
+  const edit = L.store.listSteps("s1").find((s) => s.kind === "edit");
+  const r = res();
+  c.input(edit.id, r);
+  assert.deepEqual(JSON.parse(r.body), { input: edit.input });
+  assert.throws(() => c.input("nope", res()), /Not Found/);
   await t.close();
 });
 

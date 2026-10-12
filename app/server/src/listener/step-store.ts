@@ -57,6 +57,9 @@ function prepare(db: DbService["db"]) {
     stepsAfter: db.prepare(`SELECT * FROM steps WHERE session_id = ? AND seq > ? ORDER BY seq ASC`),
     stepsJson: db.prepare(stepsJsonSql(`session_id = ?`)),
     stepsJsonAfter: db.prepare(stepsJsonSql(`session_id = ? AND seq > ?`)),
+    stepsJsonSlim: db.prepare(stepsJsonSql(`session_id = ?`, true)),
+    stepsJsonSlimAfter: db.prepare(stepsJsonSql(`session_id = ? AND seq > ?`, true)),
+    stepInput: db.prepare(`SELECT input FROM steps WHERE id = ?`),
     stepTouches: db.prepare(`SELECT 1 FROM steps WHERE file_path = ? LIMIT 1`),
     stepPos: db.prepare(`SELECT session_id, seq FROM steps WHERE id = ?`),
     stepsBefore: db.prepare(`SELECT * FROM steps WHERE session_id = ? AND seq < ? ORDER BY seq DESC LIMIT ?`),
@@ -172,9 +175,19 @@ export class StepsStore {
 
   /** `JSON.stringify(listSteps(sessionId, afterSeq))`, byte for byte, built from the stored JSON text without parsing
    * it (GET /sessions/:id/steps: a long thread is thousands of steps). */
-  listStepsJson(sessionId: string, afterSeq?: number): string {
-    const row = (afterSeq === undefined ? this.st.stepsJson.get(sessionId) : this.st.stepsJsonAfter.get(sessionId, afterSeq)) as { out: string };
+  listStepsJson(sessionId: string, afterSeq?: number, opts: { slim?: boolean } = {}): string {
+    const st = this.st;
+    const [all, after] = opts.slim ? [st.stepsJsonSlim, st.stepsJsonSlimAfter] : [st.stepsJson, st.stepsJsonAfter];
+    const row = (afterSeq === undefined ? all.get(sessionId) : after.get(sessionId, afterSeq)) as { out: string };
     return row.out;
+  }
+
+  /** A step's whole input as `{"input":…}` JSON (`{}` when it has none), or undefined for an unknown step: what an
+   * edit sent with `inputTrimmed` left out (GET /api/steps/:id/input). */
+  stepInputJson(id: string): string | undefined {
+    const row = this.st.stepInput.get(id) as { input: string | null } | undefined;
+    if (!row) return undefined;
+    return row.input ? `{"input":${row.input}}` : "{}";
   }
 
   /** Whether some thread's step referenced this file (an agent read or changed it): the only files the picture endpoint serves. */
@@ -397,7 +410,7 @@ const jq = (c: string) => `CASE WHEN instr(${c}, char(0)) > 0 THEN json_quote(su
 const STEP_JSON = `'{"id":' || ${jq("id")} || ',"sessionId":' || ${jq("session_id")} || ',"seq":' || seq || ',"ts":' || ${jq("ts")} || ',"kind":' || ${jq("kind")}
   || CASE WHEN text IS NOT NULL THEN ',"text":' || ${jq("text")} ELSE '' END
   || CASE WHEN tool IS NOT NULL THEN ',"tool":' || ${jq("tool")} ELSE '' END
-  || CASE WHEN input IS NOT NULL AND input != '' THEN ',"input":' || input ELSE '' END
+  || CASE WHEN input IS NOT NULL AND input != '' THEN ',"input":' || INPUT_SLOT ELSE '' END
   || CASE WHEN file_path IS NOT NULL THEN ',"filePath":' || ${jq("file_path")} ELSE '' END
   || CASE WHEN diff IS NOT NULL AND diff != '' THEN ',"diff":' || diff ELSE '' END
   || CASE WHEN label IS NOT NULL THEN ',"label":' || ${jq("label")} ELSE '' END
@@ -433,5 +446,21 @@ export function readsOf(tool: string | null | undefined, input: unknown, cwd: st
   const j = readsJson(tool ?? null, input == null ? null : typeof input === "string" ? input : JSON.stringify(input), cwd);
   return j ? { reads: JSON.parse(j) as string[] } : {};
 }
-const stepsJsonSql = (where: string) =>
-  `SELECT '[' || coalesce(group_concat(j, ','), '') || ']' AS out FROM (SELECT ${STEP_JSON} AS j FROM steps WHERE ${where} ORDER BY seq ASC)`;
+/** The input keys an edit's diff repeats (claude.source.ts toolStep): a third of an edit-heavy thread's bytes. */
+export const TRIMMED_KEYS = ["old_string", "new_string", "content", "edits"] as const;
+const trims = `kind = 'edit' AND diff IS NOT NULL AND diff != '' AND json_valid(input) AND json_type(input) = 'object'
+  AND (${TRIMMED_KEYS.map((k) => `json_type(input, '$.${k}') IS NOT NULL`).join(" OR ")})`;
+const SLIM_INPUT = `CASE WHEN ${trims} THEN json_remove(input, ${TRIMMED_KEYS.map((k) => `'$.${k}'`).join(", ")}) || ',"inputTrimmed":true' ELSE input END`;
+/** `slim`: edits leave out what their diff repeats (slimStep), for the page's steps list. */
+const stepsJsonSql = (where: string, slim = false) =>
+  `SELECT '[' || coalesce(group_concat(j, ','), '') || ']' AS out FROM (SELECT ${STEP_JSON.replace("INPUT_SLOT", slim ? SLIM_INPUT : "input")} AS j FROM steps WHERE ${where} ORDER BY seq ASC)`;
+
+/** A step as the slim steps list sends it (what listStepsJson(…, { slim: true }) gives, parsed). */
+export function slimStep(s: Step): Step {
+  const i = s.input;
+  if (s.kind !== "edit" || !s.diff || !i || typeof i !== "object" || Array.isArray(i)) return s;
+  const rec = i as Record<string, unknown>;
+  if (!TRIMMED_KEYS.some((k) => k in rec)) return s;
+  const input = Object.fromEntries(Object.entries(rec).filter(([k]) => !(TRIMMED_KEYS as readonly string[]).includes(k)));
+  return { ...s, input, inputTrimmed: true };
+}

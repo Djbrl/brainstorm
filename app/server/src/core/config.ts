@@ -88,8 +88,9 @@ export const config = {
   get home(): string | undefined { return raw("HOME") || undefined; },
 };
 
-/** Dev only: app/.env into the environment. The plugin passes its settings in the environment, and must not pick up
- * some .env above its install folder. */
+/** Dev only: app/.env into the environment (variables already set win). The plugin passes its settings in the
+ * environment, and must not pick up some .env above its install folder: its launcher always sets RUNDOWN_VERSION and
+ * RUNDOWN_PLUGIN_ID. A dev server on a scratch data folder (RUNDOWN_DATA_DIR) still reads it. */
 export function loadDevEnv(file = resolve(__dirname, "../../../.env")) {
-  if (!config.pluginDataDir && existsSync(file)) process.loadEnvFile(file);
+  if (!config.version && !raw("RUNDOWN_PLUGIN_ID") && existsSync(file)) process.loadEnvFile(file);
 }

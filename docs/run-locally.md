@@ -8,7 +8,7 @@ The recorded hackathon demo needs no install: https://brainstorm-demo-black.verc
 
 | | Required? | Notes |
 | --- | --- | --- |
-| Node.js 22.13 or later | Yes | The server uses Node's built-in `node:sqlite` and `process.loadEnvFile` |
+| Node.js 22.13 or later | Yes | The server uses Node's built-in `node:sqlite` and `process.loadEnvFile`. `.nvmrc` names the version (`nvm use`, `fnm use`) |
 | Claude Code (or Codex) | Yes | Rundown reads their session logs in `~/.claude/projects` and `~/.codex/sessions` |
 | git | Recommended | In a git repo the map follows `.gitignore` and shows when each file was last committed |
 | Anthropic API key | Only for Ask | Without one, Ask is off and the rest works. Set `ANTHROPIC_WORKSPACE_ID` if the key isn't scoped to a workspace |
@@ -27,16 +27,16 @@ cd ../web && npm install
 cp app/.env.example app/.env
 ```
 
-Everything in it is optional. The server reads it at startup, and only from a clone (not when `RUNDOWN_DATA_DIR` is set, as the plugin does).
+Everything in it is optional. A server run from a clone reads it at startup, also with a scratch data folder (`RUNDOWN_DATA_DIR`); a variable already set in the shell wins over the file. The plugin's server never reads a `.env`: its settings come from Claude Code.
 
 | Variable | Example | Meaning |
 | --- | --- | --- |
-| `PORT` | `4000` | Server port (127.0.0.1 only). The web dev server proxies to `API_PORT`, 4000 by default |
-| `RUNDOWN_ROOT` or `MAP_ROOT` | `/Users/you/code/my-project` | The project to open at start. Otherwise pick it in the app |
+| `RUNDOWN_PORT` (or `PORT`) | `4000` | Server port (127.0.0.1 only). The web dev server proxies to `API_PORT`, 4000 by default |
+| `RUNDOWN_ROOT` | `/Users/you/code/my-project` | The project to open at start (an absolute path). Otherwise the last one picked in the app. `MAP_ROOT` does the same and wins over it |
 | `ANTHROPIC_API_KEY` | `sk-ant-…` | Claude key for Ask |
 | `ANTHROPIC_WORKSPACE_ID` | `wrkspc_…` | Only if your key isn't scoped to a workspace |
 | `CLAUDE_MODEL` | `claude-opus-5` | Any Claude model. Prices per model family for the cost meter are in `app/server/src/ask/ask.service.ts` |
-| `RUNDOWN_DATA_DIR` | `/tmp/rundown-data` | Where `rundown.db` lives. Default: `app/server/data/` |
+| `RUNDOWN_DATA_DIR` | `/tmp/rundown-data` | Where `rundown.db` and the server's private files live. Default: `app/server/data/`. Set, the server also behaves as the plugin's does: it looks for a free port upwards from its own and writes `server.json` there |
 | `RUNDOWN_MAX_FILES` | `3000` | At most this many files on the map |
 | `CLAUDE_PROJECTS_DIR`, `CODEX_HOME` | `~/.claude/projects`, `~/.codex` | Only if the agents keep their logs somewhere else |
 
@@ -56,13 +56,32 @@ Open http://localhost:5173, pick your project, then start or continue a Claude C
 
 On the first start the server maps the project and reads all of its threads in the background, the last two weeks first.
 
-To run a second copy beside another one, give it its own ports and data folder: `PORT=4976 RUNDOWN_DATA_DIR=/tmp/rd node dist/main.js` in `app/server`, `API_PORT=4976 npx vite --port 5176` in `app/web`.
+`npm run dev` in `app/server` runs `tsc -w` and the server together (`app/scripts/dev-server.mjs`); Ctrl-C stops both.
+
+### A second copy beside another one
+
+Several checkouts (git worktrees, other agents' sessions) can run at once if each has its own ports and data folder. Three variables do it:
+
+| Variable | Where | Meaning |
+| --- | --- | --- |
+| `RUNDOWN_PORT` | `app/server` | The server's port. Pick a free one |
+| `RUNDOWN_DATA_DIR` | `app/server` | A data folder of its own (any empty folder), so the copies don't share a database |
+| `RUNDOWN_ROOT` | `app/server` | The project it opens, so it doesn't start on the last one the other copy picked |
+| `API_PORT` | `app/web` | The server port the web dev server sends `/api` and `/ws` to (4000 by default) |
+
+```bash
+cd app/server && RUNDOWN_PORT=4976 RUNDOWN_DATA_DIR=/tmp/rd RUNDOWN_ROOT=/path/to/project node dist/main.js
+cd app/web && API_PORT=4976 npx vite --port 5176
+```
+
+`app/.env` is still read by such a copy (for the Anthropic key); the variables on the command line win over it.
 
 ## 4. Checks
 
 ```bash
-cd app/server && npm test        # typecheck, build and the full test suite
-cd app/web && npx tsc -b         # typecheck the web
+cd app/server && npm test             # build (with the tests) and run the full test suite
+cd app/server && npm run typecheck    # the server's code and tests, no build
+cd app/web && npm run typecheck       # the web
 ```
 
 ## 5. (Optional) Make your own hosted replay
@@ -84,4 +103,4 @@ Check `replay.json` for anything private before publishing. Secrets are masked, 
 | No threads | The open project isn't the folder the threads ran in: pick it in the app |
 | The map shows the wrong project | Pick the project in the app, or set `RUNDOWN_ROOT` to an absolute path and restart the server |
 | `npm run dev` in `app/server` fails with a Nest CLI error | Don't use `nest start`. The server builds with plain `tsc` (TypeScript 7 has no compiler API for the Nest CLI) |
-| `.env` changes are ignored | The server reads `.env` only at startup. Restart it |
+| `.env` changes are ignored | The server reads `.env` only at startup: restart it. A variable set in the shell wins over the file |

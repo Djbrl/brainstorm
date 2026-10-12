@@ -6,7 +6,7 @@
 // The usage-stats question is its last step. A step with nothing to show (no thread yet, no Readmap on a phone) is left out.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { AgentPresence, FileNode, Step } from "@contract";
-import { useLiveActions, useLiveSelector } from "../../lib/live";
+import { useLiveSelector, useThreadSteps } from "../../lib/live";
 import { END, useNavActions, useNavState } from "../../lib/nav";
 import { PRIVACY_URL, useUsageSetting } from "../../lib/usage";
 import { TOUR_AGENT, tourStore, useTour, type TourStep } from "../../lib/tour";
@@ -20,7 +20,6 @@ const WALK_MS = 1500;    // the example agent's pace
 
 export function Tour() {
   const step = useTour((t) => t.step);
-  const { loadSteps } = useLiveActions();
   const sessions = useLiveSelector((s) => s.sessions);
   const actions = useNavActions();
   const { thread, lens } = useNavState();
@@ -29,8 +28,8 @@ export function Tour() {
   useEffect(() => { tourStore.load(); }, []);
 
   const latest = useMemo(() => [...sessions].sort((a, b) => b.lastEventAt.localeCompare(a.lastEventAt))[0], [sessions]);
-  const steps = useLiveSelector((s) => (latest ? s.steps[latest.id] : undefined));
-  useEffect(() => { if (step && latest && !steps) loadSteps(latest.id); }, [step, latest?.id, !!steps]);
+  // Held while the tour is open: switching threads during it can't let go of the steps its cards point at.
+  const steps = useThreadSteps(step ? latest?.id : null);
   // The step to open: its newest edit, else its newest call.
   const shown: Step | undefined = useMemo(() => {
     const all = steps ?? [];

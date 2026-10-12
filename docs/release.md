@@ -78,6 +78,6 @@ git push origin main --follow-tags
 gh release create v0.8.2 --title "Rundown 0.8.2" --notes-file notes.md
 ```
 
-If the landing page changed: `cd site && vercel deploy --prod --yes`.
+If the landing page changed: `cd ~/rundown-site && vercel deploy --prod --yes` (it has its own repository since 12 Oct 2026).
 
 After the push, update the plugin in a Claude Code session (`/plugin`, then update Rundown, then a new session) and run `/rundown:open` once more: the log should name the new version.

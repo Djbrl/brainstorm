@@ -148,6 +148,32 @@ cores: read wall times as rough), plus profiles of the production build on the 5
   longer names, while the one it names is alive, stops itself within a minute (`main.ts`). Servers from 0.6 and 0.7.0
   don't have that: the extra ones need stopping by hand once.
 
+## Cleanup Phase 6: server performance (12 Oct 2026)
+
+Branch `cleanup/p6-perf`. Scratch data only (the bench's generated repos and threads, synthetic databases), M1 Pro
+with other agents building and testing on it: read times as rough, ratios as steady. Event-loop stalls are measured
+with a preload that watches a 20 ms timer and `monitorEventLoopDelay`.
+
+| | Before | After |
+| --- | --- | --- |
+| `/api/sessions/:id/steps`, the bench's 10k-step thread | 12.80 MB | 11.33 MB (−11%; edits leave out what their diff repeats, `GET /api/steps/:id/input` has the rest; about −32% on an edit-heavy real thread) |
+| A burst of 2,000 changed files (23 KB each), mapper side | 392 ms, 151 MB held by the kept changes | 199 ms, 43 MB, and the listener keeps at most 16 MB |
+| Longest stall: 4,000 files of a 5k repo rewritten at once | 144 ms (three over 50 ms) | none over 50 ms |
+| Longest stall: first map build of that repo | 487 ms | none over 50 ms |
+| Stalls over 50 ms: cold boot importing the 10k thread | six, up to 138 ms | one, 71 ms |
+| Opening a project: finding its visitors (600k steps, 500 visitors) | 300–1,200 ms blocking | 0 ms; known about 0.4 s later, loop never more than 17 ms late |
+| `/api/elsewhere`, 45 folders × 200 logs | 380–400 ms, loop blocked throughout | 290–300 ms, loop never more than 6 ms late; folders listed again only when they change |
+| Screenshots from a 207 MB log | 166 ms, RSS 80 → 501 MB | 109 ms, RSS 82 → 128 MB (4 MB chunks) |
+| Attention sweep | every 2 s; recent-threads query 0.78 ms on 20k threads | at the next deadline (at least every 10 s); 0.00 ms with the `sessions(last_event_at)` index |
+
+Module loading before the server listens (0.3–0.8 s) is unchanged.
+
+**30 minutes under a live writer** (the bench's writer, about 3 steps a second with bursts, 5,400 steps; a page stand-in
+with the websocket open, polling sessions, attention and elsewhere and fetching the live thread's steps every 5 s):
+heap 29–44 MB the whole time, flat; RSS 230 MB at the start, 127–213 MB after (macOS compresses idle pages). No leak.
+p99 event-loop delay 11–14 ms throughout. The longest stall grew from 14 to 79 ms as the thread grew. That came from
+the stand-in, which fetched the whole thread every 5 s; the page fetches only new steps (`?afterSeq=`).
+
 ## The overnight pass (5–6 Oct 2026)
 
 Three read-only audits (front end, server, code health) found where the time goes. The work was split into branches

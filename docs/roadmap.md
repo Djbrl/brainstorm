@@ -51,7 +51,7 @@ The user keeps typing to their agent, and Brainstorm shows up next to it. Four l
 
 Watching agents is hard to charge a single developer for. Brainstorm becomes worth more with more agents, more people and more money at stake. Tiers (the prices are guesses we'd need to test):
 
-- **Free, source-available, local.** One developer on one machine, and the code never leaves it. That builds trust and spreads it.
+- **Free, open source (MIT), local.** One developer on one machine, and the code never leaves it. That builds trust and spreads it.
 - **Pro, about $10–15 a month.**
   - Models included, no API keys needed.
   - History and search across every session ("when did login break?").
@@ -180,6 +180,7 @@ To settle before building. Record each decision here with the date.
 | 28 Sep 2026 | First package: a Claude Code plugin (replay + map), built on the same bundle a later `npx brainstorm` will use. |
 | 28 Sep 2026 | AI: bring your own, detected automatically; default is the user's Claude Code. We provide AI only in the paid, hosted parts, paid per token rather than on our own GPUs. |
 | 28 Sep 2026 | License: FSL-1.1-ALv2 (Functional Source License). Free to use, change and self-host; no competing product or service; each release becomes Apache 2.0 after two years. The future cloud service stays in a separate, closed repo. |
+| 12 Oct 2026 | License: MIT, replacing FSL-1.1-ALv2. A licence protects the code, not the product: anyone can rebuild the idea anyway, so reach, trust and contributions matter more. |
 | 28 Sep 2026 | Results out: 3rd place, Senegal. `post-deadline` merged into `main`, which is the development branch again. The judged state stays tagged `hackathon-submission`, and the judged demo stays online unchanged. |
 | 28 Sep 2026 | Tasks (formerly the Cowork prototype): follow and replay agents' non-code work as a storyboard (goal, how, made, sources) with a filmstrip of the agent's screenshots. Developers first, non-coders once we can reach their tools. |
 | 5 Oct 2026 | Next big directions: record, share and live; and the experiments lab ([share-and-experiments.md](share-and-experiments.md)). Project memory, the comprehension layer and recipes go in the Fridge. |

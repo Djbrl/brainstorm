@@ -8,7 +8,7 @@
   },
   "homepage": "https://brainstorm-landing.vercel.app",
   "repository": "https://github.com/Djbrl/brainstorm",
-  "license": "FSL-1.1-ALv2",
+  "license": "MIT",
   "keywords": [
     "replay",
     "map",

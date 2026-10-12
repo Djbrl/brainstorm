@@ -295,3 +295,7 @@ Format: `HH:MM [from → to] what you need`. Mark `DONE` when handled.
 ## 12 Oct 2026, 17:20 — New hosted demo (v0.9)
 
 New recording in ~/demos/trailhead (thread 783cf0e6: sunset and leave-by times, two subagents, web lookup, localhost checks, a bug found and fixed; copy at ~/demos/replay-next.oct12.json). The demo build now opens on its thread and shows the thread bar, the keys and Find a thread (branch demo/v09). Found: redact.ts misses the dashed home path (-Users-<name>-); fixed by hand in this recording.
+
+## 12 Oct 2026, 18:30 — Licence: MIT
+
+Rundown is now MIT (was FSL-1.1-ALv2): LICENSE.md, plugin/LICENSE.md, plugin.json, both READMEs, the directory notes, the roadmap. Takes effect for users with the next plugin release. The landing page (rundown-site) footer and terms changed too.

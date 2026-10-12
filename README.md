@@ -108,7 +108,7 @@ Works with Claude Code and Codex sessions. No file summaries or model-written st
 
 ## License
 
-[Functional Source License 1.1, Apache 2.0 future license](LICENSE.md) (`FSL-1.1-ALv2`). You can use, read, change and self-host Rundown, including at work. You can't offer it, or something built from it, as a competing product or service. Two years after each release, that release is also available under the Apache License 2.0.
+[MIT](LICENSE.md). Rundown is open source: use it, change it, share it, build on it, including at work and in commercial products. Keep the copyright and licence notice in copies.
 
 ## Trademarks
 

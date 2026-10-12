@@ -100,7 +100,7 @@ The server listens on `127.0.0.1` only (port 4747, or the next free one), so oth
 
 ## License
 
-[FSL-1.1-ALv2](../LICENSE.md): use, change and self-host it freely; no competing product or service. Each release also becomes Apache 2.0 two years later.
+[MIT](../LICENSE.md): open source. Use it, change it and build on it freely; keep the copyright and licence notice in copies.
 
 ## Uninstall
 

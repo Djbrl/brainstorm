@@ -21,7 +21,7 @@ The docs: [submit a plugin](https://claude.com/docs/plugins/submit), [pre-submis
 - **Support / contact:** sydjbrl@gmail.com (the address on the privacy page)
 - **Privacy policy:** https://brainstorm-landing.vercel.app/privacy
 - **Terms:** https://brainstorm-landing.vercel.app/terms
-- **License:** FSL-1.1-ALv2 (`LICENSE.md` in the plugin folder)
+- **License:** MIT (`LICENSE.md` in the plugin folder)
 
 ## Data handling
 

@@ -9,7 +9,7 @@ import type { ThreadLayerApi } from "./thread/ThreadLayer";
 import { boxOf, type Box, type Camera, type ReplayCamera, type View } from "./camera";
 import { boxOfPts, DIRECTOR, frameArea, groupAhead, isCut, shouldMove, viewFor, type P } from "./director";
 import { useCameraKeys } from "./useCameraKeys";
-import type { AgentAnim } from "./agents";
+import { PARK, type AgentAnim } from "./agents";
 import type { GNode } from "./graph";
 
 // ---- camera intent: what the camera is framing, so it can frame it again when a panel opens or the window resizes ----
@@ -97,7 +97,7 @@ export function useMapCamera({ cam, camRef, replayCam, nodeIndex, nodeIndexRef, 
     }
     // Live: each agent's last few edits (its marker stands on the last file it changed: reads never move it).
     for (const [id, st] of anim.current) {
-      if (!st.file) continue;
+      if (!st.file || st.file === PARK) continue;   // waiting at the top of the project: nothing to frame (the fit shows it)
       const h = D.hist.get(id);
       if (!h) D.hist.set(id, { files: [st.file], at: 0 });
       else if (h.files[h.files.length - 1] !== st.file) { h.files.push(st.file); if (h.files.length > 3) h.files.shift(); h.at = now; }
@@ -210,7 +210,8 @@ export function useMapCamera({ cam, camRef, replayCam, nodeIndex, nodeIndexRef, 
   // Frame the map as soon as it has files: the layout is final from the first frame (graph.ts), so no glide.
   useEffect(() => {
     if (!hasNodes) return;
-    const t = requestAnimationFrame(() => applyIntent(0));
+    // The first framing is the director's: a touch while the map loaded doesn't count as taking the camera.
+    const t = requestAnimationFrame(() => { if (!S.framed) { D.handAt = S.intentAt = performance.now(); } applyIntent(0); });
     return () => cancelAnimationFrame(t);
   }, [hasNodes, applyIntent]);
 

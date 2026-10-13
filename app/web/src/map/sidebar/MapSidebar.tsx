@@ -20,7 +20,7 @@ import { NowCard } from "./NowCard";
 import { useShortcut, windowOpen } from "../../switch/shortcuts";
 import "./sidebar.css";
 import { readStored, writeStored } from "../../lib/store";
-import { useSidebarFold } from "./useSidebarFold";
+import { takeThreadList, useSidebarFold } from "./useSidebarFold";
 import { usePhoneSheet } from "./usePhoneSheet";
 
 export type MapSidebarProps = {
@@ -63,6 +63,8 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
     opened.current = true;
     setListing(false);
     if (phone) setOverNow(!!thread);
+    // The small window's Back (switch/CompactBar.tsx): the thread closed, its list opens.
+    if (!thread && takeThreadList()) { setTab("threads"); setOpen(true); }
   }, [thread]);
   const shown: Tab = tab;
   const inThread = shown === "threads" && !!thread && !listing;

@@ -9,6 +9,14 @@ import { NARROW, PHONE, reducedMotion, useMedia } from "../../lib/breakpoints";
 
 const LEAVE_MS = 220;                 // the sheet sliding away as it folds (sidebar.css)
 
+// The small window's Back (switch/CompactBar.tsx) closes the thread, then the sidebar opens on the thread list. The
+// sidebar may be mounted again in between (from Places, the map view loads anew): it asks once it has seen the thread go.
+let listAsked = false;
+/** Open the sidebar on Threads, its list, as soon as the open thread has closed. */
+export function showThreadList() { listAsked = true; }
+/** For MapSidebar: whether the list was asked for (once). */
+export function takeThreadList(): boolean { const a = listAsked; listAsked = false; return a; }
+
 export function useSidebarFold() {
   const { step: openStep } = useNavState();
   const { closeStep } = useNavActions();

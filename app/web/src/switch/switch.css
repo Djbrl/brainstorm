@@ -2,6 +2,9 @@
 
 /* ---- the tab bar ---- */
 .threadbar { display: flex; align-items: center; gap: 16px; padding: 6px 20px; border-bottom: 1px solid var(--line); background: var(--bg); flex: none; min-height: 47px; }
+/* Below a full screen (NARROW, 1100 px) there is no thread bar: the header and the compact bar at the bottom of the map
+   (CompactBar.tsx) hold what it gave. It stays mounted, hidden, so 1 to 9 and [ ] still switch threads. */
+@media (max-width: 1100px) { .threadbar { display: none; } }
 /* The project, first, a hairline after it. */
 .threadbar-project { flex: none; max-width: 22ch; border: 0; background: none; padding: 6px 10px; margin-left: -10px; border-radius: 10px;
   font-size: 14px; font-weight: 650; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; }

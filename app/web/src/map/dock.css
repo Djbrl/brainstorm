@@ -4,10 +4,23 @@
 .dock { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: calc(100% - 48px); }
 .map-wrap:has(.map-panel.open) .dock { left: calc(50% - var(--panel-w) / 2); }
 
+/* The small window's bar (switch/CompactBar.tsx): back to the threads, Map | Places, Find. Only below a full screen. */
+.compact-bar { display: none; align-items: center; gap: 4px; padding: 4px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line);
+  box-shadow: 0 8px 24px rgba(0,0,0,.10); max-width: 100%; }
+.compact-bar > button { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px 0 10px; border: 0; border-radius: 999px;
+  background: none; color: var(--ink); font-size: 14px; font-weight: 600; white-space: nowrap; }
+.compact-bar > button:hover { background: var(--fill); }
+.compact-bar > button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.compact-bar svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.compact-find { color: var(--ink-2) !important; }
+.compact-find:not(:has(span)) { width: 34px; padding: 0 !important; justify-content: center; }
+.compact-bar .lens-switch.in-bar { margin: 0 2px; }
+@media (max-width: 1100px) { .compact-bar { display: flex; } }
+
 /* Narrow (tablet and phone, NARROW in lib/breakpoints.ts): no footer player. The folded card's scroller and the keys
    (Space, ← →, Home/End: map/thread/playback.ts, places/CoworkView.tsx) drive the replay. */
 @media (max-width: 1100px) {
-  .dock { display: none; }
+  .dock .rp-player { display: none; }
   /* A side panel open: the footer keeps to the space left of it. */
   .map-wrap:has(.map-panel.open) .dock { left: 16px; right: calc(var(--panel-w) + 16px); width: auto; transform: none; max-width: none; }
 }

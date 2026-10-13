@@ -11,7 +11,7 @@
   .lens-switch { top: 16px; left: auto; right: 12px; transform: none; }
   .lens-switch button { padding: 6px 13px; }
 }
-/* Small window (the Claude app's browser pane): the switch moves into the thread bar, the map's top is the thread's card. */
+/* Small window (the Claude app's browser pane): the switch moves into the compact bar at the bottom (switch/CompactBar.tsx), the map's top is the thread's card. */
 .lens-switch.in-bar { display: none; }
 @media (max-width: 1100px) {
   .lens-switch:not(.in-bar) { display: none; }

@@ -103,7 +103,7 @@ export function PlacesView() {
       )}
       <MapSidebar agents={Object.values(agents)} accent="#2563eb" followId={null} onFollow={() => setLens("map")} onFocusFile={() => setLens("map")} map={map} />
       <LensSwitch />
-      {data && rows.length > 0 && <Dock steps={{ at, count: rows.length, go, noun: "place" }} />}
+      <Dock player={!!data && rows.length > 0} steps={{ at, count: rows.length, go, noun: "place" }} />
       {!thread && <p className="cw-note">Pick a thread to see where it went outside the code.</p>}
       {thread && error && <p className="cw-note">The places couldn't load. Check that Rundown is still running.</p>}
       <StepPanel follow={false} back="Back to the places" onClose={() => selectPlace(null)} header={step && here.length > 1 && (

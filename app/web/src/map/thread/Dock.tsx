@@ -7,6 +7,7 @@ import { useNavActions, useNavState, useReplay, type ReplaySpeed } from "../../l
 import { useThread, type Thread } from "../../lib/thread";
 import { chaptersOf } from "../../lib/chapters";
 import { togglePlay } from "./ThreadLayer";
+import { CompactBar } from "../../switch/CompactBar";
 import "./replay.css";
 import "../dock.css";
 
@@ -115,11 +116,11 @@ function Player({ steps }: { steps?: Steps }) {
 }
 
 /**
- * The footer: only the player, while replaying. Share sits by the thread's title in the sidebar's Track; the map's
- * switches are in Settings and on keys (L, M). On Places its ‹ › go place by place (CoworkView).
+ * The footer. On a full screen, only the player, while replaying. Share sits by the thread's title in the sidebar's
+ * Track; the map's switches are in Settings and on keys (L, M). On Places its ‹ › go place by place (CoworkView).
+ * On a small window (1100 px and below) no player: the compact bar instead (switch/CompactBar.tsx, map/dock.css).
  */
-export function Dock({ steps }: { steps?: Steps } = {}) {
+export function Dock({ steps, player = true }: { steps?: Steps; player?: boolean } = {}) {
   const { thread } = useNavState();
-  if (thread?.mode !== "play") return null;
-  return <div className="dock"><Player steps={steps} /></div>;
+  return <div className="dock">{player && thread?.mode === "play" && <Player steps={steps} />}<CompactBar /></div>;
 }

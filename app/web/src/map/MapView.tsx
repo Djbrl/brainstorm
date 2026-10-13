@@ -326,14 +326,15 @@ export function MapView() {
 
 
 /**
- * A big project past the file cap (mapper/ignore.ts): the map says it shows some of the files, not all, until you close
- * the note (remembered per project). The Files tab says how they're picked.
+ * A big project past the file cap (mapper/ignore.ts): the map says it shows some of the files, not all, once, until you
+ * close the note (remembered per project); then only a tiny count stays. The Files tab says how they're picked.
  */
 function CapNote({ map }: { map: ProjectMap }) {
   const key = "rundown-cap-note:" + map.root;
   const [closed, setClosed] = useState(() => readStored(key) === "1");
   const total = map.totalFiles ?? 0, shown = map.files.length;
-  if (closed || total <= shown) return null;
+  if (total <= shown) return null;
+  if (closed) return <p className="map-cap-count" title="The map shows the files that matter most. Files says how they're picked.">{shown.toLocaleString()} of {total.toLocaleString()} files</p>;
   const close = () => { setClosed(true); writeStored(key, "1"); }; // storage blocked: shown again next time
   return (
     <p className="map-cap">

@@ -36,10 +36,19 @@ const ChapterMarks = memo(function ChapterMarks({ thread }: { thread: Thread }) 
   );
 });
 
-/** Local app: download this thread as a replay file anyone can open, or as a Markdown summary. */
-export function ShareMenu({ sessionId, className = "track-share" }: { sessionId: string; className?: string }) {
+/**
+ * The open thread's "…" menu, beside its title in the sidebar (local app): share it as a replay file, copy its link,
+ * export a Markdown summary, and show or hide its agents on the map.
+ */
+export function ThreadMenu({ sessionId, className = "track-share" }: { sessionId: string; className?: string }) {
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const { hiddenAgents } = useNavState();
+  const { setHiddenAgents } = useNavActions();
+  const agents = useLiveSelector((s) => s.agents);
+  const ids = useMemo(() => Object.values(agents ?? {}).filter((a) => a.sessionId === sessionId).map((a) => a.id), [agents, sessionId]);
+  const allHidden = ids.length > 0 && ids.every((id) => hiddenAgents.has(id));
   useEffect(() => {
     if (!open) return;
     const away = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
@@ -48,21 +57,36 @@ export function ShareMenu({ sessionId, className = "track-share" }: { sessionId:
     window.addEventListener("keydown", esc, true); // before the app's Esc (up one level)
     return () => { document.removeEventListener("mousedown", away); window.removeEventListener("keydown", esc, true); };
   }, [open]);
+  useEffect(() => { if (!copied) return; const t = setTimeout(() => setCopied(false), 1600); return () => clearTimeout(t); }, [copied]);
   const q = `sessionId=${encodeURIComponent(sessionId)}`;
+  const copy = () => {
+    const url = `${location.origin}/thread/${encodeURIComponent(sessionId)}`;
+    navigator.clipboard?.writeText(url).then(() => setCopied(true), () => setCopied(false));
+  };
+  const toggleAgents = () => { setHiddenAgents(allHidden ? [...hiddenAgents].filter((id) => !ids.includes(id)) : [...hiddenAgents, ...ids]); setOpen(false); };
   return (
     <div className="rp-share" ref={ref}>
-      <button className={className} aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen((o) => !o)} title="Share this thread">Share</button>
+      <button className={className} aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen((o) => !o)} aria-label="More for this thread" title="Share, copy the link, export">…</button>
       {open && (
         <div className="rp-share-menu" role="menu">
           <a role="menuitem" href={`/api/share?${q}`} download onClick={() => setOpen(false)}>
-            <strong>Replay file</strong>
+            <strong>Share a replay</strong>
             <span>One .html file that opens in any browser, with the map, every step and the code changes.</span>
           </a>
+          <button role="menuitem" onClick={copy}>
+            <strong>{copied ? "Link copied" : "Copy link"}</strong>
+            <span>Opens this thread in Rundown on this computer.</span>
+          </button>
           <a role="menuitem" href={`/api/export.md?${q}`} download onClick={() => setOpen(false)}>
-            <strong>Summary</strong>
-            <span>A Markdown report: what was asked, the files changed by module, what failed.</span>
+            <strong>Export Markdown</strong>
+            <span>A summary: what was asked, the files changed by module, what failed.</span>
           </a>
-          <p className="rp-share-note">Both include this thread's prompts, messages, commands and code changes. Secrets are masked and your home folder is hidden. Screenshots are never included.</p>
+          {ids.length > 0 && (
+            <button role="menuitem" onClick={toggleAgents}>
+              <strong>{allHidden ? "Show its agents on the map" : "Hide its agents from the map"}</strong>
+            </button>
+          )}
+          <p className="rp-share-note">The replay and the summary include this thread's prompts, messages, commands and code changes. Secrets are masked and your home folder is hidden. Screenshots are never included.</p>
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
 // The open thread, in the sidebar's Threads tab (a back arrow to the list): its steps, next to the map (scrolling them moves the
-// tracer), or its places on the Places lens, under the thread's name (with Share) and, when
+// tracer), or its places on the Places lens, under the thread's name (with its … menu: share, copy link, export) and, when
 // subagents worked in it, who: everyone, or one agent on its own. Live isn't a button: a running thread follows its
 // newest step until you move off it (then a footer offers the way back), and follows again once you're back on it
 // (App's LiveFollow). Space replays.
@@ -11,7 +11,7 @@ import { useTheme } from "../../lib/theme";
 import { agentColor, initial, inkOn } from "../agents";
 import { readTokens } from "../color";
 import { Track } from "../thread/Track";
-import { ShareMenu } from "../thread/Dock";
+import { ThreadMenu } from "../thread/Dock";
 import { isRecording } from "../../lib/live";
 import { PlaceSteps } from "../../places/PlaceSteps";
 
@@ -30,7 +30,7 @@ export function TrackPanel({ onBack }: { onBack?: () => void }) {
           </button>
         )}
         <h2 className="sidebar-track-title" title={session?.title}>{session?.title || "Untitled thread"}</h2>
-        {!isRecording() && <ShareMenu sessionId={thread.sessionId} className="track-share" />}
+        {!isRecording() && <ThreadMenu sessionId={thread.sessionId} className="track-share" />}
       </div>
       {lens !== "places" && <AgentPicker title={session?.title} />}
       {lens === "places" ? <PlaceSteps /> : <Track />}

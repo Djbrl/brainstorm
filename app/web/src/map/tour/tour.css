@@ -2,7 +2,7 @@
    over the app. While it runs (:root[data-tour]), the extras are out of sight until their step: the Readmap, the file
    window, the key hints, the "agents elsewhere" pill, the notes over the map, the usage question and the old welcome
    card. `visibility`, not `display`: their own rules for small windows stay as they are. */
-:root[data-tour] :is(.readmap, .map-peek, .threadbar-keys, .elsewhere, .map-cap, .map-sparse, .usage-ask, .welcome) { visibility: hidden !important; }
+:root[data-tour] :is(.readmap, .map-peek, .threadbar-keys, .elsewhere, .map-cap, .map-cap-count, .map-sparse, .usage-ask, .welcome) { visibility: hidden !important; }
 :root[data-tour="readmap"] .readmap, :root[data-tour="keys"] .threadbar-keys { visibility: visible !important; }
 :root[data-tour="readmap"] .readmap.asleep { opacity: 1 !important; transform: none !important; pointer-events: auto !important; }
 

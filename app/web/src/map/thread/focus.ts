@@ -1,6 +1,7 @@
 // THE FOCUS of an open thread, in one place (moved out of ThreadLayer.ts): which files are lit (and named) at the cursor, what
 // every other file is, and how each file eases into and out of it. Read for every file on every frame, so the focus is
 // cached per cursor (the test compares fields and builds nothing) and the eased look per file.
+import { DIM } from "../agents";
 import { useCallback, useMemo, useRef, type RefObject } from "react";
 import { mapPrefs } from "../../lib/nav";
 import type { Thread } from "../../lib/thread";
@@ -20,9 +21,10 @@ type Focus = { files: Map<string, Target>; rest: Target };
 /** Where the replay is: what the focus is worked out from (ThreadLayer.ts keeps it up to date every render). */
 export type Cursor = { active: boolean; thread: Thread | null; index: number; mode: string };
 
-const DIM = 0.3;            // files out of focus: the thread never touched them, or not in the recent window (0.15 hid the map)
-const PAST = 0.42;          // whole-thread replay: files it touched earlier than the fog window below
-const READ = 0.5;           // files it only read ("Show reads" on): there, quieter than what it changed
+// Files out of focus (the thread never touched them, or not in the recent window; in a whole-thread replay, those it
+// touched before the last few moments) take the map's one faint look. Files it only read are in focus: solid, without
+// the colour of a change.
+const PAST = DIM, READ = 1;
 const FADE_MS = 120;        // a file easing into or out of the focus (time constant: settled in about 400 ms)
 /** Fog of war (the whole-thread replay): only the last few moments are drawn (path, numbers) and lit in full. */
 export const WINDOW = 25;

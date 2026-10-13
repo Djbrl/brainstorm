@@ -45,17 +45,20 @@ export function visibleAgents(agents: AgentPresence[], now = clock()): AgentPres
   return agents.filter((a) => a.active || now - Date.parse(a.ts) < 10 * 60_000);
 }
 
-/**
- * How strongly a marker shows: lit while it works, waits on you or thinks; then dimmed. On the project overview it fades
- * out over the next 8 minutes; with its thread open it stays, dimmed, where it last was (by its trail).
- */
-/** How faint a background agent is (see drawAgents' `dimmed`). */
+/** The one faint look on the map, and it means only "not the focus": files outside the thread's recent steps, an agent
+ *  of the thread you aren't watching (drawAgents' `dimmed`, thread/focus.ts). Nothing else is drawn faint. */
 export const DIM = 0.4;
+const IDLE_AFTER = 20_000, IDLE_FADE = 40_000;   // an agent at rest on the overview: lit a little longer, then gone
 
+/**
+ * How strongly a marker shows: lit while it works, waits on you or thinks. On the project overview, once it rests it
+ * fades out over a short while and disappears (it doesn't linger faint: faint means "not the focus"); with its thread
+ * open it stays, solid, where it last was (by its trail).
+ */
 export function agentAlpha(a: AgentPresence, now: number, busy: boolean, keep: boolean): number {
   if (a.active || busy) return 1;
   if (keep) return 1;   // a thread open: its agent, done, stays where it is now, as solid as it was (map, Readmap)
-  return Math.max(0, 0.35 * (1 - (now - Date.parse(a.ts) - 2 * 60_000) / (8 * 60_000)));
+  return Math.max(0, Math.min(1, 1 - (now - Date.parse(a.ts) - IDLE_AFTER) / IDLE_FADE));
 }
 
 // ---------- canvas layer ----------

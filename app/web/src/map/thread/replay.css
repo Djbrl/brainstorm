@@ -1,15 +1,12 @@
 /* Thread replay on the map: the player and the footer around it (dock), the step list, the share menu, the talk card. */
 
 /* ---------- player controls ---------- */
-.rp-empty { margin: 0; color: var(--ink-2); font-size: 14.5px; }
 
 .rp-steps button { font: inherit; }
 .rp-icon { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; border: 0; padding: 0;
   background: transparent; color: var(--ink-2); transition: background .15s, color .15s; }
 .rp-icon:hover:not(:disabled) { background: var(--fill-hover); color: var(--ink); }
 .rp-icon:disabled { opacity: .35; cursor: default; }
-.rp-play { width: 38px; height: 38px; background: var(--ink); color: var(--bg); }
-.rp-play:hover:not(:disabled) { background: var(--ink); color: var(--bg); opacity: .86; }
 
 .rp-steps :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -26,14 +23,6 @@
 .rp-slider input:focus-visible { outline: none; }
 .rp-slider input:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(37,99,235,.3); }
 
-.rp-speed { display: flex; background: var(--fill); border-radius: 999px; padding: 2px; }
-.rp-speed button { border: 0; background: transparent; color: var(--ink-2); font-size: 12.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
-  font-variant-numeric: tabular-nums; }
-.rp-speed button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.1); }
-
-@media (max-width: 640px) {
-  .rp-slider { order: 5; flex-basis: 100%; }
-}
 
 /* ---------- step list (fills the height the sidebar gives it) ---------- */
 .rp-steps { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; }
@@ -116,11 +105,11 @@
 .track-agents button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 
-.rp-player { display: flex; align-items: center; gap: 8px; width: min(640px, calc(100vw - 480px)); min-width: 420px; padding: 10px 12px; border: 1px solid var(--line);
-  border-radius: 18px; background: var(--surface); box-shadow: 0 10px 30px rgba(0,0,0,.08); animation: rp-rise .3s cubic-bezier(.2,.85,.25,1); }
+/* The slim timeline (full screen only, while replaying: map/dock.css hides it below). */
+.rp-player { display: flex; align-items: center; gap: 4px; width: min(560px, calc(100vw - 480px)); min-width: 360px; padding: 3px 6px; border: 1px solid var(--line);
+  border-radius: 999px; background: var(--surface); box-shadow: 0 10px 30px rgba(0,0,0,.08); animation: rp-rise .3s cubic-bezier(.2,.85,.25,1); }
 @keyframes rp-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .rp-player { animation: none; } }
-.rp-player-empty { justify-content: space-between; }
 .rp-player .rp-slider { margin: 0 6px; }
 .rp-marks { position: absolute; left: 7px; right: 7px; top: 8px; bottom: 8px; pointer-events: none; }
 .rp-marks i { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; border-radius: 1px; background: #c7cbd6; }
@@ -152,18 +141,6 @@
 /* Dark themes: the light amber sheet would glare (the grey ones take the theme's --wash). */
 :root:is([data-theme="prism"], [data-theme="hologram"]) .rp-waiting.blocked { background: rgba(245,158,11,.14); color: #f5c06a; }
 
-/* Narrow (tablet and phone): the footer and the player fit the width they have. */
-@media (max-width: 1100px) {
-  .rp-player { min-width: 0; width: min(640px, calc(100vw - 48px)); }
-  .map-wrap:has(.map-panel.open) .rp-player { width: 100%; flex-wrap: wrap; }
-  .map-wrap:has(.map-panel.open) .rp-player .rp-slider { order: 5; flex-basis: 100%; margin: 0; }
-}
-/* Phone: the footer wraps; the share menu opens centred over it. */
-@media (max-width: 440px) {
-  .rp-player, .map-wrap:has(.map-panel.open) .rp-player { width: calc(100vw - 24px); flex-wrap: wrap; gap: 4px 6px; }
-  .rp-player .rp-slider, .map-wrap:has(.map-panel.open) .rp-player .rp-slider { order: 5; flex-basis: 100%; margin: 0; }
-  .rp-player .rp-speed { margin-left: auto; }
-}
 
 /* ---------- long Track lists: an open chapter draws only the rows near the view and the cursor (Track.tsx) ---------- */
 /* Every row is drawn for real (no placeholder height), so the empty space standing in for the others adds up exactly. */

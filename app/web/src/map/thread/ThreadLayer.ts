@@ -107,13 +107,12 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
 
   // Landing on a step id (links, Follow, switching detail) is App's LandStep: on every lens, before live-follow.
 
-  const speed = replay?.speed ?? 1;
   // Following live, the thread's own agents are drawn by the live layer (each in its colour): no single cursor marker.
   const live = !!replay?.live;
   // The thread is mid-turn and the model hasn't answered yet: at its last step, the marker shows it's thinking.
   const thinking = useLiveSelector((s) => !!replay && s.attention[replay.sessionId]?.state === "thinking") && active && index >= last;
-  const st = useRef<{ active: boolean; thread: Thread | null; index: number; len: number; mode: string; speed: number; live: boolean; thinking: boolean }>({ active, thread, index, len, mode, speed, live, thinking });
-  st.current = { active, thread, index, len, mode, speed, live, thinking };
+  const st = useRef<{ active: boolean; thread: Thread | null; index: number; len: number; mode: string; live: boolean; thinking: boolean }>({ active, thread, index, len, mode, live, thinking });
+  st.current = { active, thread, index, len, mode, live, thinking };
   // Only a ring actually drawn needs frames: following a live thread, the agent's own marker (agents.tsx, CSS ring)
   // stands there instead, and before its first move there is no marker at all.
   const ringDrawn = useRef(false);
@@ -173,7 +172,7 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
     if (target) {
       if (a.file === null) { a.x = a.fromX = target.x; a.y = a.fromY = target.y; a.t0 = -1e9; a.file = curFile; }
       else if (a.file !== curFile) { setOff(a, t); a.file = curFile; }
-      const g = glide(a, target.x, target.y, t, style.route, s.speed, () => { if (curFile) land(curFile, t); });
+      const g = glide(a, target.x, target.y, t, style.route, 1, () => { if (curFile) land(curFile, t); });
       if (g.trip) { trip = g.trip; tp = g.p; te = g.e; }
     } else if (!curFile) {
       a.file = null;

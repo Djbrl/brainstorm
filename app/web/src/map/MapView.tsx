@@ -1,7 +1,6 @@
 // Force graph of files/modules, glow by recency, a ripple per agent edit + outline while active, side panel + AskBox.
 // The pieces: graph.ts (nodes, layout, forces), drawNode.ts (drawing a frame), color.ts (recency colours), labels.ts
 // (names), useMapCamera.ts (what the camera frames), useLiveAgents.ts (agents on the map), redraw.ts (when to redraw).
-import { LensSwitch } from "./LensSwitch";
 import { clock } from "../lib/live";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ProjectMap } from "@contract";
@@ -303,7 +302,6 @@ export function MapView() {
         <p className="map-sparse">This project has only {map.files.length === 1 ? "one file" : `${map.files.length} files`} on the map.</p>
       )}
       {map && <CapNote map={map} />}
-      <LensSwitch />
       {hasNodes && readmap && (
         <Readmap graphRef={graphRef} anim={anim} drawnRef={agentsRef} cam={camRef} subject={() => replayRef.current.subject()} now={() => replayRef.current.nowAt()} reads={readmapReads} agents={tracks} followId={followId} accent={tokens.accent}
           big={!small} onTrack={follow} onLook={lookAt} onHide={() => setReadmap(false)} frame={readmapFrame} kick={redraw.kick} />

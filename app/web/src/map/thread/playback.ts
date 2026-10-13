@@ -9,7 +9,7 @@ import { useShortcut } from "../../switch/shortcuts";
 const OTHER_MS = 120;       // playback pace for single "other" steps (every-step detail)
 const SUMMARY_MS = 380;     // playback pace for summary beats (light detail)
 const READ_MS = 520;        // playback pace for reads
-const STEP_MS = 700;        // playback pace for edits and your prompts (at 1×)
+const STEP_MS = 700;        // playback pace for edits and your prompts (scrolling the steps is the fast-forward)
 
 type SetIndex = (i: number | ((i: number) => number)) => void;
 
@@ -24,10 +24,9 @@ export function useReplayPlayback({ active, replay, thread, index, last, st, set
     if (index >= last) { setReplayPlaying(false); return; }
     const cur = thread!.beats[index];
     const base = cur.kind === "summary" ? SUMMARY_MS : cur.action === "read" ? READ_MS : cur.kind === "step" && cur.action === "other" ? OTHER_MS : STEP_MS;
-    const ms = base / replay.speed;
-    const t = setTimeout(() => setReplayIndex((i) => Math.min(last, i + 1)), ms);
+    const t = setTimeout(() => setReplayIndex((i) => Math.min(last, i + 1)), base);
     return () => clearTimeout(t);
-  }, [active, replay?.playing, replay?.speed, index, last, thread, setReplayIndex, setReplayPlaying]);
+  }, [active, replay?.playing, index, last, thread, setReplayIndex, setReplayPlaying]);
 
   const replayPlayingRef = useRef(false);
   replayPlayingRef.current = !!replay?.playing;
@@ -49,7 +48,7 @@ export function useReplayPlayback({ active, replay, thread, index, last, st, set
 
 /**
  * Play/pause from the step you're on. At the last one, play starts again from the first (`restart` goes there). Shared
- * by the keyboard and the Dock (the map's and Places').
+ * by the keyboard and Places' own Space.
  */
 export function togglePlay(playing: boolean, setPlaying: (p: boolean) => void, atEnd = false, restart?: () => void) {
   if (!playing && atEnd) restart?.();

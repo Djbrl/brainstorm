@@ -54,24 +54,12 @@
 .threadbar-find kbd, .picker-foot kbd, .keys-body kbd { white-space: nowrap; font: 500 11.5px var(--font-body); color: var(--ink-2); background: var(--surface); border: 1px solid var(--line);
   border-bottom-width: 2px; border-radius: 6px; padding: 0 6px; min-width: 22px; text-align: center; display: inline-block; line-height: 18px; }
 
-/* The most used keys, quiet, before Find a thread. */
-.threadbar-keys { flex: none; display: flex; align-items: center; gap: 16px; padding: 0 8px; font-size: 12.5px; color: var(--ink-3); white-space: nowrap; }
-.threadbar-keys > span, .threadbar-keys > button { display: flex; align-items: center; gap: 6px; }
-.threadbar-keys > button { border: 0; background: none; padding: 4px 6px; margin: 0 -6px; border-radius: 8px; color: inherit; font-size: inherit; }
-.threadbar-keys > button:hover { background: var(--accent-soft); color: var(--ink); }
-.threadbar-keys kbd { font: 500 11.5px var(--font-body); color: var(--ink-2); background: var(--surface); border: 1px solid var(--line);
-  border-bottom-width: 2px; border-radius: 6px; padding: 0 6px; min-width: 22px; text-align: center; display: inline-block; line-height: 18px; }
-.threadbar-keys + .threadbar-find { margin-left: -8px; }
-/* Narrower windows keep the room for the tabs: only ? stays. */
-@media (max-width: 1280px) { .threadbar-key-extra { display: none !important; } }
-
-/* Play / Pause for the open thread (the thread bar, a shared replay's header): at every width; just the icon on a phone. */
-.play-button { flex: none; display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 14px 0 11px; border: 1px solid var(--line);
-  border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 13.5px; font-weight: 600; white-space: nowrap; }
-.play-button svg { width: 14px; height: 14px; color: var(--accent); }
-.play-button:hover { border-color: var(--accent); }
-.play-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-@media (max-width: 760px) { .play-button { width: 32px; padding: 0; justify-content: center; } .play-button span { display: none; } }
+/* The shortcuts window: one small "?" before Find a thread (the keys are listed there, not in the bar). */
+.threadbar-keys { flex: none; display: flex; align-items: center; }
+.threadbar-help { width: 26px; height: 26px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 50%;
+  background: none; color: var(--ink-3); font: 600 13px var(--font-body); }
+.threadbar-help:hover { background: var(--accent-soft); color: var(--ink); border-color: var(--ink-3); }
+.threadbar-help:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---- agents in other projects (header) ---- */
 .elsewhere { position: relative; }

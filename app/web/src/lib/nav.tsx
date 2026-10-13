@@ -27,7 +27,6 @@ import { listeners, readStored, readStoredJson, shallowEqual, useStoreSelector, 
 
 /** How a thread is shown: where it happened in the code, or the places it went outside the code. */
 export type Lens = "map" | "places";
-export type ReplaySpeed = 1 | 2 | 4;
 /**
  * How much of an open thread is out: its steps as a list (what opening a thread shows), or the replay with its player
  * (from the footer).
@@ -39,7 +38,7 @@ export const END = Number.MAX_SAFE_INTEGER;
  * An open thread. `index` is the current beat (see lib/thread.ts) in `detail` mode.
  * `atStep` is a step id to land on once the thread is built (links, switching detail); the replay layer resolves and clears it.
  */
-export type ThreadReplay = { sessionId: string; index: number; playing: boolean; speed: ReplaySpeed; detail: ReplayDetail; mode: ThreadMode; atStep?: string; live?: boolean };
+export type ThreadReplay = { sessionId: string; index: number; playing: boolean; detail: ReplayDetail; mode: ThreadMode; atStep?: string; live?: boolean };
 /** The open thread without its cursor (see useNavState). */
 export type OpenThread = Omit<ThreadReplay, "index" | "playing">;
 /** The replay cursor: the beat it's on and whether it plays. */
@@ -75,7 +74,6 @@ type Nav = {
   /** Move the replay cursor. The caller clamps to the thread length. */
   setReplayIndex: (i: number | ((prev: number) => number)) => void;
   setReplayPlaying: (playing: boolean) => void;
-  setReplaySpeed: (speed: ReplaySpeed) => void;
   /** Switch between the light replay (summaries) and every step, staying on the same step. */
   setReplayDetail: (detail: ReplayDetail, atStep?: string) => void;
   /** Clear `atStep` after landing on it, at `index`. */
@@ -109,7 +107,7 @@ type Nav = {
 
 /** Every setter of Nav. */
 export type NavActions = Pick<Nav, "setFocusFile" | "openFile" | "selectFile" | "startReplay" | "setThreadMode" | "followLive" | "setReplayLive"
-  | "setLens" | "setReplayIndex" | "setReplayPlaying" | "setReplaySpeed" | "setReplayDetail" | "landReplay" | "setCursorStep" | "cursorStep" | "stopReplay" | "openStep"
+  | "setLens" | "setReplayIndex" | "setReplayPlaying" | "setReplayDetail" | "landReplay" | "setCursorStep" | "cursorStep" | "stopReplay" | "openStep"
   | "showStep" | "closeStep" | "back" | "toggleAgent" | "setHiddenAgents" | "setShowReads">;
 
 /** The store's state: the open thread and its cursor are kept apart, so moving the cursor leaves `thread` as it was. */
@@ -196,7 +194,7 @@ export function createNavStore(): NavStore {
     file: first.file ?? null,
     step: first.step,
     lens: first.lens,
-    thread: first.thread ? { sessionId: first.thread, speed: 1, detail: DETAIL, mode: "steps", atStep: first.step ?? undefined } : null,
+    thread: first.thread ? { sessionId: first.thread, detail: DETAIL, mode: "steps", atStep: first.step ?? undefined } : null,
     cursor: { index: first.thread ? END : 0, playing: false },
     cursorStep: null,
     hiddenAgents: loadHidden(),
@@ -239,7 +237,7 @@ export function createNavStore(): NavStore {
 
   const startReplay: NavActions["startReplay"] = (sid, at = 0, opts) => set({
     ...replayPatch((r) => ({
-      sessionId: sid, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? DETAIL, mode: opts?.mode ?? "steps",
+      sessionId: sid, playing: false, detail: r?.detail ?? DETAIL, mode: opts?.mode ?? "steps",
       index: typeof at === "number" ? Math.max(0, at) : 0, atStep: typeof at === "string" ? at : undefined, live: !!opts?.live,
     })),
     step: null,
@@ -262,7 +260,6 @@ export function createNavStore(): NavStore {
     followLive: (i) => setReplay((r) => (r && r.live && r.index !== i ? { ...r, index: Math.max(0, i), atStep: undefined } : r)),
     setReplayLive: (live) => setReplay((r) => (r ? { ...r, live, playing: false } : r)),
     setReplayPlaying: (playing) => setReplay((r) => (r ? { ...r, playing, live: playing ? false : r.live, mode: playing ? "play" : r.mode } : r)),
-    setReplaySpeed: (speed) => setReplay((r) => (r ? { ...r, speed } : r)),
     setReplayDetail: (detail, atStep) => setReplay((r) => (r ? { ...r, detail, playing: false, atStep: atStep ?? data.cursorStep ?? undefined } : r)),
     landReplay: (index) => setReplay((r) => (r ? { ...r, index: Math.max(0, index), atStep: undefined } : r)),
     setCursorStep: (stepId) => set({ cursorStep: stepId }),
@@ -270,7 +267,7 @@ export function createNavStore(): NavStore {
     openStep: (sid, stepId) => set({
       ...replayPatch((r) => (r && r.sessionId === sid
         ? { ...r, atStep: stepId, playing: false, live: false }
-        : { sessionId: sid, index: 0, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? DETAIL, mode: "steps", atStep: stepId })),
+        : { sessionId: sid, index: 0, playing: false, detail: r?.detail ?? DETAIL, mode: "steps", atStep: stepId })),
       step: stepId,
     }),
     showStep: (stepId) => { flags.replaceNext = true; set({ step: stepId }); },
@@ -298,7 +295,7 @@ export function createNavStore(): NavStore {
         ...replayPatch((r) => {
           if (!p.thread) return null;
           if (r && r.sessionId === p.thread) return p.step ? { ...r, atStep: p.step, playing: false } : r;
-          return { sessionId: p.thread, index: END, playing: false, speed: r?.speed ?? 1, detail: r?.detail ?? DETAIL, mode: "steps", atStep: p.step ?? undefined };
+          return { sessionId: p.thread, index: END, playing: false, detail: r?.detail ?? DETAIL, mode: "steps", atStep: p.step ?? undefined };
         }),
       });
     });

@@ -19,7 +19,7 @@ export function CompactBar() {
           Threads
         </button>
       )}
-      <LensSwitch inBar />
+      <LensSwitch />
       <button className="compact-find" onClick={() => run("find")} aria-label="Find a thread" title={`Find any thread, in this project or another (${MOD} K)`}>
         <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5 14 14" /></svg>
         {!thread && <span>Find a thread</span>}

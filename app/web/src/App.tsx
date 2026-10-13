@@ -17,7 +17,7 @@ import { Crashed, Offline, OfflineBanner, useOffline } from "./Trouble";
 import { useAttentionAlerts } from "./lib/attention";
 import { Logo } from "./Logo";
 import { track } from "./lib/usage";
-import { PlayButton, ThreadBar } from "./switch/ThreadBar";
+import { ThreadBar } from "./switch/ThreadBar";
 import { Elsewhere } from "./switch/Elsewhere";
 import { Keys } from "./switch/Keys";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
@@ -153,7 +153,6 @@ function Shell() {
           ? <a className="wordmark" href={LANDING_URL} aria-label="Rundown home"><Logo label="Rundown home" /></a>
           : <button className="wordmark" onClick={goHome} aria-label="Home" title="Home"><Logo /></button>}
         {!local ? <Crumbs project={project || (kind === "shared" ? "The whole map" : "")} /> : <div className="topbar-space" />}
-        {kind === "shared" && thread && <PlayButton />}
         <div className="status">
           {local && <Elsewhere />}
           {DEMO && kind === "preview" && (

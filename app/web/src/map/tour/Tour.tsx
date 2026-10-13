@@ -46,7 +46,7 @@ export function Tour() {
     if (latest && shown) o.push("step");
     o.push("files", "map");
     if (!phone && getReadmap()) o.push("readmap");   // the Readmap on, as it is unless turned off (none on a phone)
-    if (shownEl(".threadbar-keys")) o.push("keys");   // the key hints fit the thread bar (a wide enough window)
+    if (shownEl(".threadbar-keys")) o.push("keys");   // the ? button shows in the thread bar (a wide enough window)
     o.push(asks ? "stats" : "end");
     return o;
   }, [!!latest, !!shown, asks]);
@@ -149,12 +149,12 @@ function cardFor(step: TourStep, { threads, title }: { threads: number; title?: 
     case "threads": return { title: "Your threads", anchor: ".map-sidebar", body: threads
       ? "Each Claude Code or Codex session in this project is a thread, newest first. A blue dot means it's working right now."
       : "Each Claude Code or Codex session in this project will be a thread here, newest first, as soon as an agent works in it." };
-    case "steps": return { title: "Every step it took", anchor: ".map-sidebar", body: `This is ${title ? `"${title}"` : "your newest thread"}: what the agent read, changed and ran, in order. Scroll back through it and the map follows.` };
+    case "steps": return { title: "Every step it took", anchor: ".map-sidebar", body: `This is ${title ? `"${title}"` : "your newest thread"}: what the agent read, changed and ran, in order. Scroll back through it and the map follows; press Space to watch it play, and Space again to pause.` };
     case "step": return { title: "One step, up close", anchor: ".map-panel.open", body: "Click a step to see exactly what happened: the change it made, or what a command printed. You can ask about it too." };
     case "files": return { title: "Your files", anchor: ".map-sidebar", body: "Files is your project as a folder tree. Pick a file to see what it does, what uses it, and which agents worked on it." };
     case "map": return { title: "The map", body: "The same files, as dots grouped in folders. An agent at work is a dot that moves to each file it changes, leaving a trail, with a dotted line to the files it reads. This one is an example." };
     case "readmap": return { title: "The Readmap", anchor: ".readmap", body: "Agents often read files far from where they work. The Readmap follows what they read, up close, so you don't have to look for it. M hides or shows it." };
-    case "keys": return { title: "Shortcuts", anchor: ".threadbar-keys", body: "Space plays a thread back, T shows or hides the sidebar, M the Readmap. ? lists them all." };
+    case "keys": return { title: "Shortcuts", anchor: ".threadbar-keys", body: "Space plays a thread back and pauses it, T shows or hides the sidebar, M the Readmap. This ? button (or the ? key) lists them all." };
     case "stats": return { title: "One last question", body: "Can Rundown send anonymous usage stats, once a day? Counts only (how much you used it), its version, your OS and country. Never code, paths, prompts or names. You can change this in Settings." };
     case "end": return isRecording()
       ? { title: "Your turn", body: "The thread is open again: click a step to see it, press Space to watch it play, P for the places it went outside the code. ? lists every key." }

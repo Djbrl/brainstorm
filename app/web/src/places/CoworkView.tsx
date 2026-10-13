@@ -8,7 +8,6 @@ import { useLiveSelector, useLiveStep } from "../lib/live";
 import { useNavActions, useNavState, useReplayCursor } from "../lib/nav";
 import { initial } from "../map/agents";
 import { MapSidebar } from "../map/sidebar/MapSidebar";
-import { LensSwitch } from "../map/LensSwitch";
 import { usePlaceRows, usePlaceTimeline } from "./rows";
 import { Dock } from "../map/thread/Dock";
 import { togglePlay } from "../map/thread/ThreadLayer";
@@ -64,7 +63,7 @@ export function PlacesView() {
   const beatOf = useCallback((id: string) => full?.stepBeat.get(id), [full]);
   const small = useMedia(NARROW);
 
-  // ---- the player, place by place: Space plays from the place you're on, one place every ~1.1 s (faster at 2× 4×);
+  // ---- the player, place by place: Space plays from the place you're on, one place every ~1.1 s;
   // in the player ← → go one place back or forward, Home and End the first and the last ----
   const { rows, at, go } = usePlaceRows();
   const playing = useReplayCursor((c) => c.playing);
@@ -72,9 +71,9 @@ export function PlacesView() {
   useEffect(() => {
     if (!playing || !thread) return;
     if (at >= rows.length - 1) { navRef.current.setReplayPlaying(false); return; }
-    const t = setTimeout(() => now.current.go(now.current.at + 1, true), PLACE_MS / (thread.speed ?? 1));
+    const t = setTimeout(() => now.current.go(now.current.at + 1, true), PLACE_MS);
     return () => clearTimeout(t);
-  }, [playing, at, rows.length, thread?.speed]);
+  }, [playing, at, rows.length]);
   useShortcut("play", (e) => {
     const { rows: rs, at: i, go: to, playing: p, thread: r } = now.current;
     if (!r || !rs.length || (e?.target as HTMLElement | null)?.tagName === "BUTTON") return false;
@@ -102,7 +101,6 @@ export function PlacesView() {
           letter={initial({ name: session?.title ?? "", isSubagent: false })} />
       )}
       <MapSidebar agents={Object.values(agents)} accent="#2563eb" followId={null} onFollow={() => setLens("map")} onFocusFile={() => setLens("map")} map={map} />
-      <LensSwitch />
       <Dock player={!!data && rows.length > 0} steps={{ at, count: rows.length, go, noun: "place" }} />
       {!thread && <p className="cw-note">Pick a thread to see where it went outside the code.</p>}
       {thread && error && <p className="cw-note">The places couldn't load. Check that Rundown is still running.</p>}

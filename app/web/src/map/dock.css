@@ -14,7 +14,7 @@
 .compact-bar svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .compact-find { color: var(--ink-2) !important; }
 .compact-find:not(:has(span)) { width: 34px; padding: 0 !important; justify-content: center; }
-.compact-bar .lens-switch.in-bar { margin: 0 2px; }
+.compact-bar .lens-switch { margin: 0 2px; }
 @media (max-width: 1100px) { .compact-bar { display: flex; } }
 /* A step's panel beside the map on a small tablet: the bar keeps to the narrow space left of it (Map | Places waits
    for the panel to close; P still switches). */

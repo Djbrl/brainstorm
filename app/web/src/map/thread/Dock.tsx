@@ -1,17 +1,15 @@
-// The map's floating footer, the player, shown while you replay (Space); and the share menu, beside
-// the open thread's title in the sidebar. The player is only what playing needs: back, play, forward, a
-// timeline cut by chapter (red where one failed), speed and hide. The step panel follows the cursor (no "Open step"),
-// the camera recenters itself, "Every step" is under the step list.
-import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { useNavActions, useNavState, useReplay, type ReplaySpeed } from "../../lib/nav";
+// The map's floating footer, a slim timeline shown while you replay (Space plays and pauses, Esc leaves); and the share
+// menu, beside the open thread's title in the sidebar. No play button and no speeds: Space plays, and scrolling the
+// steps is the fast-forward. The timeline is ‹ › and a scrubber cut by chapter (red where one failed). The step panel
+// follows the cursor, the camera recenters itself, "Every step" is under the step list.
+import { memo, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useNavActions, useNavState, useReplay } from "../../lib/nav";
 import { useThread, type Thread } from "../../lib/thread";
 import { chaptersOf } from "../../lib/chapters";
-import { togglePlay } from "./ThreadLayer";
 import { CompactBar } from "../../switch/CompactBar";
 import "./replay.css";
 import "../dock.css";
 
-const SPEEDS: ReplaySpeed[] = [1, 2, 4];
 const P = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
 export const Icon = {
@@ -74,46 +72,33 @@ type Steps = { at: number; count: number; go: (i: number) => void; noun: string 
 
 function Player({ steps }: { steps?: Steps }) {
   const replay = useReplay();
-  const { setReplayIndex, setReplayPlaying, setReplaySpeed, setThreadMode } = useNavActions();
+  const { setReplayIndex, setReplayPlaying } = useNavActions();
   const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
-  if (!replay) return null;
-  const hide = <button className="rp-icon" onClick={() => setThreadMode("steps")} aria-label="Hide the player" title="Hide the player (Esc)">{Icon.close}</button>;
-  if (!thread || !thread.beats.length) {
-    return <div className="rp-player rp-player-empty" role="region" aria-label="Replay"><p className="rp-empty">{thread ? "This thread has no steps yet." : "Loading the thread…"}</p>{hide}</div>;
-  }
+  if (!replay || !thread || !thread.beats.length) return null;
   const len = thread.beats.length;
   const index = Math.min(replay.index, len - 1);
   const set = (i: number) => { setReplayPlaying(false); setReplayIndex(Math.max(0, Math.min(len - 1, i))); };
   const pct = len > 1 ? (index / (len - 1)) * 100 : 100;
   return (
-    <div className="rp-player" role="region" aria-label="Replay">
+    <div className="rp-player" role="region" aria-label={replay.playing ? "Replay, playing (Space pauses)" : "Replay (Space plays)"}>
       {steps
-        ? <button className="rp-icon" onClick={() => steps.go(steps.at - 1)} disabled={steps.at <= 0} aria-label={`Previous ${steps.noun}`} title={`Previous ${steps.noun} (←)`}>{Icon.back}</button>
-        : <button className="rp-icon" onClick={() => set(index - 1)} disabled={index === 0} aria-label="Previous step" title="Previous step (←)">{Icon.back}</button>}
-      <button className="rp-icon rp-play" onClick={() => steps
-          ? togglePlay(replay.playing, setReplayPlaying, steps.at >= steps.count - 1, () => steps.go(0))
-          : togglePlay(replay.playing, setReplayPlaying, index >= len - 1, () => setReplayIndex(0))}
-        aria-label={replay.playing ? "Pause" : "Play"} title={replay.playing ? "Pause (Space)" : (steps ? steps.at >= steps.count - 1 : index >= len - 1) ? "Play from the start (Space)" : "Play (Space)"}>
-        {replay.playing ? Icon.pause : Icon.play}
-      </button>
-      {steps
-        ? <button className="rp-icon" onClick={() => steps.go(steps.at + 1)} disabled={steps.at >= steps.count - 1} aria-label={`Next ${steps.noun}`} title={`Next ${steps.noun} (→)`}>{Icon.fwd}</button>
-        : <button className="rp-icon" onClick={() => set(index + 1)} disabled={index >= len - 1} aria-label="Next step" title="Next step (→)">{Icon.fwd}</button>}
+        ? <button className="rp-icon" onMouseDown={keepFocus} onClick={() => steps.go(steps.at - 1)} disabled={steps.at <= 0} aria-label={`Previous ${steps.noun}`} title={`Previous ${steps.noun} (←)`}>{Icon.back}</button>
+        : <button className="rp-icon" onMouseDown={keepFocus} onClick={() => set(index - 1)} disabled={index === 0} aria-label="Previous step" title="Previous step (←)">{Icon.back}</button>}
       <div className="rp-slider" style={{ ["--rp-pct" as string]: `${pct}%` }}>
         <ChapterMarks thread={thread} />
         <input type="range" min={0} max={len - 1} step={1} value={index} aria-label="Replay position"
           aria-valuetext={`${index + 1} of ${len}`} onChange={(e) => set(Number(e.target.value))}
           onPointerUp={(e) => e.currentTarget.blur()} /> {/* dragged, it lets go of the keys: Space plays again, ← → step */}
       </div>
-      <div className="rp-speed" role="group" aria-label="Speed">
-        {SPEEDS.map((s) => (
-          <button key={s} className={replay.speed === s ? "on" : ""} aria-pressed={replay.speed === s} onClick={() => setReplaySpeed(s)}>{s}×</button>
-        ))}
-      </div>
-      {hide}
+      {steps
+        ? <button className="rp-icon" onMouseDown={keepFocus} onClick={() => steps.go(steps.at + 1)} disabled={steps.at >= steps.count - 1} aria-label={`Next ${steps.noun}`} title={`Next ${steps.noun} (→)`}>{Icon.fwd}</button>
+        : <button className="rp-icon" onMouseDown={keepFocus} onClick={() => set(index + 1)} disabled={index >= len - 1} aria-label="Next step" title="Next step (→)">{Icon.fwd}</button>}
     </div>
   );
 }
+
+/** A click that doesn't take the focus: Space keeps playing and pausing instead of pressing the button again. */
+const keepFocus = (e: ReactMouseEvent) => e.preventDefault();
 
 /**
  * The footer. On a full screen, only the player, while replaying. Share sits by the thread's title in the sidebar's

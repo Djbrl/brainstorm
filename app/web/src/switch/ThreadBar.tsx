@@ -2,11 +2,10 @@
 // one key: 1 to 9, [ and ]) from each other. Find a thread (⌘K) for the rest, this project's and your other projects'.
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useLiveSelector } from "../lib/live";
-import { useNavActions, useNavState, useReplayCursor } from "../lib/nav";
-import { setCameraLock, setReadmap, useCameraLock, useReadmap } from "../map/prefs";
+import { useNavActions, useNavState } from "../lib/nav";
 import { attentionText, needsYou, yourTurn } from "../lib/attention";
 import { forgetThread, openThread, rememberThread, useBarThreads, type BarThread } from "../lib/switcher";
-import { MOD, run, useShortcut } from "./shortcuts";
+import { MOD, useShortcut } from "./shortcuts";
 import { WorkspaceMenu } from "./WorkspaceMenu";
 import { LensSwitch } from "../map/LensSwitch";
 import "./switch.css";
@@ -56,9 +55,8 @@ export function ThreadBar({ project, onFind, onHelp, onAllProjects }: { project:
           onOpen={() => openThread(nav, t.session)}
           onClose={() => { forgetThread(root, t.session.id); if (t.session.id === openId) nav.stopReplay(); }} />)}
       </div>
-      {openId && <PlayButton />}
-      <LensSwitch inBar />
-      <KeyHints open={!!openId} onHelp={onHelp} />
+      <LensSwitch />
+      <HelpButton onHelp={onHelp} />
       <button className="threadbar-find" onClick={onFind} title={`Find any thread, in this project or another (${MOD} K)`}>
         <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5 14 14" /></svg>
         Find a thread<kbd>{MOD === "⌘" ? "⌘K" : "Ctrl K"}</kbd>
@@ -70,39 +68,11 @@ export function ThreadBar({ project, onFind, onHelp, onAllProjects }: { project:
 /** A click that doesn't take the focus: the keys keep working on the map, and no focus ring shows on the button. */
 const keepFocus = (e: MouseEvent) => e.preventDefault();
 
-/**
- * Play or pause the open thread's replay (Space does the same): in the thread bar, so on a full screen only (below it
- * the bar is hidden, and Space, ← → and the folded card's scroller drive the replay); and in a shared replay's header,
- * which has no thread bar.
- */
-const PLAY = <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.2v9.6L12.8 8z" fill="currentColor" /></svg>;
-const PAUSE = <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9M11 3.5v9" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" /></svg>;
-export function PlayButton() {
-  const playing = useReplayCursor((c) => c.playing);
+/** The shortcuts window, one quiet "?" beside Find a thread: the keys themselves are listed there, not in the bar. */
+function HelpButton({ onHelp }: { onHelp: () => void }) {
   return (
-    <button className="play-button" onMouseDown={keepFocus} onClick={() => run("play")} aria-label={playing ? "Pause" : "Play"}
-      title={playing ? "Pause (Space)" : "Play from the step you're on (Space)"}>
-      {playing ? PAUSE : PLAY}<span>{playing ? "Pause" : "Play"}</span>
-    </button>
-  );
-}
-
-/**
- * The keys people use most, said quietly beside Find a thread, and clickable: center and the camera lock with a
- * thread open, the Readmap on the map, and ? for the rest.
- */
-function KeyHints({ open, onHelp }: { open: boolean; onHelp: () => void }) {
-  const lock = useCameraLock();
-  const readmap = useReadmap();
-  const { lens } = useNavState();
-  return (
-    <div className="threadbar-keys" aria-label="Keyboard shortcuts">
-      {open && <button className="threadbar-key-extra" onMouseDown={keepFocus} onClick={() => run("center")} title="Center the camera on the agent (C)"><kbd>C</kbd>Center</button>}
-      {open && <button className="threadbar-key-extra" role="switch" aria-checked={lock} onMouseDown={keepFocus} onClick={() => setCameraLock(!lock)}
-        title={lock ? "The camera keeps the agent centred. Click to move the map freely (L)" : "Keep the agent centred as it moves (L)"}><kbd>L</kbd>{lock ? "Free camera" : "Lock camera"}</button>}
-      {lens === "map" && <button role="switch" aria-checked={readmap} onMouseDown={keepFocus} onClick={() => setReadmap(!readmap)}
-        title={readmap ? "Hide the Readmap, the small map of what the agent reads (M)" : "Show the Readmap, the small map of what the agent reads (M)"}><kbd>M</kbd>Readmap</button>}
-      <button onMouseDown={keepFocus} onClick={onHelp} title="Every keyboard shortcut"><kbd>?</kbd>Shortcuts</button>
+    <div className="threadbar-keys">
+      <button className="threadbar-help" onMouseDown={keepFocus} onClick={onHelp} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
     </div>
   );
 }

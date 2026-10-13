@@ -498,3 +498,41 @@ Left open:
 
 - The live presence trail keeps an agent's last 12 moves. After a reload, an agent whose last edit has scrolled out of the trail behind many reads waits at the top of the project until its next edit. A server field for the last edited file would fix it.
 - On a small window, ← → and Home/End step through the thread only once the replay has started (Space). That is how it worked before.
+
+### Calm map (stage 1)
+
+Stage 1 of the plan "Rundown: calmer UI, smarter camera": fewer things on the map at once, each look meaning one thing. Stage 2 (the director camera) is later; the camera's follow and lock are unchanged.
+
+What you might notice:
+
+- No Play button anywhere and no 1× 2× 4×. Space plays and pauses (the tour says so); scrolling the steps is the fast-forward. On a full screen, a slim timeline (‹, the scrubber, ›) shows while you replay.
+- Map | Places is in the thread bar (full screen) or the compact bar (smaller), never floating over the map. The C, L, M, ? hints are one small "?" button.
+- Looking back through a thread, the agent has one marker, solid, where it was. Where it works now is a small ring. "Back to now" at the bottom of the map (and End) returns to the present; the sidebar's button says the same.
+- No numbered badges along the trail.
+- Faint means only "not the focus". An agent at rest on the overview fades out in under a minute instead of lingering faint for ten.
+- One ring per agent: red (failed), then amber (needs you), then thinking. An edit pulses the file once, no ring stays. The selected file has a thin outline. Islands are tinted, not dashed.
+- Agents off the visible map show as an arrow on its edge, with their initial; a click goes to them.
+- Trails and read lines only for the agent you point at, focus or follow.
+- The Readmap comes when an agent reads a file off your view and fades five seconds later; M pins it. The file window opens only for edits, then shrinks to a chip.
+- The thread's Share button became a "…" menu (Share a replay, Copy link, Export Markdown, Show/Hide its agents). Eye buttons show on hover. The "shows N of M files" note shows once, then a tiny count.
+
+The changes:
+
+- **Stop badges.** The numbered badges on each file of the trail are gone; the marker keeps its number and the Track lists every step. Commit `5496ba4`.
+- **Duplicates.** The floating Map | Places is removed from the map and Places (`LensSwitch` has one style, in a bar). The thread bar's key hints became one "?" button that opens the shortcuts window (`.threadbar-keys` kept as the tour's anchor). The Play buttons (thread bar, player, shared replay header) and the speeds are removed; `speed` is gone from the nav state. The player is a slim timeline, shown on a full screen while replaying; Esc leaves it. Why keep it rather than remove it: below a full screen the folded card's scroller already does this, but on a full screen nothing else shows where you are in the whole thread or lets you drag through it. The tour's steps and shortcuts cards teach Space. Commit `625af28`.
+- **One marker per agent.** `PAST_ALPHA` and the "now" marker are gone from `ThreadLayer.ts`, `Readmap.tsx` and `PlacesMap.tsx`. Looking back, the live layer draws the thread's agents as a small ring while they work (`behind` in `agents.tsx`, amber when they wait), nothing once they rest. A Back to now pill (`Dock.tsx BackToNow`) and End (`now` shortcut) go to the newest step and follow live again while the thread runs. "Back to now" is the wording for both. Before the thread's first edit the marker stands on the first file it touches instead of the empty top of the project; it still never moves on a read (`standsOn`). Commit `99e5ed6`.
+- **Opacity.** One faint value, `DIM = 0.4` (`agents.tsx`), used by the focus (`focus.ts`: files out of focus and, in a whole-thread replay, files before the last few moments) and by agents not watched. Files only read are in focus, solid. Idle agents on the overview: lit for 20 s, then fade out over 40 s. Commit `ad4921e`.
+- **Rings.** `drawAgents` picks one ring by priority; the activity pulse waits for none to show; the replay marker's thinking ring gives way to red. `drawNode.ts` drops the steady "editing now" ring on files and closed folders (`ringOf` removed); the ripple stays. Selected and hovered files: a 1.3 px (1 px) ink outline. Islands: a 7% accent tint inside, no dashes. Commit `bb18637`.
+- **Edge arrows.** `drawAgents` reports where each shown agent is (`spots`); `useMapFrame.ts syncEdges` puts a button on the edge of the safe area (the part no panel covers) for each one off it. Click: follow it (`MapView` `follow`). Commit `debb216`.
+- **Trails and read lines.** Only for the agent followed, pointed at (its file under the pointer) or whose edge arrow has the keyboard focus. The `quiet` option is gone. Show reads stays: it still decides whether reads count in the focus and on the Readmap. Commit `68b5fa3`.
+- **Readmap and file window.** The Readmap is always mounted and sleeps (`.asleep`, faded, hidden from Tab) unless pinned or woken by a new read whose file the big camera doesn't see (`cam.sees`), for 5 s. The pref is now "pinned", a new key `rundown-readmap-pinned`, off by default (the old "shown" key is ignored). The file window's `momentAt` takes edits only; past its moment it renders its header as a chip. Commit `bd276db`.
+- **Thread menu.** `ShareMenu` became `ThreadMenu` ("…"): Share a replay, Copy link (`location.origin/thread/<id>`), Export Markdown, Show/Hide its agents. Eyes: CSS, on hover or focus-within, kept while hidden, always on touch. The agent chips already showed only with subagents. CapNote: closed, a count in the map's corner. Commit `5b23f4f`.
+
+Checked at 1440 and 420 px, light and Prism, on the bench's live writer and a finished 400-step thread: Space, ← →, Home, End (in the player and out of it), Esc, ? and Tab. `npx tsc -b`, `npx vitest run` (45 tests) and `vite build` passed after each commit. The server wasn't touched.
+
+Left open (stage 2 or a decision):
+
+- The replay's marker is always the thread's colour, also for a subagent's step.
+- An agent's hover is its file under the pointer, not the marker itself.
+- The live layer still parks an agent that has written nothing at the top of the project (`anchorFile`'s `PARK`); only the replay's marker was changed.
+- On a phone the map under the sheet often shows empty space (the camera's framing), as before.

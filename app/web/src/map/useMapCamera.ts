@@ -32,6 +32,7 @@ type CameraState = {
 
 const BEAT_MS = 150;        // how often the director looks
 const IDLE_MS = 60_000;
+const LEAD_MS = 8000;       // agents too far apart: the least time the camera stays with one
 const SETTLE_MS = 450;      // the work stays out of the middle this long before the camera goes (a burst lands once)     // a camera you took, left alone this long with nothing open, goes back to the director
 
 export function useMapCamera({ cam, camRef, replayCam, nodeIndex, nodeIndexRef, replayRef, replayActive, replay, step, selected, selectedRef, setSelected,
@@ -73,6 +74,8 @@ export function useMapCamera({ cam, camRef, replayCam, nodeIndex, nodeIndexRef, 
     busyUntil: 0, lastTick: 0,
     /** Since when the work has been out of the dead zone (0: it isn't): a burst of edits settles before the camera moves. */
     outSince: 0,
+    /** The agent framed when they're too far apart to frame together, and since when. */
+    lead: null as string | null, leadAt: 0,
     /** Per agent: the files its marker stood on lately (its last few edits), newest last, and when it last moved. */
     hist: new Map<string, { files: string[]; at: number }>(),
   }).current;
@@ -100,18 +103,22 @@ export function useMapCamera({ cam, camRef, replayCam, nodeIndex, nodeIndexRef, 
       else if (h.files[h.files.length - 1] !== st.file) { h.files.push(st.file); if (h.files.length > 3) h.files.shift(); h.at = now; }
     }
     const ids = followRef.current ? [followRef.current] : drawn.filter((a) => a.active).map((a) => a.id);
-    const groups: P[][] = [], times: number[] = [];
+    const groups: P[][] = [], times: number[] = [], who: string[] = [];
     for (const id of ids) {
       const st = anim.current.get(id), h = D.hist.get(id);
       if (!st || !h) continue;
       // Newest first, the older edits only as long as they share one framing with it (a jump across the project
       // leaves the old place behind).
       const pts = groupAhead(h.files.map((f, i) => at(f, i === h.files.length - 1 ? st : undefined)).filter((p): p is P => !!p).reverse(), s);
-      if (pts.length) { groups.push(pts.reverse()); times.push(h.at); }
+      if (pts.length) { groups.push(pts.reverse()); times.push(h.at); who.push(id); }
     }
     if (!groups.length) return null;
-    const latest = times.indexOf(Math.max(...times));
-    const box = frameArea(groups, latest, s);
+    // Too far apart to frame together: the agent that edited last, but the camera stays with one for a few seconds
+    // (three agents across the project took turns on every edit).
+    // Only as it edits: the camera never moves on a clock.
+    const last = Math.max(...times), latest = who[times.indexOf(last)];
+    if (D.lead !== latest && (!D.lead || !who.includes(D.lead) || (now - D.leadAt > LEAD_MS && now - last < 1000))) { D.lead = latest; D.leadAt = now; }
+    const box = frameArea(groups, who.indexOf(D.lead ?? latest), s);
     if (!box) return null;
     const inBox = (p: P) => p.x >= box.x0 && p.x <= box.x1 && p.y >= box.y0 && p.y <= box.y1;
     return { box, markers: groups.map((g) => g[g.length - 1]).filter(inBox) };

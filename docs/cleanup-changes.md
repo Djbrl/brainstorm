@@ -461,3 +461,32 @@ The graph library's own animation loop, left open in Phase 6, is gone with the l
 - Measured at rest over 30 s (headless Chrome, 1440 px, nothing moving): animation-frame callbacks went from 63 a second to 0, map draws from 3 a second to 0, and main-thread work from 27.5 to about 3 to 5 ms a second. Places went from a callback every frame to none. In the dark themes the cubes and globes still turn slowly (15 draws a second), as designed.
 - Bundle: all JavaScript went from 1,069 kB (377 kB compressed) to 886 kB (317 kB compressed).
 - What a user might notice: nothing on screen. A laptop stays cooler with the map open. A two-finger pinch on a touch screen now zooms the map, not the page.
+
+### Compact views
+
+The maintainer tried the app in the Claude desktop app's browser pane (about 400 to 660 px wide): the map jumped back and forth at the live end of a thread, the second bar took a row and gave no clear way back from a thread, and a step's panel squeezed the folded sidebar into tiny rows. "Full screen" here means wider than `NARROW` (1100 px, `lib/breakpoints.ts`); everything below it is a compact view. Branch `ux/compact`.
+
+What you might notice:
+
+- At the live end of a thread on a small window, the map stays put on the agent's marker instead of swinging between two places every second.
+- No Play button in the thread bar. Space plays and pauses everywhere; the footer player shows only on a full screen.
+- Below a full screen there is no second bar. A compact bar floats at the bottom of the map and of Places: ‹ Threads, Map | Places, and Find a thread.
+- ‹ Threads closes the thread and opens the sidebar on the thread list. In the sidebar, clicking Threads while a thread shows goes back to the list too.
+- With a step's panel open on a small window, the folded sidebar is gone until the panel closes.
+- The header says "Change project" at every width, and the logo, Change project and Settings always fit, down to 360 px.
+
+The changes:
+
+- **The camera at the live end.** On a small map, a thread followed live had two cameras: the replay's (the marker on the newest step) and the agent follow that `autoTrack` turns on (the agent's own spot, from its hooks). When the two spots differed (the last step is the agent talking, or a hook moved the agent elsewhere), each one framed its own spot again about every 1.2 s, as soon as the other had moved the camera away. Locked, the two eased toward a point between them. Now the thread's marker alone has the camera while it is on the map. Reproduced with the bench's live writer and the agent's spot moved off the marker: before, the camera swung every 1.2 s; after, it stays, locked or not. Commit `f1a369e`.
+- **No Play in the thread bar.** It did what Space does and took room in a crowded bar. A shared replay keeps its Play in the header, which has no thread bar. Commit `0593dcb`.
+- **The compact bar.** At 1100 px and below the thread bar is hidden (still mounted, so 1 to 9 and [ ] keep switching threads). `switch/CompactBar.tsx` sits where the full screen's player is, placed by the dock's rules (beside a side panel, on the phone's thread sheet), so it never covers the thread's card or the Readmap at the top. The project switcher is the header's Change project. Why at the bottom: the top of a small map already holds the thread's card and the Readmap, and the player's spot is free below a full screen. Commit `164c361`.
+- **Threads as a second Back.** Clicking Threads while a thread shows under it opens the list, as the ‹ beside the title does. The thread stays open on the map. Commit `32b3d11`.
+- **No squeezed sidebar beside a panel.** Between 441 and 1100 px, a step's panel hides the folded card and the folded Threads tab until it closes. On a small tablet (760 px and below) the compact bar also drops Map | Places while the panel is open, so it fits beside it; P still switches. Commit `5121a0d`.
+- **Header.** "Change project" keeps its words on a phone (it was a bare folder icon). The logo, Change project and Settings don't shrink, and the header has a min-width of 360 px. Below that, the page scrolls sideways rather than cut them. Commit `cc07a58`.
+
+Checked at 1440, 900, 660, 420 and 360 px, in the light and Prism themes. Space, ← → and Home/End, Esc, ? and Tab still work at 660 px. `npx tsc -b`, `npx vitest run` (45 tests) and `vite build` passed after each commit.
+
+Left open:
+
+- On a full screen, the player opens only with Space now (or the folded card on a small window). A mouse-only user on a wide screen has no button to start a replay. A Play beside the thread's title in the Track would bring one back without crowding the bar.
+- On a small window, ← → and Home/End step through the thread only once the replay has started (Space). That is how it worked before.

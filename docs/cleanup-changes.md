@@ -568,3 +568,12 @@ Left open:
 
 - Dev builds expose `window.__rundownCam`, `__rundownAnim` and `__directorLog` for these measurements. They are absent from production builds.
 - The tour never mentioned L, C or the lock; its "Shortcuts" step could mention F once stage 1 settles the bar's key hints.
+
+#### Framing at phone and mid widths, step toggle (13 Oct)
+
+- What: the safe area (camera.ts) counted the lens pill as a top band even where it rides in the bottom dock (phone, mid and 1440 widths with a thread open). At 410 × 900 the visible map measured top 293 / bottom 343 px (a 200 px sliver clamped around the dock), so framings and the replay's follow centred the agent just above the pill and the sheet: on scroll-back it looked like the camera didn't follow. Now top 64 / bottom 484 (the map above the dock), and the marker lands in the middle of what you see. That was the scroll-back cause; the dead zone, look-ahead and hand-move detection were fine (a wheel on the step list never takes the camera: only a wheel or drag on the canvas does).
+- What: an agent waiting at the top of the project (no file yet, `@project`) was framed by the director at 1.4× on an empty spot; it's no longer framed, so the home map opens on the whole project, folders centred. A touch while the map loads no longer counts as taking the camera (no "Follow again" on opening).
+- What: a click on the step that is open closes its details again (all widths).
+- Noticeable: at 410 × 900 the home map opens on app / plugin / docs centred above the tab bar; a thread opens with its folders above the sheet; scrolling the steps back keeps the marker in view at 410, 900 and 1440 wide.
+
+Commits: `7a6bfc2` (safe area), `3ff0e28` (opening framing), `67591f6` (step toggle).

@@ -469,7 +469,9 @@ The maintainer tried the app in the Claude desktop app's browser pane (about 400
 What you might notice:
 
 - At the live end of a thread on a small window, the map stays put on the agent's marker instead of swinging between two places every second.
-- No Play button in the thread bar. Space plays and pauses everywhere; the footer player shows only on a full screen.
+- No Play button below a full screen. On a full screen the thread bar keeps its Play, and the player shows. Space plays and pauses everywhere.
+- A thread opens with the camera locked on its agent.
+- Reading a file no longer moves the agent's marker or the camera. Only edits do.
 - Below a full screen there is no second bar. A compact bar floats at the bottom of the map and of Places: ‹ Threads, Map | Places, and Find a thread.
 - ‹ Threads closes the thread and opens the sidebar on the thread list. In the sidebar, clicking Threads while a thread shows goes back to the list too.
 - With a step's panel open on a small window, the folded sidebar is gone until the panel closes.
@@ -478,7 +480,13 @@ What you might notice:
 The changes:
 
 - **The camera at the live end.** On a small map, a thread followed live had two cameras: the replay's (the marker on the newest step) and the agent follow that `autoTrack` turns on (the agent's own spot, from its hooks). When the two spots differed (the last step is the agent talking, or a hook moved the agent elsewhere), each one framed its own spot again about every 1.2 s, as soon as the other had moved the camera away. Locked, the two eased toward a point between them. Now the thread's marker alone has the camera while it is on the map. Reproduced with the bench's live writer and the agent's spot moved off the marker: before, the camera swung every 1.2 s; after, it stays, locked or not. Commit `f1a369e`.
-- **No Play in the thread bar.** It did what Space does and took room in a crowded bar. A shared replay keeps its Play in the header, which has no thread bar. Commit `0593dcb`.
+- **Play only on a full screen.** `0593dcb` removed the thread bar's Play at every width. The maintainer only wanted it gone below a full screen, and it was the only way to start a replay with the mouse there. It is back in the thread bar, which is hidden at 1100 px and below, so it shows on a full screen only. A shared replay keeps its Play in the header. Commits `0593dcb`, `5f7281a`.
+- **Camera locked by default.** The lock is on unless you turned it off with L, and it is set again each time a thread opens. L still unlocks and relocks it. The arrow keys still unlock it, as before. Dragging and the wheel don't: the wheel zooms and the zoom stays, and a drag is pulled back to the agent. Commit `ce9797d`.
+- **Reads don't move the marker.** Before its first edit, the marker went to the file the agent read last (`56eb7a5`), live and in a replay. In a replay, the camera also aimed between the marker and the file of a read step. With the camera following the marker, the map panned on every read. Now the marker moves only on an edit (an edit, a write, a command that edits). Before the first edit it stays where it stood, or at the top of the project. The camera follows the marker alone. Reads still show in the Readmap, as read lines and in the step panel. This is a web-only change: the server's `reads` and the presence trail are unchanged. Checked by sampling the camera every 200 ms:
+  - Replay, stepping through 50 moments: no move on any read (the one exception was the first sample, still gliding from Home). Every edit moved it, except edits of the same file as the step before.
+  - Live, with the bench's writer at 1440 and 420 px: moves came with edits only.
+
+  Commit `7863bee`.
 - **The compact bar.** At 1100 px and below the thread bar is hidden (still mounted, so 1 to 9 and [ ] keep switching threads). `switch/CompactBar.tsx` sits where the full screen's player is, placed by the dock's rules (beside a side panel, on the phone's thread sheet), so it never covers the thread's card or the Readmap at the top. The project switcher is the header's Change project. Why at the bottom: the top of a small map already holds the thread's card and the Readmap, and the player's spot is free below a full screen. Commit `164c361`.
 - **Threads as a second Back.** Clicking Threads while a thread shows under it opens the list, as the ‹ beside the title does. The thread stays open on the map. Commit `32b3d11`.
 - **No squeezed sidebar beside a panel.** Between 441 and 1100 px, a step's panel hides the folded card and the folded Threads tab until it closes. On a small tablet (760 px and below) the compact bar also drops Map | Places while the panel is open, so it fits beside it; P still switches. Commit `5121a0d`.
@@ -488,5 +496,5 @@ Checked at 1440, 900, 660, 420 and 360 px, in the light and Prism themes. Space,
 
 Left open:
 
-- On a full screen, the player opens only with Space now (or the folded card on a small window). A mouse-only user on a wide screen has no button to start a replay. A Play beside the thread's title in the Track would bring one back without crowding the bar.
+- The live presence trail keeps an agent's last 12 moves. After a reload, an agent whose last edit has scrolled out of the trail behind many reads waits at the top of the project until its next edit. A server field for the last edited file would fix it.
 - On a small window, ← → and Home/End step through the thread only once the replay has started (Space). That is how it worked before.

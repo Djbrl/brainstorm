@@ -320,7 +320,8 @@ export function MapView() {
 
       <FileWindow />
       <Dock />
-      <FollowAgain show={taken} bottom={cam.safe.current.bottom} onClick={followAgain} />
+      {/* Looking back, the player's "Back to now" is the way back (it gives the camera back too): one pill at a time. */}
+      <FollowAgain show={taken && !(replay && !replay.live)} bottom={cam.safe.current.bottom} onClick={followAgain} />
       {hasNodes && <AgentKeys agents={tracks} anim={anim} cam={camRef} onFollow={follow} onHover={setHover} />}
 
       <StepPanel />

@@ -267,6 +267,8 @@ export function useMapCamera({ cam, camRef, replayCam, nodeIndex, nodeIndexRef, 
     else { setIntent({ kind: "fit" }); applyIntent(700); }
   }, [panelFile, setIntent, applyIntent]);
 
+  // Back to now (following the thread live again) gives the camera back to the director too.
+  useEffect(() => { if (replay?.live) followAgain(); }, [replay?.live]); // eslint-disable-line react-hooks/exhaustive-deps
   // Opening a step gives the camera back to the director.
   useEffect(() => { if (step) followAgain(); }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 

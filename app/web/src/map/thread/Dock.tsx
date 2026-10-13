@@ -145,7 +145,7 @@ function BackToNow() {
 
 /**
  * The footer. On a full screen, only the player, while replaying. Share sits by the thread's title in the sidebar's
- * Track; the map's switches are in Settings and on keys (L, M). On Places its ‹ › go place by place (CoworkView).
+ * Track; the map's switches are in Settings and on keys (M, F). On Places its ‹ › go place by place (CoworkView).
  * On a small window (1100 px and below) no player: the compact bar instead (switch/CompactBar.tsx, map/dock.css).
  */
 export function Dock({ steps, player = true }: { steps?: Steps; player?: boolean } = {}) {

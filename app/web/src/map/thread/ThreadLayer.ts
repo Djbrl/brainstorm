@@ -10,7 +10,7 @@ import { getStepWindow } from "../prefs";
 import { mapStyle } from "../themes";
 import { drawMarker } from "../marks";
 import { drawTrip, platform } from "../routes";
-import { PARK } from "../agents";
+import { agentColor, inkOn, PARK } from "../agents";
 
 /** Where the marker stands at a beat: the file of its latest move (an edit). Before the first edit, on the first file the
  *  thread touches at all, so it stands on a real file and still doesn't move on reads; only a thread that touches no
@@ -240,8 +240,11 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
     }
 
     // Current marker with a soft halo. Red, with one red ring, when this beat has a failed tool call.
+    // In the colour of the agent that made the edit it stands on: a subagent's own colour (agents.tsx), as live.
     const failed = beat.failed > 0;
-    const mark = failed ? RED : line;
+    const by = mi >= 0 ? beats[moves[mi].beatIndex]?.step.agentId : undefined;
+    const own = by ? agentColor({ id: by, isSubagent: true }, accent) : line;
+    const mark = failed ? RED : own;
     // One marker per agent: following live, the live layer's; looking back, this one, solid, where the agent was then.
     const ownMarker = !s.live || !liveShown?.current;
     if (target && curFile && ownMarker) {
@@ -255,16 +258,16 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
 
       if (s.thinking && !failed) { // one ring at a time: red wins. A slow ring in its colour, swelling and fading, like a live agent's (agents.tsx)
         ringDrawn.current = true;
-        drawThinkRing(ctx, a.x, a.y, t, line, 1, scale);
+        drawThinkRing(ctx, a.x, a.y, t, own, 1, scale);
       }
       if (failed) drawPulse(ctx, a.x, a.y, (t - a.beatAt) / ERR_PULSE_MS, 10, 28, RED, 2.4, 0.8, scale);
-      else if (beat.action === "edit") drawPulse(ctx, a.x, a.y, (t - a.beatAt) / PULSE_MS, 10, 16, line, 2, 0.6, scale); // pulse on every edit, even when the tracer stays on the same file
+      else if (beat.action === "edit") drawPulse(ctx, a.x, a.y, (t - a.beatAt) / PULSE_MS, 10, 16, own, 2, 0.6, scale); // pulse on every edit, even when the tracer stays on the same file
 
       ctx.globalAlpha = 1;
       const num = String(mi + 1);
       const ms = mapStyle();   // Metro: its line badge; elsewhere a disc ringed white with a white number, in every theme
       if (ms.marker === "badge") drawMarker(ctx, a.x, a.y, 10 / scale, mark, num, num.length > 2 ? 8 : 9.5, ms.labelFont ?? font, scale, ms);
-      else drawMarker(ctx, a.x, a.y, 10 / scale, mark, num, num.length > 2 ? 8 : 9.5, font, scale, { ...ms, glow: false, markerStroke: "#fff", markerText: "#fff" });
+      else drawMarker(ctx, a.x, a.y, 10 / scale, mark, num, num.length > 2 ? 8 : 9.5, font, scale, { ...ms, glow: false, markerStroke: "#fff", markerText: by && !failed ? inkOn(mark) : "#fff" });
 
       const lx = a.x + 14 / scale;
       ctx.textAlign = "left";

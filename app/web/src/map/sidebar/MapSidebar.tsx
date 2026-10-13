@@ -136,7 +136,8 @@ export function MapSidebar({ agents, accent, followId, onFollow, onFocusFile, ma
       {pip && <div className="pip-grab" {...grab}><i aria-hidden="true" /></div>}
       <div className="sidebar-head">
         <nav className="sidebar-tabs" role="tablist" aria-label="Sidebar view">
-          <button role="tab" aria-selected={shown === "threads"} onClick={() => setTab("threads")}>Threads</button>
+          {/* Threads again while a thread shows under it: the list, as the thread's ‹ does (the thread stays open). */}
+          <button role="tab" aria-selected={shown === "threads"} onClick={() => { if (inThread) setListing(true); setTab("threads"); }}>Threads</button>
           <button role="tab" aria-selected={shown === "files"} onClick={() => setTab("files")}>Files</button>
         </nav>
         <button className="sidebar-collapse" onClick={() => setCollapsed(true)} aria-label="Collapse sidebar" title="Collapse (T)">‹</button>

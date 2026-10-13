@@ -4,6 +4,7 @@
    card. `visibility`, not `display`: their own rules for small windows stay as they are. */
 :root[data-tour] :is(.readmap, .map-peek, .threadbar-keys, .elsewhere, .map-cap, .map-sparse, .usage-ask, .welcome) { visibility: hidden !important; }
 :root[data-tour="readmap"] .readmap, :root[data-tour="keys"] .threadbar-keys { visibility: visible !important; }
+:root[data-tour="readmap"] .readmap.asleep { opacity: 1 !important; transform: none !important; pointer-events: auto !important; }
 
 .tour-card { position: fixed; z-index: 60; width: min(360px, calc(100vw - 24px)); padding: 22px 22px 16px; border-radius: 18px;
   background: var(--surface, #fff); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 18px 50px rgba(0,0,0,.14);

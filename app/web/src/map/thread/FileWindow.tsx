@@ -1,8 +1,8 @@
-// A small window over the map with the file the agent is reading or writing at the replay cursor, while you
-// follow a thread live or replay it: the change as a diff (a new file as numbered lines), or the part of a file it read.
+// A small window over the map with the file the agent is changing at the replay cursor, while you follow a thread live
+// or replay it: the change as a diff (a new file as numbered lines). Reads don't open it (the Readmap shows them).
 // It reuses the step panel's renderers (Diff with its styles, editPair, the numbered Code) and hides while that panel is
-// open, since it shows the same step in full. Between files (the agent talking, running commands) it keeps the last
-// file it touched, quieter and in the past tense ("Edited"), rather than blinking out and back every few moments.
+// open, since it shows the same step in full. Once the agent moves on (reads, talks, runs commands) it shrinks to a small
+// chip with the last change in the past tense ("Edited x.ts +3 −1"), rather than blinking out and back.
 //
 // Cheap on purpose: the outer part reads only the open thread and the pref; the body reads the cursor and the thread,
 // works out which step to show (a short scan back from the cursor), and the window itself re-renders only when that
@@ -27,7 +27,7 @@ import "./peek.css";
 const LOOK_BACK = 400;   // beats scanned back from the cursor for the last file touched
 const BIG = 240;         // lines (before + after) above which an edit shows its new text instead of a diff
 
-/** The step to show at the cursor: the last edit or read at or before it, and whether it is the cursor's own moment. */
+/** The step to show at the cursor: the last edit at or before it, and whether it is the cursor's own moment. */
 type Moment = { step: Step; result?: Step; now: boolean };
 
 function momentAt(thread: Thread, index: number): Moment | null {
@@ -35,8 +35,8 @@ function momentAt(thread: Thread, index: number): Moment | null {
   const at = Math.min(index, beats.length - 1);
   for (let i = at; i >= 0 && i > at - LOOK_BACK; i--) {
     const b = beats[i];
-    if (b.action === "other") continue;
-    // The beat's own file step: its (last) edit, or its last read.
+    if (b.action !== "edit") continue;
+    // The beat's own file step: its (last) edit.
     let step: Step | undefined;
     for (let j = b.steps.length - 1; j >= 0; j--) if (actionOf(b.steps[j]) === b.action) { step = b.steps[j]; break; }
     if (!step) continue;
@@ -150,7 +150,7 @@ const Window = memo(function Window({ sessionId, step, result, now, roots }: Mom
   }, [step]);
 
   return (
-    <section className={`map-peek${now ? "" : " past"}`} aria-label="The file the agent is working on" aria-live="off">
+    <section className={`map-peek${now ? "" : " past"}`} aria-label={now ? "The file the agent is changing" : "The last file the agent changed"} aria-live="off">
       <header className="peek-head">
         <span className={`peek-verb${step.kind === "edit" ? " edit" : ""}`}>{verbOf(step, now, pair)}</span>
         <button className="peek-file" onClick={() => openStep(sessionId, step.id)} title={`${path}\nOpen this step in full`}>
@@ -162,9 +162,9 @@ const Window = memo(function Window({ sessionId, step, result, now, roots }: Mom
         <button className="peek-close" onClick={() => setShowFile(false)} aria-label="Hide this window"
           title="Hide. Settings brings it back">{Icon.close}</button>
       </header>
-      <div className="peek-body" ref={scroll}>
+      {now && <div className="peek-body" ref={scroll}>
         <Body step={step} result={result} />
-      </div>
+      </div>}
     </section>
   );
 });

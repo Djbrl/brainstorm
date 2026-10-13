@@ -7,9 +7,9 @@
   box-shadow: 0 10px 30px rgba(0,0,0,.08); animation: peek-in .28s cubic-bezier(.2,.85,.25,1); transition: opacity .25s; }
 @keyframes peek-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .map-peek { animation: none; } }
-/* Between files: the last one stays, quieter. */
-.map-peek.past { opacity: .9; }   /* faded, its quiet words still readable (4.5:1) */
-.map-peek.past:hover { opacity: 1; }
+/* The agent moved on: a small chip with the last change (its header only); a click on the file opens the step. */
+.map-peek.past { width: auto; max-width: 360px; height: auto; border-radius: 999px; }
+.map-peek.past .peek-head { border-bottom: 0; padding: 6px 6px 6px 14px; }
 
 .peek-head { display: flex; align-items: center; gap: 8px; padding: 9px 8px 8px 14px; border-bottom: 1px solid var(--line); flex: none; min-width: 0; }
 .peek-verb { flex: none; font-size: 12.5px; font-weight: 600; color: var(--ink-3); }

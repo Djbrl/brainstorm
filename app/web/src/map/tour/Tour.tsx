@@ -10,7 +10,6 @@ import { isRecording, useLiveSelector, useThreadSteps } from "../../lib/live";
 import { END, useNavActions, useNavState } from "../../lib/nav";
 import { PRIVACY_URL, useUsageSetting } from "../../lib/usage";
 import { TOUR_AGENT, tourStore, useTour, type TourStep } from "../../lib/tour";
-import { getReadmap } from "../prefs";
 import { NARROW, PHONE, matches } from "../../lib/breakpoints";
 import "./tour.css";
 
@@ -45,7 +44,7 @@ export function Tour() {
     if (latest) o.push("steps");
     if (latest && shown) o.push("step");
     o.push("files", "map");
-    if (!phone && getReadmap()) o.push("readmap");   // the Readmap on, as it is unless turned off (none on a phone)
+    if (!phone) o.push("readmap");   // the Readmap (none on a phone)
     if (shownEl(".threadbar-keys")) o.push("keys");   // the ? button shows in the thread bar (a wide enough window)
     o.push(asks ? "stats" : "end");
     return o;
@@ -153,7 +152,7 @@ function cardFor(step: TourStep, { threads, title }: { threads: number; title?: 
     case "step": return { title: "One step, up close", anchor: ".map-panel.open", body: "Click a step to see exactly what happened: the change it made, or what a command printed. You can ask about it too." };
     case "files": return { title: "Your files", anchor: ".map-sidebar", body: "Files is your project as a folder tree. Pick a file to see what it does, what uses it, and which agents worked on it." };
     case "map": return { title: "The map", body: "The same files, as dots grouped in folders. An agent at work is a dot that moves to each file it changes, leaving a trail, with a dotted line to the files it reads. This one is an example." };
-    case "readmap": return { title: "The Readmap", anchor: ".readmap", body: "Agents often read files far from where they work. The Readmap follows what they read, up close, so you don't have to look for it. M hides or shows it." };
+    case "readmap": return { title: "The Readmap", anchor: ".readmap", body: "Agents often read files far from where they work. When one reads a file off your view, the Readmap shows it up close for a few seconds, so you don't have to look for it. M keeps it pinned." };
     case "keys": return { title: "Shortcuts", anchor: ".threadbar-keys", body: "Space plays a thread back and pauses it, T shows or hides the sidebar, M the Readmap. This ? button (or the ? key) lists them all." };
     case "stats": return { title: "One last question", body: "Can Rundown send anonymous usage stats, once a day? Counts only (how much you used it), its version, your OS and country. Never code, paths, prompts or names. You can change this in Settings." };
     case "end": return isRecording()

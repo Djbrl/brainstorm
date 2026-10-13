@@ -26,6 +26,7 @@ const SMALL = { w: 208, h: 132 }, BIG = { w: 358, h: 196 };
 const GLIDE = 0.28;          // seconds for the camera to (nearly) reach a new file
 const READ_FLASH_MS = 1500;  // a read as it happens (the map's line of sight lasts as long: agents.tsx)
 const NAMES_MAX = 7;         // file names besides the ones read
+const AWAKE_MS = 5000;       // unpinned: how long it stays after a read off the visible map with nothing new
 const TOGETHER_MS = 15_000;  // reads this close to the last one are one look around (several files read at once)
 const READABLE = 3.5;        // a file's radius in the picture (px) from which its name goes under it
 
@@ -36,7 +37,10 @@ export type ReadmapReads = {
   past: string[] | null;
 };
 
-export function Readmap({ graphRef, anim, drawnRef, cam, subject, back, reads, agents, followId, accent, big, onTrack, onLook, onHide, frame, kick }: {
+export function Readmap({ pinned, graphRef, anim, drawnRef, cam, subject, back, reads, agents, followId, accent, big, onTrack, onLook, onHide, frame, kick }: {
+  /** Pinned (M): always shown. Else it wakes when an agent reads a file off the visible map, and sleeps a few seconds
+   *  after the last such read. */
+  pinned: boolean;
   graphRef: RefObject<Graph>;
   anim: RefObject<Map<string, AgentAnim>>;
   /** The agents the map draws this frame (where each one is comes from `anim`). */
@@ -76,6 +80,10 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, back, reads, a
   const subjectRef = useRef(subject); subjectRef.current = subject;
   const backRef = useRef(back); backRef.current = back;
   const readsRef = useRef(reads); readsRef.current = reads;
+  const pinnedRef = useRef(pinned); pinnedRef.current = pinned;
+  const root = useRef<HTMLElement>(null);
+  // Unpinned: when it woke (a read off the visible map) and what it showed then; asleep, it fades out.
+  const wake = useRef({ at: -1e9, key: "", timer: 0 });
   // The Readmap's own camera (graph point (x, y) in the middle, k pixels per graph unit), and what it shows now: the
   // file read (its id) or the whole map (null). A click goes there.
   const view = useRef<View | null>(null);
@@ -151,6 +159,17 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, back, reads, a
         }
       }
       shows.current = read ? { id: read.id, x: read.x!, y: read.y! } : { id: null, x: 0, y: 0 };
+      // Unpinned: a new read of a file you can't see on the map wakes it for a few seconds.
+      const key = read ? `${read.id}|${together.length}|${who?.id ?? ""}` : "", wk = wake.current;
+      if (key !== wk.key) {
+        if (read && wk.key && !cam.current?.sees(read.x!, read.y!)) {
+          wk.at = t; clearTimeout(wk.timer);
+          wk.timer = window.setTimeout(kick, AWAKE_MS + 50);   // a frame when it's due to sleep
+        }
+        wk.key = key;
+      }
+      const awake = pinnedRef.current || t - wk.at < AWAKE_MS;
+      root.current?.classList.toggle("asleep", !awake);
       // The camera glides there (in log zoom, so near and far zooms take the same time).
       const v = view.current ?? (view.current = { ...want });
       const e = 1 - Math.exp(-dt / GLIDE);
@@ -322,7 +341,7 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, back, reads, a
     };
     frame.current = draw;
     kick();
-    return () => { if (frame.current === draw) frame.current = null; };
+    return () => { clearTimeout(wake.current.timer); if (frame.current === draw) frame.current = null; };
   }, [graphRef, anim, drawnRef, cam, W, H]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A click: the big map shows that place (the file read, or the point clicked on the whole map).
@@ -335,7 +354,7 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, back, reads, a
   };
 
   return (
-    <section className={`readmap${big ? " big" : ""}`} aria-label="Readmap: the file the agent is reading" style={{ width: W + 2 }}>
+    <section ref={root} className={`readmap asleep${big ? " big" : ""}${pinned ? " pinned" : ""}`} aria-label="Readmap: the file the agent is reading" style={{ width: W + 2 }}>
       <header className="peek-head mm-head">
         <span className="peek-verb" ref={verbEl} />
         <span className="peek-file"><strong ref={fileEl} /><span ref={dirEl} /></span>
@@ -352,7 +371,8 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, back, reads, a
             })}
           </span>
         )}
-        <button className="peek-close" onClick={onHide} aria-label="Hide the Readmap (M)" title="Hide (M)">{Icon.close}</button>
+        <button className="peek-close" onClick={() => { wake.current.at = -1e9; root.current?.classList.add("asleep"); onHide(); }}
+          aria-label={pinned ? "Unpin and hide the Readmap (M)" : "Hide the Readmap"} title={pinned ? "Unpin and hide (M)" : "Hide until the next read off the map"}>{Icon.close}</button>
       </header>
       <canvas ref={canvas} style={{ width: W, height: H }} role="img" onClick={onClick}
         aria-label="The file the agent read last, up close, with the files around it. Click to show it on the map." />

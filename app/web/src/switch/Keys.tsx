@@ -26,7 +26,7 @@ export function Keys({ finding, setFinding, help, setHelp }: {
     if (finding) return false;
     const on = !getCameraLock(); setCameraLock(on); say(on ? "Camera locked on the agent" : "Camera free");
   });
-  useShortcut("readmap", () => { if (finding || lens !== "map") return false; setReadmap(!getReadmap()); });
+  useShortcut("readmap", () => { if (finding || lens !== "map") return false; const on = !getReadmap(); setReadmap(on); say(on ? "Readmap pinned" : "Readmap shows only for reads off the map"); });
   useShortcut("lens", () => { if (finding || !thread) return false; setLens(lens === "places" ? "map" : "places"); });
 
   return <>

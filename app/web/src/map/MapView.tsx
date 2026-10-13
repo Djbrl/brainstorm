@@ -311,8 +311,8 @@ export function MapView() {
         <p className="map-sparse">This project has only {map.files.length === 1 ? "one file" : `${map.files.length} files`} on the map.</p>
       )}
       {map && <CapNote map={map} />}
-      {hasNodes && readmap && (
-        <Readmap graphRef={graphRef} anim={anim} drawnRef={agentsRef} cam={camRef} subject={() => replayRef.current.subject()} back={() => backRef.current} reads={readmapReads} agents={tracks} followId={followId} accent={tokens.accent}
+      {hasNodes && (
+        <Readmap pinned={readmap} graphRef={graphRef} anim={anim} drawnRef={agentsRef} cam={camRef} subject={() => replayRef.current.subject()} back={() => backRef.current} reads={readmapReads} agents={tracks} followId={followId} accent={tokens.accent}
           big={!small} onTrack={follow} onLook={lookAt} onHide={() => setReadmap(false)} frame={readmapFrame} kick={redraw.kick} />
       )}
 

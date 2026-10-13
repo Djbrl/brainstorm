@@ -8,7 +8,8 @@ import { clock, isRecording } from "../lib/live";
 import { sinceMs } from "../lib/visit";
 import { mapPrefs } from "../lib/nav";
 import { tourHidesExtras } from "../lib/tour";
-import { drawAgents, type AgentRing } from "./agents";
+import { drawAgents, type AgentRing, type AgentSpot } from "./agents";
+import type { Safe } from "./camera";
 import type { ThreadLayerApi } from "./thread/ThreadLayer";
 import { drawQueuedLabels, LabelSpace, type QueuedLabel } from "./labels";
 import { mapStyle } from "./themes";
@@ -36,7 +37,7 @@ export type FrameInputs = {
   theme: string;
 };
 
-export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIndexRef, resolveId, replayRef, live, followRef, ringLayer, readmap, redraw, files }: {
+export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIndexRef, resolveId, replayRef, live, followRef, ringLayer, edgeLayer, safe, readmap, redraw, files }: {
   fg: RefObject<ZoomApi | undefined>;
   inputs: { readonly current: FrameInputs };
   epoch: RefObject<number>; caches: RefObject<Caches>;
@@ -49,6 +50,9 @@ export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIn
   followRef: RefObject<string | null>;
   /** The agents' breathing rings, over the canvas (syncRings). */
   ringLayer: RefObject<HTMLDivElement | null>;
+  /** The arrows on the screen's edge for agents off the visible map (syncEdges), and the part of the canvas no panel covers. */
+  edgeLayer: RefObject<HTMLDivElement | null>;
+  safe: () => Safe | null;
   /** The Readmap's draw, while it shows (Readmap.tsx): it draws on the map's frames; true while it still moves. */
   readmap: RefObject<(() => boolean) | null>;
   redraw: Redraw;
@@ -58,6 +62,7 @@ export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIn
   const space = useRef(new LabelSpace());         // taken this frame: files, replay badges, folder names, file names
   const markedRef = useRef<string | null>(null);  // the file the replay's marker names this frame
   const ringsOut = useRef<AgentRing[]>([]);
+  const spotsOut = useRef<AgentSpot[]>([]);
   const labelBufs = useRef({ order: [] as number[], queue: [] as QueuedLabel[], pool: [] as QueuedLabel[] });
   // drawAgents' options: one object, refilled each frame; its two callbacks made once.
   const agentOpts = useRef<Parameters<typeof drawAgents>[0]>(null as never);
@@ -171,8 +176,10 @@ export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIn
     A.hoverFile = I.hover; A.followId = followRef.current; A.resolveId = resolveId; A.showReads = mapPrefs.showReads && !tourHidesExtras();
     A.quiet = !I.open; A.waiting = live.waitingRef.current; A.thinking = live.thinkingRef.current; A.keep = I.open; A.dimmed = live.dimmedRef.current; A.behind = live.behindRef.current;
     ringsOut.current.length = 0; A.rings = ringsOut.current;
+    spotsOut.current.length = 0; A.spots = spotsOut.current;
     drawAgents(A);
     syncRings(ringLayer.current, ringsOut.current);
+    syncEdges(edgeLayer.current, spotsOut.current, safe(), followRef.current);
   }, [resolveId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const endFrame = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
@@ -194,6 +201,42 @@ export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIn
   }, [drawModules, drawAgentLayer, redraw]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { startFrame, drawNode, endFrame };
+}
+
+const EDGE_IN = 22;   // how far inside the visible map's edge an arrow sits (CSS px)
+/**
+ * An arrow on the edge of the visible map (the part no panel covers) for each agent off it, pointing where it is: its
+ * colour and its initial, amber when it waits on you. A button: a click goes to it (MapView's onClick on the layer).
+ */
+function syncEdges(layer: HTMLDivElement | null, spots: AgentSpot[], safe: Safe | null, followed: string | null) {
+  if (!layer) return;
+  const seen = new Set<string>();
+  if (safe) {
+    const x0 = safe.left + EDGE_IN, x1 = safe.w - safe.right - EDGE_IN, y0 = safe.top + EDGE_IN, y1 = safe.h - safe.bottom - EDGE_IN;
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    for (const s of spots) {
+      if (x1 <= x0 || y1 <= y0 || (s.x >= x0 - EDGE_IN && s.x <= x1 + EDGE_IN && s.y >= y0 - EDGE_IN && s.y <= y1 + EDGE_IN)) continue;   // in view
+      const dx = s.x - cx, dy = s.y - cy, k = Math.min((x1 - cx) / Math.max(1e-6, Math.abs(dx)), (y1 - cy) / Math.max(1e-6, Math.abs(dy)));
+      const x = cx + dx * k, y = cy + dy * k, ang = Math.atan2(dy, dx);
+      seen.add(s.id);
+      let el = layer.querySelector<HTMLButtonElement>(`[data-edge="${CSS.escape(s.id)}"]`);
+      if (!el) {
+        el = document.createElement("button"); el.dataset.edge = s.id; el.className = "agent-edge"; el.type = "button";
+        el.innerHTML = "<i></i><span></span>"; layer.appendChild(el);
+      }
+      const label = `${s.name}${s.waits ? ", waiting on you" : ""}: go to it`;
+      if (el.getAttribute("aria-label") !== label) { el.setAttribute("aria-label", label); el.title = label; }
+      el.classList.toggle("waits", s.waits);
+      el.classList.toggle("on", s.id === followed);
+      const tr = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`, rot = `rotate(${ang.toFixed(3)}rad)`;
+      if (el.style.transform !== tr) el.style.transform = tr;
+      const arrow = el.firstElementChild as HTMLElement, letter = el.lastElementChild as HTMLElement;
+      if (arrow.style.transform !== rot) arrow.style.transform = rot;
+      if (letter.textContent !== s.letter) letter.textContent = s.letter;
+      if (el.style.getPropertyValue("--c") !== s.color) el.style.setProperty("--c", s.color);
+    }
+  }
+  for (const el of [...layer.children] as HTMLElement[]) if (!seen.has(el.dataset.edge ?? "")) el.remove();
 }
 
 /** Puts the agents' breathing rings where the frame just drew them (one element per agent and kind, kept between frames

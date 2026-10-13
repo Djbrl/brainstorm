@@ -113,6 +113,7 @@ export function MapView() {
   const { agents, drawnAgents, waiting, agentsRef, anim, dimmedRef, behindRef } = live;
   const selectedRef = useRef(selected); selectedRef.current = selected;
   const ringLayer = useRef<HTMLDivElement>(null);   // agents' breathing rings (useMapFrame's syncRings)
+  const edgeLayer = useRef<HTMLDivElement>(null);   // arrows on the edge for agents off the visible map (syncEdges)
   // Every file and folder by id, and how an agent's file finds its node (useNodeResolver.ts).
   const { nodeIndex, nodeIndexRef, resolveId } = useNodeResolver(map, graph);
   const liveShown = useRef(false);
@@ -235,7 +236,7 @@ export function MapView() {
   const inputs = useLatest({ size, selected, hover, tokens, linkFocus: hover ?? selected, pinned, foldOn, open: !!replay, playing, theme });
   const readmapFrame = useRef<(() => boolean) | null>(null);   // the Readmap draws on the map's frames
   const { startFrame, drawNode, endFrame } = useMapFrame({
-    fg, inputs, epoch, caches, tween, graphRef, nodeIndexRef, resolveId, replayRef, live, followRef, ringLayer, readmap: readmapFrame, redraw, files: map?.files ?? null,
+    fg, inputs, epoch, caches, tween, graphRef, nodeIndexRef, resolveId, replayRef, live, followRef, ringLayer, edgeLayer, safe: () => camRef.current.safe.current, readmap: readmapFrame, redraw, files: map?.files ?? null,
   });
   // One frame: what it knows, each file in drawing order, then everything over the files. The context is saved before
   // the files and restored after each one and at the end, as the graph library painted them (each file starts from the
@@ -295,6 +296,11 @@ export function MapView() {
       )}
       {/* Agents' breathing rings (thinking, waiting on you), over the canvas: CSS animates them, the map rests. */}
       <div className="agent-rings" ref={ringLayer} aria-hidden="true" />
+      {/* Agents off the visible map: an arrow on its edge, in their colour with their initial; a click goes to one. */}
+      <div className="agent-edges" ref={edgeLayer} onClick={(e) => {
+        const id = (e.target as HTMLElement).closest<HTMLElement>("[data-edge]")?.dataset.edge;
+        if (id) follow(id);
+      }} />
 
 
       <MapSidebar agents={agents} accent={tokens.accent} followId={followId}

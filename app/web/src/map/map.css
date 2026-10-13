@@ -80,3 +80,16 @@
 @keyframes agent-think { 0% { transform: scale(1); opacity: 0; } 50% { opacity: .7; } 100% { transform: scale(1.82); opacity: 0; } }
 @keyframes agent-wait { 0% { transform: scale(1); opacity: .9; } 100% { transform: scale(2.45); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .agent-ring::before { animation: none; opacity: .5; } }
+
+/* Agents off the visible map: a small arrow on its edge, in the agent's colour with its initial (useMapFrame's syncEdges).
+   Amber when it waits on you. A click goes to it. */
+.agent-edges { position: absolute; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; }
+.agent-edge { position: absolute; left: -12px; top: -12px; width: 24px; height: 24px; padding: 0; border: 0; background: none; pointer-events: auto; cursor: pointer; }
+.agent-edge i { position: absolute; inset: 0; }
+.agent-edge i::before { content: ""; position: absolute; left: 0; top: 0; width: 24px; height: 24px; border-radius: 50% 0 50% 50%; transform: rotate(45deg);
+  background: var(--c); box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+.agent-edge span { position: relative; display: grid; place-items: center; height: 100%; color: #fff; font: 700 10.5px/1 var(--font-body); }
+.agent-edge.waits i::before { background: #f59e0b; }
+.agent-edge.waits span { color: #3b2400; }
+.agent-edge:hover i::before, .agent-edge.on i::before { box-shadow: 0 0 0 3px var(--surface), 0 2px 8px rgba(0,0,0,.2); }
+.agent-edge:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 50%; }

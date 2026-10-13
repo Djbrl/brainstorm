@@ -67,6 +67,9 @@ export function agentAlpha(a: AgentPresence, now: number, busy: boolean, keep: b
 // the file read fades out. A step with no file (a search or a command) is a short pulse on the marker.
 /** A breathing ring for the page to draw over the map: where (CSS pixels on the canvas), whose colour, how strong. */
 export type AgentRing = { id: string; kind: "think" | "wait"; x: number; y: number; color: string; alpha: number };
+/** Where an agent is, in CSS pixels on the canvas, for the arrows on the screen's edge (useMapFrame's syncEdges): one off
+ *  the visible map shows as a small arrow there, in its colour with its initial (amber when it waits on you). */
+export type AgentSpot = { id: string; x: number; y: number; color: string; letter: string; waits: boolean; name: string };
 
 export type AgentAnim = {
   x: number; y: number; fromX: number; fromY: number; t0: number; file: string; alpha: number;
@@ -164,10 +167,12 @@ export function drawAgents(opts: {
   /** Filled with the rings that breathe (thinking, waiting on you), in CSS pixels on the canvas: the page draws them
    *  over the map (MapView's AgentRings, CSS animations), so a breath doesn't repaint the whole map. */
   rings?: AgentRing[];
+  /** Filled with where each agent shown is (CSS pixels on the canvas): the page puts an arrow on the edge for those off it. */
+  spots?: AgentSpot[];
   /** A marker landed on a file (Prism's hop: its cube spins up and flashes). */
   land?: (id: string, t: number) => void;
 }) {
-  const { ctx, scale, agents, anim, resolve, accent, hoverFile, followId, resolveId, showReads, quiet, waiting, thinking, keep, dimmed, behind, rings, land } = opts;
+  const { ctx, scale, agents, anim, resolve, accent, hoverFile, followId, resolveId, showReads, quiet, waiting, thinking, keep, dimmed, behind, rings, spots, land } = opts;
   // Graph point → CSS pixel on the canvas (its transform is in device pixels).
   const m = ctx.getTransform(), dpr = ctx.canvas.width / Math.max(1, ctx.canvas.clientWidth);
   const onScreen = (x: number, y: number) => ({ x: (m.a * x + m.c * y + m.e) / dpr, y: (m.b * x + m.d * y + m.f) / dpr });
@@ -230,10 +235,14 @@ export function drawAgents(opts: {
         trail: a.trail, resolveId, was: st.read?.was, anchor: key, key, files: writtenFiles(a, resolveId), reads: recentReads(a, resolveId, key),
       });
       if (st.alpha < 0.01) { st.easing = false; continue; }
+      const waits = !!waiting?.has(a.id), working = a.active || thinks || waits;
+      if (spots && st.alpha > 0.3 && (working || !behind?.has(a.id))) {
+        const at = onScreen(st.x, st.y);
+        spots.push({ id: a.id, x: at.x, y: at.y, color: agentColor(a, accent), letter: initial(a), waits, name: shortName(a, 40) });
+      }
       if (behind?.has(a.id)) {   // looking back: where it works now, a small ring in its colour (amber: it waits on you)
         st.easing = false; st.flashes.length = 0;
-        const waits = !!waiting?.has(a.id);
-        if (a.active || thinks || waits) {
+        if (working) {
           ctx.globalAlpha = st.alpha;
           ctx.beginPath(); ctx.arc(st.x, st.y, 4.5 / scale, 0, Math.PI * 2);
           ctx.strokeStyle = waits ? WAIT_AMBER : agentColor(a, accent); ctx.lineWidth = 2 / scale; ctx.stroke();

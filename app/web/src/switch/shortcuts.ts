@@ -43,16 +43,15 @@ const ENTRIES: Entry[] = [
   { id: "thread.next", group: "Threads", keys: ["[", "]"], what: "The thread before or after in the bar", match: key("[", "]") },
   { id: "sidebar", group: "Threads", keys: ["T"], what: "Show or hide the sidebar (folded, it shows the thread's step)", match: key("t", "T") },
   { id: "follow.stop", raw: true, match: key("Escape") },
-  { id: "back", group: "Threads", keys: ["Esc"], what: "Step back: close the step, stop following, close the thread", raw: true, match: key("Escape") },
+  { id: "back", group: "Threads", keys: ["Esc"], what: "Step back: follow again, close the step, stop following, close the thread", raw: true, match: key("Escape") },
 
   { id: "map.move", group: "Map", keys: ["←", "↑", "→", "↓"], what: "Move around the map: hold to glide", raw: true,
     match: (e) => !e.shiftKey && key("ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown")(e) },
   { id: "map.zoom", group: "Map", keys: ["Shift", "↑", "↓"], what: "Zoom in or out: hold to keep going", raw: true,
     match: (e) => key("Shift", "+", "=", "-", "_")(e) || (e.shiftKey && key("ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown")(e)) },
-  { id: "center", group: "Map", keys: ["C"], what: "Center the camera on the agent (without locking it)", match: key("c", "C") },
   { id: "follow.next", group: "Map", keys: ["A"], what: "Follow the next agent (with Shift, the one before)", match: key("a", "A") },
   { id: "readmap", group: "Map", keys: ["M"], what: "Show or hide the Readmap", match: key("m", "M") },
-  { id: "lock", group: "Map", keys: ["L"], what: "Lock or unlock the camera on the agent", match: key("l", "L") },
+  { id: "follow.again", group: "Map", keys: ["F"], what: "Follow again: the camera frames the agents' work after you moved the map", match: key("f", "F") },
   { id: "lens", group: "Map", keys: ["P"], what: "Switch between the map and Places", match: key("p", "P") },
 
   { id: "play", group: "Replay", keys: ["Space"], what: "Play or pause, from the step you're on", match: key(" ") },
@@ -63,8 +62,8 @@ const ENTRIES: Entry[] = [
   { id: "help", group: "Help", keys: ["?"], what: "These shortcuts", match: key("?") },
 ];
 
-export type ShortcutId = "find" | "thread.number" | "thread.next" | "sidebar" | "follow.stop" | "back" | "map.move" | "map.zoom" | "center"
-  | "follow.next" | "readmap" | "lock" | "lens" | "play" | "player.step" | "player.ends" | "now" | "help";
+export type ShortcutId = "find" | "thread.number" | "thread.next" | "sidebar" | "follow.stop" | "back" | "map.move" | "map.zoom"
+  | "follow.next" | "follow.again" | "readmap" | "lens" | "play" | "player.step" | "player.ends" | "now" | "help";
 
 /** The ? window's list: the shortcuts by group, in order. */
 export const SHORTCUTS: { title: string; keys: { keys: string[]; what: string }[] }[] = [];

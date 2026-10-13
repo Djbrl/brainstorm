@@ -1,26 +1,24 @@
-// The camera's keys, registered in the shortcuts registry (switch/shortcuts.ts: map.move, map.zoom, center,
-// follow.stop). Moved out of useMapCamera.ts.
+// The camera's keys, registered in the shortcuts registry (switch/shortcuts.ts: map.move, map.zoom,
+// follow.again, follow.stop). Moved out of useMapCamera.ts.
 import { useEffect, useRef, type RefObject } from "react";
-import type { ThreadReplay } from "../lib/nav";
-import { getCameraLock, setCameraLock } from "./prefs";
 import { keyRules, useShortcut, windowOpen } from "../switch/shortcuts";
 import type { ThreadLayerApi } from "./thread/ThreadLayer";
 import type { Camera } from "./camera";
-import type { AgentAnim } from "./agents";
 
-export function useCameraKeys({ camRef, replayRef, followRef, setFollowId, anim, replay, free }: {
+export function useCameraKeys({ camRef, replayRef, followRef, setFollowId, free, taken, followAgain }: {
   camRef: RefObject<Camera>; replayRef: RefObject<ThreadLayerApi>;
   followRef: RefObject<string | null>; setFollowId: (id: string | null) => void;
-  anim: RefObject<Map<string, AgentAnim>>; replay: ThreadReplay | null;
   /** The camera is yours now (a hand move): no automatic re-frame. */
   free: () => void;
+  /** Whether the camera is yours (the director lets it be), and giving it back to the director. */
+  taken: () => boolean; followAgain: () => void;
 }) {
   const freeRef = useRef(free); freeRef.current = free;
   // The arrow keys glide the map while they're held (two at once go diagonally); with Shift, ↑ and ↓ zoom in and out
   // instead (+ and − too, = and _ without Shift); all easing in and out: the map without a mouse or trackpad. In the
   // replay player ← → step through it, so only Shift ↑ ↓ zoom there; none in the Track's list (there they scroll it).
-  // One loop, only while a key is held or a glide eases out. Moving the map stops following an agent and unlocks the
-  // camera, like a drag would want. The key presses come through the registry; their releases (and the window losing
+  // One loop, only while a key is held or a glide eases out. Moving the map hands the camera to you, as a drag does
+  // (the director lets go until you follow again: F, Esc or the pill). The key presses come through the registry; their releases (and the window losing
   // focus) are listened to here, since the registry hands out presses only.
   const keyDown = useRef<(e: KeyboardEvent) => boolean>(() => false);
   useEffect(() => {
@@ -63,8 +61,6 @@ export function useCameraKeys({ camRef, replayRef, followRef, setFollowId, anim,
       // A tap still moves a little: start at half speed rather than from rest (a zoom at full speed: a tap is a step).
       if (z) { if (Math.abs(vel.z) < ZOOM_RATE) vel.z = z * ZOOM_RATE; }
       else {
-        if (followRef.current) setFollowId(null);
-        if (getCameraLock() && replayRef.current.tracing) setCameraLock(false);
         if (Math.abs(vel.x) < SPEED / 2 && d[0]) vel.x = d[0] * SPEED / 2;
         if (Math.abs(vel.y) < SPEED / 2 && d[1]) vel.y = d[1] * SPEED / 2;
       }
@@ -83,24 +79,15 @@ export function useCameraKeys({ camRef, replayRef, followRef, setFollowId, anim,
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useShortcut("map.move", (e) => !!e && keyDown.current(e));
   useShortcut("map.zoom", (e) => !!e && keyDown.current(e));
-  // C centres the camera on the agent once, without locking: the replay's marker, the agent you follow, the open thread's
-  // agent, or else the agent that moved last. Zoomed far out, it comes in a little so the agent reads.
-  useShortcut("center", () => {
-    const agents = anim.current;
-    const newest = () => { let best: AgentAnim | undefined; for (const a of agents.values()) if (!best || a.lastTs > best.lastTs) best = a; return best; };
-    const at = replayRef.current.subject()
-      ?? (followRef.current ? agents.get(followRef.current) : undefined)
-      ?? (replay ? agents.get(replay.sessionId) : undefined)
-      ?? (replay ? undefined : newest());
-    if (!at) return false;
-    freeRef.current();
-    const k = camRef.current.view()?.k ?? 1;
-    camRef.current.lookAt(at.x, at.y, Math.max(k, 1.6), 600);
-  });
-  // Esc stops following an agent before it steps back out of anything else (the registry tries it before "back"). A window
-  // open over the map (Settings, Find a thread, a picture) takes that Esc for itself.
+  // F: follow again, the director has the camera back.
+  useShortcut("follow.again", () => { if (windowOpen() || !taken()) return false; followAgain(); });
+  // Esc gives the camera back to the director if you had taken it, else stops following an agent, before it steps back
+  // out of anything else (the registry tries it before "back"). A window open over the map (Settings, Find a thread, a
+  // picture) takes that Esc for itself.
   useShortcut("follow.stop", (e) => {
-    if ((e && (e.defaultPrevented || keyRules.inField(e.target))) || !followRef.current || windowOpen()) return false;
+    if ((e && (e.defaultPrevented || keyRules.inField(e.target))) || windowOpen()) return false;
+    if (taken()) { e?.preventDefault(); followAgain(); return; }
+    if (!followRef.current) return false;
     e?.preventDefault();
     setFollowId(null);
   });

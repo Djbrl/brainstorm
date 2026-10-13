@@ -64,7 +64,7 @@ export type ThreadData = ReturnType<typeof threadData>;
 
 /**
  * The focus at a cursor, or null when nothing is in focus (no thread open: the map as it is). With a thread open it's the
- * recent window, the files of the moments (Track rows) from the cursor back N (the "On the map, show" setting): what they
+ * recent window, the files of the moments (Track rows) from the cursor back 15 (map/prefs.ts: no longer a setting): what they
  * changed in its own recency colours, what they read quieter (with "Show reads" on), the rest dimmed back with no names.
  * "The whole thread": at rest its whole footprint, in a replay the fog of its last few moments. A thread that changed
  * nothing lights nothing, as its "Changed no files" says.

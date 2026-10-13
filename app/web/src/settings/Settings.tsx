@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useNotifyPref } from "../lib/attention";
 import { isRecording } from "../lib/live";
 import { setTheme, THEMES, useTheme } from "../lib/theme";
-import { setShowFile, setStepWindow, STEP_WINDOWS, useShowFile, useStepWindow } from "../map/prefs";
+import { setShowFile, useShowFile } from "../map/prefs";
 import { useNavActions, useNavState } from "../lib/nav";
 import { setFoldOn, useFoldOn } from "../map/fold";
 import { EDITORS, setEditor, useEditor } from "../lib/editor";
@@ -53,7 +53,6 @@ export function SettingsButton() {
                 ))}
               </div>
             </section>
-            <WindowSetting />
             <FollowSetting />
             <EditorSetting />
             <FoldSetting />
@@ -69,23 +68,6 @@ export function SettingsButton() {
         document.body,
       )}
     </div>
-  );
-}
-
-/** How much of an open thread the map lights up and names (map/prefs.ts; the focus is in map/thread/ThreadLayer.ts). */
-function WindowSetting() {
-  const win = useStepWindow();
-  return (
-    <section className="set-sec">
-      <h3>On the map, show</h3>
-      <div className="theme-list view-list" role="radiogroup" aria-label="On the map, show">
-        {STEP_WINDOWS.map((w) => (
-          <button key={w.id} role="radio" aria-checked={win === w.id} className={`theme-opt view-opt ${win === w.id ? "on" : ""}`} onClick={() => setStepWindow(w.id)}>
-            <span className="theme-text"><b>{w.name}</b></span>
-          </button>
-        ))}
-      </div>
-    </section>
   );
 }
 

@@ -1,10 +1,10 @@
-// The app-wide keys: ⌘K finds a thread, ? lists every shortcut, L locks the camera, M shows or hides the
+// The app-wide keys: ⌘K finds a thread, ? lists every shortcut, M shows or hides the
 // Readmap (on the map), P switches between the map and Places. (Reads show or hide in Settings.) A key that flips something you can't see says so for a moment.
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { tourStore } from "../lib/tour";
 import { useNavActions, useNavState } from "../lib/nav";
-import { getCameraLock, getReadmap, setCameraLock, setReadmap } from "../map/prefs";
+import { getReadmap, setReadmap } from "../map/prefs";
 import { Picker } from "./Picker";
 import { useDialogFocus } from "../lib/useDialogFocus";
 import { SHORTCUTS, useShortcut } from "./shortcuts";
@@ -22,10 +22,6 @@ export function Keys({ finding, setFinding, help, setHelp }: {
   useShortcut("find", (e) => { if (e?.defaultPrevented) return false; e?.preventDefault(); setFinding(!finding); });
   // The single keys wait while Find a thread is open.
   useShortcut("help", () => { if (finding) return false; setHelp((h) => !h); });
-  useShortcut("lock", () => {
-    if (finding) return false;
-    const on = !getCameraLock(); setCameraLock(on); say(on ? "Camera locked on the agent" : "Camera free");
-  });
   useShortcut("readmap", () => { if (finding || lens !== "map") return false; const on = !getReadmap(); setReadmap(on); say(on ? "Readmap pinned" : "Readmap shows only for reads off the map"); });
   useShortcut("lens", () => { if (finding || !thread) return false; setLens(lens === "places" ? "map" : "places"); });
 

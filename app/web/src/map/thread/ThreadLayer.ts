@@ -61,6 +61,8 @@ export type ThreadLayerApi = {
   readsNow: () => string[] | null;
   /** The tracer's camera target (the marker), or null: what a locked camera centres. */
   subject: () => { x: number; y: number } | null;
+  /** The director's look-ahead: the files of the marker's move and the next `n` moves after it (graph points), in order. */
+  ahead: (n: number) => { x: number; y: number }[];
   /** Draw the tracer, the current marker and read flashes. Called every frame after the agent layer. */
   draw: (ctx: CanvasRenderingContext2D, scale: number) => void;
   /** Where draw() will put the marker and its name this frame, so file names keep off them;
@@ -312,6 +314,16 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
     return mi >= 0 ? [s.thread.moves[mi].file] : [];
   }, [focus]);
   const subject = useCallback(() => (st.current.active ? anim.current.cam : null), []);
+  const ahead = useCallback((n: number) => {
+    const s = st.current, out: { x: number; y: number }[] = [];
+    if (!s.active || !s.thread) return out;
+    const moves = s.thread.moves, mi = s.thread.beats[s.index]?.moveIndex ?? -1;
+    for (let k = Math.max(0, mi); k < moves.length && out.length <= n; k++) {
+      const p = nodeIndexRef.current?.get(moves[k].file);
+      if (p?.x !== undefined && p.y !== undefined) out.push({ x: p.x, y: p.y });
+    }
+    return out;
+  }, [nodeIndexRef]);
   const touches = useCallback((id: string) => !!st.current.thread?.touched.has(id), []);
   const readsNow = useCallback(() => {
     const s = st.current;
@@ -324,6 +336,6 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
     return [];
   }, []);
 
-  return { active, thinking, ringing, tracing: active, playable, footprint, touches, readsNow, subject, nodeAlpha, look, draw, marks };
+  return { active, thinking, ringing, tracing: active, playable, footprint, touches, readsNow, subject, ahead, nodeAlpha, look, draw, marks };
 }
 

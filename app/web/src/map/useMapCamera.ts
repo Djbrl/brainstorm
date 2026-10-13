@@ -1,10 +1,13 @@
-// What the map's camera frames and when (moved out of MapView.tsx): the whole project or an open thread's
-// files, the open file, a followed agent; again when a panel opens or the window resizes, unless you moved it yourself.
+// What the map's camera frames and when (moved out of MapView.tsx): the whole project or an open thread's files, the
+// open file, and the director (director.ts): the working agents' recent edits, or a replay's next few moves, framed
+// together, moving only when they leave the middle of the view. Any hand move (drag, wheel, pinch, arrow keys) hands the
+// camera to you; "Follow again" (the pill, F, Esc, opening a step, or a minute without touching it) gives it back.
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import type { AgentPresence } from "@contract";
 import type { ThreadReplay } from "../lib/nav";
-import { getCameraLock, setCameraLock } from "./prefs";
 import type { ThreadLayerApi } from "./thread/ThreadLayer";
-import { boxOf, fitView, type Camera, type ReplayCamera, type View } from "./camera";
+import { boxOf, type Box, type Camera, type ReplayCamera, type View } from "./camera";
+import { boxOfPts, DIRECTOR, frameArea, groupAhead, isCut, shouldMove, viewFor, type P } from "./director";
 import { useCameraKeys } from "./useCameraKeys";
 import type { AgentAnim } from "./agents";
 import type { GNode } from "./graph";
@@ -27,8 +30,13 @@ type CameraState = {
   hadThread: boolean;
 };
 
+const BEAT_MS = 150;        // how often the director looks
+const IDLE_MS = 60_000;
+const LEAD_MS = 8000;       // agents too far apart: the least time the camera stays with one
+const SETTLE_MS = 450;      // the work stays out of the middle this long before the camera goes (a burst lands once)     // a camera you took, left alone this long with nothing open, goes back to the director
+
 export function useMapCamera({ cam, camRef, replayCam, nodeIndex, nodeIndexRef, replayRef, replayActive, replay, step, selected, selectedRef, setSelected,
-  resolveId, anim, hasNodes, focusFile, setFocusFile, smallRef }: {
+  resolveId, anim, agentsRef, hasNodes, focusFile, setFocusFile }: {
   cam: Camera; camRef: RefObject<Camera>;
   /** What the replay layer's camera follow asks of this camera (thread/ThreadLayer.ts): filled in here. */
   replayCam: RefObject<ReplayCamera>;
@@ -36,9 +44,11 @@ export function useMapCamera({ cam, camRef, replayCam, nodeIndex, nodeIndexRef, 
   replayRef: RefObject<ThreadLayerApi>; replayActive: boolean; replay: ThreadReplay | null; step: string | null;
   selected: string | null; selectedRef: RefObject<string | null>; setSelected: (id: string | null) => void;
   resolveId: (file: string) => string | undefined; anim: RefObject<Map<string, AgentAnim>>; hasNodes: boolean;
+  /** The agents on the map (with a thread open, its own): the director frames the working ones. */
+  agentsRef: RefObject<AgentPresence[]>;
   focusFile: string | null; setFocusFile: (f: string | null) => void;
-  /** A small map (the Claude app's browser pane): a followed agent is framed again sooner, before it reaches the edge. */
-  smallRef: RefObject<boolean>;
+  /** A small map (the Claude app's browser pane). The director's dead zone works the same on it. */
+  smallRef?: RefObject<boolean>;
 }) {
   const [followId, setFollowId] = useState<string | null>(null);
   // Following the same agent again (its button on the Readmap) frames it again, even after you moved the camera.
@@ -48,11 +58,110 @@ export function useMapCamera({ cam, camRef, replayCam, nodeIndex, nodeIndexRef, 
   useEffect(() => { if (replay) setFollowId(null); }, [replay?.sessionId]);
   const followRef = useRef(followId); followRef.current = followId;
 
+  // Dev only: the camera and the agents, for the camera's measurements (sampled from the browser).
+  if (import.meta.env.DEV) Object.assign(window, { __rundownCam: camRef, __rundownAnim: anim });
   const state = useRef<CameraState>({ intent: { kind: "fit" }, intentAt: 0, framed: false, before: null, zoomTo: null, hadThread: false });
   const S = state.current;
   const setIntent = useCallback((i: Intent) => { S.intent = i; S.intentAt = performance.now(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  /** Locked onto something that moves (the tracer, a followed agent): the follow owns the centre, so no automatic re-frame. */
-  const lockedOn = useCallback(() => getCameraLock() && (replayRef.current.tracing || !!followRef.current), []);
+  // ---- the director (director.ts) ----
+  const [taken, setTaken] = useState(false);
+  const D = useRef({
+    /** The camera is yours (a hand move since the director last had it): it frames nothing until you give it back. */
+    taken: false,
+    /** When the director last got the camera (a hand move after it takes it). */
+    handAt: 0,
+    /** A move of its own is under way until then: it doesn't look again before. */
+    busyUntil: 0, lastTick: 0,
+    /** Since when the work has been out of the dead zone (0: it isn't): a burst of edits settles before the camera moves. */
+    outSince: 0,
+    /** The agent framed when they're too far apart to frame together, and since when. */
+    lead: null as string | null, leadAt: 0,
+    /** Per agent: the files its marker stood on lately (its last few edits), newest last, and when it last moved. */
+    hist: new Map<string, { files: string[]; at: number }>(),
+  }).current;
+  /** What the director frames now: the area, and the markers that must stay in the dead zone. Null: nothing to frame. */
+  const target = useCallback((): { box: Box; markers: P[] } | null => {
+    const c = camRef.current, s = c.safe.current, idx = nodeIndexRef.current, R = replayRef.current, now = performance.now();
+    const at = (file: string, st?: AgentAnim): P | undefined => {
+      const n = idx.get(file);
+      return n?.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y } : st ? { x: st.x, y: st.y } : undefined;
+    };
+    const drawn = agentsRef.current;
+    // A replay (looking back, or a live thread whose agent the map no longer shows): the director knows what comes next.
+    // The marker and the next few moves that fit one framing with it: the camera moves once for a run of nearby edits,
+    // the marker walks through them, and only the marker must stay in the dead zone.
+    if (R.tracing && !followRef.current && (!replay?.live || !drawn.length)) {
+      const run = groupAhead(R.ahead(DIRECTOR.ahead), s);
+      const box = boxOfPts(run);
+      return box ? { box, markers: [run[0]] } : null;
+    }
+    // Live: each agent's last few edits (its marker stands on the last file it changed: reads never move it).
+    for (const [id, st] of anim.current) {
+      if (!st.file) continue;
+      const h = D.hist.get(id);
+      if (!h) D.hist.set(id, { files: [st.file], at: 0 });
+      else if (h.files[h.files.length - 1] !== st.file) { h.files.push(st.file); if (h.files.length > 3) h.files.shift(); h.at = now; }
+    }
+    const ids = followRef.current ? [followRef.current] : drawn.filter((a) => a.active).map((a) => a.id);
+    const groups: P[][] = [], times: number[] = [], who: string[] = [];
+    for (const id of ids) {
+      const st = anim.current.get(id), h = D.hist.get(id);
+      if (!st || !h) continue;
+      // Newest first, the older edits only as long as they share one framing with it (a jump across the project
+      // leaves the old place behind).
+      const pts = groupAhead(h.files.map((f, i) => at(f, i === h.files.length - 1 ? st : undefined)).filter((p): p is P => !!p).reverse(), s);
+      if (pts.length) { groups.push(pts.reverse()); times.push(h.at); who.push(id); }
+    }
+    if (!groups.length) return null;
+    // Too far apart to frame together: the agent that edited last, but the camera stays with one for a few seconds
+    // (three agents across the project took turns on every edit).
+    // Only as it edits: the camera never moves on a clock.
+    const last = Math.max(...times), latest = who[times.indexOf(last)];
+    if (D.lead !== latest && (!D.lead || !who.includes(D.lead) || (now - D.leadAt > LEAD_MS && now - last < 1000))) { D.lead = latest; D.leadAt = now; }
+    const box = frameArea(groups, who.indexOf(D.lead ?? latest), s);
+    if (!box) return null;
+    const inBox = (p: P) => p.x >= box.x0 && p.x <= box.x1 && p.y >= box.y0 && p.y <= box.y1;
+    return { box, markers: groups.map((g) => g[g.length - 1]).filter(inBox) };
+  }, [replay?.live]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** One look: hand the camera to you on a hand move, back after a minute idle; else move if the work left the middle.
+   *  `force`: frame it now, dead zone or not. Returns whether there is something to direct. */
+  const direct = useCallback((force = false): boolean => {
+    const c = camRef.current, v = c.view(), now = performance.now();
+    D.lastTick = now;
+    if (!v) return false;
+    const t = target();
+    if (!t) return false;
+    if (!D.taken && c.userAt() > D.handAt) { D.taken = true; setTaken(true); }
+    if (D.taken) {
+      // A minute without touching the map, nothing open: the director takes it back.
+      if (now - c.userAt() > IDLE_MS && !selectedRef.current && !step) { D.taken = false; setTaken(false); D.handAt = now; force = true; }
+      else return true;
+    }
+    if (replayCam.current.pinned || S.intent.kind === "file") return true;
+    if (!force && now < D.busyUntil) return true;
+    const s = c.measure(), want = viewFor(t.box, s);
+    if (!force && !shouldMove(v, s, t.markers, want)) { D.outSince = 0; return true; }
+    if (!force && (D.outSince ||= now) > now - SETTLE_MS) return true;
+    D.outSince = 0;
+    if (import.meta.env.DEV) ((window as unknown as { __directorLog?: unknown[] }).__directorLog ??= []).push({ at: Math.round(now), force, cut: isCut(v, want, s), k: [v.k, want.k], markers: t.markers.length });
+    if (isCut(v, want, s)) { c.cut(want); D.busyUntil = now + 450; }
+    else { c.moveTo(want, 700); D.busyUntil = now + 750; }
+    S.framed = true;
+    return true;
+  }, [target, step]); // eslint-disable-line react-hooks/exhaustive-deps
+  const directRef = useRef(direct); directRef.current = direct;
+  /** "Follow again": the pill, F, Esc, opening a step, following an agent. The director frames the work at once. */
+  const followAgain = useCallback(() => {
+    D.taken = false; setTaken(false); D.handAt = performance.now(); D.busyUntil = 0;
+    directRef.current(true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Its beat: a few times a second (cheap: a handful of points), and at once when the replay's marker moves.
+  useEffect(() => {
+    const t = setInterval(() => directRef.current(), BEAT_MS);
+    replayCam.current.kick = () => { if (performance.now() - D.lastTick > 90) directRef.current(); };
+    return () => { clearInterval(t); replayCam.current.kick = null; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   /** Frame the open thread's focus (its recent window, or all its files), or the whole project. */
   const fitAll = useCallback((ms = 800) => {
     const idx = nodeIndexRef.current;
@@ -70,77 +179,24 @@ export function useMapCamera({ cam, camRef, replayCam, nodeIndex, nodeIndexRef, 
     const i = S.intent, c = camRef.current;
     if (i.kind === "free" || c.userAt() > S.intentAt) return;
     // Following an agent, the follow owns the camera (F lets go of it first): no fit takes it back.
-    if (i.kind === "fit") { if (!lockedOn() && !followRef.current) fitAll(ms); return; }
+    if (i.kind === "fit") { if (!direct(true)) fitAll(ms); return; }
     const n = nodeIndexRef.current.get(i.id);
     if (!n || n.x === undefined || n.y === undefined) return;
     if (i.zoom) c.lookAt(n.x, n.y, 3, ms);
     else c.reveal(n.x, n.y, n.r + 14, ms);   // room for its name under it
     S.framed = true;
-  }, [fitAll, lockedOn]);
-  // Unlocked, the tracer left the view: frame the recent window again (applyIntent: unless you moved the camera since).
-  // On a small map it follows the marker instead, as it follows an agent (the frame it's in, not the recent window: that
-  // can span the whole project), unless you moved the camera since.
-  useEffect(() => {
-    const r = replayCam.current;
-    r.onLost = () => {
-      const c = camRef.current, m = replayRef.current.subject();
-      if (!smallRef.current || !m) { applyIntent(700); return; }
-      if (c.userAt() > S.intentAt) return;
-      c.lookAt(m.x, m.y, undefined, 600);
-    };
-    r.margin = () => {
-      if (!smallRef.current) return 24;
-      const s = camRef.current.safe.current;
-      return Math.max(24, Math.min(s.w - s.left - s.right, s.h - s.top - s.bottom) * 0.2);
-    };
-    return () => { r.onLost = null; r.margin = () => 24; };
-  }, [applyIntent]);
+  }, [fitAll]); // eslint-disable-line react-hooks/exhaustive-deps
   // The safe area changed (a panel opened, the sidebar collapsed, the window resized): frame the same thing in it.
   useEffect(() => {
     const t = setTimeout(() => applyIntent(450), 60);
     return () => clearTimeout(t);
   }, [cam.version, applyIntent]);
   // The arrow keys, + and −, C and Esc (useCameraKeys.ts): moving the map by hand is a free intent.
-  useCameraKeys({ camRef, replayRef, followRef, setFollowId, anim, replay, free: () => setIntent({ kind: "free" }) });
+  useCameraKeys({ camRef, replayRef, followRef, setFollowId, free: () => setIntent({ kind: "free" }),
+    taken: () => D.taken, followAgain: () => followAgain() });
 
-  // Follow an agent (from the sidebar), like the tracer: the camera frames it once; locked, it keeps it centred (easing,
-  // every frame, no stacked tweens) at whatever zoom you pick; unlocked, it stays where you put it, and frames the agent
-  // again when it leaves the view only if you haven't moved the camera since following began. On a small map, "the view"
-  // is its middle: the agent is framed again once it gets within a fifth of the view of an edge, so it stays readable.
-  useEffect(() => {
-    if (!followId) return;
-    setIntent({ kind: "free" });
-    const t0 = performance.now();
-    let raf = 0, framedAt = 0;
-    const tick = () => {
-      const st = anim.current.get(followId), c = camRef.current, now = performance.now();
-      // An open thread's marker on the map (the replay, live or not) has the camera (thread/follow.ts): the agent's own
-      // spot can be elsewhere (where its hooks last put it, a read beside its step), and two follows took turns, the
-      // map jumping between the two about every second.
-      if (st && !replayRef.current.tracing) {
-        if (!framedAt) { framedAt = now; c.lookAt(st.x, st.y, zoomFor(st.file, c), 700); }
-        else if (getCameraLock()) { if (now - framedAt > 700) c.easeToward(st.x, st.y, 0.09); }
-        else if (c.userAt() < t0 && now - framedAt > 1200 && !c.sees(st.x, st.y, margin(c))) { framedAt = now; c.lookAt(st.x, st.y, smallRef.current ? zoomFor(st.file, c) : undefined, 700); }
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    // How close: on a big map, close enough to read its files; on a small one, the folder it works in fills the view
-    // (its neighbours named around it), the camera following it from folder to folder.
-    const zoomFor = (file: string, c: Camera) => {
-      const k = c.view()?.k ?? 0;
-      if (!smallRef.current) return Math.max(2.2, k);
-      const n = nodeIndexRef.current.get(file), f = n?.up ?? n;
-      if (f?.x === undefined || f.y === undefined) return Math.max(1.6, k);
-      return fitView(c.safe.current, { x0: f.x - f.r, x1: f.x + f.r, y0: f.y - f.r, y1: f.y + f.r }, { pad: 16, minZoom: 1.1, maxZoom: 2.2 }).k;
-    };
-    const margin = (c: Camera) => {
-      if (!smallRef.current) return 24;
-      const s = c.safe.current;
-      return Math.max(24, Math.min(s.w - s.left - s.right, s.h - s.top - s.bottom) * 0.2);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [followId, followAt, setIntent]);
+  // Following an agent (the sidebar, the Readmap, A): the director frames that one, at once, and the camera is its again.
+  useEffect(() => { if (followId) followAgain(); }, [followId, followAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const focusOnFile = useCallback((file: string) => {
     setFollowId(null);
     const id = resolveId(file);
@@ -162,15 +218,14 @@ export function useMapCamera({ cam, camRef, replayCam, nodeIndex, nodeIndexRef, 
   // thread that loads before the map is framed by the hasNodes effect above). Closing the thread frames the whole project again.
   const openThread = replayActive ? replay?.sessionId : undefined;
   const playing = replay?.mode === "play";
-  // A thread opens with the camera locked on its agent (L unlocks it, as do the arrow keys).
-  useEffect(() => { if (openThread) setCameraLock(true); }, [openThread]);
   useEffect(() => {
     if (openThread) S.hadThread = true;
     else if (!S.hadThread) return;
     if (!openThread) S.hadThread = false;
     setIntent({ kind: "fit" });
     if (replayCam.current.pinned) return; // a file is selected: the camera stays on the file
-    fitAll(700);
+    D.taken = false; setTaken(false); D.handAt = performance.now();
+    if (!direct(true)) fitAll(700);
   }, [openThread, playing, setIntent, fitAll]);
 
   // Focus from Follow (and file links)
@@ -212,5 +267,8 @@ export function useMapCamera({ cam, camRef, replayCam, nodeIndex, nodeIndexRef, 
     else { setIntent({ kind: "fit" }); applyIntent(700); }
   }, [panelFile, setIntent, applyIntent]);
 
-  return { followId, setFollowId, refollow, followRef, focusOnFile, applyIntent };
+  // Opening a step gives the camera back to the director.
+  useEffect(() => { if (step) followAgain(); }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { followId, setFollowId, refollow, followRef, focusOnFile, applyIntent, taken, followAgain };
 }

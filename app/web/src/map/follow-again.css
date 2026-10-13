@@ -1,0 +1,14 @@
+/* The "Follow again" pill (FollowAgain.tsx): light, small, dark text, centred at the bottom of the map. */
+.follow-again {
+  position: absolute; left: 50%; transform: translateX(-50%); z-index: 6;
+  padding: 7px 16px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--pill); color: var(--ink); font: 600 13.5px/1.2 var(--font-body);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .08); cursor: pointer; backdrop-filter: blur(8px);
+  animation: follow-again-in .18s ease-out;
+}
+.follow-again:hover { background: var(--fill-active); }
+.follow-again:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@keyframes follow-again-in { from { opacity: 0; transform: translate(-50%, 6px); } }
+@media (prefers-reduced-motion: reduce) { .follow-again { animation: none; } }
+/* A phone: the thread's sheet and its Map | Places bar fill the bottom of the map: the pill stands at its top instead. */
+@media (max-width: 760px) { .follow-again { top: 14px; bottom: auto !important; } }

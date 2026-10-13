@@ -1,16 +1,13 @@
-// The camera's keys, registered in the shortcuts registry (switch/shortcuts.ts: map.move, map.zoom, center,
+// The camera's keys, registered in the shortcuts registry (switch/shortcuts.ts: map.move, map.zoom,
 // follow.again, follow.stop). Moved out of useMapCamera.ts.
 import { useEffect, useRef, type RefObject } from "react";
-import type { ThreadReplay } from "../lib/nav";
 import { keyRules, useShortcut, windowOpen } from "../switch/shortcuts";
 import type { ThreadLayerApi } from "./thread/ThreadLayer";
 import type { Camera } from "./camera";
-import type { AgentAnim } from "./agents";
 
-export function useCameraKeys({ camRef, replayRef, followRef, setFollowId, anim, replay, free, taken, followAgain }: {
+export function useCameraKeys({ camRef, replayRef, followRef, setFollowId, free, taken, followAgain }: {
   camRef: RefObject<Camera>; replayRef: RefObject<ThreadLayerApi>;
   followRef: RefObject<string | null>; setFollowId: (id: string | null) => void;
-  anim: RefObject<Map<string, AgentAnim>>; replay: ThreadReplay | null;
   /** The camera is yours now (a hand move): no automatic re-frame. */
   free: () => void;
   /** Whether the camera is yours (the director lets it be), and giving it back to the director. */
@@ -82,20 +79,6 @@ export function useCameraKeys({ camRef, replayRef, followRef, setFollowId, anim,
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useShortcut("map.move", (e) => !!e && keyDown.current(e));
   useShortcut("map.zoom", (e) => !!e && keyDown.current(e));
-  // C centres the camera on the agent once, without locking: the replay's marker, the agent you follow, the open thread's
-  // agent, or else the agent that moved last. Zoomed far out, it comes in a little so the agent reads.
-  useShortcut("center", () => {
-    const agents = anim.current;
-    const newest = () => { let best: AgentAnim | undefined; for (const a of agents.values()) if (!best || a.lastTs > best.lastTs) best = a; return best; };
-    const at = replayRef.current.subject()
-      ?? (followRef.current ? agents.get(followRef.current) : undefined)
-      ?? (replay ? agents.get(replay.sessionId) : undefined)
-      ?? (replay ? undefined : newest());
-    if (!at) return false;
-    freeRef.current();
-    const k = camRef.current.view()?.k ?? 1;
-    camRef.current.lookAt(at.x, at.y, Math.max(k, 1.6), 600);
-  });
   // F: follow again, the director has the camera back.
   useShortcut("follow.again", () => { if (windowOpen() || !taken()) return false; followAgain(); });
   // Esc gives the camera back to the director if you had taken it, else stops following an agent, before it steps back

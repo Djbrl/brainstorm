@@ -58,7 +58,7 @@ export function ThreadBar({ project, onFind, onHelp, onAllProjects }: { project:
       </div>
       {openId && <PlayButton />}
       <LensSwitch inBar />
-      <KeyHints open={!!openId} onHelp={onHelp} />
+      <KeyHints onHelp={onHelp} />
       <button className="threadbar-find" onClick={onFind} title={`Find any thread, in this project or another (${MOD} K)`}>
         <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5 14 14" /></svg>
         Find a thread<kbd>{MOD === "⌘" ? "⌘K" : "Ctrl K"}</kbd>
@@ -88,15 +88,14 @@ export function PlayButton() {
 }
 
 /**
- * The keys people use most, said quietly beside Find a thread, and clickable: center with a thread open, the Readmap
- * on the map, and ? for the rest.
+ * The keys people use most, said quietly beside Find a thread, and clickable: the Readmap on the map, and ? for the
+ * rest.
  */
-function KeyHints({ open, onHelp }: { open: boolean; onHelp: () => void }) {
+function KeyHints({ onHelp }: { onHelp: () => void }) {
   const readmap = useReadmap();
   const { lens } = useNavState();
   return (
     <div className="threadbar-keys" aria-label="Keyboard shortcuts">
-      {open && <button className="threadbar-key-extra" onMouseDown={keepFocus} onClick={() => run("center")} title="Center the camera on the agent (C)"><kbd>C</kbd>Center</button>}
       {lens === "map" && <button role="switch" aria-checked={readmap} onMouseDown={keepFocus} onClick={() => setReadmap(!readmap)}
         title={readmap ? "Hide the Readmap, the small map of what the agent reads (M)" : "Show the Readmap, the small map of what the agent reads (M)"}><kbd>M</kbd>Readmap</button>}
       <button onMouseDown={keepFocus} onClick={onHelp} title="Every keyboard shortcut"><kbd>?</kbd>Shortcuts</button>

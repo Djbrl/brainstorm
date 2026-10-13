@@ -63,7 +63,6 @@
   border-bottom-width: 2px; border-radius: 6px; padding: 0 6px; min-width: 22px; text-align: center; display: inline-block; line-height: 18px; }
 .threadbar-keys + .threadbar-find { margin-left: -8px; }
 /* Narrower windows keep the room for the tabs: only ? stays. */
-@media (max-width: 1280px) { .threadbar-key-extra { display: none !important; } }
 
 /* Play / Pause for the open thread (the thread bar, a shared replay's header): at every width; just the icon on a phone. */
 .play-button { flex: none; display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 14px 0 11px; border: 1px solid var(--line);

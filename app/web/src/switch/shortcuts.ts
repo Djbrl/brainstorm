@@ -49,7 +49,6 @@ const ENTRIES: Entry[] = [
     match: (e) => !e.shiftKey && key("ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown")(e) },
   { id: "map.zoom", group: "Map", keys: ["Shift", "↑", "↓"], what: "Zoom in or out: hold to keep going", raw: true,
     match: (e) => key("Shift", "+", "=", "-", "_")(e) || (e.shiftKey && key("ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown")(e)) },
-  { id: "center", group: "Map", keys: ["C"], what: "Center the camera on the agent (without locking it)", match: key("c", "C") },
   { id: "follow.next", group: "Map", keys: ["A"], what: "Follow the next agent (with Shift, the one before)", match: key("a", "A") },
   { id: "readmap", group: "Map", keys: ["M"], what: "Show or hide the Readmap", match: key("m", "M") },
   { id: "follow.again", group: "Map", keys: ["F"], what: "Follow again: the camera frames the agents' work after you moved the map", match: key("f", "F") },
@@ -62,7 +61,7 @@ const ENTRIES: Entry[] = [
   { id: "help", group: "Help", keys: ["?"], what: "These shortcuts", match: key("?") },
 ];
 
-export type ShortcutId = "find" | "thread.number" | "thread.next" | "sidebar" | "follow.stop" | "back" | "map.move" | "map.zoom" | "center"
+export type ShortcutId = "find" | "thread.number" | "thread.next" | "sidebar" | "follow.stop" | "back" | "map.move" | "map.zoom"
   | "follow.next" | "follow.again" | "readmap" | "lens" | "play" | "player.step" | "player.ends" | "help";
 
 /** The ? window's list: the shortcuts by group, in order. */

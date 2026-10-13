@@ -185,7 +185,7 @@ export function useMapCamera({ cam, camRef, replayCam, nodeIndex, nodeIndexRef, 
     return () => clearTimeout(t);
   }, [cam.version, applyIntent]);
   // The arrow keys, + and −, C and Esc (useCameraKeys.ts): moving the map by hand is a free intent.
-  useCameraKeys({ camRef, replayRef, followRef, setFollowId, anim, replay, free: () => setIntent({ kind: "free" }),
+  useCameraKeys({ camRef, replayRef, followRef, setFollowId, free: () => setIntent({ kind: "free" }),
     taken: () => D.taken, followAgain: () => followAgain() });
 
   // Following an agent (the sidebar, the Readmap, A): the director frames that one, at once, and the camera is its again.

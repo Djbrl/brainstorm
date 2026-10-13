@@ -44,7 +44,7 @@ describe("buildThread", () => {
     expect(buildThread("M", steps, resolve)).toBe(buildThread("M", steps, resolve));
   });
 
-  it("moves the tracer on edits, and on reads only before the first edit", () => {
+  it("moves the tracer on edits only, never on reads", () => {
     const at = (i: number) => new Date(Date.parse("2026-10-11T10:00:00Z") + i * 1000).toISOString();
     const s = (i: number, kind: Step["kind"], over: Partial<Step> = {}): Step => ({ id: `x${i}`, sessionId: "T", seq: i, ts: at(i), kind, ...over });
     const steps = [
@@ -55,7 +55,7 @@ describe("buildThread", () => {
       s(4, "tool_call", { tool: "Read", filePath: "/p/src/c.ts", toolUseId: "r2" }),
     ];
     const t = buildThread("T", steps, freshResolver());
-    expect(t.moves.map((m) => m.file)).toEqual(["/p/a.ts", "/p/b.ts"]);
+    expect(t.moves.map((m) => m.file)).toEqual(["/p/b.ts"]);
     expect(t.editCount).toBe(1);
     expect(t.files).toEqual(["/p/a.ts", "/p/b.ts", "/p/src/c.ts"]);
   });

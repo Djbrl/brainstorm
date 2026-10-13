@@ -132,17 +132,13 @@ export function lastReadAt(a: AgentPresence): number {
 /** Where an agent waits that hasn't touched a file yet: the top of the project's circle (MapView adds it to the nodes). */
 export const PARK = "@project";
 
-/** Where the marker stands (a map node): the last file it changed; before it changes any, the last one it read (a
- *  reviewer that only reads goes from file to file); with neither on the map, where it stood already (`was`: a command,
- *  a search, it stays put); else the top of the project (PARK), until it touches something. Never nowhere: an agent
- *  that existed but stood on no file used to be left off the map, which looked broken. */
+/** Where the marker stands (a map node): the last file it changed (an edit, a write, a command that edits). Reads never
+ *  move it (they are lines of sight and the Readmap). Before it changes anything, or with what it changed off the map,
+ *  where it stood already (`was`); else the top of the project (PARK). Never nowhere: an agent that existed but stood
+ *  on no file used to be left off the map, which looked broken. */
 export function anchorFile(a: AgentPresence, resolveId: (file: string) => string | undefined, was?: string): string {
-  let wrote = false;
-  for (let i = a.trail.length - 1; i >= 0; i--) if (isWrite(a.trail[i].action)) { wrote = true; const id = resolveId(a.trail[i].file); if (id) return id; }
-  if (!wrote) for (let i = a.trail.length - 1; i >= 0; i--) { const id = resolveId(a.trail[i].file); if (id) return id; }
-  if (was) return was;
-  const here = a.file ? resolveId(a.file) : undefined;
-  return here ?? PARK;
+  for (let i = a.trail.length - 1; i >= 0; i--) if (isWrite(a.trail[i].action)) { const id = resolveId(a.trail[i].file); if (id) return id; }
+  return was ?? PARK;
 }
 
 export function drawAgents(opts: {

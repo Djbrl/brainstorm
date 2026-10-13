@@ -167,7 +167,7 @@ type Draft = {
   version: number;        // bumped on every change
   out?: Beat; outVersion: number;
 };
-type DraftMove = { beat: number; file: string; ts: string; out?: Move; read?: boolean };
+type DraftMove = { beat: number; file: string; ts: string; out?: Move };
 
 const failedSeen = new WeakMap<Step, boolean>();
 const failedOf = (s: Step, tool?: string) => {
@@ -197,7 +197,6 @@ class ThreadBuilder {
   private touched = new Map<string, { edits: number; reads: number }>();
   private stepBeat = new Map<string, number>(); // step id → draft position
   private editCount = 0;
-  private edited = false;             // the tracer moved on an edit: from then on only edits move it
   private stepCount = 0;
   private absorbed = 0;
   private callBeat = new Map<string, Draft>(); // tool_use id → the draft holding the call
@@ -281,25 +280,12 @@ class ThreadBuilder {
     d.outside = d.files.length === 0 && !!s.filePath;
     d.version++;
   }
-  /** Where the tracer stands: on an edit's file; before any edit, on the file it read last (an agent that only reads,
-   *  a reviewer, goes from file to file instead of standing nowhere the whole thread). */
+  /** Where the tracer stands: on the file it last edited. Reads never move it (they flash their file); before its first
+   *  edit it waits at the top of the project. */
   private place(d: Draft, file: string, action: BeatAction, ts: string) {
-    if (TRACER_MOVES_ON.has(action)) this.edited = true;
-    else if (action !== "read" || this.edited) return;
-    // Reads place it once per moment, on the last file read: a run of 100 commands reading 40 files is one stop, not 40.
-    const last = this.moves[this.moves.length - 1];
-    if (action === "read" && last?.beat === d.at && last.read && this.moves.length - 1 === d.moveIndex) {
-      if (last.file !== file) { this.moves[this.moves.length - 1] = { beat: d.at, file, ts, read: true }; this.drop(file); d.moveIndex = this.moves.length - 1; }
-      return;
-    }
+    if (!TRACER_MOVES_ON.has(action)) return;
     this.moveTo(file, d.at, ts);
-    if (action === "read" && this.moves[this.moves.length - 1]?.beat === d.at) this.moves[this.moves.length - 1].read = true;
     d.moveIndex = this.moves.length - 1;
-  }
-  /** The move before the last one already on `file` (A, B, then A again): they'd be the same stop twice, keep one. */
-  private drop(file: string) {
-    const n = this.moves.length;
-    if (n >= 2 && this.moves[n - 2].file === file) this.moves.splice(n - 1, 1);
   }
   /** The files a shell command read (`reads`, worked out by the server from `cat`, `sed -n`, `grep`…): reads of its beat,
    *  which keeps its own words ("Ran 3 commands"). */

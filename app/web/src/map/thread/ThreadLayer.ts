@@ -46,7 +46,7 @@ export type ThreadLayerApi = {
   readsNow: () => string[] | null;
   /** Looking back with no live agent on the map: where the thread is now (its newest move), the solid marker. */
   nowAt: () => { x: number; y: number } | null;
-  /** The tracer's camera target (the marker, or between it and a file it reads), or null: what a locked camera centres. */
+  /** The tracer's camera target (the marker), or null: what a locked camera centres. */
   subject: () => { x: number; y: number } | null;
   /** Draw the tracer, numbered stops, the current marker and read flashes. Called every frame after the agent layer. */
   draw: (ctx: CanvasRenderingContext2D, scale: number) => void;
@@ -209,9 +209,8 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
       a.file = null;
     }
 
-    // Camera target: the marker; on a read, between the marker and the file read so both stay in view.
-    const readPos = beat.action === "read" && beat.file ? pos(beat.file) : undefined; // the last file of a read group
-    a.cam = target && readPos ? { x: (a.x + readPos.x) / 2, y: (a.y + readPos.y) / 2 } : target ? { x: a.x, y: a.y } : readPos ? { x: readPos.x, y: readPos.y } : null;
+    // Camera target: the marker, nothing else. A read doesn't move the camera (the Readmap and the read lines show it).
+    a.cam = target ? { x: a.x, y: a.y } : null;
     kickCamera(ctx);
 
     // Tracer path through the moves of the recent window only (the "On the map, show" setting; the whole thread: its last

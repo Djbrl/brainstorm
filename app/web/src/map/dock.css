@@ -4,7 +4,7 @@
 .dock { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: calc(100% - 48px); }
 .map-wrap:has(.map-panel.open) .dock { left: calc(50% - var(--panel-w) / 2); }
 
-/* Narrow (tablet and phone): no footer player. The thread bar's Play, the folded card's scroller and the keys
+/* Narrow (tablet and phone, NARROW in lib/breakpoints.ts): no footer player. The folded card's scroller and the keys
    (Space, ← →, Home/End: map/thread/playback.ts, places/CoworkView.tsx) drive the replay. */
 @media (max-width: 1100px) {
   .dock { display: none; }

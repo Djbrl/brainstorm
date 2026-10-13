@@ -56,7 +56,6 @@ export function ThreadBar({ project, onFind, onHelp, onAllProjects }: { project:
           onOpen={() => openThread(nav, t.session)}
           onClose={() => { forgetThread(root, t.session.id); if (t.session.id === openId) nav.stopReplay(); }} />)}
       </div>
-      {openId && <PlayButton />}
       <LensSwitch inBar />
       <KeyHints open={!!openId} onHelp={onHelp} />
       <button className="threadbar-find" onClick={onFind} title={`Find any thread, in this project or another (${MOD} K)`}>
@@ -71,8 +70,8 @@ export function ThreadBar({ project, onFind, onHelp, onAllProjects }: { project:
 const keepFocus = (e: MouseEvent) => e.preventDefault();
 
 /**
- * Play or pause the open thread's replay, at every width (Space does the same): the player comes up at the bottom
- * with its position and speed. Also in a shared replay's header, which has no thread bar.
+ * Play or pause the open thread's replay (Space does the same), in a shared replay's header, which has no thread bar.
+ * Your own Rundown has no Play button: Space, ← → and the player (full screen) or the folded card's scroller drive it.
  */
 const PLAY = <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.2v9.6L12.8 8z" fill="currentColor" /></svg>;
 const PAUSE = <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9M11 3.5v9" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" /></svg>;

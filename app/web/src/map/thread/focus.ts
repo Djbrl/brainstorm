@@ -56,9 +56,7 @@ function threadData(thread: Thread | null) {
     }
     return { touched, edited: new Set(b.files), ts };
   });
-  const firstVisit = new Map<string, number>();
-  (thread?.moves ?? []).forEach((m, k) => { if (!firstVisit.has(m.file)) firstVisit.set(m.file, k); });
-  return { beatFiles, touchedAt, editsAt, firstVisit };
+  return { beatFiles, touchedAt, editsAt };
 }
 export type ThreadData = ReturnType<typeof threadData>;
 
@@ -139,5 +137,5 @@ export function useFocus(st: RefObject<Cursor>, thread: Thread | null) {
     else if (e.tone === 0 && e.alpha === 1) { shown.current.delete(id); return null; }
     return e;
   }, [focusOf]);
-  return { focus, look, dataRef };
+  return { focus, look };
 }

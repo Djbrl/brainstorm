@@ -1,4 +1,4 @@
-// Map-canvas side of the thread replay: the tracer, its numbered stops and read flashes, drawn here; the focus (which
+// Map-canvas side of the thread replay: the tracer, its marker and read flashes, drawn here; the focus (which
 // files are lit and named: focus.ts), the camera follow (follow.ts) and playback with its keys (playback.ts) composed.
 // The wheel zooms the map: scrubbing is the Track tab's scroll, the arrow keys and the player's slider.
 import { useCallback, useEffect, useRef, type RefObject } from "react";
@@ -48,9 +48,9 @@ export type ThreadLayerApi = {
   nowAt: () => { x: number; y: number } | null;
   /** The tracer's camera target (the marker), or null: what a locked camera centres. */
   subject: () => { x: number; y: number } | null;
-  /** Draw the tracer, numbered stops, the current marker and read flashes. Called every frame after the agent layer. */
+  /** Draw the tracer, the current marker and read flashes. Called every frame after the agent layer. */
   draw: (ctx: CanvasRenderingContext2D, scale: number) => void;
-  /** Where draw() will put its numbered stops, the marker and its name this frame, so file names keep off them;
+  /** Where draw() will put the marker and its name this frame, so file names keep off them;
    *  and the file the marker names (its own label would say the same thing twice). */
   marks: (ctx: CanvasRenderingContext2D, scale: number) => { boxes: Box[]; named: string | null };
 };
@@ -61,32 +61,13 @@ const READS_BACK = 8;       // how many moments back the Readmap still shows the
 const PAST_ALPHA = 0.42;    // the marker, looking back, beside the agent where it is now (as on the Readmap)
 const TAPER = 3;            // a tracer segment fades out over its last few moments in the window, so the trail doesn't end in a cut
 
-/**
- * The numbered stops: each file visited within the window, by its latest stop (the marker's own file has none), in the
- * order of each file's first visit (the order they are drawn in). Moves are in beat order, so only the moves inside the
- * window are read, from the marker back.
- */
-function stopsOf(moves: Thread["moves"], mi: number, fogBefore: number, curFile: string | null, firstVisit: Map<string, number>) {
-  const latest = new Map<string, number>();
-  for (let k = mi; k >= 0 && moves[k].beatIndex >= fogBefore; k--) {
-    const f = moves[k].file;
-    if (f !== curFile && !latest.has(f)) latest.set(f, k);
-  }
-  if (latest.size < 2) return latest;
-  return new Map([...latest].sort((a, b) => (firstVisit.get(a[0]) ?? 0) - (firstVisit.get(b[0]) ?? 0)));
-}
 /** The first move at or after a beat (binary search over the moves' beat indexes, up to `hi`). */
 function firstMoveFrom(moves: Thread["moves"], beat: number, hi: number) {
   let lo = 0;
   while (lo < hi) { const m = (lo + hi) >> 1; if (moves[m].beatIndex < beat) lo = m + 1; else hi = m; }
   return lo;
 }
-/** A stop's badge: just off the file's top-left. */
-const badgeAt = (n: { x: number; y: number; r: number }, scale: number) => {
-  const d = n.r + 8 / scale, ang = (-3 * Math.PI) / 4;
-  return { x: n.x + Math.cos(ang) * d, y: n.y + Math.sin(ang) * d };
-};
-const BADGE_FONT = 9.5, MARK_R = 10, NAME_FONT = 12;
+const MARK_R = 10, NAME_FONT = 12;
 import { basename as baseName } from "@shared/text";
 const INK = "#1d1d1f";
 
@@ -159,19 +140,8 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
   const kickCamera = useReplayFollow({ active, mode, camera, follow, target: () => anim.current.cam });
 
   // ---- the focus (focus.ts) ----
-  const { focus, look, dataRef } = useFocus(st, thread);
+  const { focus, look } = useFocus(st, thread);
   const nodeAlpha = useCallback((id: string) => look(id)?.alpha ?? 1, [look]);
-
-  // The numbered stops for a cursor: draw() and marks() both ask, every frame.
-  const stopsCache = useRef<{ thread: Thread | null; mi: number; fog: number; cur: string | null; stops: Map<string, number> }>(
-    { thread: null, mi: -2, fog: 0, cur: null, stops: new Map() });
-  const stopsAt = useCallback((thread: Thread, mi: number, fog: number, cur: string | null) => {
-    const c = stopsCache.current;
-    if (c.thread === thread && c.mi === mi && c.fog === fog && c.cur === cur) return c.stops;
-    const stops = stopsOf(thread.moves, mi, fog, cur, dataRef.current.firstVisit);
-    stopsCache.current = { thread, mi, fog, cur, stops };
-    return stops;
-  }, []);
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
     const s = st.current;
@@ -229,28 +199,6 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
       ctx.lineWidth = ((1.1 + 2 * w) * (style.trackWidth ?? 1)) / scale;
       trailPath(ctx, p0, p1, style.route, scale);
       ctx.stroke();
-    }
-
-    // Numbered stops: each file visited within the window shows its latest stop number (top-left of the file).
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = `700 ${BADGE_FONT / scale}px ${font}`;
-    for (const [file, k] of stopsAt(s.thread, mi, fogBefore, curFile)) {
-      const n = pos(file);
-      if (!n) continue;
-      const label = String(k + 1);
-      const { x: bx, y: by } = badgeAt(n, scale);
-      const h = 15 / scale, wdt = Math.max(h, ctx.measureText(label).width + 8 / scale);
-      ctx.globalAlpha = 0.5 + 0.5 * Math.pow(0.9, mi - k);
-      ctx.beginPath();
-      ctx.roundRect(bx - wdt / 2, by - h / 2, wdt, h, h / 2);
-      ctx.fillStyle = "#fff";
-      ctx.fill();
-      ctx.lineWidth = 1.4 / scale;
-      ctx.strokeStyle = line;
-      ctx.stroke();
-      ctx.fillStyle = line;
-      ctx.fillText(label, bx, by + 0.5 / scale);
     }
 
     // Read flash: a hollow ring on each file read (a group of reads flashes them all); the tracer stays put.
@@ -335,21 +283,14 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
     // For the Readmap: where now is, also when the marker stands on it (it draws its own marker faint, now solid on top).
     nowRef.current = nowFile && !s.live ? nowAt ?? markerAt(nowFile) ?? null : null;
     ctx.restore();
-  }, [accent, font, nodeIndexRef, stopsAt, kickCamera]);
+  }, [accent, font, nodeIndexRef, kickCamera]);
 
   const marks = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
     const s = st.current, boxes: Box[] = [];
     const beat = s.active && s.thread ? s.thread.beats[s.index] : undefined;
     if (!beat || !s.thread) return { boxes, named: null };
     const { moves } = s.thread, mi = beat.moveIndex, curFile = mi >= 0 ? moves[mi].file : PARK, nodes = nodeIndexRef.current;
-    const h = 15 / scale, pad = 2 / scale, win = getStepWindow();
-    for (const [file, k] of stopsAt(s.thread, mi, s.index - (win === "all" ? WINDOW : win), curFile)) {   // as draw() does
-      const n = nodes?.get(file);
-      if (n?.x === undefined || n.y === undefined) continue;
-      const b = badgeAt({ x: n.x, y: n.y, r: n.r }, scale), w = Math.max(h, (String(k + 1).length * BADGE_FONT * 0.62 + 8) / scale);
-      boxes.push({ x0: b.x - w / 2 - pad, x1: b.x + w / 2 + pad, y0: b.y - h / 2 - pad, y1: b.y + h / 2 + pad });
-    }
-    const a = anim.current;
+    const pad = 2 / scale, a = anim.current;
     if (curFile && a.file === curFile && (!s.live || !liveShown?.current)) {   // the marker (where it is this frame) and its name to the right
       ctx.save(); ctx.font = `600 ${NAME_FONT / scale}px ${font}`;
       const w = curFile === PARK ? 0 : ctx.measureText(baseName(curFile)).width; ctx.restore();
@@ -365,7 +306,7 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
       boxes.push({ x0: read.x - w / 2 - pad, x1: read.x + w / 2 + pad, y0: by - 14 / scale, y1: by + pad });
     }
     return { boxes, named: curFile === PARK ? null : curFile };
-  }, [font, nodeIndexRef, stopsAt]);
+  }, [font, nodeIndexRef]);
 
   const footprint = useCallback(() => {
     const s = st.current, f = focus();

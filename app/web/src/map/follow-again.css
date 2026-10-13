@@ -10,3 +10,5 @@
 .follow-again:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @keyframes follow-again-in { from { opacity: 0; transform: translate(-50%, 6px); } }
 @media (prefers-reduced-motion: reduce) { .follow-again { animation: none; } }
+/* A phone: the thread's sheet and its Map | Places bar fill the bottom of the map: the pill stands at its top instead. */
+@media (max-width: 760px) { .follow-again { top: 14px; bottom: auto !important; } }

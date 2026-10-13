@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useLiveSelector } from "../lib/live";
 import { useNavActions, useNavState, useReplayCursor } from "../lib/nav";
-import { setCameraLock, setReadmap, useCameraLock, useReadmap } from "../map/prefs";
+import { setReadmap, useReadmap } from "../map/prefs";
 import { attentionText, needsYou, yourTurn } from "../lib/attention";
 import { forgetThread, openThread, rememberThread, useBarThreads, type BarThread } from "../lib/switcher";
 import { MOD, run, useShortcut } from "./shortcuts";
@@ -88,18 +88,15 @@ export function PlayButton() {
 }
 
 /**
- * The keys people use most, said quietly beside Find a thread, and clickable: center and the camera lock with a
- * thread open, the Readmap on the map, and ? for the rest.
+ * The keys people use most, said quietly beside Find a thread, and clickable: center with a thread open, the Readmap
+ * on the map, and ? for the rest.
  */
 function KeyHints({ open, onHelp }: { open: boolean; onHelp: () => void }) {
-  const lock = useCameraLock();
   const readmap = useReadmap();
   const { lens } = useNavState();
   return (
     <div className="threadbar-keys" aria-label="Keyboard shortcuts">
       {open && <button className="threadbar-key-extra" onMouseDown={keepFocus} onClick={() => run("center")} title="Center the camera on the agent (C)"><kbd>C</kbd>Center</button>}
-      {open && <button className="threadbar-key-extra" role="switch" aria-checked={lock} onMouseDown={keepFocus} onClick={() => setCameraLock(!lock)}
-        title={lock ? "The camera keeps the agent centred. Click to move the map freely (L)" : "Keep the agent centred as it moves (L)"}><kbd>L</kbd>{lock ? "Free camera" : "Lock camera"}</button>}
       {lens === "map" && <button role="switch" aria-checked={readmap} onMouseDown={keepFocus} onClick={() => setReadmap(!readmap)}
         title={readmap ? "Hide the Readmap, the small map of what the agent reads (M)" : "Show the Readmap, the small map of what the agent reads (M)"}><kbd>M</kbd>Readmap</button>}
       <button onMouseDown={keepFocus} onClick={onHelp} title="Every keyboard shortcut"><kbd>?</kbd>Shortcuts</button>

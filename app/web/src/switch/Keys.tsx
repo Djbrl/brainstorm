@@ -1,10 +1,10 @@
-// The app-wide keys: ⌘K finds a thread, ? lists every shortcut, L locks the camera, M shows or hides the
-// Readmap (on the map), P switches between the map and Places. (Reads show or hide in Settings.) A key that flips something you can't see says so for a moment.
-import { useEffect, useRef, useState } from "react";
+// The app-wide keys: ⌘K finds a thread, ? lists every shortcut, M shows or hides the
+// Readmap (on the map), P switches between the map and Places. (Reads show or hide in Settings.)
+import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { tourStore } from "../lib/tour";
 import { useNavActions, useNavState } from "../lib/nav";
-import { getCameraLock, getReadmap, setCameraLock, setReadmap } from "../map/prefs";
+import { getReadmap, setReadmap } from "../map/prefs";
 import { Picker } from "./Picker";
 import { useDialogFocus } from "../lib/useDialogFocus";
 import { SHORTCUTS, useShortcut } from "./shortcuts";
@@ -15,24 +15,16 @@ export function Keys({ finding, setFinding, help, setHelp }: {
 }) {
   const { thread, lens } = useNavState();
   const { setLens } = useNavActions();
-  const [toast, setToast] = useState<string | null>(null);
-  const toastT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const say = (s: string) => { setToast(s); clearTimeout(toastT.current); toastT.current = setTimeout(() => setToast(null), 1400); };
 
   useShortcut("find", (e) => { if (e?.defaultPrevented) return false; e?.preventDefault(); setFinding(!finding); });
   // The single keys wait while Find a thread is open.
   useShortcut("help", () => { if (finding) return false; setHelp((h) => !h); });
-  useShortcut("lock", () => {
-    if (finding) return false;
-    const on = !getCameraLock(); setCameraLock(on); say(on ? "Camera locked on the agent" : "Camera free");
-  });
   useShortcut("readmap", () => { if (finding || lens !== "map") return false; setReadmap(!getReadmap()); });
   useShortcut("lens", () => { if (finding || !thread) return false; setLens(lens === "places" ? "map" : "places"); });
 
   return <>
     {finding && <Picker onClose={() => setFinding(false)} />}
     {help && <Help onClose={() => setHelp(false)} />}
-    {toast && createPortal(<div className="key-toast" role="status">{toast}</div>, document.body)}
   </>;
 }
 

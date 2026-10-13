@@ -120,9 +120,6 @@
 .keys-body dd { margin: 0; font-size: 14px; color: var(--ink-2); line-height: 1.4; }
 @media (max-width: 640px) { .keys-body { grid-template-columns: 1fr; } }
 
-.key-toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 80; background: var(--ink); color: var(--bg);
-  padding: 8px 16px; border-radius: 999px; font-size: 13.5px; font-weight: 600; pointer-events: none; animation: settings-in .15s ease-out; }
-
 @media (max-width: 760px) {
   .threadbar { padding: 6px 10px; }
   .threadbar-keys { display: none; }

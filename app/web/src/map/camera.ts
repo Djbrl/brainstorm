@@ -96,6 +96,8 @@ export type Camera = {
   view: () => View | null;
   /** Glide to a view (centre and zoom together, so the subject travels in a straight line). */
   moveTo: (v: View, ms?: number) => void;
+  /** A long jump: the map dips out, the view changes at once, the map comes back (instant with reduced motion). */
+  cut: (v: View) => void;
   /** Put a graph point in the middle of the safe area, at zoom k (default: the current zoom). */
   lookAt: (x: number, y: number, k?: number, ms?: number) => void;
   /** Shift the view by (dx, dy) screen pixels at once, as a hand move (each frame of a held arrow key). */
@@ -116,13 +118,10 @@ export type Camera = {
   touch: () => void;
 };
 
-/** What the replay layer's camera follow (thread/ThreadLayer.ts) asks of the map's camera (useMapCamera.ts fills it in). */
+/** What the replay layer (thread/ThreadLayer.ts) and the map's camera (useMapCamera.ts, the director) share. */
 export type ReplayCamera = {
-  /** Unlocked camera: the tracer left the view. The map frames the recent window again, unless you moved the camera. */
-  onLost: (() => void) | null;
-  /** How far inside the view's edges the tracer counts as in view (px): more on a small map, where the camera follows
-   *  it before it reaches the edge. */
-  margin: () => number;
+  /** The marker moved, or the view did: the director looks again now rather than at its next beat. */
+  kick: (() => void) | null;
   /** A file's panel is open: the camera stays on that file instead of following the tracer. */
   pinned: boolean;
 };
@@ -136,6 +135,7 @@ export function useCamera(fg: RefObject<Graph | undefined | null>, hostRef: RefO
   const [version, setVersion] = useState(0);
   const userAt = useRef(0);
   const glide = useRef(0);
+  const cutT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -170,11 +170,11 @@ export function useCamera(fg: RefObject<Graph | undefined | null>, hostRef: RefO
     setVersion((v) => v + 1);
     // Hand moves: a wheel or a drag on the canvas.
     let down: { x: number; y: number } | null = null;
-    const onWheel = (e: WheelEvent) => { if ((e.target as HTMLElement).tagName === "CANVAS") { userAt.current = performance.now(); cancelAnimationFrame(glide.current); } };
+    const onWheel = (e: WheelEvent) => { if ((e.target as HTMLElement).tagName === "CANVAS") { userAt.current = performance.now(); cancelAnimationFrame(glide.current); clearTimeout(cutT.current); } };
     const onDown = (e: PointerEvent) => { down = (e.target as HTMLElement).tagName === "CANVAS" ? { x: e.clientX, y: e.clientY } : null; };
     const onMove = (e: PointerEvent) => {
       if (!down || !e.buttons || Math.hypot(e.clientX - down.x, e.clientY - down.y) < 4) return;
-      userAt.current = performance.now(); cancelAnimationFrame(glide.current);
+      userAt.current = performance.now(); cancelAnimationFrame(glide.current); clearTimeout(cutT.current);
     };
     const onUp = () => { down = null; };
     host.addEventListener("wheel", onWheel, { capture: true, passive: true });
@@ -194,7 +194,7 @@ export function useCamera(fg: RefObject<Graph | undefined | null>, hostRef: RefO
     const g = () => fg.current ?? undefined;
     const measure = () => { const host = hostRef.current; if (host) safe.current = measureSafe(host); return safe.current; };
     const view = (): View | null => { const c = g(); if (!c) return null; const p = c.centerAt(); return p ? { x: p.x, y: p.y, k: c.zoom() } : null; };
-    const stop = () => cancelAnimationFrame(glide.current);
+    const stop = () => { cancelAnimationFrame(glide.current); clearTimeout(cutT.current); };
     const moveTo = (to: View, ms = 700) => {
       const c = g(), from = view();
       stop();
@@ -208,6 +208,13 @@ export function useCamera(fg: RefObject<Graph | undefined | null>, hostRef: RefO
         if (p < 1) glide.current = requestAnimationFrame(tick);
       };
       glide.current = requestAnimationFrame(tick);
+    };
+    const cut = (to: View) => {
+      const canvas = hostRef.current?.querySelector("canvas");
+      stop();
+      if (!canvas || reducedMotion() || typeof canvas.animate !== "function") { moveTo(to, 0); return; }
+      canvas.animate([{ opacity: 1 }, { opacity: 0.25, offset: 0.4 }, { opacity: 0.25, offset: 0.5 }, { opacity: 1 }], { duration: 360, easing: "ease-in-out" });
+      cutT.current = setTimeout(() => moveTo(to, 0), 150);   // at the dip
     };
     const lookAt = (x: number, y: number, k?: number, ms = 700) => {
       const kk = k ?? g()?.zoom() ?? 1;
@@ -259,6 +266,6 @@ export function useCamera(fg: RefObject<Graph | undefined | null>, hostRef: RefO
       return sx > s.left + m && sx < s.w - s.right - m && sy > s.top + m && sy < s.h - s.bottom - m;
     };
     const touch = () => { stop(); userAt.current = performance.now(); };
-    return { safe, version, measure, userAt: () => userAt.current, view, moveTo, lookAt, nudge, zoomBy, frame, reveal, easeToward, sees, stop, touch };
+    return { safe, version, measure, userAt: () => userAt.current, view, moveTo, cut, lookAt, nudge, zoomBy, frame, reveal, easeToward, sees, stop, touch };
   }, [fg, hostRef, version]);
 }

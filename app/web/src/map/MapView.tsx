@@ -34,6 +34,7 @@ import { useRedrawTriggers } from "./useRedrawTriggers";
 import { useOpenFolders } from "./useOpenFolders";
 import { useNodeResolver } from "./useNodeResolver";
 import { useMapCamera } from "./useMapCamera";
+import { FollowAgain } from "./FollowAgain";
 import { useLiveAgents } from "./useLiveAgents";
 import { Readmap, trackable } from "./Readmap";
 import { useAutoTrack } from "./autoTrack";
@@ -119,7 +120,7 @@ export function MapView() {
   const liveShown = useRef(false);
   liveShown.current = !!replay && drawnAgents.some((a) => a.sessionId === replay.sessionId);
   // The replay's camera follow and the map's camera talk through this (useMapCamera fills it in, the layer reads it).
-  const replayCam = useRef<ReplayCamera>({ onLost: null, margin: () => 24, pinned: false });
+  const replayCam = useRef<ReplayCamera>({ kick: null, pinned: false });
   // What drawing keeps between frames (drawNode.ts): ripples, colour batches, a marker's landings.
   const caches = useRef(newCaches());
   const land = useCallback((id: string, t: number) => { caches.current.landings.set(id, t); }, []);
@@ -129,9 +130,9 @@ export function MapView() {
 
   // ---- the camera (useMapCamera.ts) ----
   const hasNodes = graph.nodes.length > 0;
-  const { followId, setFollowId, refollow, followRef, focusOnFile } = useMapCamera({
+  const { followId, setFollowId, refollow, followRef, focusOnFile, taken, followAgain } = useMapCamera({
     cam, camRef, replayCam, nodeIndex, nodeIndexRef, replayRef, replayActive: replayLayer.active, replay, step, selected, selectedRef, setSelected,
-    resolveId, anim, hasNodes, focusFile, setFocusFile, smallRef,
+    resolveId, anim, agentsRef, hasNodes, focusFile, setFocusFile, smallRef,
   });
   // Looking back through the thread (its replay's marker on the map), the camera follows the marker, not an agent where
   // it is now: following stops (back at the newest moment, autoTrack follows the agent again).
@@ -311,6 +312,7 @@ export function MapView() {
 
       <FileWindow />
       <Dock />
+      <FollowAgain show={taken} bottom={cam.safe.current.bottom} onClick={followAgain} />
 
       <StepPanel />
     </div>

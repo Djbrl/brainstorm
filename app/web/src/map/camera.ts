@@ -43,7 +43,9 @@ export function measureSafe(host: HTMLElement): Safe {
   // Top and bottom bands count only where they reach into the space between the side panels.
   const x0 = r.left + left, x1 = r.right - right;
   const across = (b: DOMRect) => shown(b) && b.right > x0 && b.left < x1;
-  for (const el of scope.querySelectorAll(TOP)) { const b = el.getBoundingClientRect(); if (across(b)) top = Math.max(top, b.bottom - r.top + GAP); }
+  // Only where they stand: on a phone the lens pill rides in the dock above the thread's sheet (the bottom), and counting
+  // it as a top band squeezed the safe area to a sliver in the middle of the map (framings tiny, far off, or nowhere).
+  for (const el of scope.querySelectorAll(TOP)) { if (el.closest(BOTTOM)) continue; const b = el.getBoundingClientRect(); if (across(b)) top = Math.max(top, b.bottom - r.top + GAP); }
   for (const el of scope.querySelectorAll(BOTTOM)) { const b = el.getBoundingClientRect(); if (across(b)) bottom = Math.max(bottom, r.bottom - b.top + GAP); }
   bottom = Math.max(bottom, sheet);
   // The canvas fades out in a band at the top and bottom (map.css, --fade-top / --fade-bottom): keep framings out of it too.

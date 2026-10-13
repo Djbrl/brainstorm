@@ -160,10 +160,7 @@ function Shell() {
             <button className="ws-chip" title="Play back a recorded setup run" onClick={openSetup}>Setup preview</button>
           )}
           {local && state.setup?.root && (
-            <button className="ws-chip ws-change" title={state.setup.root} onClick={openSetup}>
-              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.75 6.25V15a1.25 1.25 0 0 0 1.25 1.25h12A1.25 1.25 0 0 0 17.25 15V8A1.25 1.25 0 0 0 16 6.75h-6.2L8.3 4.5a1 1 0 0 0-.83-.45H4A1.25 1.25 0 0 0 2.75 5.3Z" /></svg>
-              Change project
-            </button>
+            <button className="ws-chip ws-change" title={state.setup.root} onClick={openSetup}>Change project</button>
           )}
           <SettingsButton />
           {/* No "Live" pill: being live is the normal state. Only what isn't is said: a replay, or the server out of reach. */}

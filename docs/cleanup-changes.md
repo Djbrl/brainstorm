@@ -498,3 +498,35 @@ Left open:
 
 - The live presence trail keeps an agent's last 12 moves. After a reload, an agent whose last edit has scrolled out of the trail behind many reads waits at the top of the project until its next edit. A server field for the last edited file would fix it.
 - On a small window, ← → and Home/End step through the thread only once the replay has started (Space). That is how it worked before.
+
+### Director camera (stage 2)
+
+Branch `ux/director`, from `main` at 0.9.1. The plan is "Rundown: calmer UI, smarter camera", the section "A smarter camera". Stage 1 (markers, rings, Play buttons, the Readmap on demand) is on `ux/calm` at the same time; this stage stays in the camera.
+
+What you notice:
+
+- The camera frames the work, not a point: the area of the working agents' last few edits, with a margin. One agent: its neighbourhood. Several: all of them, or the one that edited last when they're far apart (it stays with one for at least 8 s and switches only as one edits).
+- It holds still while the agents' markers stay in the middle 60% of the view. A framing fills the middle 42%, so the next edit next door lands inside without a move. A burst of edits settles for 450 ms before the camera goes.
+- The zoom follows how spread out the recent edits are (0.9 to 2.2) instead of a fixed 2.2. Long jumps cut (the map dips out for a third of a second, instant with reduced motion), short ones glide.
+- In a replay the director knows the next steps: it frames the marker and up to six next moves that share one framing, and moves once for the run.
+- Any drag, wheel, pinch or arrow key hands the camera to you. A small "Follow again" pill shows at the bottom of the map (at the top on a phone). The pill, F, Esc, opening a step or following an agent gives it back, and so does a minute without touching the map with nothing open. Checked by timing it (it comes back at 60 s), not yet by living with it: worth a human's minute.
+- Gone: the camera lock (L, the "Camera locked/free" toast, the lock's default, its button in the thread bar), C and its Center button, and the "On the map, show 15 / 50 / whole thread" setting (the map keeps the last 15 moments lit). A and Shift+A stay.
+- Tab and Shift+Tab move between the agents on the map, with a ring on the marker; Enter follows that agent; focus shows its name as a hover does.
+
+Measured by sampling the camera every 200 ms (bench repo of 1,000 files, the bench's live writer at about 2 steps a second, 1440 × 900):
+
+| Case | Before (0.9.1) | After |
+| --- | --- | --- |
+| Live thread, one agent, 120 s | 26 moves for 33 edits, moving 23.8 s | 21 moves for 40 edits, moving 7.8 s |
+| Replay of a 1,500-step thread at 1×, 40 s (71 moments) | 18 moves, moving 12.8 s | 8 moves, moving 2.2 s (12 and 4.8 s without look-ahead) |
+| Home map, three agents, 60 s | no moves (the home map never followed) | 12 moves for 53 edits (24 before the 8 s rule) |
+| Your pan or zoom, then 50 s of edits | pulled back to the agent (locked) | 0 moves; back at 60 s idle, or at once with F, Esc, the pill |
+
+No move came on a read (reads don't move markers since 0.9.1, and the director only looks at markers). Every move the director made without a "follow again" was with a marker outside the dead zone or the view far wider than the spread wants. Most remaining live moves are cuts: the bench's writer jumps to a random file a quarter of the time, further than any framing.
+
+Commits: `32ddd48` (director), `728437d` (look-ahead), `3c5a870` (settings removed), `b4e406c` (agents far apart), `98bbd76` (Tab between agents), `2957c53` (the pill on a phone).
+
+Left open:
+
+- Dev builds expose `window.__rundownCam`, `__rundownAnim` and `__directorLog` for these measurements. They are absent from production builds.
+- The tour never mentioned L, C or the lock; its "Shortcuts" step could mention F once stage 1 settles the bar's key hints.

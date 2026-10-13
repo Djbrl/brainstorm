@@ -174,7 +174,8 @@ export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIn
     const A = agentOpts.current;
     A.ctx = ctx; A.scale = scale; A.agents = live.agentsRef.current; A.anim = live.anim.current; A.accent = tokens.accent; A.font = tokens.body;
     A.hoverFile = I.hover; A.followId = followRef.current; A.resolveId = resolveId; A.showReads = mapPrefs.showReads && !tourHidesExtras();
-    A.quiet = !I.open; A.waiting = live.waitingRef.current; A.thinking = live.thinkingRef.current; A.keep = I.open; A.dimmed = live.dimmedRef.current; A.behind = live.behindRef.current;
+    A.waiting = live.waitingRef.current; A.thinking = live.thinkingRef.current; A.keep = I.open; A.dimmed = live.dimmedRef.current; A.behind = live.behindRef.current;
+    A.hot = (document.activeElement as HTMLElement | null)?.dataset?.edge ?? null;
     ringsOut.current.length = 0; A.rings = ringsOut.current;
     spotsOut.current.length = 0; A.spots = spotsOut.current;
     drawAgents(A);

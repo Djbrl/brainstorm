@@ -300,7 +300,7 @@ export function MapView() {
       <div className="agent-edges" ref={edgeLayer} onClick={(e) => {
         const id = (e.target as HTMLElement).closest<HTMLElement>("[data-edge]")?.dataset.edge;
         if (id) follow(id);
-      }} />
+      }} onFocus={() => redraw.kick()} onBlur={() => redraw.kick()} />
 
 
       <MapSidebar agents={agents} accent={tokens.accent} followId={followId}

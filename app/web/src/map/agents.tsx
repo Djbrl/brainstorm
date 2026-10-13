@@ -151,8 +151,8 @@ export function drawAgents(opts: {
   ctx: CanvasRenderingContext2D; scale: number; agents: AgentPresence[]; anim: Map<string, AgentAnim>;
   resolve: (file: string) => Pt | undefined; accent: string; font: string; hoverFile: string | null; followId: string | null;
   resolveId: (file: string) => string | undefined; showReads: boolean;
-  /** The project overview: markers only (no trails, no lines of sight), until a thread or an agent is picked. */
-  quiet?: boolean;
+  /** The agent with the keyboard focus (its arrow on the edge), or null: its trail and lines of sight show. */
+  hot?: string | null;
   /** Agents waiting on you (attention), by agent id → the label to show. They stay lit and breathe amber. */
   waiting?: ReadonlyMap<string, string>;
   /** Agents thinking (mid-turn, nothing logged yet): lit, a slow ring in their colour, "Thinking…". */
@@ -172,7 +172,7 @@ export function drawAgents(opts: {
   /** A marker landed on a file (Prism's hop: its cube spins up and flashes). */
   land?: (id: string, t: number) => void;
 }) {
-  const { ctx, scale, agents, anim, resolve, accent, hoverFile, followId, resolveId, showReads, quiet, waiting, thinking, keep, dimmed, behind, rings, spots, land } = opts;
+  const { ctx, scale, agents, anim, resolve, accent, hoverFile, followId, resolveId, showReads, waiting, thinking, keep, dimmed, behind, rings, spots, hot, land } = opts;
   // Graph point → CSS pixel on the canvas (its transform is in device pixels).
   const m = ctx.getTransform(), dpr = ctx.canvas.width / Math.max(1, ctx.canvas.clientWidth);
   const onScreen = (x: number, y: number) => ({ x: (m.a * x + m.c * y + m.e) / dpr, y: (m.b * x + m.d * y + m.f) / dpr });
@@ -271,6 +271,9 @@ export function drawAgents(opts: {
       if (st.markKey !== mk || !st.markCss) { st.markKey = mk; st.markCss = `rgb(${r0},${g0},${b0})`; }
       const markCss = st.markCss;
 
+      // Trails and lines of sight only for the agent you point at, give the keyboard focus to, or follow: the others
+      // stay plain markers, so many agents don't cover the map in lines.
+      const shows = followId === a.id || hoverFile === key || hot === a.id;
       // Trail through the last distinct files it wrote, newest strongest.
       // Metro: through the marker's stops by each file, so the track it rode is the one it leaves.
       const pts = (st.pts ??= []);
@@ -285,7 +288,7 @@ export function drawAgents(opts: {
       }
       pts.length = np;
       if (np) { const q = pts[np - 1]; q.x = st.x; q.y = st.y; q.r = 0; } // end at the marker
-      if (pts.length > 1 && (!quiet || followId === a.id)) {
+      if (pts.length > 1 && shows) {
         ctx.lineCap = "round";
         for (let k = 0; k < pts.length - 1; k++) {
           const a0 = pts[k], a1 = pts[k + 1];
@@ -306,7 +309,7 @@ export function drawAgents(opts: {
 
       // What it read lately: a dotted line from the marker to each of the last few files it read (not the one it stands
       // on), the newest strongest, until it reads others. Writes are the solid trail above.
-      if (showReads && (!quiet || followId === a.id)) {
+      if (showReads && shows) {
         const reads = rd.reads;
         if (reads.length) {
           dash[0] = 2.2 / scale; dash[1] = 3.6 / scale;
@@ -328,7 +331,7 @@ export function drawAgents(opts: {
 
       // A read as it happens: a thin line from the marker to the file read and a small ring on it, fading out.
       if (st.flashes.length) { let kept = 0; for (const fl of st.flashes) if (t - fl.t0 < READ_MS) st.flashes[kept++] = fl; st.flashes.length = kept; }
-      if (showReads && (!quiet || followId === a.id)) for (const f of st.flashes) {
+      if (showReads && shows) for (const f of st.flashes) {
         const id = resolveId(f.file);
         const n = id ? resolve(id) : undefined;
         if (!n) continue;

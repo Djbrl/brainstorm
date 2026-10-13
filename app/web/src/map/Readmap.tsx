@@ -25,7 +25,6 @@ import "./readmap.css";
 const SMALL = { w: 208, h: 132 }, BIG = { w: 358, h: 196 };
 const GLIDE = 0.28;          // seconds for the camera to (nearly) reach a new file
 const READ_FLASH_MS = 1500;  // a read as it happens (the map's line of sight lasts as long: agents.tsx)
-const PAST_ALPHA = 0.38;     // the replay's marker (the thread in its past), beside the agents where they are now
 const NAMES_MAX = 7;         // file names besides the ones read
 const TOGETHER_MS = 15_000;  // reads this close to the last one are one look around (several files read at once)
 const READABLE = 3.5;        // a file's radius in the picture (px) from which its name goes under it
@@ -37,7 +36,7 @@ export type ReadmapReads = {
   past: string[] | null;
 };
 
-export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, agents, followId, accent, big, onTrack, onLook, onHide, frame, kick }: {
+export function Readmap({ graphRef, anim, drawnRef, cam, subject, back, reads, agents, followId, accent, big, onTrack, onLook, onHide, frame, kick }: {
   graphRef: RefObject<Graph>;
   anim: RefObject<Map<string, AgentAnim>>;
   /** The agents the map draws this frame (where each one is comes from `anim`). */
@@ -45,8 +44,9 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
   cam: RefObject<Camera>;
   /** The replay's marker, while it shows (thread/ThreadLayer.ts), or null. */
   subject: () => { x: number; y: number } | null;
-  /** Where the thread is now when no live agent is on the map (thread/ThreadLayer.ts nowAt), or null: drawn solid. */
-  now: () => { x: number; y: number } | null;
+  /** Looking back through the open thread: the replay's marker is the agent's one marker; the agents where they work
+   *  now are a small ring, and nothing once they rest. */
+  back: () => boolean;
   /** The map's resolver and nodes, and whose reads count (the open thread's agents, or on the project overview only
    *  the one followed); null when reads are hidden (Settings). */
   reads: () => ReadmapReads | null;
@@ -74,7 +74,7 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
   const followRef = useRef(followId); followRef.current = followId;
   const accentRef = useRef(accent); accentRef.current = accent;
   const subjectRef = useRef(subject); subjectRef.current = subject;
-  const nowRef = useRef(now); nowRef.current = now;
+  const backRef = useRef(back); backRef.current = back;
   const readsRef = useRef(reads); readsRef.current = reads;
   // The Readmap's own camera (graph point (x, y) in the middle, k pixels per graph unit), and what it shows now: the
   // file read (its id) or the whole map (null). A click goes there.
@@ -97,7 +97,7 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
     // this picture with it. Its own glide and a read's swelling ring ask the map for more (the return value).
     const draw = (): boolean => {
       const t = performance.now();
-      const g = graphRef.current, st = mapStyle(), n0 = nowRef.current();
+      const g = graphRef.current, st = mapStyle(), lookingBack = backRef.current();
       // Coming out of rest, the glide takes one frame's step, as it would have on a frame loop that kept running.
       const dt = settled ? 1 / 60 : Math.min(0.1, (t - last) / 1000); last = t;
       // Read again every half second, and at once after a theme switch (the map may draw only one frame for it).
@@ -272,18 +272,13 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
         }
       }
 
-      // ---- a replay's marker, where the thread was at that moment: the same blue, faint, under the agents where they are
-      // now (at the newest moment the two meet, the agent on top) ----
-      const mk = subjectRef.current();
+      // ---- a replay's marker: looking back, the agent's one marker, solid, where the thread was at that moment (and
+      // following live, where the thread is when its agent is no longer on the map) ----
+      const mk = lookingBack || !drawn.length ? subjectRef.current() : null;
       if (mk) {
-        ctx.globalAlpha = PAST_ALPHA;
-        ctx.beginPath(); ctx.arc(X(mk.x), Y(mk.y), 4.6, 0, Math.PI * 2); ctx.fillStyle = accentRef.current; ctx.fill();
-      }
-      // The thread where it is now, when no live agent stands there: solid, like an agent's dot.
-      if (n0) {
         ctx.globalAlpha = 1;
-        ctx.beginPath(); ctx.arc(X(n0.x), Y(n0.y), 6.1, 0, Math.PI * 2); ctx.fillStyle = st.halo; ctx.fill();
-        ctx.beginPath(); ctx.arc(X(n0.x), Y(n0.y), 4.6, 0, Math.PI * 2); ctx.fillStyle = accentRef.current; ctx.fill();
+        ctx.beginPath(); ctx.arc(X(mk.x), Y(mk.y), 6.1, 0, Math.PI * 2); ctx.fillStyle = st.halo; ctx.fill();
+        ctx.beginPath(); ctx.arc(X(mk.x), Y(mk.y), 4.6, 0, Math.PI * 2); ctx.fillStyle = accentRef.current; ctx.fill();
       }
       // ---- agents: those in the picture where they are; up close, the one watched, off the picture, is an arrow on the
       // edge pointing where it is ----
@@ -291,6 +286,12 @@ export function Readmap({ graphRef, anim, drawnRef, cam, subject, now, reads, ag
         const p = A?.get(a.id);
         if (!p || p.alpha < 0.05) continue;
         const ax = X(p.x), ay = Y(p.y), c = agentColor(a, accentRef.current), on = a.id === (who?.id ?? followRef.current);
+        if (lookingBack) {   // where it works now: a small ring (nothing once it rests), never a second marker
+          if (a.active && ax > -4 && ax < W + 4 && ay > -4 && ay < H + 4) {
+            ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(ax, ay, 3, 0, Math.PI * 2); ctx.strokeStyle = c; ctx.lineWidth = 1.5; ctx.stroke();
+          }
+          continue;
+        }
         if (ax > -4 && ax < W + 4 && ay > -4 && ay < H + 4) {
           ctx.globalAlpha = p.alpha > 0.5 ? 1 : Math.max(0.3, p.alpha);   // solid where it is now (faint: another agent, while one is followed)
           ctx.beginPath(); ctx.arc(ax, ay, (on ? 4.6 : 3.4) + 1.5, 0, Math.PI * 2); ctx.fillStyle = st.halo; ctx.fill();

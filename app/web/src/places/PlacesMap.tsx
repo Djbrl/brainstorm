@@ -2,8 +2,8 @@
 // circle like a top folder, its sites circles inside it, their pages dots, packed the same way (d3-hierarchy: the same
 // places always give the same map, nothing floats). A page is coloured by when it was last worked on, ringed orange if
 // something changed there, a red dot if a step failed there. The open thread's marker stands on the place it's at (its
-// newest while it follows live, the moment you're on when you look back: then a faint second marker, the agent where it
-// is now stays solid), its trail through the places it went before. Looking back, only its recent places (the map's
+// newest while it follows live, the moment you're on when you look back: one marker, solid; where the agent works now is
+// only a small ring while it still works), its trail through the places it went before. Looking back, only its recent places (the map's
 // "last 15 steps" setting, counted in places) are lit and named, the rest fades: what it did up to there, not everything.
 // The camera follows it from site to site: on a small map it frames the site it's in. A click on a place opens its step (CoworkView).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -92,7 +92,7 @@ export function placeUnder(g: PlacesGraph, x: number, y: number, k: number): PNo
 /** Which place a cowork event stands on: its page when the page has its own dot, else its site. */
 const placeOf = (e: CoworkEvent, ids: ReadonlySet<string>) => (ids.has(`${e.area}|${e.page}`) ? `${e.area}|${e.page}` : `${e.area}|${e.site}`);
 
-export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0, small, beatOf, beats, cursor, until, live, letter }: {
+export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0, small, beatOf, beats, cursor, until, live, working, letter }: {
   data: CoworkSummary; selected: string | null; highlight: string | null; onSelect: (id: string | null) => void;
   /** Set while the step panel is open on the right. */
   rightInset?: number;
@@ -105,6 +105,8 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
   /** Where the thread is, in the same steps as beatOf, and the event to stop at there (the list's row: a step can hold
    *  several); whether it follows live (the marker on its newest place). */
   cursor: number; until?: string | null; live: boolean;
+  /** The thread's agent is still at work: looking back, a small ring shows where it is now. */
+  working?: boolean;
   /** The letter on the marker (the thread's). */
   letter: string;
 }) {
@@ -149,7 +151,7 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
   const past = useMemo(() => (live ? null : placeAt(cursor, until)), [placeAt, cursor, live, until]);
   const path = past ?? now;                            // the trail the camera and the marker follow
   const here = path[path.length - 1]?.place ?? null;
-  const nowAt = now[now.length - 1]?.place ?? null;    // the agent where it is now (solid while you look back)
+  const nowAt = now[now.length - 1]?.place ?? null;    // the agent where it is now (a small ring while you look back)
   // Looking back: the places of its recent window, and the sites and areas that hold them.
   const win = useStepWindow();
   const focus = useMemo(() => {
@@ -291,10 +293,16 @@ export function PlacesMap({ data, selected, highlight, onSelect, rightInset = 0,
       }
       ctx.restore();
     }
-    // The marker: where the thread is (faint when you look back), and the agent where it is now, solid, on top.
+    // One marker: where the thread is (the moment you're on when you look back, solid). Looking back while the agent
+    // still works, a small ring where it is now: never a second marker.
     const nn = nowAt ? byId.get(nowAt) : undefined;
-    if (past && tn) { ctx.save(); ctx.globalAlpha = 0.42; drawMarker(ctx, m.x, m.y, 9 / scale, tokens.accent, letter, 10, font, scale, { ...st, glow: false }); ctx.restore(); }
-    if (nn) { const q = past ? platform(nn.x, nn.y, nn.r, scale) : { x: m.x, y: m.y }; drawMarker(ctx, q.x, q.y, 9 / scale, tokens.accent, letter, 10, font, scale, { ...st, glow: false }); }
+    if (past) {
+      if (tn) drawMarker(ctx, m.x, m.y, 9 / scale, tokens.accent, letter, 10, font, scale, { ...st, glow: false });
+      if (nn && working) {
+        const q = platform(nn.x, nn.y, nn.r, scale);
+        ctx.save(); ctx.beginPath(); ctx.arc(q.x, q.y, 4.5 / scale, 0, Math.PI * 2); ctx.strokeStyle = tokens.accent; ctx.lineWidth = 2 / scale; ctx.stroke(); ctx.restore();
+      }
+    } else if (nn) drawMarker(ctx, m.x, m.y, 9 / scale, tokens.accent, letter, 10, font, scale, { ...st, glow: false });
     redraw.drew(p < 1 ? Motion.Smooth : Motion.None);
   };
 

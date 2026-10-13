@@ -105,6 +105,12 @@
 .track-agents button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 
+/* Back to now: looking back through a thread, a small pill at the bottom of the map (Dock's BackToNow). */
+.rp-now { border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 600;
+  padding: 6px 14px; box-shadow: 0 6px 18px rgba(0,0,0,.08); animation: rp-rise .22s cubic-bezier(.2,.85,.25,1); }
+.rp-now:hover { border-color: var(--ink-3); }
+.rp-now:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 /* The slim timeline (full screen only, while replaying: map/dock.css hides it below). */
 .rp-player { display: flex; align-items: center; gap: 4px; width: min(560px, calc(100vw - 480px)); min-width: 360px; padding: 3px 6px; border: 1px solid var(--line);
   border-radius: 999px; background: var(--surface); box-shadow: 0 10px 30px rgba(0,0,0,.08); animation: rp-rise .3s cubic-bezier(.2,.85,.25,1); }

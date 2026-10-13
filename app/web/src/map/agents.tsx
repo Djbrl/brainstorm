@@ -153,15 +153,18 @@ export function drawAgents(opts: {
   thinking?: ReadonlySet<string>;
   /** A thread is open: its agents stay where they last were once they stop. */
   keep?: boolean;
-  /** Agents in the background (you look back through the thread, or at another agent of it): drawn faint. */
+  /** Agents in the background (another agent of the thread, while you watch one): drawn faint. */
   dimmed?: ReadonlySet<string>;
+  /** Agents whose replay marker stands in for them (you look back through their thread): the replay's marker is their
+   *  one marker, where they were then; here only a small ring where they work now, and nothing once they rest. */
+  behind?: ReadonlySet<string>;
   /** Filled with the rings that breathe (thinking, waiting on you), in CSS pixels on the canvas: the page draws them
    *  over the map (MapView's AgentRings, CSS animations), so a breath doesn't repaint the whole map. */
   rings?: AgentRing[];
   /** A marker landed on a file (Prism's hop: its cube spins up and flashes). */
   land?: (id: string, t: number) => void;
 }) {
-  const { ctx, scale, agents, anim, resolve, accent, hoverFile, followId, resolveId, showReads, quiet, waiting, thinking, keep, dimmed, rings, land } = opts;
+  const { ctx, scale, agents, anim, resolve, accent, hoverFile, followId, resolveId, showReads, quiet, waiting, thinking, keep, dimmed, behind, rings, land } = opts;
   // Graph point → CSS pixel on the canvas (its transform is in device pixels).
   const m = ctx.getTransform(), dpr = ctx.canvas.width / Math.max(1, ctx.canvas.clientWidth);
   const onScreen = (x: number, y: number) => ({ x: (m.a * x + m.c * y + m.e) / dpr, y: (m.b * x + m.d * y + m.f) / dpr });
@@ -224,6 +227,17 @@ export function drawAgents(opts: {
         trail: a.trail, resolveId, was: st.read?.was, anchor: key, key, files: writtenFiles(a, resolveId), reads: recentReads(a, resolveId, key),
       });
       if (st.alpha < 0.01) { st.easing = false; continue; }
+      if (behind?.has(a.id)) {   // looking back: where it works now, a small ring in its colour (amber: it waits on you)
+        st.easing = false; st.flashes.length = 0;
+        const waits = !!waiting?.has(a.id);
+        if (a.active || thinks || waits) {
+          ctx.globalAlpha = st.alpha;
+          ctx.beginPath(); ctx.arc(st.x, st.y, 4.5 / scale, 0, Math.PI * 2);
+          ctx.strokeStyle = waits ? WAIT_AMBER : agentColor(a, accent); ctx.lineWidth = 2 / scale; ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+        continue;
+      }
 
       const erring = t - st.errT0 < ERR_MS;
       const color = erring ? ERROR_RED : agentColor(a, accent);

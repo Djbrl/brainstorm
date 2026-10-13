@@ -97,7 +97,7 @@ export function PlacesView() {
         <PlacesMap key={thread?.sessionId} data={data} selected={selected} highlight={highlight} rightInset={step ? 440 : 0}
           onSelect={(id) => (id === HOME ? setLens("map") : selectPlace(id))} small={small} beatOf={beatOf} beats={timeline.steps}
           cursor={pickedRow && pickedRow.beat === timeline.index ? pickedRow.step : timeline.pos}
-          until={pickedRow && pickedRow.beat === timeline.index ? pickedRow.event : undefined} live={!!thread?.live}
+          until={pickedRow && pickedRow.beat === timeline.index ? pickedRow.event : undefined} live={!!thread?.live} working={session?.status === "running"}
           letter={initial({ name: session?.title ?? "", isSubagent: false })} />
       )}
       <MapSidebar agents={Object.values(agents)} accent="#2563eb" followId={null} onFollow={() => setLens("map")} onFocusFile={() => setLens("map")} map={map} />

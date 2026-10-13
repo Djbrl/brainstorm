@@ -5,6 +5,8 @@
 import { memo, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { useNavActions, useNavState, useReplay } from "../../lib/nav";
 import { useThread, type Thread } from "../../lib/thread";
+import { useLiveSelector } from "../../lib/live";
+import { useShortcut } from "../../switch/shortcuts";
 import { chaptersOf } from "../../lib/chapters";
 import { CompactBar } from "../../switch/CompactBar";
 import "./replay.css";
@@ -101,11 +103,28 @@ function Player({ steps }: { steps?: Steps }) {
 const keepFocus = (e: ReactMouseEvent) => e.preventDefault();
 
 /**
+ * Looking back through the open thread (the map shows where its agent was then): a small pill to the present, its
+ * newest step, followed live again while it runs. End does the same. The sidebar's footer says the same words.
+ */
+function BackToNow() {
+  const replay = useReplay();
+  const { setReplayIndex, setReplayLive, setReplayPlaying } = useNavActions();
+  const thread = useThread(replay?.sessionId ?? null, replay?.detail ?? "light");
+  const running = useLiveSelector((s) => !!replay && s.sessions.find((x) => x.id === replay.sessionId)?.status === "running");
+  const len = thread?.sessionId === replay?.sessionId ? thread?.beats.length ?? 0 : 0;
+  const back = !!replay && !replay.live && !replay.atStep && len > 0 && (replay.index < len - 1 || running);
+  const go = () => { setReplayPlaying(false); setReplayIndex(len - 1); if (running) setReplayLive(true); };
+  useShortcut("now", (e) => { if (!back || e?.key !== "End") return false; go(); });
+  if (!back) return null;
+  return <button className="rp-now" onMouseDown={keepFocus} onClick={go} title="Back to the newest step (End)">Back to now</button>;
+}
+
+/**
  * The footer. On a full screen, only the player, while replaying. Share sits by the thread's title in the sidebar's
  * Track; the map's switches are in Settings and on keys (L, M). On Places its ‹ › go place by place (CoworkView).
  * On a small window (1100 px and below) no player: the compact bar instead (switch/CompactBar.tsx, map/dock.css).
  */
 export function Dock({ steps, player = true }: { steps?: Steps; player?: boolean } = {}) {
-  const { thread } = useNavState();
-  return <div className="dock">{player && thread?.mode === "play" && <Player steps={steps} />}<CompactBar /></div>;
+  const { thread, lens } = useNavState();
+  return <div className="dock">{lens === "map" && <BackToNow />}{player && thread?.mode === "play" && <Player steps={steps} />}<CompactBar /></div>;
 }

@@ -24,12 +24,14 @@ export function useLiveAgents({ agents: live, attention, hiddenAgents, threadId 
     return all.filter((a) => shown.has(a) || waitingIds.has(a.id) || thinking.has(a.id) || (!!threadId && a.sessionId === threadId));
   }, [live, waitingIds, thinking, threadId]); // the open thread's agents stay, where they last were
   // Hidden agents (sidebar toggles) are not drawn. With a thread open: only its own agents (main and subagents, each in
-  // its colour), live or not: while you move through its past they stay where they are now, faint (MapView's dimmed),
-  // behind the replay's marker.
+  // its colour), live or not: while you move through its past the replay's marker is their one marker, and they show
+  // only as a small ring where they work now (MapView's behind).
   const drawnAgents = useMemo(() => agents.filter((a) => !hiddenAgents.has(a.id) && (!threadId || a.sessionId === threadId)),
     [agents, hiddenAgents, threadId]);
   /** Agents drawn faint, filled by the view (it knows who is followed and whose steps show). */
   const dimmedRef = useRef<ReadonlySet<string>>(new Set());
+  /** Agents the replay's marker stands in for (looking back through their thread), filled by the view: a small ring. */
+  const behindRef = useRef<ReadonlySet<string>>(new Set());
   // Agents waiting on you (attention): agent id → label. A subagent waits under its own id, a main thread under the session's.
   const waiting = useMemo(() => new Map(Object.values(attention).filter(needsYou).map((a) => [a.agentId ?? a.sessionId, attentionText(a).badge === "Stuck" ? "Stuck" : `Needs you · ${attentionText(a).title.toLowerCase()}`])), [attention]);
   const waitingRef = useRef(waiting); waitingRef.current = waiting;
@@ -54,5 +56,5 @@ export function useLiveAgents({ agents: live, attention, hiddenAgents, threadId 
     return Motion.None;
   }, []);
 
-  return { agents, drawnAgents, waiting, waitingRef, thinkingRef, agentsRef, anim, moving, dimmedRef };
+  return { agents, drawnAgents, waiting, waitingRef, thinkingRef, agentsRef, anim, moving, dimmedRef, behindRef };
 }

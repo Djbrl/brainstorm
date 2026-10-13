@@ -110,7 +110,7 @@ export function MapView() {
   const live = useLiveAgents({
     agents: liveAgents, attention, hiddenAgents, threadId: replay?.sessionId ?? null,
   });
-  const { agents, drawnAgents, waiting, agentsRef, anim, dimmedRef } = live;
+  const { agents, drawnAgents, waiting, agentsRef, anim, dimmedRef, behindRef } = live;
   const selectedRef = useRef(selected); selectedRef.current = selected;
   const ringLayer = useRef<HTMLDivElement>(null);   // agents' breathing rings (useMapFrame's syncRings)
   // Every file and folder by id, and how an agent's file finds its node (useNodeResolver.ts).
@@ -145,14 +145,17 @@ export function MapView() {
   useAutoTrack({ on: small && !!replay?.live && replayLayer.active, sessionId: replay?.sessionId ?? null, agents: drawnAgents, followId, setFollowId });
 
   // Faint: with a thread open, its agents you aren't watching (one followed, or one on its own: agentFocus, the others).
-  // Looking back through it they stay as they are: solid where they are now, the replay's own marker faint where the
-  // thread was (thread/ThreadLayer.ts).
+  // Looking back through it, one marker per agent: the replay's, solid where the thread was (thread/ThreadLayer.ts); the
+  // agents where they work now are a small ring (behind).
   const focus = useAgentFocus(replay?.sessionId ?? null);
   dimmedRef.current = useMemo(() => {
     if (!replay) return new Set<string>();
     const lead = followId ?? focus;
     return new Set(lead ? drawnAgents.filter((a) => a.id !== lead).map((a) => a.id) : []);
   }, [replay?.sessionId, replay?.live, drawnAgents, followId, focus]);
+  const lookingBack = !!replay && !replay.live && replayLayer.active;
+  behindRef.current = useMemo(() => new Set(lookingBack ? drawnAgents.map((a) => a.id) : []), [lookingBack, drawnAgents]);
+  const backRef = useRef(lookingBack); backRef.current = lookingBack;
   // Another thread: everyone's steps again.
   useEffect(() => () => { if (replay?.sessionId) setAgentFocus(replay.sessionId, null); }, [replay?.sessionId]);
   // Following one of the thread's agents shows it: the thread follows live again, and its steps show on their own.
@@ -303,7 +306,7 @@ export function MapView() {
       )}
       {map && <CapNote map={map} />}
       {hasNodes && readmap && (
-        <Readmap graphRef={graphRef} anim={anim} drawnRef={agentsRef} cam={camRef} subject={() => replayRef.current.subject()} now={() => replayRef.current.nowAt()} reads={readmapReads} agents={tracks} followId={followId} accent={tokens.accent}
+        <Readmap graphRef={graphRef} anim={anim} drawnRef={agentsRef} cam={camRef} subject={() => replayRef.current.subject()} back={() => backRef.current} reads={readmapReads} agents={tracks} followId={followId} accent={tokens.accent}
           big={!small} onTrack={follow} onLook={lookAt} onHide={() => setReadmap(false)} frame={readmapFrame} kick={redraw.kick} />
       )}
 

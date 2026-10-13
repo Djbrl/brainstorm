@@ -47,7 +47,7 @@ function BackToLive({ onBack }: { onBack: () => void }) {
   return (
     <div className="track-back-live" role="status">
       <span><i aria-hidden="true" />This thread is live</span>
-      <button onClick={onBack}>Back to live <span aria-hidden="true">↓</span></button>
+      <button onClick={onBack}>Back to now <span aria-hidden="true">↓</span></button>
     </div>
   );
 }

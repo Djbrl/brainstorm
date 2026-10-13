@@ -58,12 +58,13 @@ const ENTRIES: Entry[] = [
   { id: "play", group: "Replay", keys: ["Space"], what: "Play or pause, from the step you're on", match: key(" ") },
   { id: "player.step", group: "Replay", keys: ["←", "→"], what: "In the player: one step back or forward (with Shift, ten)", match: key("ArrowLeft", "ArrowRight") },
   { id: "player.ends", group: "Replay", keys: ["Home", "End"], what: "In the player: the first or the last step", match: key("Home", "End") },
+  { id: "now", group: "Replay", keys: ["End"], what: "Looking back through a thread: back to now", match: key("End") },
 
   { id: "help", group: "Help", keys: ["?"], what: "These shortcuts", match: key("?") },
 ];
 
 export type ShortcutId = "find" | "thread.number" | "thread.next" | "sidebar" | "follow.stop" | "back" | "map.move" | "map.zoom" | "center"
-  | "follow.next" | "readmap" | "lock" | "lens" | "play" | "player.step" | "player.ends" | "help";
+  | "follow.next" | "readmap" | "lock" | "lens" | "play" | "player.step" | "player.ends" | "now" | "help";
 
 /** The ? window's list: the shortcuts by group, in order. */
 export const SHORTCUTS: { title: string; keys: { keys: string[]; what: string }[] }[] = [];

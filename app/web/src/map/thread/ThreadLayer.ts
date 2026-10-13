@@ -11,6 +11,21 @@ import { mapStyle } from "../themes";
 import { drawMarker } from "../marks";
 import { drawTrip, platform } from "../routes";
 import { PARK } from "../agents";
+
+/** Where the marker stands at a beat: the file of its latest move (an edit). Before the first edit, on the first file the
+ *  thread touches at all, so it stands on a real file and still doesn't move on reads; only a thread that touches no
+ *  file waits at the top of the project. */
+const firstFiles = new WeakMap<Thread, string>();
+function standsOn(thread: Thread, index: number): string {
+  const mi = thread.beats[index]?.moveIndex ?? -1;
+  if (mi >= 0) return thread.moves[mi].file;
+  let first = firstFiles.get(thread);
+  if (first === undefined) {
+    first = thread.beats.find((b) => b.file)?.file ?? PARK;
+    firstFiles.set(thread, first);
+  }
+  return first;
+}
 import { drawPulse, drawThinkRing, ERR_PULSE_MS, ERROR_RED as RED, glide, PULSE_MS, setOff, trailPath } from "../tracer";
 import { useFocus, WINDOW, type Look } from "./focus";
 import { useReplayFollow } from "./follow";
@@ -44,8 +59,6 @@ export type ThreadLayerApi = {
    *  at the last read before it (up to a few moments back), newest first, or none; null when not looking back. The
    *  readmap shows them (none: the whole project, not what the agents read now). */
   readsNow: () => string[] | null;
-  /** Looking back with no live agent on the map: where the thread is now (its newest move), the solid marker. */
-  nowAt: () => { x: number; y: number } | null;
   /** The tracer's camera target (the marker), or null: what a locked camera centres. */
   subject: () => { x: number; y: number } | null;
   /** Draw the tracer, the current marker and read flashes. Called every frame after the agent layer. */
@@ -58,7 +71,6 @@ type Box = { x0: number; y0: number; x1: number; y1: number };
 
 const FLASH_MS = 600;       // read flash
 const READS_BACK = 8;       // how many moments back the Readmap still shows the last read (readsNow)
-const PAST_ALPHA = 0.42;    // the marker, looking back, beside the agent where it is now (as on the Readmap)
 const TAPER = 3;            // a tracer segment fades out over its last few moments in the window, so the trail doesn't end in a cut
 
 /** The first move at or after a beat (binary search over the moves' beat indexes, up to `hi`). */
@@ -86,8 +98,8 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
   /** The marker landed on a file (Prism's hop: its cube spins up and flashes). */
   land: (id: string, t: number) => void;
   /** Whether the live layer draws the thread's agent where it is now. Following live, the replay's marker stands in for
-   *  it only if it's gone (the server forgets an agent after half an hour); looking back, the marker is drawn faint
-   *  beside it (the past, under the agent now), at full strength only without it. */
+   *  it only if it's gone (the server forgets an agent after half an hour). Looking back, this marker is the agent's one
+   *  marker, solid, where it was then; the live layer shows where it works now only as a small ring (agents.tsx `behind`). */
   liveShown?: RefObject<boolean>;
 }): ThreadLayerApi {
   const replay = useReplay();
@@ -117,7 +129,6 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
   // stands there instead, and before its first move there is no marker at all.
   const ringDrawn = useRef(false);
   const ringing = useCallback(() => ringDrawn.current, []);
-  const nowRef = useRef<{ x: number; y: number } | null>(null);
   const anim = useRef<Anim>({ x: 0, y: 0, fromX: 0, fromY: 0, t0: -1e9, file: null, lastIndex: -1, beatAt: -1e9, cam: null });
 
   // Bounds: clamp the cursor whenever the thread (or its length) changes.
@@ -164,9 +175,8 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
 
     // Marker target: just off the file's top-right, like the live agents.
     const markerAt = (id: string) => { const n = pos(id); return n ? platform(n.x, n.y, n.r, scale) : undefined; };
-    // Before its first move (it hasn't touched a file yet: commands, searches, thinking), the marker waits at the top of
-    // the project (PARK), never nowhere.
-    const curFile = mi >= 0 ? moves[mi].file : PARK;
+    // A step with no file keeps the marker where it last was; before the first edit, on the thread's first file (standsOn).
+    const curFile = standsOn(s.thread, s.index);
     const target = curFile ? markerAt(curFile) : undefined;
     let trip: ReturnType<typeof glide>["trip"] = null, tp = 1, te = 1;
     if (target) {
@@ -230,31 +240,25 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
     // Current marker with a soft halo. Red, with one red ring, when this beat has a failed tool call.
     const failed = beat.failed > 0;
     const mark = failed ? RED : line;
+    // One marker per agent: following live, the live layer's; looking back, this one, solid, where the agent was then.
     const ownMarker = !s.live || !liveShown?.current;
-    // Where the thread is now (its newest move) when no live agent stands there (the server forgot it, half an hour after
-    // it stopped): the marker that says "now", solid, as the agent's would be.
-    const lastMove = moves.length - 1;
-    const nowFile = !liveShown?.current && lastMove >= 0 ? moves[lastMove].file : null;
-    const nowAt = nowFile && nowFile !== curFile ? markerAt(nowFile) : undefined;
-    // Looking back: the marker is the past, the same colour, faint, under the one for now (the agent, or nowAt).
-    const past = !s.live && (!!liveShown?.current || (!!nowFile && mi < lastMove)) ? PAST_ALPHA : 1;
     if (target && curFile && ownMarker) {
-      if (trip) drawTrip(ctx, style.route, trip, tp, te, mark, 10 / scale, past, scale);
+      if (trip) drawTrip(ctx, style.route, trip, tp, te, mark, 10 / scale, 1, scale);
       const halo = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, 26 / scale);
       halo.addColorStop(0, hexA(mark, 0.28));
       halo.addColorStop(1, hexA(mark, 0));
-      ctx.globalAlpha = past;
+      ctx.globalAlpha = 1;
       ctx.fillStyle = halo;
       ctx.beginPath(); ctx.arc(a.x, a.y, 26 / scale, 0, Math.PI * 2); ctx.fill();
 
       if (s.thinking) { // a slow ring in its colour, swelling and fading, like a live agent's (agents.tsx)
         ringDrawn.current = true;
-        drawThinkRing(ctx, a.x, a.y, t, line, past, scale);
+        drawThinkRing(ctx, a.x, a.y, t, line, 1, scale);
       }
-      if (failed) drawPulse(ctx, a.x, a.y, (t - a.beatAt) / ERR_PULSE_MS, 10, 28, RED, 2.4, 0.8 * past, scale);
-      else if (beat.action === "edit") drawPulse(ctx, a.x, a.y, (t - a.beatAt) / PULSE_MS, 10, 16, line, 2, 0.6 * past, scale); // pulse on every edit, even when the tracer stays on the same file
+      if (failed) drawPulse(ctx, a.x, a.y, (t - a.beatAt) / ERR_PULSE_MS, 10, 28, RED, 2.4, 0.8, scale);
+      else if (beat.action === "edit") drawPulse(ctx, a.x, a.y, (t - a.beatAt) / PULSE_MS, 10, 16, line, 2, 0.6, scale); // pulse on every edit, even when the tracer stays on the same file
 
-      ctx.globalAlpha = past;
+      ctx.globalAlpha = 1;
       const num = String(mi + 1);
       const ms = mapStyle();   // Metro: its line badge; elsewhere a disc ringed white with a white number, in every theme
       if (ms.marker === "badge") drawMarker(ctx, a.x, a.y, 10 / scale, mark, num, num.length > 2 ? 8 : 9.5, ms.labelFont ?? font, scale, ms);
@@ -273,14 +277,6 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
         ctx.strokeText(note, lx, ny); ctx.fillStyle = hexA(INK, 0.55); ctx.fillText(note, lx, ny);
       }
     }
-    if (nowAt && !s.live) {
-      const ms = mapStyle(), num = String(lastMove + 1);
-      ctx.globalAlpha = 1;
-      if (ms.marker === "badge") drawMarker(ctx, nowAt.x, nowAt.y, 10 / scale, line, num, num.length > 2 ? 8 : 9.5, ms.labelFont ?? font, scale, ms);
-      else drawMarker(ctx, nowAt.x, nowAt.y, 10 / scale, line, num, num.length > 2 ? 8 : 9.5, font, scale, { ...ms, glow: false, markerStroke: "#fff", markerText: "#fff" });
-    }
-    // For the Readmap: where now is, also when the marker stands on it (it draws its own marker faint, now solid on top).
-    nowRef.current = nowFile && !s.live ? nowAt ?? markerAt(nowFile) ?? null : null;
     ctx.restore();
   }, [accent, font, nodeIndexRef, kickCamera]);
 
@@ -288,7 +284,7 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
     const s = st.current, boxes: Box[] = [];
     const beat = s.active && s.thread ? s.thread.beats[s.index] : undefined;
     if (!beat || !s.thread) return { boxes, named: null };
-    const { moves } = s.thread, mi = beat.moveIndex, curFile = mi >= 0 ? moves[mi].file : PARK, nodes = nodeIndexRef.current;
+    const curFile = standsOn(s.thread, s.index), nodes = nodeIndexRef.current;
     const pad = 2 / scale, a = anim.current;
     if (curFile && a.file === curFile && (!s.live || !liveShown?.current)) {   // the marker (where it is this frame) and its name to the right
       ctx.save(); ctx.font = `600 ${NAME_FONT / scale}px ${font}`;
@@ -328,7 +324,6 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
     return [];
   }, []);
 
-  const nowAt = useCallback(() => nowRef.current, []);
-  return { active, thinking, ringing, tracing: active, playable, footprint, touches, readsNow, nowAt, subject, nodeAlpha, look, draw, marks };
+  return { active, thinking, ringing, tracing: active, playable, footprint, touches, readsNow, subject, nodeAlpha, look, draw, marks };
 }
 

@@ -45,7 +45,7 @@ export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIn
   resolveId: (file: string) => string | undefined;
   replayRef: RefObject<ThreadLayerApi>;
   /** The live agents (useLiveAgents.ts). */
-  live: Pick<ReturnType<typeof useLiveAgents>, "agentsRef" | "anim" | "waitingRef" | "thinkingRef" | "dimmedRef" | "moving">;
+  live: Pick<ReturnType<typeof useLiveAgents>, "agentsRef" | "anim" | "waitingRef" | "thinkingRef" | "dimmedRef" | "behindRef" | "moving">;
   followRef: RefObject<string | null>;
   /** The agents' breathing rings, over the canvas (syncRings). */
   ringLayer: RefObject<HTMLDivElement | null>;
@@ -169,7 +169,7 @@ export function useMapFrame({ fg, inputs, epoch, caches, tween, graphRef, nodeIn
     const A = agentOpts.current;
     A.ctx = ctx; A.scale = scale; A.agents = live.agentsRef.current; A.anim = live.anim.current; A.accent = tokens.accent; A.font = tokens.body;
     A.hoverFile = I.hover; A.followId = followRef.current; A.resolveId = resolveId; A.showReads = mapPrefs.showReads && !tourHidesExtras();
-    A.quiet = !I.open; A.waiting = live.waitingRef.current; A.thinking = live.thinkingRef.current; A.keep = I.open; A.dimmed = live.dimmedRef.current;
+    A.quiet = !I.open; A.waiting = live.waitingRef.current; A.thinking = live.thinkingRef.current; A.keep = I.open; A.dimmed = live.dimmedRef.current; A.behind = live.behindRef.current;
     ringsOut.current.length = 0; A.rings = ringsOut.current;
     drawAgents(A);
     syncRings(ringLayer.current, ringsOut.current);

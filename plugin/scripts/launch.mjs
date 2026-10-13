@@ -38,8 +38,18 @@ const FLAGS = parseFlags(process.argv.slice(2));
 const BACKGROUND = FLAGS.background;
 const say = (msg) => { if (!BACKGROUND) console.log(msg); };
 
+// The plugin's data folder. Claude Code passes it as CLAUDE_PLUGIN_DATA, but not to every command (a session-start hook
+// once ran without it while /rundown:open had it: two servers on two folders, neither seeing the other). Without it,
+// the same folder is worked out from where the plugin is installed (…/plugins/cache/<marketplace>/<plugin>/<version>
+// → …/plugins/data/<plugin>-<marketplace>); ~/.rundown only for a copy run from elsewhere (a clone, a test).
+export function pluginDataDir(env, pluginRoot, home) {
+  if (env.CLAUDE_PLUGIN_DATA) return env.CLAUDE_PLUGIN_DATA;
+  const m = /^(.*[\\/]plugins)[\\/]cache[\\/]([^\\/]+)[\\/]([^\\/]+)[\\/][^\\/]+[\\/]?$/.exec(pluginRoot);
+  return m ? join(m[1], "data", `${m[3]}-${m[2]}`) : join(home, ".rundown");
+}
+
 const PLUGIN = process.env.CLAUDE_PLUGIN_ROOT || resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const DATA = process.env.CLAUDE_PLUGIN_DATA || join(homedir(), ".rundown");
+const DATA = pluginDataDir(process.env, PLUGIN, homedir());
 // The marketplace it came from, as Claude Code named it here (…/plugins/cache/<marketplace>/<plugin>/<version>): "rundown",
 // or "brainstorm" for someone who installed before the rename. The update command needs that name.
 const MARKET = /[\\/]plugins[\\/]cache[\\/]([^\\/]+)[\\/]/.exec(PLUGIN)?.[1] ?? "rundown";

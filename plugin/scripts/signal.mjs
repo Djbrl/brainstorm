@@ -3,9 +3,16 @@
 import { createHmac, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const DATA = process.env.CLAUDE_PLUGIN_DATA || join(homedir(), ".rundown");
+// Same folder as the launcher's (launch.mjs pluginDataDir): Claude Code doesn't always pass CLAUDE_PLUGIN_DATA.
+function pluginDataDir(env, pluginRoot, home) {
+  if (env.CLAUDE_PLUGIN_DATA) return env.CLAUDE_PLUGIN_DATA;
+  const m = /^(.*[\\/]plugins)[\\/]cache[\\/]([^\\/]+)[\\/]([^\\/]+)[\\/][^\\/]+[\\/]?$/.exec(pluginRoot);
+  return m ? join(m[1], "data", `${m[3]}-${m[2]}`) : join(home, ".rundown");
+}
+const DATA = pluginDataDir(process.env, process.env.CLAUDE_PLUGIN_ROOT || resolve(dirname(fileURLToPath(import.meta.url)), ".."), homedir());
 
 async function main() {
   let input = "";

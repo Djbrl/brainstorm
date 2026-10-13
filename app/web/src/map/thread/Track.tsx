@@ -107,8 +107,8 @@ const Moments = memo(function Moments({ beats, from, last, index, rowH, onPick, 
 });
 
 export function Track() {
-  const { thread: openThread } = useNavState();
-  const { setReplayIndex, setReplayPlaying, setReplayDetail, openStep } = useNavActions();
+  const { thread: openThread, step: openStepId } = useNavState();
+  const { setReplayIndex, setReplayPlaying, setReplayDetail, openStep, closeStep } = useNavActions();
   const cursor = useReplayCursor();
   const thread = useThread(openThread?.sessionId ?? null, openThread?.detail ?? "light");
   const sid = openThread?.sessionId ?? null;
@@ -125,7 +125,8 @@ export function Track() {
   const len = thread.beats.length;
   return (
     <TrackList thread={thread} sessionId={openThread.sessionId} whoOf={whoOf} index={Math.min(cursor.index, Math.max(0, len - 1))} playing={!!cursor.playing}
-      full={openThread.detail === "full"} setReplayIndex={setReplayIndex} setReplayPlaying={setReplayPlaying} setReplayDetail={setReplayDetail} openStep={openStep} />
+      full={openThread.detail === "full"} setReplayIndex={setReplayIndex} setReplayPlaying={setReplayPlaying} setReplayDetail={setReplayDetail} openStep={openStep}
+      openStepId={openStepId} closeStep={closeStep} />
   );
 }
 
@@ -139,10 +140,13 @@ type TrackProps = {
   thread: Thread; sessionId: string; whoOf: (b: Beat) => Who | undefined; index: number; playing: boolean; full: boolean;
   setReplayIndex: (i: number | ((prev: number) => number)) => void; setReplayPlaying: (p: boolean) => void;
   setReplayDetail: (d: "light" | "full") => void; openStep: (sessionId: string, stepId: string) => void;
+  /** The step whose details are open (a click on its row again closes them), and how to close them. */
+  openStepId: string | null; closeStep: () => void;
 };
 
 /** The list itself. Memoised: a live message that doesn't change this thread or its cursor leaves it alone. */
-const TrackList = memo(function TrackList({ thread, sessionId, whoOf, index, playing, full, setReplayIndex, setReplayPlaying, setReplayDetail, openStep }: TrackProps) {
+const TrackList = memo(function TrackList({ thread, sessionId, whoOf, index, playing, full, setReplayIndex, setReplayPlaying, setReplayDetail, openStep, openStepId, closeStep }: TrackProps) {
+  const openStepRef = useRef(openStepId); openStepRef.current = openStepId;
   const threadRef = useRef(thread); threadRef.current = thread;
   const afterRef = useRef<HTMLSpanElement>(null);   // where Skip past the steps lands
   const [rowH, setRowH] = useState(ROW_H);
@@ -197,14 +201,16 @@ const TrackList = memo(function TrackList({ thread, sessionId, whoOf, index, pla
   });
   const { release } = scroll;
 
-  // A moment opens in the side panel (a summary, on the agent's own words).
+  // A moment opens in the side panel (a summary, on the agent's own words); a click on the open one closes it again.
   const onPick = useCallback((i: number) => {
     setReplayPlaying(false); setReplayIndex(i); release();
     const beat = threadRef.current?.beats[i];
     if (!beat) return;
     const words = beat.kind === "summary" ? [...beat.steps].reverse().find((s) => s.kind === "text" && s.text?.trim()) : undefined;
-    openStep(sessionId, (words ?? beat.step).id);
-  }, [setReplayIndex, setReplayPlaying, openStep, sessionId, release]);
+    const id = (words ?? beat.step).id;
+    if (openStepRef.current === id) closeStep();
+    else openStep(sessionId, id);
+  }, [setReplayIndex, setReplayPlaying, openStep, closeStep, sessionId, release]);
 
   const onRowH = useCallback((h: number) => setRowH(h), []);
 

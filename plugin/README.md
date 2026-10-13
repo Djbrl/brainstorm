@@ -2,7 +2,7 @@
 
 A live map and replay of what your agents do: every session, every file and place they touch, what broke. Everything runs on your machine.
 
-Preview release (0.9.0). The full release is planned for late October 2026.
+Preview release (0.9.1). The full release is planned for late October 2026.
 
 - **Map:** your project's files as a graph, with what changed since you last looked. Each agent is a marker that moves to the file it's working on. Open a thread to see what it touched first, then its steps or its replay; a running one can be followed live.
 - **Places:** where the thread went outside the code: websites, your local apps, services like GitHub and Vercel, and what it changed there (pushes, deploys, sent forms). Click a place to read its step.

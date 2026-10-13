@@ -10,7 +10,7 @@ Rundown was called Brainstorm until October 2026 (the plugin was renamed in 0.5;
 
 AI agents make it easy to stop understanding your own work. Rundown runs next to Claude Code and shows what the agents did, where, and why, so a human stays in the loop. Every session becomes a replay you can watch live or catch up on later, for code and for work that isn't code.
 
-Rundown is a preview (version 0.9.0). The full release is planned for late October 2026.
+Rundown is a preview (version 0.9.1). The full release is planned for late October 2026.
 
 ## Install (Claude Code plugin, preview)
 

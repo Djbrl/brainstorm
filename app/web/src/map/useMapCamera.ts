@@ -114,7 +114,10 @@ export function useMapCamera({ cam, camRef, replayCam, nodeIndex, nodeIndexRef, 
     let raf = 0, framedAt = 0;
     const tick = () => {
       const st = anim.current.get(followId), c = camRef.current, now = performance.now();
-      if (st) {
+      // An open thread's marker on the map (the replay, live or not) has the camera (thread/follow.ts): the agent's own
+      // spot can be elsewhere (where its hooks last put it, a read beside its step), and two follows took turns, the
+      // map jumping between the two about every second.
+      if (st && !replayRef.current.tracing) {
         if (!framedAt) { framedAt = now; c.lookAt(st.x, st.y, zoomFor(st.file, c), 700); }
         else if (getCameraLock()) { if (now - framedAt > 700) c.easeToward(st.x, st.y, 0.09); }
         else if (c.userAt() < t0 && now - framedAt > 1200 && !c.sees(st.x, st.y, margin(c))) { framedAt = now; c.lookAt(st.x, st.y, smallRef.current ? zoomFor(st.file, c) : undefined, 700); }

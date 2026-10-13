@@ -35,6 +35,7 @@ import { useOpenFolders } from "./useOpenFolders";
 import { useNodeResolver } from "./useNodeResolver";
 import { useMapCamera } from "./useMapCamera";
 import { FollowAgain } from "./FollowAgain";
+import { AgentKeys } from "./AgentKeys";
 import { useLiveAgents } from "./useLiveAgents";
 import { Readmap, trackable } from "./Readmap";
 import { useAutoTrack } from "./autoTrack";
@@ -313,6 +314,7 @@ export function MapView() {
       <FileWindow />
       <Dock />
       <FollowAgain show={taken} bottom={cam.safe.current.bottom} onClick={followAgain} />
+      {hasNodes && <AgentKeys agents={tracks} anim={anim} cam={camRef} onFollow={follow} onHover={setHover} />}
 
       <StepPanel />
     </div>

@@ -253,8 +253,10 @@ export function drawAgents(opts: {
       // Eased in fractions and rounded only for the CSS string: rounding each frame would stall a channel a few
       // units short of its target (the step is ~0.1 at 60 fps), and the map would keep redrawing for nothing.
       if (st.col) easeRGB(st.col, want, f); else st.col = [want[0], want[1], want[2]];
-      st.thinkA = toward(st.thinkA ?? (thinks ? 1 : 0), thinks ? 1 : 0, f);
-      st.waitA = toward(st.waitA ?? (waiting?.has(a.id) ? 1 : 0), waiting?.has(a.id) ? 1 : 0, f);
+      // One ring at a time, by what matters most: red (failed), then amber (needs you), then the thinking breath.
+      const ringWait = !erring && !!waiting?.has(a.id), ringThink = !erring && !ringWait && thinks;
+      st.thinkA = toward(st.thinkA ?? (ringThink ? 1 : 0), ringThink ? 1 : 0, f);
+      st.waitA = toward(st.waitA ?? (ringWait ? 1 : 0), ringWait ? 1 : 0, f);
       st.easing = !same(st.col, want) || (st.thinkA > 0 && st.thinkA < 1) || (st.waitA > 0 && st.waitA < 1);
       const r0 = Math.round(st.col[0]), g0 = Math.round(st.col[1]), b0 = Math.round(st.col[2]), mk = (r0 << 16) | (g0 << 8) | b0;
       if (st.markKey !== mk || !st.markCss) { st.markKey = mk; st.markCss = `rgb(${r0},${g0},${b0})`; }
@@ -330,8 +332,8 @@ export function drawAgents(opts: {
         ctx.beginPath(); ctx.arc(n.x, n.y, n.r + 4 / scale, 0, Math.PI * 2); ctx.stroke();
       }
 
-      // A search or command without a file: one short pulse on the marker.
-      drawPulse(ctx, st.x, st.y, (t - st.pulseT0) / PULSE_MS, 9, 12, color, 1.6, st.alpha * 0.55, scale);
+      // A search or command without a file: one short pulse on the marker (not over another ring).
+      if (!erring && !ringWait && !ringThink) drawPulse(ctx, st.x, st.y, (t - st.pulseT0) / PULSE_MS, 9, 12, color, 1.6, st.alpha * 0.55, scale);
 
       // A failed tool call: one red ring, wider than the activity pulse.
       drawPulse(ctx, st.x, st.y, (t - st.errT0) / ERR_PULSE_MS, 10, 26, ERROR_RED, 2.4, st.alpha * 0.8, scale);

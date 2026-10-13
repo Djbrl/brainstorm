@@ -35,7 +35,7 @@ export type GNode = {
   // Kept per file between frames (perf-canvas): its colour, its focus look this frame, its cube's turn.
   cAt?: string; cMs?: number; cEp?: number; c?: RGB; css?: string;
   // Transitions (drawNode.ts): the colour it had when it changed and since when; how much its "editing now" ring shows.
-  cFrom?: RGB; cT0?: number; ringA?: number; ringT?: number;
+  cFrom?: RGB; cT0?: number;
   /** On an island (outside the project): an open thread's focus doesn't dim it. */
   isle?: boolean;
   lf?: number; lk?: Look | null;

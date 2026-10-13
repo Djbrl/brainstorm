@@ -110,7 +110,6 @@ export const lookOf = (n: GNode, F: Frame): Look | null => {
 
 /** A file's own colour (when anyone last changed it), cached on the node. */
 const COLOUR_MS = 450;   // a file changing colour (an edit lands: grey to orange) eases over this
-const RING_EASE = 0.12;  // seconds for the "editing now" ring to (nearly) fade in or out
 const ownColour = (n: GNode, F: Frame) => {
   if (n.cAt !== n.file.lastChangedAt || n.cEp !== F.epoch || !n.c) {
     const was = n.c, edited = n.cAt !== undefined && n.cAt !== n.file.lastChangedAt;
@@ -130,14 +129,6 @@ function easedColour(n: GNode, F: Frame): RGB | undefined {
   if (k >= 1) { n.cFrom = undefined; return undefined; }
   moreMotion(F, Motion.Smooth);
   return mixRGB(n.cFrom, n.c!, 1 - (1 - k) ** 3);
-}
-/** How much the "editing now" ring shows (0…1), easing toward on or off; keeps frames coming while it moves. */
-function ringOf(n: GNode, on: boolean, F: Frame): number {
-  const target = on ? 1 : 0, a = n.ringA ?? target, dt = Math.min(0.1, Math.max(0, (F.t - (n.ringT ?? F.t)) / 1000));
-  n.ringT = F.t;
-  const next = Math.abs(target - a) < 0.01 ? target : a + (target - a) * (1 - Math.exp(-dt / RING_EASE));
-  if (next !== target) moreMotion(F, Motion.Smooth);
-  return (n.ringA = next);
 }
 /** The focus's colour for a time the thread changed a file (or the quiet colour: undefined). */
 const focusColour = (edited: string | undefined, F: Frame, m: Caches["focusColours"]) => {
@@ -236,7 +227,7 @@ export function drawFile(ctx: CanvasRenderingContext2D, n: GNode, scale: number,
   ctx.globalAlpha = alpha;
   const plain = st.node !== "dot"; // themed files stay plain: no ripple or outlines, one mark where an agent is
 
-  // An edit lands: one ripple, once. While the file stays active: a steady outline, no motion.
+  // An edit lands: one ripple, once, and no ring after it (rings are the agents': failed, needs you, thinking).
   const rippleStart = c.ripples.get(n.id);
   let rippling = false;
   if (rippleStart !== undefined) {
@@ -256,16 +247,6 @@ export function drawFile(ctx: CanvasRenderingContext2D, n: GNode, scale: number,
         ctx.globalAlpha = alpha;
       }
     }
-  }
-  const ringA = plain ? 0 : ringOf(n, active, F);
-  if (ringA > 0.01) {
-    ctx.beginPath();
-    ctx.arc(x, y, r + 3.5 / scale, 0, TAU);
-    ctx.strokeStyle = tokens.accent;
-    ctx.globalAlpha = 0.9 * alpha * ringA;
-    ctx.lineWidth = 1.6 / scale;
-    ctx.stroke();
-    ctx.globalAlpha = alpha;
   }
 
   // In a focus, a file takes the focus's colour (when the thread changed it, or the quiet one), not the project's.
@@ -313,11 +294,11 @@ export function drawFile(ctx: CanvasRenderingContext2D, n: GNode, scale: number,
     if (!d) { if (c.dots.size > 512) c.dots.clear(); c.dots.set(key, (d = { css: rgbCss, a, xyr: [] })); }
     d.xyr.push(x, y, r);
   }
-  if (isSel || isHover || (active && !plain)) {
+  if (isSel || isHover) {   // the file you picked or point at: a thin outline in ink, never an agent's ring
     ctx.beginPath();
     ctx.arc(x, y, st.node === "dot" ? r : r * 1.35 + 2 / scale, 0, TAU);
-    ctx.lineWidth = (isSel ? 2.4 : 1.4) / scale;
-    ctx.strokeStyle = active ? tokens.accent : tokens.ink;
+    ctx.lineWidth = (isSel ? 1.3 : 1) / scale;
+    ctx.strokeStyle = tokens.ink;
     ctx.stroke();
   }
 
@@ -345,15 +326,15 @@ const FOLDER_TEXT_PX = 15;
  */
 function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: Frame, c: Caches, shown: number) {
   const x = n.x!, y = n.y!, r = n.r, tokens = F.tokens, st = F.st, open = n.open ?? 1;
-  // A closed folder stands in for files too small to see: it keeps their blue ring (only the outermost closed one is drawn).
   const active = !!n.file.activeSessionId, isSel = n.id === F.sel, isHover = n.id === F.hover;
   const look = lookOf(n, F);
   if (look) { F.anyLook = true; F.lookSum += look.alpha * 3 + look.tone; }
   // A thread's focus dims folders less than files: they're the lay of the land around what it did.
   const dim = (look ? 0.5 + 0.5 * look.alpha : 1), alpha = dim * shown;
-  // An island (files outside the project, lib/islands.ts): its outline dashed, like a coast seen from afar.
+  // An island (files outside the project, lib/islands.ts): a soft tint of the accent inside its outline, so it reads as
+  // another place. Not dashed: dashes and dots on the map mean only "read".
   const isle = !!n.dir!.more || (!!n.dir!.island && n.dir!.rel === n.dir!.island);   // the island's own outline, not its folders'
-  if (isle) ctx.setLineDash([5 / scale, 4 / scale]);
+  if (isle && open > 0) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.globalAlpha = alpha * open * 0.07; ctx.fillStyle = tokens.accent; ctx.fill(); }
   // Open: the outline, and a breath of fill so folders inside folders read as levels.
   const zones = !!st.zoneInk && !isle;
   if (open > 0 && zones) {
@@ -369,7 +350,7 @@ function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: F
     ctx.strokeStyle = tokens.ink; ctx.stroke();
   }
   const closed = alpha * (1 - open);
-  if (closed <= 0.01) { ctx.globalAlpha = 1; if (isle) ctx.setLineDash([]); return; }
+  if (closed <= 0.01) { ctx.globalAlpha = 1; return; }
   const own = ownColour(n, F), eased = easedColour(n, F);
   let rgbCss = eased ? css(eased) : own.css!;
   if (look && look.tone >= 1) rgbCss = focusColour(look.edited, F, c.focusColours).css;
@@ -377,14 +358,11 @@ function drawFolder(ctx: CanvasRenderingContext2D, n: GNode, scale: number, F: F
   // Metro: a white roundel ringed in its folder's colour, like a terminus; elsewhere a tint of the folder's colour.
   const metro = st.node === "station", line = lineOf(n, st);
   if (metro) { ctx.globalAlpha = closed * 0.94; ctx.fillStyle = "#fff"; ctx.fill(); if (!same(own.c!, tokens.cool)) { ctx.globalAlpha = closed * 0.22; ctx.fillStyle = rgbCss; ctx.fill(); } }
-  else { ctx.globalAlpha = closed * (isHover ? 0.24 : 0.16); ctx.fillStyle = rgbCss; ctx.fill(); }
+  else { ctx.globalAlpha = closed * (isHover ? 0.24 : 0.16); ctx.fillStyle = rgbCss; ctx.fill(); if (isle) { ctx.globalAlpha = closed * 0.1; ctx.fillStyle = tokens.accent; ctx.fill(); } }
   ctx.globalAlpha = closed * (isHover || isSel || line ? 0.9 : 0.5);
   ctx.lineWidth = (line ? 2.6 : isHover || isSel ? 1.8 : 1.2) / scale;
-  ctx.strokeStyle = active ? tokens.accent : line ?? (isHover || isSel ? tokens.ink : rgbCss);
+  ctx.strokeStyle = line ?? (isHover || isSel ? tokens.ink : rgbCss);   // no blue ring for the edits inside: a change pulses once
   ctx.stroke();
-  if (isle) ctx.setLineDash([]);
-  const ringA = ringOf(n, active, F);
-  if (ringA > 0.01) { ctx.beginPath(); ctx.arc(x, y, r + 3.5 / scale, 0, TAU); ctx.globalAlpha = 0.9 * closed * ringA; ctx.lineWidth = 1.6 / scale; ctx.strokeStyle = tokens.accent; ctx.stroke(); }
   ctx.globalAlpha = 1;
   const px = r * scale, count = n.dir!.files.length;
   if (px < FOLDER_TEXT_PX) {

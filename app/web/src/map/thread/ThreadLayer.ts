@@ -251,7 +251,7 @@ export function useThreadLayer({ nodeIndexRef, accent, font, camera, follow, lan
       ctx.fillStyle = halo;
       ctx.beginPath(); ctx.arc(a.x, a.y, 26 / scale, 0, Math.PI * 2); ctx.fill();
 
-      if (s.thinking) { // a slow ring in its colour, swelling and fading, like a live agent's (agents.tsx)
+      if (s.thinking && !failed) { // one ring at a time: red wins. A slow ring in its colour, swelling and fading, like a live agent's (agents.tsx)
         ringDrawn.current = true;
         drawThinkRing(ctx, a.x, a.y, t, line, 1, scale);
       }

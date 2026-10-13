@@ -15,7 +15,7 @@ export const STEP_WINDOWS: { id: StepWindow; name: string }[] = [
 
 const onOff = (on: boolean) => (on ? "1" : "0");
 const stepWindow = createAtom<StepWindow>(15, { key: "rundown-map-window", parse: (v) => (v === "50" ? 50 : v === "all" ? "all" : 15) });
-const lock = createAtom(false, { key: "rundown-camera-lock", parse: (v) => v === "1", serialize: onOff });
+const lock = createAtom(true, { key: "rundown-camera-lock", parse: (v) => v !== "0", serialize: onOff });   // on unless turned off
 const peek = createAtom(true, { key: "rundown-map-peek", parse: (v) => v !== "0", serialize: onOff });    // on unless turned off
 const mini = createAtom(true, { key: "rundown-readmap-shown", parse: (v) => v !== "0", serialize: onOff }); // on unless turned off
 
@@ -23,7 +23,8 @@ export const getStepWindow = stepWindow.get;
 export const setStepWindow = (w: StepWindow) => stepWindow.set(w);
 export const useStepWindow = stepWindow.use;
 
-/** Locked: the camera keeps the tracer (or the followed agent) centred; unlocked, it frames it once and stays put. */
+/** Locked: the camera keeps the tracer (or the followed agent) centred; unlocked, it frames it once and stays put. Locked
+ *  by default, and again each time a thread opens (useMapCamera.ts); L, or moving the map with the arrow keys, unlocks it. */
 export const getCameraLock = lock.get;
 export const setCameraLock = (on: boolean) => lock.set(on);
 export const useCameraLock = lock.use;

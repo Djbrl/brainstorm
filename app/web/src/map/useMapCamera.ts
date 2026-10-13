@@ -2,7 +2,7 @@
 // files, the open file, a followed agent; again when a panel opens or the window resizes, unless you moved it yourself.
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { ThreadReplay } from "../lib/nav";
-import { getCameraLock } from "./prefs";
+import { getCameraLock, setCameraLock } from "./prefs";
 import type { ThreadLayerApi } from "./thread/ThreadLayer";
 import { boxOf, fitView, type Camera, type ReplayCamera, type View } from "./camera";
 import { useCameraKeys } from "./useCameraKeys";
@@ -162,6 +162,8 @@ export function useMapCamera({ cam, camRef, replayCam, nodeIndex, nodeIndexRef, 
   // thread that loads before the map is framed by the hasNodes effect above). Closing the thread frames the whole project again.
   const openThread = replayActive ? replay?.sessionId : undefined;
   const playing = replay?.mode === "play";
+  // A thread opens with the camera locked on its agent (L unlocks it, as do the arrow keys).
+  useEffect(() => { if (openThread) setCameraLock(true); }, [openThread]);
   useEffect(() => {
     if (openThread) S.hadThread = true;
     else if (!S.hadThread) return;

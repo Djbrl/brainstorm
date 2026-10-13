@@ -7,7 +7,7 @@ import type { AgentPresence } from "@contract";
 import type { ThreadReplay } from "../lib/nav";
 import type { ThreadLayerApi } from "./thread/ThreadLayer";
 import { boxOf, type Box, type Camera, type ReplayCamera, type View } from "./camera";
-import { boxOfPts, frameArea, groupAhead, isCut, shouldMove, viewFor, type P } from "./director";
+import { boxOfPts, DIRECTOR, frameArea, groupAhead, isCut, shouldMove, viewFor, type P } from "./director";
 import { useCameraKeys } from "./useCameraKeys";
 import type { AgentAnim } from "./agents";
 import type { GNode } from "./graph";
@@ -84,9 +84,11 @@ export function useMapCamera({ cam, camRef, replayCam, nodeIndex, nodeIndexRef, 
       return n?.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y } : st ? { x: st.x, y: st.y } : undefined;
     };
     const drawn = agentsRef.current;
-    // A replay (looking back, or a live thread whose agent the map no longer shows): the marker.
+    // A replay (looking back, or a live thread whose agent the map no longer shows): the director knows what comes next.
+    // The marker and the next few moves that fit one framing with it: the camera moves once for a run of nearby edits,
+    // the marker walks through them, and only the marker must stay in the dead zone.
     if (R.tracing && !followRef.current && (!replay?.live || !drawn.length)) {
-      const run = groupAhead(R.ahead(0), s);
+      const run = groupAhead(R.ahead(DIRECTOR.ahead), s);
       const box = boxOfPts(run);
       return box ? { box, markers: [run[0]] } : null;
     }
